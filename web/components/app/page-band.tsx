@@ -2,7 +2,7 @@
 
 import { useRef, type ReactNode } from "react"
 import { motion } from "motion/react"
-import { useBandRepel } from "@/lib/band-repel"
+import { BandChrome } from "@/components/app/band-chrome"
 import { BandArray } from "@/components/app/band-array"
 import { BandLiquid } from "@/components/app/band-liquid"
 import { BandAura } from "@/components/app/band-aura"
@@ -65,12 +65,27 @@ export const SETS: Record<string, string[]> = {
   shapes: [O("star"), O("torus"), O("squiggle"), O("cloud"), O("blob-peri"), O("blob-lime")],
   /** A garment and an abstract, alternating — the product with room around it. */
   mixed: [O("tee"), O("torus"), O("cap"), O("squiggle"), O("socks"), O("blob-lime")],
+  /**
+   * THE RENDERED LIQUIDS — generated, not drawn.
+   *
+   * The CSS pool could never get here and it was not a tuning problem: gradients merged by a
+   * blur cannot produce mirror reflections, dark banding or caustics, and those ARE the
+   * substance of liquid chrome. These are renders (Higgsfield nano_banana_pro, backgrounds
+   * removed with Recraft) at the family's standard framing, so they drop into the same
+   * arrangements, the same drift and the same pointer repulsion as everything else.
+   *
+   * ONE OR TWO OBJECTS, NOT FIVE. A form this detailed is a subject, and five subjects in a
+   * 90px stripe is a crowd — every reference for this look puts ONE on the canvas.
+   */
+  chrome: [O("liquid-chrome")],
+  pearl: [O("liquid-pearl")],
+  liquid: [O("liquid-chrome"), O("liquid-pearl")],
   /** Real blanks, photographed and cut off the studio sweep (tools/cut-blank.py). The quiet
    *  option, and the only set that is a product rather than a render. */
   blanks: ["/ploy/cut/cap.webp", "/ploy/cut/bag.webp", "/ploy/cut/beanie.webp"],
 }
 
-export const DEFAULT_SET = "garments"
+export const DEFAULT_SET = "chrome"
 
 /**
  * THE ARRANGEMENTS.
@@ -145,6 +160,15 @@ export const LAYOUTS: Record<string, BandSlot[]> = {
     { x: 90.5, y: 0, h: 70 },
     { x: 94.0, y: 48, h: 46 },
   ],
+  /** SUBJECT — for the rendered liquids. One form big enough that the band CROPS it, which is
+   *  what makes a render read as a thing in a space rather than an icon dropped on a bar; a
+   *  second, smaller one sits back and left so there is depth rather than a mascot. Sized well
+   *  past 100% on purpose: a detailed object contained politely inside a 90px stripe just
+   *  looks small. */
+  subject: [
+    { x: 79, y: -30, h: 160 },
+    { x: 63, y: 8, h: 84 },
+  ],
   /** HERO — one object big enough to be the subject, three small ones in orbit. */
   hero: [
     { x: 71.0, y: -4, h: 106 },
@@ -155,7 +179,7 @@ export const LAYOUTS: Record<string, BandSlot[]> = {
 }
 
 /** The arrangement every band uses unless it is being compared against another. */
-export const DEFAULT_LAYOUT = "even"
+export const DEFAULT_LAYOUT = "subject"
 
 /**
  * HOW THE OBJECTS MOVE. Each is a pair of CSS rules in globals.css.
@@ -176,15 +200,16 @@ export const DEFAULT_MOTION = "swim"
  *   beads    the same liquid at a finer grain — many small drops
  *   objects  the garment family, floating and draggable
  *   field    a rim-lit array of soft modules with a diagonal wave through it
- *   pool     liquid chrome and lime, merging and pulling apart — THE DEFAULT (owner's call)
+ *   chromefield  a raymarched field of liquid chrome that detaches and recombines — THE ONE
+ *   pool     liquid chrome and lime in CSS — superseded by chromefield
  *
  * The two abstract ones exist because five objects at arm's length from each other read as
  * five items and a lot of gap, however they were sized, spaced or moved — the eye reads the
  * distance between things. A field and a pool are each ONE body: one composition, one motion,
  * and the whole half of the band is used rather than dotted.
  */
-export const FIGURES = ["pool", "beads", "objects", "field", "aura"] as const
-export const DEFAULT_FIGURE = "pool"
+export const FIGURES = ["chromefield", "pool", "beads", "objects", "field", "aura"] as const
+export const DEFAULT_FIGURE = "chromefield"
 
 /**
  * HOW ONE OBJECT SWIMS — an X period, a Y period, and how far it goes on each.
@@ -209,6 +234,19 @@ export const DEFAULT_FIGURE = "pool"
  * edge — and nothing ever heads for the greeting.
  */
 type SwimPath = { sx: string; sy: string; r: string; dx: number; dy: number; ex: number; ey: number }
+/**
+ * A BIG SUBJECT BARELY MOVES, and it must not use the paths above.
+ *
+ * The swim travels ~30cqw — a third of the band — which is right for a shoal of small objects
+ * and catastrophic for one large one: the rendered chrome spent half its cycle entirely past
+ * the right edge, so the band looked EMPTY at random and full at random, which reads as a
+ * broken image rather than as motion. Mass should move less, not more.
+ */
+const SWIM_CALM: SwimPath[] = [
+  { sx: "4cqw", sy: "-7%", r: "2.5deg", dx: 14, dy: 9, ex: -2, ey: -5 },
+  { sx: "-6cqw", sy: "-10%", r: "-3deg", dx: 11, dy: 7.5, ex: -6, ey: -1 },
+]
+
 const SWIM: SwimPath[] = [
   { sx: "30cqw", sy: "-9%", r: "6deg", dx: 9.0, dy: 5.0, ex: -3, ey: -4 },
   { sx: "23cqw", sy: "-11%", r: "-5deg", dx: 11.0, dy: 6.5, ex: -7, ey: -1.5 },
@@ -251,9 +289,6 @@ function FloatingObject({
         * and it is also what makes the two axes run on different clocks, which is the whole
         * difference between drifting and bouncing.
         */}
-      {/* One more nesting level, and the same rule as everywhere else: this span owns the
-          pointer's shove and nothing else, so it cannot fight the swim or the drag. */}
-      <span className="eg-repel block size-full">
       <span
         className="eg-band-swim block size-full"
         style={{
@@ -279,7 +314,6 @@ function FloatingObject({
             "--swim-y-delay": `${o.swim.ey}s`,
           } as React.CSSProperties}
         />
-      </span>
       </span>
     </motion.div>
   )
@@ -309,10 +343,6 @@ export function PageBand({
   figure?: (typeof FIGURES)[number]
 }) {
   const band = useRef<HTMLDivElement>(null)
-  /* Every figure answers the pointer the same way: whatever carries `.eg-repel` gets out of
-     its path. Attached to the BAND, so the shove reaches across the whole stripe rather than
-     starting when you enter some inner box. */
-  useBandRepel(band, { radius: 240, strength: 92 })
   /*
    * A SHORT SET TAKES FEWER SLOTS — it does not wrap.
    *
@@ -324,6 +354,8 @@ export function PageBand({
    */
   const objects = SETS[set] ?? SETS[DEFAULT_SET]
   const slots = (LAYOUTS[layout] ?? LAYOUTS[DEFAULT_LAYOUT]).slice(0, objects.length)
+  /* One large form gets the calm paths; a field of small ones gets the wide ones. */
+  const paths = layout === "subject" ? SWIM_CALM : SWIM
 
   return (
     <div
@@ -343,7 +375,7 @@ export function PageBand({
       </div>
       {children}
 
-      {figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "beads" ? <BandLiquid dense /> : figure === "aura" ? <BandAura /> : (
+      {figure === "chromefield" ? <BandChrome /> : figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "beads" ? <BandLiquid dense /> : figure === "aura" ? <BandAura /> : (
       /*
         * THE LAYER IS THE WHOLE BAND, not the right 40%.
         *
@@ -361,7 +393,7 @@ export function PageBand({
         className="pointer-events-none absolute inset-0 -z-10 hidden select-none sm:block"
       >
         {slots.map((slot, i) => (
-          <FloatingObject key={i} o={{ ...slot, src: objects[i], swim: SWIM[i % SWIM.length] }} bounds={band} />
+          <FloatingObject key={i} o={{ ...slot, src: objects[i], swim: paths[i % paths.length] }} bounds={band} />
         ))}
       </div>
       )}

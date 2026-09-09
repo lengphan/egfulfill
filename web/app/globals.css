@@ -1934,9 +1934,13 @@ td[align="right"] {
    a beat is what makes ambient motion read as a mechanism.
 
    THE FILTER IS THE EXPENSIVE PART. It repaints a blurred region every frame, so
-   it is scoped to the band's right half, capped at seven drops, and the blur stays
-   at 9 — big enough to merge, small enough not to cost a compositor pass on a
-   header that is on screen all day. */
+   the drop count is capped and the blur is as small as will still fuse them.
+
+   AND IT HAS A CEILING BEFORE IT STARTS DELETING THINGS. The alpha ramp cuts
+   anything whose blurred alpha lands under about 0.4; widen the blur and a drop's
+   own peak falls under that on its own, so at stdDeviation 16 five of the seven
+   lobes simply were not drawn — the band looked half empty and nothing in the DOM
+   said why. The blur and the ramp are one setting, not two. */
 /* THE WRAP IS THE WHOLE BAND, and the drops simply live in its right half. Clipping it to
    the right 50% put a hard vertical edge through the leftmost drop — an invisible box cutting
    a liquid, which is the one thing a liquid must never do. The band's own overflow and radius
@@ -1952,16 +1956,21 @@ td[align="right"] {
 .eg-pool {
   position: absolute;
   inset: -18% -6%;
-  filter: url(#eg-goo);
+  /* The url() is written at the call site: the grain of the liquid decides the blur, and a
+     blur that fuses large lobes erases small beads. */
   will-change: filter;
 }
 .eg-pool-slot {
   position: absolute;
-  aspect-ratio: 1;
-  /* The slot is centred on its coordinate AND takes the repulsion; both are transform, and
-     one element may own the property once, so they are written together here. */
-  transform: translate(-50%, -50%) translate3d(var(--rx, 0px), var(--ry, 0px), 0);
-  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* WIDTH AND HEIGHT, BOTH STATED, both in cqh so the drop stays round. It was `aspect-ratio`
+     with only a height, and the width that derives from that is not known when the filter
+     first computes its region — so Chrome cached a region from a row of 0-width boxes and
+     then drew only the drops that happened to fall inside it. Half the pool was missing on
+     load and complete after any change that invalidated the filter, which is exactly the kind
+     of bug that looks like "sometimes it works". */
+  width: var(--s);
+  height: var(--s);
+  transform: translate(-50%, -50%);
 }
 .eg-pool-drop {
   position: absolute;
@@ -2048,20 +2057,35 @@ td[align="right"] {
   html:not([data-force-motion]) .eg-aura-layer { animation: none; }
 }
 
-/* ── REPULSION — the band's figure gets out of the pointer's way ───────────────
-   The offset is written as two custom properties by lib/band-repel.ts; this is
-   the only thing that reads them. The element owns `transform` and NOTHING else
-   in the file may touch it — every figure nests one of these inside or outside
-   its animated parts for exactly that reason.
 
-   The transition is the whole feel: 420ms out of a soft ease means the shove
-   lands with a little weight and the return drifts rather than snapping, and when
-   the pointer leaves the handler simply stops writing, so the transition carries
-   everything home with no loop left running. */
-.eg-repel {
-  transform: translate3d(var(--rx, 0px), var(--ry, 0px), 0);
-  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+/* ── THE BAND'S CHROME FIELD — a live WebGL surface ────────────────────────────
+   The canvas holds the band's right half. It is drawn at HALF resolution and
+   stretched back by CSS: at this size the field is soft, nobody can see the
+   difference, and it quarters the fragment count — which is what makes a shader
+   affordable on a header that is open all day.
+
+   pointer-events stay ON here, unlike every other figure this band has had: the
+   surface parts around the cursor, so it has to know where the cursor is. It sits
+   behind the type (-z-10 on the wrapper's stacking context) so a long name still
+   wins. */
+.eg-chrome-wrap {
+  position: absolute;
+  inset: 0 0 0 46%;
+  display: none;
+  overflow: hidden;
 }
-@media (prefers-reduced-motion: reduce) {
-  .eg-repel { transition: none; }
+@media (min-width: 640px) { .eg-chrome-wrap { display: block; } }
+.eg-chrome-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* Only the FALLBACK still is fitted — the canvas must fill its box, because the shader is
+   already doing the aspect maths and object-fit would letterbox a frame it drew correctly. */
+.eg-chrome-still {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
 }
