@@ -1011,10 +1011,21 @@ export default function OrderDetailPage() {
    * up. Only a fully covered line is marked; a partly covered one is still owed something and
    * must not read as settled.
    *
-   * IT CANNOT DISAPPEAR, and that is deliberate. Both movements happened — the wallet went
-   * down and came back up — and the seller's statement shows both. A summary that hid them
-   * would disagree with the wallet the seller can open in the next tab, and two screens
-   * disagreeing about money is worse than a line that reads as settled.
+   * A FULLY REVERSED ADJUSTMENT IS NOT SHOWN HERE (owner's call, asked twice). It was struck
+   * through first, on the argument that hiding a movement makes this card disagree with the
+   * wallet. The counter-argument is the stronger one: this card answers WHAT THIS ORDER
+   * COSTS, and an adjustment that was charged and sent back contributes nothing to that. Six
+   * struck-out rows are six things to read past to find the four that are still true.
+   *
+   * NOTHING IS HIDDEN THAT IS NOT ALSO RECORDED. Both movements stay in wallet_ledger, on the
+   * seller's statement, and in Order history with who pressed it and when — which is where
+   * "what happened to this order" is answered, and where it is answered better than a struck
+   * line ever did.
+   *
+   * AND THE TOTALS STILL RECONCILE, which is what makes this safe rather than cosmetic:
+   * hiding a reversed pair drops an equal charge and refund, so the rows on screen still sum
+   * to Seller paid. `claimed` is subtracted from the refunded row for exactly that reason —
+   * shown charges minus shown refunds equals charged minus refunded, which is netCost.
    */
  const reversedLines = (() => {
  let left = (charges?.parts ?? []).find((p) => p.key === "fee")?.refunded ?? 0
@@ -1033,21 +1044,17 @@ export default function OrderDetailPage() {
  const chargedRows = (
     <>
                     {(charges?.lines ?? []).map((l, i) => (
+                      reversedLines.marked.has(i) ? null : (
                       <div key={`${l.part}-${i}`} className="flex justify-between">
                         <dt className="text-muted-foreground">
                           {l.label}
                           {l.note && <span className="opacity-70"> · {l.note}</span>}
-                          {/* The row says it was undone, so the money below does not have to
-                              be explained twice. */}
-                          {reversedLines.marked.has(i) && <span className="opacity-70"> · reversed</span>}
                         </dt>
                         {/* A deduction reads as one: same minus and same green as the quote,
                             so the row a seller checks looks identical either side of the
                             charge. */}
                         <dd className="flex items-center gap-2">
-                          <span className={"tabular-nums "
-                            + (reversedLines.marked.has(i) ? "text-muted-foreground line-through " : "")
-                            + (l.amount < 0 ? "text-success" : "")}>
+                          <span className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
                             {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
                           </span>
                           {/* AFTER THE FIGURE, and a mark rather than a word. "Reverse" ahead
@@ -1057,7 +1064,7 @@ export default function OrderDetailPage() {
                               up and the action reads as belonging to the row it is on.
                               Staff only, adjustments only, and only while that part still has
                               room to send back — so it cannot be pressed twice. */}
-                          {isStaff && l.part === "fee" && l.amount > 0 && !reversedLines.marked.has(i) && (charges?.parts ?? []).some((p) => p.key === "fee" && p.refundable >= l.amount - 0.005) && (
+                          {isStaff && l.part === "fee" && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === "fee" && p.refundable >= l.amount - 0.005) && (
                             <button
                               type="button"
                               onClick={() => void reverseFee(l, `${l.part}-${i}`)}
@@ -1073,6 +1080,7 @@ export default function OrderDetailPage() {
                           )}
                         </dd>
                       </div>
+                      )
                     ))}
                     {/* EVERYTHING ELSE SENT BACK. Reversals are already shown on the rows
                         they cancelled, so counting them here too would report the same money
