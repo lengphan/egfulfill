@@ -110,6 +110,7 @@ function MotionState() {
 
 const NOTES: Record<string, string> = {
   even: "one size, evenly spaced — the default",
+  subject: "one big rendered form, cropped by the band",
   shelf: "one baseline, sizes vary",
   arc: "a curve lifting off the right edge",
   bunch: "one mass in the corner, overlapping",
@@ -135,6 +136,11 @@ const MOTION_NOTES: Record<string, string> = {
 }
 
 const SET_NOTES: Record<string, string> = {
+  balloon: "one blown-up chrome balloon, big and cropped",
+  balloonperi: "the same, in periwinkle and lime",
+  chrome: "the rendered liquid chrome, alone",
+  pearl: "the rendered inflated pearl, alone",
+  liquid: "both renders — chrome leading, pearl behind",
   shapes: "six abstract forms, nothing repeated",
   garments: "what we make, inflated — tee, cap, beanie, shorts, varsity, hoodie",
   mixed: "a garment and an abstract, alternating",
@@ -148,9 +154,28 @@ function Column({ dark }: { dark: boolean }) {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           {dark ? "Dark" : "Light"}
         </p>
-        <p className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Figures — what fills the empty half</p>
-        <p className="text-xs text-muted-foreground">Every figure repels the pointer — move across a band to see it.</p>
-        {FIGURES.map((f) => (
+        <p className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Rendered liquids — generated, not drawn
+        </p>
+        {["balloon", "balloonperi", "chrome", "pearl"].map((key) => (
+          <div key={key} className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              <span className="font-semibold text-foreground">{key}</span> — {SET_NOTES[key]}
+            </p>
+            <PageBand
+              set={key}
+              figure="objects"
+              layout="subject"
+              title="Good afternoon, Linh"
+              sub={<><span className="font-medium text-[var(--mk-acid)]">5</span> new today</>}
+            />
+          </div>
+        ))}
+
+        <p className="pt-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Drawn figures — CSS, for comparison
+        </p>
+        {FIGURES.filter((f) => f !== "objects").map((f) => (
           <div key={f} className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">
               <span className="font-semibold text-foreground">{f}</span> — {FIGURE_NOTES[f]}
@@ -178,13 +203,16 @@ function Column({ dark }: { dark: boolean }) {
         ))}
 
         <p className="pt-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sets — in the default arrangement</p>
-        {Object.keys(SETS).map((key) => (
+        {Object.keys(SETS).filter((k) => !["chrome", "pearl", "liquid"].includes(k)).map((key) => (
           <div key={key} className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">
               <span className="font-semibold text-foreground">{key}</span> — {SET_NOTES[key]}
             </p>
             <PageBand
               set={key}
+              figure="objects"
+              /* The renders are subjects, so they take the arrangement built around one big
+                 object; the flat sets keep the even row. */
               layout={DEFAULT_LAYOUT}
               title="Good afternoon, Linh"
               sub={<><span className="font-medium text-[var(--mk-acid)]">5</span> new today</>}

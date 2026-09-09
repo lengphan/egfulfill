@@ -77,6 +77,11 @@ export const SETS: Record<string, string[]> = {
    * ONE OR TWO OBJECTS, NOT FIVE. A form this detailed is a subject, and five subjects in a
    * 90px stripe is a crowd — every reference for this look puts ONE on the canvas.
    */
+  /* ONE BLOWN-UP BALLOON, big enough that the band crops it — the figure you can grab and
+     throw about. Sized past the band's height on purpose: a form contained politely inside a
+     90px stripe reads as an icon, and this is meant to be an object in the space. */
+  balloon: [O("balloon-chrome")],
+  balloonperi: [O("balloon-peri")],
   chrome: [O("liquid-chrome")],
   pearl: [O("liquid-pearl")],
   liquid: [O("liquid-chrome"), O("liquid-pearl")],
@@ -85,7 +90,7 @@ export const SETS: Record<string, string[]> = {
   blanks: ["/ploy/cut/cap.webp", "/ploy/cut/bag.webp", "/ploy/cut/beanie.webp"],
 }
 
-export const DEFAULT_SET = "chrome"
+export const DEFAULT_SET = "balloon"
 
 /**
  * THE ARRANGEMENTS.
@@ -166,8 +171,8 @@ export const LAYOUTS: Record<string, BandSlot[]> = {
    *  past 100% on purpose: a detailed object contained politely inside a 90px stripe just
    *  looks small. */
   subject: [
-    { x: 79, y: -30, h: 160 },
-    { x: 63, y: 8, h: 84 },
+    { x: 76, y: -58, h: 216 },
+    { x: 62, y: 2, h: 96 },
   ],
   /** HERO — one object big enough to be the subject, three small ones in orbit. */
   hero: [
@@ -200,7 +205,11 @@ export const DEFAULT_MOTION = "swim"
  *   beads    the same liquid at a finer grain — many small drops
  *   objects  the garment family, floating and draggable
  *   field    a rim-lit array of soft modules with a diagonal wave through it
- *   chromefield  a raymarched field of liquid chrome that detaches and recombines — THE ONE
+ *   chromefield  a raymarched field of liquid chrome. Built, and rejected on sight: the
+ *                procedural environment renders muddy brown at band size and the forms read
+ *                small and cheap next to the generated stills. Kept behind the prop, not the
+ *                default — a live shader is only worth it if it beats a picture, and it does
+ *                not yet.
  *   pool     liquid chrome and lime in CSS — superseded by chromefield
  *
  * The two abstract ones exist because five objects at arm's length from each other read as
@@ -209,7 +218,7 @@ export const DEFAULT_MOTION = "swim"
  * and the whole half of the band is used rather than dotted.
  */
 export const FIGURES = ["chromefield", "pool", "beads", "objects", "field", "aura"] as const
-export const DEFAULT_FIGURE = "chromefield"
+export const DEFAULT_FIGURE = "objects"
 
 /**
  * HOW ONE OBJECT SWIMS — an X period, a Y period, and how far it goes on each.
