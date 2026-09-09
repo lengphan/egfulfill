@@ -17,9 +17,9 @@ import { FaceTile } from "@/components/app/face-tile"
 import { TabBar } from "@/components/app/tab-bar"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-picker"
-import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
-import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
+import { resolveProduct, mockupFaces, isEmbroidery, offeredSides, setTypeMockups } from "@/lib/variant-resolve"
 import { printZoneOf, printSizeOf, outsideZone, fitToZone } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
 import { useIsNarrow } from "@/lib/use-narrow"
@@ -988,32 +988,61 @@ export function DesignCanvasDialog({
   }, [item, variantPatch])
 
  const product = useMemo(() => resolveProduct(liveItem, catalog ?? []), [liveItem, catalog])
+  /**
+   * THE CATEGORY SPECS, so `offeredSides` can answer confidently.
+   *
+   * A product's own `sides` needs nothing loaded, but most products do not state them and
+   * fall back to their TYPE — and the type table lives in platform settings, in a module map
+   * that is empty until somebody fills it. This screen opens from the boards, where nothing
+   * else had loaded it, so without this every line would look like a product whose category
+   * nobody has configured and keep the padded four.
+   *
+   * `typesLoaded` is what makes the faces recompute when they land: setTypeMockups writes a
+   * module variable, which React cannot see on its own. Fetched once on mount, depending on
+   * nothing it writes (CLAUDE.md §2.8).
+   */
+ const [typesLoaded, setTypesLoaded] = useState(false)
+ useEffect(() => {
+ const t = setTimeout(() => {
+ getProductTypes().then((rows) => { setTypeMockups(rows ?? []); setTypesLoaded(true) }).catch(() => {})
+    }, 0)
+ return () => clearTimeout(t)
+  }, [])
  const faces = useMemo(() => {
  const f = mockupFaces(product, liveItem.color)
  const base = f.length ? f : (liveItem.img ? [{ side: "front", url: liveItem.img }] : [])
     /*
-     * THE STANDARD SURFACES ARE ALWAYS ON OFFER — owner's call, 2026-09-07.
+     * THE PRODUCT DECIDES WHICH FACES ARE ON OFFER (owner's call, 2026-09-09).
      *
-     * The pills only appeared when the PRODUCT declared per-side mockups, and most do not:
-     * an apron, a cap, a tote with one photo got a single "front" face and no pills at
-     * all, so there was no way to put a second position on it from here even though the
-     * server has stored one artwork per side for weeks. "No surfaces in the designer" was
-     * exactly that — the surfaces were gated on staff having uploaded a back photo.
+     * This padded in four standard faces — front, back, left, right — for every line,
+     * whatever the blank was. That was itself a fix (2026-09-07): the pills used to appear
+     * only when a product declared per-side MOCKUPS, and most do not, so an apron, a cap or
+     * a tote with one photo got a single "front" and no way to place a second position at
+     * all. Padding solved that and overshot: a duffel offering Front/Back on its product
+     * page offered Front/Back/Left/Right here on the same afternoon, so artwork could be
+     * placed on a face the price never charged for.
      *
-     * So the four faces almost anything has are padded in, drawn on the front's photo when
-     * the product has no picture of its own for that side. The print zone still comes per
-     * side from print-zone.ts, and any extra face the product DOES declare (sleeve, hood,
-     * wrap) is kept ahead of the padding, in its own order. A face with a borrowed photo is
-     * still a real position: it stores, it costs, it reaches the floor.
+     * `offeredSides` is the one rule both surfaces read now — the product's own `sides`,
+     * else its configured TYPE's. It returns NULL when neither has been stated, and only
+     * then does the padding still apply: "we have not been told" is not the same as "front
+     * only", and under-offering is what the 2026-09-07 call was fixing.
+     *
+     * THE PHOTO IS STILL BORROWED. Offering a face and having a picture of it are separate
+     * questions: a declared face with no mockup of its own is drawn on the front's photo,
+     * exactly as before. The print zone still comes per side from print-zone.ts, and a face
+     * with a borrowed photo is a real position — it stores, it costs, it reaches the floor.
      */
- const STANDARD = ["front", "back", "left", "right"]
  const frontUrl = base.find((x) => (x.side || "front").toLowerCase() === "front")?.url || base[0]?.url || liveItem.img || ""
-    /* Padded even with NO picture at all — a line with no blank picked yet has none, and
-       that is exactly the line someone opens to set up. FaceTile draws a blank tile for an
-       empty url, and the stage already copes with an empty backdrop. */
+ const photoFor = (k: string) => base.find((x) => (x.side || "front").toLowerCase() === k)?.url || frontUrl
+ const declared = offeredSides(product)
+ if (declared) return declared.map((k) => ({ side: k, url: photoFor(k) }))
+    /* Nothing stated anywhere — keep the four almost anything has. Padded even with NO
+       picture at all: a line with no blank picked yet has none, and that is exactly the line
+       someone opens to set up. FaceTile draws a blank tile for an empty url. */
+ const STANDARD = ["front", "back", "left", "right"]
  const have = new Set(base.map((x) => (x.side || "front").toLowerCase()))
  return [...base, ...STANDARD.filter((k) => !have.has(k)).map((k) => ({ side: k, url: frontUrl }))]
-  }, [product, liveItem.color, liveItem.img])
+  }, [product, liveItem.color, liveItem.img, typesLoaded])
  const [side, setSide] = useState(0)
   /**
    * WHOSE PHOTO THE STAGE DRAWS.

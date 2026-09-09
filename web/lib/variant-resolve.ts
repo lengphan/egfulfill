@@ -278,6 +278,36 @@ export function sidesOf(p: CatalogProduct | null): string[] {
 export const ALL_SIDES = ["front", "back", "left", "right", "sleeve", "hood", "inside", "wrap"]
 
 /**
+ * THE FACES TO OFFER FOR THIS BLANK — or null when we genuinely cannot say.
+ *
+ * `sidesOf` always answers, which is what makes it wrong for a PICKER: its fallback for a
+ * type nobody has configured is ["front"], and that is indistinguishable from a garment
+ * that really does print on one face. Offering one face when the truth is "we have not been
+ * told" is worse than offering several, so this returns NULL for that case and the caller
+ * keeps whatever fallback suits its surface.
+ *
+ * Confident in exactly two situations, in this order:
+ *   1. the product states its own `sides` — a statement about one garment, and a category
+ *      cannot know better than the person holding it;
+ *   2. its TYPE is configured, which means somebody has said what that category prints on.
+ *
+ * The type table is TYPE_SPECS, filled by setTypeMockups from platform settings — so a
+ * surface that wants a confident answer has to have loaded them, and gets null until it has.
+ *
+ * ONE DEFINITION, because there were two: the import sheet worked this out inline and the
+ * designer did not do it at all (it padded in four standard faces regardless of the
+ * product), which is how one duffel came to be offered Front/Back on its product page and
+ * Front/Back/Left/Right in the designer on the same afternoon.
+ */
+export function offeredSides(p: CatalogProduct | null): string[] | null {
+  const own = (Array.isArray(p?.sides) ? p.sides : []).filter((s) => ALL_SIDES.includes(String(s)))
+  if (own.length) return own
+  const spec = specFor(p)
+  if (spec) return spec.sides?.length ? spec.sides : ["front"]
+  return null
+}
+
+/**
  * EVERY SIDE THIS PRODUCT CAN BE DESIGNED ON — the product's own photo per side, and the
  * category's outline wherever it has none.
  *

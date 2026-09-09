@@ -39,7 +39,7 @@ import {
   type ImportRecord,
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
-import { resolveProduct, productLabel, setTypeMockups, sidesOf } from "@/lib/variant-resolve"
+import { resolveProduct, productLabel, setTypeMockups, offeredSides } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { platformName } from "@/shared/order-rules"
 import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles, getProductTypes,
@@ -533,18 +533,16 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
          SIDE_LABEL, so the cell holds "Left sleeve" and never the bare "left" that would
          read as an unfinished sentence in a spreadsheet. normalizeSide reads both back. */
       if (colKey === "print_side") {
-        /* THE PRODUCT'S OWN FACES FIRST, its category's after — sidesOf is that rule, and
-           it is the same one the design maker's stage follows, so a blank cannot offer a
-           face here that you then cannot place artwork on there.
-           The fallback to all eight is for a type nobody has configured: sidesOf answers
-           ["front"] for that, which is indistinguishable from a genuinely front-only
-           category, and offering one face when the truth is "we don't know" is worse than
-           offering all of them. A product that states its own sides is never in doubt. */
-        const own = (p as { sides?: string[] }).sides ?? []
-        const known = own.length > 0
-          || productTypes.some((t) => t.name.toLowerCase() === String(p.type ?? "").toLowerCase())
-        return known
-          ? sidesOf(p as never).map((sd) => SIDE_LABEL[sd] ?? sd)
+        /* THE PRODUCT'S OWN FACES FIRST, its category's after — and `offeredSides` is that
+           rule, shared with the designer's face strip so a blank cannot offer a placement
+           here that you then cannot place artwork on there. It answers null for a type
+           nobody has configured, which is where the fallback to all eight belongs: offering
+           one face when the truth is "we have not been told" is worse than offering all of
+           them. This was written out inline here and not at all in the designer, which is
+           how the two came to disagree about the same duffel. */
+        const declared = offeredSides(p as never)
+        return declared
+          ? declared.map((sd) => SIDE_LABEL[sd] ?? sd)
           : FIXED_OPTIONS.print_side ?? null
       }
       /* BOTH FIELDS, NOT ONE. This read `method` alone, and CatalogProduct's own note on
@@ -557,7 +555,9 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
       const own = normalizeMethods([p.method, ...(p.methods ?? [])]).map((m) => m.label)
       return own.length ? own : FIXED_OPTIONS[colKey] ?? null
     },
-    [catalog, refOptions, productTypes],
+    /* `productTypes` is no longer read here — offeredSides consults the type map directly.
+       It is still fetched above, because filling that map is what lets it answer. */
+    [catalog, refOptions],
   )
 
   /**
