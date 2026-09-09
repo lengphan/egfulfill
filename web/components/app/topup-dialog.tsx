@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
 import { PaypalButton } from "@/components/app/paypal-button"
-import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment, type TopupConfig } from "@/lib/api"
+import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, getSavedPaypal, quotePaypal, chargeSavedPaypal, capturePaypalOrder, deleteSavedPaypal, VN_BANK_NAMES, type VietqrPayment, type TopupConfig, type SavedPaypal } from "@/lib/api"
 import { Dropzone } from "@/components/app/dropzone"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
@@ -422,9 +422,63 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  const [error, setError] = useState<string | null>(null)
  const { minUsd, small: smallPresets } = amountOptions(cfg)
  useSeedAmount(cfg, amount, setAmount)
+  /**
+   * THE POPUP HAPPENS ONCE. PayPal will never let us take somebody's PayPal login on our
+   * own page, and nothing here should ever look as though it does — so the first payment
+   * goes through PayPal's window and, if they tick Remember, PayPal vaults the account.
+   * After that this tab is a button on our page: the order is created and captured
+   * server-side against the saved token, and no window opens at all.
+   */
+ const [saved, setSaved] = useState<SavedPaypal[] | null>(null)
+ const [useSaved, setUseSaved] = useState(true)
+ const [remember, setRemember] = useState(true)
+ const [busy, setBusy] = useState(false)
+  /* The saved path's three figures. From the SERVER — the same rule as the interactive
+     path, which is that the client never computes a charge it is about to collect. */
+ const [quote, setQuote] = useState<{ credit: number; charge: number; fee: number; pct: number; fixed: number } | null>(null)
+ useEffect(() => {
+ const t = setTimeout(() => { getSavedPaypal().then(setSaved).catch(() => setSaved([])) }, 0)
+ return () => clearTimeout(t)
+  }, [])
+ const account = (saved ?? [])[0] ?? null
  const proceed = () => {
  if (Number(amount) < minUsd) { setError(`Minimum top-up is ${usd0(minUsd)}.`); return }
- setError(null); setPhase("pay")
+ setError(null); setQuote(null); setPhase("pay")
+  }
+  // Priced when the pay step opens, and only for the saved path — the interactive one gets
+  // its figures back from create-order because it has to create one anyway.
+ useEffect(() => {
+ if (phase !== "pay" || !account || !useSaved) return
+ let live = true
+ const t = setTimeout(() => {
+ quotePaypal(Number(amount) || 0)
+        .then((q) => {
+ if (!live || q.error || q.charge == null || q.credit == null) return
+ setQuote({ credit: q.credit, charge: q.charge, fee: q.fee ?? Number((q.charge - q.credit).toFixed(2)), pct: q.feeCfg?.pct ?? 0, fixed: q.feeCfg?.fixed ?? 0 })
+        })
+        .catch(() => {})
+    }, 0)
+ return () => { live = false; clearTimeout(t) }
+  }, [phase, account, useSaved, amount])
+  /* No window: create against the saved token, then the SAME capture the button uses. */
+ const payWithSaved = async () => {
+ if (!account) return
+ setBusy(true); setError(null)
+ try {
+ const r = await chargeSavedPaypal(Number(amount) || 0, account.id)
+ if (r.error || !r.orderID) throw new Error(r.error || "PayPal wouldn't start that payment.")
+ const c = await capturePaypalOrder(r.orderID)
+ if (!c.ok) throw new Error(c.error || "PayPal didn't confirm the payment.")
+ setPhase("paid"); onFunded()
+    } catch (e) {
+ setError(e instanceof Error ? e.message : "Couldn't take that payment.")
+    } finally { setBusy(false) }
+  }
+ const forget = async () => {
+ if (!account) return
+ setBusy(true)
+ try { await deleteSavedPaypal(account.id); setSaved((p) => (p ?? []).filter((x) => x.id !== account.id)); setUseSaved(false) }
+ catch { setError("Couldn't remove that account.") } finally { setBusy(false) }
   }
   // Stable identities: PaypalButton creates the PayPal order inside an effect keyed on these,
   // so a new function each render would tear the order down and mint another one every time
@@ -440,7 +494,54 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
           <span className="text-muted-foreground">{tl("topup", "Topping up")}</span>
           <span className="font-semibold tabular-nums">{usd(Number(amount) || 0)}</span>
         </div>
-        <PaypalButton amount={Number(amount) || 0} onPaid={paid} onError={failed} />
+        {account && useSaved ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+              <span className="min-w-0">
+                <span className="block font-medium">PayPal</span>
+                <span className="block truncate text-xs text-muted-foreground">{account.label || tl("topup", "Saved account")}</span>
+              </span>
+              <Button variant="ghost" size="sm" onClick={forget} disabled={busy}>{tl("topup", "Forget")}</Button>
+            </div>
+            {/* THE SAME THREE FIGURES as the interactive path. One click is not a reason to
+                collect a fee somebody has not seen. Held back until the server answers,
+                because a total that appears after the button would be worse than none. */}
+            {quote && (
+              <dl className="space-y-1.5 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">{tl("topup", "Wallet credit")}</dt>
+                  <dd className="tabular-nums">{usd(quote.credit)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">
+                    {tl("topup", "PayPal fee")}<span className="opacity-70"> · {quote.pct}% + {usd(quote.fixed)}</span>
+                  </dt>
+                  <dd className="tabular-nums">{usd(quote.fee)}</dd>
+                </div>
+                <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
+                  <dt>{tl("topup", "You pay")}</dt>
+                  <dd className="tabular-nums">{usd(quote.charge)}</dd>
+                </div>
+              </dl>
+            )}
+            <Button className="w-full" onClick={payWithSaved} disabled={busy || !quote}>
+              {busy ? <CircleNotch size={16} className="animate-spin" /> : `${tl("topup", "Pay")} ${usd(quote?.charge ?? (Number(amount) || 0))}`}
+            </Button>
+            <button onClick={() => setUseSaved(false)} className="text-xs text-muted-foreground hover:text-foreground">
+              {tl("topup", "Use a different PayPal account")}
+            </button>
+          </div>
+        ) : (
+          <>
+            <PaypalButton amount={Number(amount) || 0} remember={remember} onPaid={paid} onError={failed} />
+            {/* A CHECKBOX, NOT A BUTTON — it toggles, so it looks like a toggle (§4). The
+                consent itself is given inside PayPal's window; this only asks for it. */}
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="size-3.5 accent-primary" />
+              {tl("topup", "Remember this PayPal account for next time")}
+            </label>
+          </>
+        )}
         {error && <div className="text-sm text-destructive">{error}</div>}
         <button onClick={() => setPhase("amount")} className="text-xs text-muted-foreground hover:text-foreground">{tl("topup", "← Change amount")}</button>
       </div>

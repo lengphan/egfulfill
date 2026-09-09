@@ -595,18 +595,43 @@ export function getPaypalConfig() {
 }
 /** `credit` is what the wallet gets, `charge` is what PayPal is billed; the difference is
  *  the processor's cut, which the server computes — never the client. */
-export function createPaypalOrder(amount: number) {
+export function createPaypalOrder(amount: number, remember = false) {
   // `withFee` is the caller asserting it will show the three figures before the button —
   // the server defaults it off for the legacy wallet page, which cannot. See paypal.js.
+  // `remember` asks PayPal to vault the account during ITS approval window, which is the
+  // only place that consent can be given.
   return api<{ id?: string; approveUrl?: string | null; error?: string; credit?: number; charge?: number; fee?: number; feeCfg?: { pct: number; fixed: number } }>(`/api/paypal/create-order`, {
     method: "POST",
-    body: JSON.stringify({ amount, withFee: true }),
+    body: JSON.stringify({ amount, withFee: true, remember }),
+  })
+}
+
+/** What a top-up would cost, WITHOUT creating an order — for the saved-account path, which
+ *  must show the same three figures before its one-click button. Server-computed always. */
+export function quotePaypal(amount: number) {
+  return api<{ credit?: number; charge?: number; fee?: number; feeCfg?: { pct: number; fixed: number }; error?: string }>(`/api/paypal/quote?amount=${encodeURIComponent(String(amount))}`)
+}
+
+/** A PayPal account this seller has saved. The token stays at PayPal; this is the label. */
+export type SavedPaypal = { id: number; token_id: string; label?: string | null; created_at?: string }
+export function getSavedPaypal() {
+  return api<SavedPaypal[]>(`/api/paypal/saved`)
+}
+export function deleteSavedPaypal(id: number) {
+  return api<{ ok?: boolean; error?: string }>(`/api/paypal/saved/${id}`, { method: "DELETE" })
+}
+/** Opens no window: the server creates a merchant-initiated order against the saved token
+ *  and hands back an orderID for the SAME capture route the interactive path uses. */
+export function chargeSavedPaypal(amount: number, savedId: number) {
+  return api<{ ok?: boolean; orderID?: string; credit?: number; charge?: number; fee?: number; label?: string | null; error?: string }>(`/api/paypal/charge-saved`, {
+    method: "POST",
+    body: JSON.stringify({ amount, savedId }),
   })
 }
 /** `amount` is what was credited; `charged` and `fee` are what actually left the payer —
  *  `fee` being PayPal's own reported figure, not our estimate of it. */
 export function capturePaypalOrder(orderID: string) {
-  return api<{ ok?: boolean; amount?: number; charged?: number; fee?: number; captureId?: string; status?: string; ref?: string; error?: string }>(`/api/paypal/capture-order`, {
+  return api<{ ok?: boolean; amount?: number; charged?: number; fee?: number; captureId?: string; status?: string; ref?: string; saved?: string | null; error?: string }>(`/api/paypal/capture-order`, {
     method: "POST",
     body: JSON.stringify({ orderID }),
   })

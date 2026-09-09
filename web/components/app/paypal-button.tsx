@@ -73,10 +73,14 @@ function loadSdk(clientId: string): Promise<PaypalButtonsApi> {
 
 export function PaypalButton({
   amount,
+  remember,
   onPaid,
   onError,
 }: {
   amount: number
+  /** Ask PayPal to vault the account during its approval window, so the NEXT top-up needs
+   *  no window at all. Consent has to be given there; it cannot be given on our page. */
+  remember?: boolean
   onPaid: () => void
   onError: (m: string) => void
 }) {
@@ -99,7 +103,7 @@ export function PaypalButton({
         // The order is created UP FRONT, like the Stripe intent, so the three figures can be
         // on screen before anything is pressed. The SDK's createOrder then just hands the id
         // it already has back to PayPal.
-        const order = await createPaypalOrder(amount)
+        const order = await createPaypalOrder(amount, remember === true)
         if (!order.id) throw new Error(order.error || "Couldn't start the PayPal payment.")
         if (!alive) return
         if (order.charge != null && order.credit != null) {
@@ -136,7 +140,7 @@ export function PaypalButton({
       alive = false
       try { buttons?.close() } catch { /* already torn down with the node */ }
     }
-  }, [amount, onPaid, onError])
+  }, [amount, remember, onPaid, onError])
 
   if (err) return <div className="py-6 text-center text-sm text-hold">{err}</div>
 

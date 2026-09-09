@@ -98,6 +98,43 @@ export function paypalRoutes(app, requireAuth) {
   /** Rounded UP to the cent: rounding down leaves us paying the last cent of every top-up. */
   const grossUp = (want, cfg) => Math.ceil(((want + cfg.fixed) / (1 - cfg.pct / 100)) * 100) / 100;
 
+  /**
+   * A SAVED PAYPAL ACCOUNT — the vault, and why the first payment still opens PayPal.
+   *
+   * PayPal will never let us collect somebody's PayPal login on our own page, and we must
+   * never build anything that looks like it does. What Vault gives instead is CONSENT ONCE:
+   * the first top-up goes through PayPal's window as normal and, with `attributes.vault` on
+   * the order, PayPal hands back a token for the account on success. Every later top-up is
+   * created and captured server-side against that token — no popup, no second login, a
+   * button on our own page. Exactly the shape stripe.js already has for saved cards.
+   *
+   * WE STORE A TOKEN, NEVER A FUNDING SOURCE. The card list the buyer sees inside PayPal
+   * (their VIB card, their Standard Chartered debit) is theirs and stays there; we hold an
+   * opaque id and a label to show. That is the entire point of a vault — the details we do
+   * not have cannot leak from us.
+   *
+   * `customer_id` is ours to mint and must be STABLE per seller: PayPal keys the vault to
+   * it, so a regenerated one orphans every token that seller has saved.
+   */
+  q(`create table if not exists paypal_vault (
+       id          serial primary key,
+       seller_id   uuid references users(id) on delete cascade,
+       customer_id text not null,
+       token_id    text not null unique,
+       label       text,
+       created_at  timestamptz default now())`).catch(() => {});
+  q('create index if not exists paypal_vault_seller_idx on paypal_vault(seller_id)').catch(() => {});
+
+  /** The seller's PayPal customer id — minted once, then read forever. */
+  async function customerFor(user) {
+    const ex = await q('select customer_id from paypal_vault where seller_id=$1 limit 1', [user.sub])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (ex && ex.customer_id) return ex.customer_id;
+    /* Derived from the user id rather than random, so a seller whose only vault row was
+       deleted comes back to the SAME customer at PayPal instead of a second one. */
+    return 'eg-' + String(user.sub).replace(/-/g, '').slice(0, 22);
+  }
+
   // The client-id is public (it goes in the PayPal JS SDK URL); the frontend fetches it.
   // `fee` rides along so the dialog can price the top-up before it creates an order.
   app.get('/api/paypal/config', { preHandler: requireAuth }, async () => ({ clientId: cidKey(), env: ENV, enabled: !!(cidKey() && secKey()), fee: await feeCfg() }));
@@ -137,6 +174,18 @@ export function paypalRoutes(app, requireAuth) {
       // (same-origin wallet page). PayPal sends the buyer there with ?token=<orderId>
       // appended after they approve, where we capture. application_context is optional;
       // without it the SDK popup flow still works, so only attach it when URLs are given.
+      /**
+       * SAVE IT ON SUCCESS, if the seller asked. `usage_type: MERCHANT` is what makes the
+       * token chargeable later WITHOUT the buyer present — the difference between "remember
+       * this for when I come back" and "you may bill me". PayPal shows the consent inside
+       * its own window, which is the only place that consent can honestly be given.
+       *
+       * Opt-in per order, because saving a payment method is a decision, not a side effect
+       * of paying once.
+       */
+      const remember = body.remember === true;
+      const customerId = remember ? await customerFor(req.user) : null;
+
       const order = {
         intent: 'CAPTURE',
         purchase_units: [{
@@ -149,6 +198,16 @@ export function paypalRoutes(app, requireAuth) {
           custom_id: 'credit:' + amt.toFixed(2)
         }]
       };
+      if (remember) {
+        order.payment_source = {
+          paypal: {
+            attributes: {
+              customer: { id: customerId },
+              vault: { store_in_vault: 'ON_SUCCESS', usage_type: 'MERCHANT', permit_multiple_payment_tokens: false },
+            },
+          },
+        };
+      }
       if (body.returnUrl && body.cancelUrl) {
         order.application_context = {
           brand_name: 'EGFUL', user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING',
@@ -209,6 +268,29 @@ export function paypalRoutes(app, requireAuth) {
       const netUsd = usdOf(brk.net_amount);
       const payerEmail = (d.payer && d.payer.email_address) || null;
 
+      /**
+       * THE TOKEN, IF PAYPAL VAULTED THE ACCOUNT. Present only when the order asked for it
+       * AND the account is enabled for Vault — so its absence is the honest signal that
+       * saving did not happen, and the caller is told rather than shown a saved card that
+       * is not there. Best-effort: a capture that succeeded must never fail because the
+       * bookkeeping for a convenience feature did.
+       */
+      let savedLabel = null;
+      try {
+        const vaulted = d.payment_source && d.payment_source.paypal && d.payment_source.paypal.attributes
+          && d.payment_source.paypal.attributes.vault;
+        const custId = d.payment_source && d.payment_source.paypal && d.payment_source.paypal.attributes
+          && d.payment_source.paypal.attributes.customer && d.payment_source.paypal.attributes.customer.id;
+        if (vaulted && vaulted.id && String(vaulted.status || '').toUpperCase() === 'VAULTED') {
+          savedLabel = payerEmail || 'PayPal account';
+          await q(
+            `insert into paypal_vault (seller_id, customer_id, token_id, label)
+             values ($1,$2,$3,$4) on conflict (token_id) do nothing`,
+            [req.user.sub, custId || await customerFor(req.user), vaulted.id, savedLabel]
+          );
+        }
+      } catch (e) { app.log.error('paypal vault record failed: ' + e.message); }
+
       // Real money in → record it like any top-up so the factory (admin+warehouse) is
       // credited via the same reconcile path. Idempotent per capture: clean sequential
       // EG reference + the PayPal capture id as the transaction id.
@@ -256,8 +338,110 @@ export function paypalRoutes(app, requireAuth) {
       return {
         ok: true, amount, charged: received,
         fee: Number.isFinite(feeUsd) ? feeUsd : Number((received - amount).toFixed(2)),
-        captureId: cap.id, status: d.status, ref, txnId: cap.id
+        captureId: cap.id, status: d.status, ref, txnId: cap.id,
+        // Null when nothing was saved — which the dialog must not report as "saved".
+        saved: savedLabel,
       };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  /**
+   * WHAT A TOP-UP WOULD COST, without creating an order.
+   *
+   * The interactive path gets its three figures from create-order, because it has to create
+   * one anyway. The saved-account path must not: creating an order to find out the price
+   * leaves an abandoned order at PayPal every time somebody opens the tab and changes their
+   * mind. But the figures still have to be on screen before the button — that rule does not
+   * soften because the payment is one click — and the client must never compute a charge it
+   * is about to make somebody agree to. So the server answers the question directly.
+   */
+  app.get('/api/paypal/quote', { preHandler: requireAuth }, async (req, reply) => {
+    const amt = Number((req.query || {}).amount) || 0;
+    if (amt <= 0) { reply.code(400); return { error: 'Invalid amount' }; }
+    const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
+    const cfg = await feeCfg();
+    const charge = grossUp(amt, cfg);
+    return { credit: amt, charge, fee: Number((charge - amt).toFixed(2)), feeCfg: cfg };
+  });
+
+  // ── Saved PayPal accounts — the popup happens once, then this ───────────────
+
+  /** The seller's saved accounts. Ours is the label; PayPal holds everything that matters. */
+  app.get('/api/paypal/saved', { preHandler: requireAuth }, async (req) => {
+    const r = await q('select id, token_id, label, created_at from paypal_vault where seller_id=$1 order by created_at desc', [req.user.sub])
+      .catch(() => ({ rows: [] }));
+    return r.rows;
+  });
+
+  /**
+   * Forget an account. PayPal first, our row second — the other order can leave a token
+   * live at PayPal that nothing here can see, and an un-deletable billing agreement is a
+   * worse thing to leave behind than an orphaned row.
+   */
+  app.delete('/api/paypal/saved/:id', { preHandler: requireAuth }, async (req, reply) => {
+    const row = await q('select token_id from paypal_vault where id=$1 and seller_id=$2', [parseInt(req.params.id, 10) || -1, req.user.sub])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (!row) { reply.code(404); return { error: 'Not found' }; }
+    try {
+      const tok = await ppToken();
+      const r = await fetch(BASE + '/v3/vault/payment-tokens/' + encodeURIComponent(row.token_id), {
+        method: 'DELETE', headers: { Authorization: 'Bearer ' + tok },
+      });
+      recordUsage('paypal', { endpoint: 'vault-delete', ok: r.ok });
+      // 404 means PayPal has already forgotten it, which is the state we were after.
+      if (!r.ok && r.status !== 404) { reply.code(400); return { error: 'PayPal would not remove it (HTTP ' + r.status + ')' }; }
+    } catch (e) { reply.code(400); return { error: e.message }; }
+    await q('delete from paypal_vault where id=$1 and seller_id=$2', [parseInt(req.params.id, 10) || -1, req.user.sub]).catch(() => {});
+    return { ok: true };
+  });
+
+  /**
+   * TOP UP FROM A SAVED ACCOUNT — created and captured here, with no window at all.
+   *
+   * This is the whole point of the vault: the buyer consented once, in PayPal's own UI, and
+   * a merchant-initiated order against that token completes server-side. The fee is grossed
+   * up exactly as on the interactive path — the seller has seen the three figures on our own
+   * page before pressing, which is what `withFee` asserts everywhere else.
+   *
+   * ONE CALL, TWO STEPS, AND THE SECOND CAN FAIL. Creating the order is not taking the
+   * money; the capture is. So a create that succeeds and a capture that does not must not
+   * credit anything — the wallet moves inside the same capture bookkeeping the interactive
+   * path uses, keyed on the capture id, so a retry cannot double-credit.
+   */
+  app.post('/api/paypal/charge-saved', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      const b = req.body || {};
+      const amt = Number(b.amount) || 0;
+      if (amt <= 0) { reply.code(400); return { error: 'Invalid amount' }; }
+      const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
+      const row = await q('select token_id, customer_id, label from paypal_vault where id=$1 and seller_id=$2',
+        [parseInt(b.savedId, 10) || -1, req.user.sub]).then((r) => r.rows[0]).catch(() => null);
+      if (!row) { reply.code(400); return { error: 'That saved PayPal account is not on your account.' }; }
+
+      const cfg = await feeCfg();
+      const charge = grossUp(amt, cfg);
+      const tok = await ppToken();
+      const create = await fetch(BASE + '/v2/checkout/orders', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          intent: 'CAPTURE',
+          purchase_units: [{
+            amount: { currency_code: 'USD', value: charge.toFixed(2) },
+            description: 'EGFUL wallet top-up',
+            custom_id: 'credit:' + amt.toFixed(2),
+          }],
+          payment_source: { paypal: { vault_id: row.token_id } },
+        }),
+      });
+      const cd = await create.json().catch(() => ({}));
+      recordUsage('paypal', { endpoint: 'charge-saved-create', ok: create.ok });
+      if (!create.ok || !cd.id) { reply.code(400); return { error: 'PayPal refused the saved-account payment: ' + JSON.stringify(cd).slice(0, 300) }; }
+
+      /* Hand the order id back to the same capture route the interactive path uses, rather
+         than a second copy of the crediting, the fee reading and the notification. One
+         capture path means one place a bug in it can live. */
+      return { ok: true, orderID: cd.id, credit: amt, charge, fee: Number((charge - amt).toFixed(2)), label: row.label };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
