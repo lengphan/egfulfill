@@ -1255,6 +1255,7 @@ const vi: Dict = {
   "topup.QR Code": "Mã QR",
   "topup.Card": "Thẻ",
   "topup.PayPal": "PayPal",
+  "topup.PayPal is in sandbox — no real money moves, and your balance won't really change.": "PayPal đang ở chế độ thử nghiệm — không có tiền thật nào được chuyển, và số dư của bạn sẽ không thay đổi.",
   "topup.Credited. PayPal is finishing saving this account — it should be ready by your next top-up.": "Đã cộng tiền. PayPal đang hoàn tất việc lưu tài khoản này — dự kiến sẵn sàng cho lần nạp sau.",
   "topup.Credited. PayPal is remembered as": "Đã cộng tiền. PayPal được ghi nhớ là",
   "topup.next time is one press, with no sign-in.": "lần sau chỉ cần một lần nhấn, không phải đăng nhập.",

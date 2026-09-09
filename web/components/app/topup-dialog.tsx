@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
 import { PaypalButton } from "@/components/app/paypal-button"
-import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, getSavedPaypal, quotePaypal, chargeSavedPaypal, capturePaypalOrder, deleteSavedPaypal, VN_BANK_NAMES, type VietqrPayment, type TopupConfig, type SavedPaypal } from "@/lib/api"
+import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, getSavedPaypal, getPaypalConfig, quotePaypal, chargeSavedPaypal, capturePaypalOrder, deleteSavedPaypal, VN_BANK_NAMES, type VietqrPayment, type TopupConfig, type SavedPaypal } from "@/lib/api"
 import { Dropzone } from "@/components/app/dropzone"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
@@ -428,6 +428,16 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
    * server-side against the saved token, and no window opens at all.
    */
  const [saved, setSaved] = useState<SavedPaypal[] | null>(null)
+  /**
+   * SANDBOX HAS TO SAY SO. A test payment and a real one are the same screens, the same
+   * amounts and the same success message — the ONLY difference is which client-id the server
+   * holds, which nobody looking at this dialog can see. That is the wrong kind of identical:
+   * an admin testing against sandbox believes they moved money and a seller on a
+   * misconfigured server believes they did too, and both are wrong in the expensive
+   * direction. Live is unmarked, because live is the normal state and a badge on every real
+   * top-up is noise.
+   */
+ const [ppEnv, setPpEnv] = useState<string | null>(null)
  const [useSaved, setUseSaved] = useState(true)
  const [remember, setRemember] = useState(true)
  const [busy, setBusy] = useState(false)
@@ -435,7 +445,10 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
      path, which is that the client never computes a charge it is about to collect. */
  const [quote, setQuote] = useState<{ credit: number; charge: number; fee: number; pct: number; fixed: number } | null>(null)
  useEffect(() => {
- const t = setTimeout(() => { getSavedPaypal().then(setSaved).catch(() => setSaved([])) }, 0)
+ const t = setTimeout(() => {
+ getSavedPaypal().then(setSaved).catch(() => setSaved([]))
+ getPaypalConfig().then((c) => setPpEnv(c.env ?? null)).catch(() => {})
+    }, 0)
  return () => clearTimeout(t)
   }, [])
  const account = (saved ?? [])[0] ?? null
@@ -443,6 +456,14 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  if (Number(amount) < minUsd) { setError(`Minimum top-up is ${usd0(minUsd)}.`); return }
  setError(null); setQuote(null); setPhase("pay")
   }
+  /* Amber, not red: nothing is broken. It is the warning tone this app already uses for
+     "read this before you act on the number next to it". */
+ const sandboxNote = ppEnv && ppEnv !== "live" ? (
+    <div className="flex items-center gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
+      <Warning size={13} weight="fill" className="shrink-0" />
+      {tl("topup", "PayPal is in sandbox — no real money moves, and your balance won't really change.")}
+    </div>
+  ) : null
   // Priced when the pay step opens, and only for the saved path — the interactive one gets
   // its figures back from create-order because it has to create one anyway.
  useEffect(() => {
@@ -522,6 +543,7 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
           <span className="text-muted-foreground">{tl("topup", "Topping up")}</span>
           <span className="font-semibold tabular-nums">{usd(Number(amount) || 0)}</span>
         </div>
+        {sandboxNote}
         {account && useSaved ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
@@ -587,6 +609,7 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
         <MinHint amount={amount} minUsd={minUsd} />
       </label>
+      {sandboxNote}
       {error && <div className="text-sm text-destructive">{error}</div>}
       <Button className="w-full" onClick={proceed} disabled={Number(amount) < minUsd}>{tl("topup", "Continue to PayPal")}</Button>
     </div>
