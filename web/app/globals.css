@@ -2090,47 +2090,71 @@ td[align="right"] {
   object-position: right center;
 }
 
-/* ── THE BAND'S CHROME — placed, not faded ─────────────────────────────────────
-   It ran edge to edge before, dissolved under the greeting by a gradient. That is
-   a mask apologising for a composition: the shape was still there and still
-   competing, and the one thing on this band that has to be read was the hardest
-   thing on it to read.
+/* ── THE BAND'S CHROME — full bleed, and lit for THIS room ─────────────────────
+   Every earlier version read as a cut-out, and the reason was not the edge: the
+   render was lit for a white studio, so the metal was reflecting a bright room
+   while sitting in a dark one. Chrome is a picture of its surroundings — put a
+   picture of the wrong surroundings on a charcoal plate and no amount of shadow
+   or feathering will make it belong.
 
-   So it STARTS after the name — at 42%, close enough to read as one object with
-   the greeting rather than a decoration parked in the corner — and every strand of
-   it survives. No mask, nothing dissolved.
+   So this render was made in OUR room: dark studio, low-key, no white blowouts,
+   on a flat charcoal ground. Its ground is then shifted to the plate's exact
+   colour (#32373C) — a uniform shift, never a scale, because scaling drags the
+   highlights with it and flattens the metal.
 
-   The asset is a band-shaped crop of the render (see band-web.tsx): a 10:1 stripe
-   cannot show a 2.4:1 sculpture whole, so the cut happens once, in the file, at
-   the strip carrying the most of the form — rather than every time it is drawn. */
+   Which means NO CUT-OUT AT ALL. The image is the band's whole background, the
+   greeting sits on the empty charcoal the render was composed to leave on the
+   left, and there is no join anywhere for an edge to give away. */
 .eg-web-frame {
   position: absolute;
-  inset: 0 0 0 42%;
+  inset: 0;
   overflow: hidden;
   pointer-events: none;
   z-index: -10;
   display: none;
 }
 @media (min-width: 640px) { .eg-web-frame { display: block; } }
-/* WIDER THAN ITS FRAME, and that surplus is the whole reason the drift is possible: the
-   picture slides inside a fixed window instead of the window sliding a picture, so the crop
-   edge never walks into view. */
+/* Wider than the frame so the drift has slack to move through: the picture slides inside a
+   fixed window rather than the window sliding a picture, so no edge ever walks into view. */
 .eg-web {
   position: absolute;
   inset: 0;
-  width: 122%;
+  width: 112%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 50%;
+  object-position: 100% 50%;
   user-select: none;
   animation:
     eg-web-drift 23s ease-in-out infinite alternate,
     eg-web-swell 17s ease-in-out infinite alternate;
 }
-@keyframes eg-web-drift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-16%, 0, 0); } }
-/* The swell is on the inner element's own transform-box via scale, and it is deliberately
-   tiny — 3% on a form this large is a slow inhale, and anything more reads as a zoom. */
+@keyframes eg-web-drift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-9%, 0, 0); } }
 @keyframes eg-web-swell { from { scale: 1; } to { scale: 1.03; } }
 @media (prefers-reduced-motion: reduce) {
   html:not([data-force-motion]) .eg-web { animation: none; }
+}
+
+/* ── THE BAND'S CHROME, MOVING ─────────────────────────────────────────────────
+   Offset to the right of the greeting and never under it: a still can sit behind
+   a name harmlessly, but a moving surface pulls the eye off it every few seconds,
+   and the name is the one thing on this band that has to be read.
+
+   No fade at the left edge and none needed — the clip's ground was rendered at
+   the band's own colour and shifted onto it exactly, so where the video starts is
+   simply where the tubes start. */
+.eg-bandvid-frame {
+  position: absolute;
+  inset: 0 0 0 38%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -10;
+  display: none;
+}
+@media (min-width: 640px) { .eg-bandvid-frame { display: block; } }
+.eg-bandvid {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 100% 50%;
+  display: block;
 }

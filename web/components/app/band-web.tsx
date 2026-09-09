@@ -24,7 +24,7 @@
  * parked in the corner; overlapping the name and we are back to masking. It begins at 42% —
  * a little after the greeting ends, near enough to read as one object with it.
  */
-export function BandWeb({ src = "/ploy/obj/round-c-band.webp" }: { src?: string }) {
+export function BandWeb({ src = "/ploy/obj/chrome-dark.webp" }: { src?: string }) {
   return (
     /* The frame clips; the picture inside it is wider than the frame, and that slack is what
        the drift moves through. Animate the image at its own size and the crop edge walks into
