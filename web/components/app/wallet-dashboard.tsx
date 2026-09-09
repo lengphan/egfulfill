@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { labelRail, PAYOUT_RAILS } from "@/lib/payment-method"
 import { Plus, DownloadSimple, X } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
+import { snoozeLowBalance } from "@/components/app/low-balance-banner"
 import { PayoutDialog } from "@/components/app/payout-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
@@ -814,6 +815,11 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  open={topUpOpen}
  onOpenChange={setTopUpOpen}
  onFunded={() => {
+          /* The shell's low-balance warning is answered by this, so it stops asking — a
+             notice that survives the action it asked for reads as the payment not working.
+             Said outright rather than left to the banner's own rise check, which cannot fire
+             on the first read of a page loaded after the top-up. */
+ snoozeLowBalance()
  refresh()
           // The topbar reads the wallet once on mount, so without this the header kept
           // the pre-top-up balance until a reload — same staleness a plan purchase hit.

@@ -3,7 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { loadStripe, type Stripe } from "@stripe/stripe-js"
-import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js"
+import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js"
 import { CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getStripeConfig, createStripeIntent, verifyStripeIntent, chargeSavedCard, quoteStripe } from "@/lib/api"
@@ -12,7 +12,7 @@ import { getUser } from "@/lib/auth"
 const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
 
 // Inner form — inside <Elements>, so it can use useStripe/useElements.
-function PayForm({ intentId, email, onPaid, onError }: { intentId: string; email?: string; onPaid: () => void; onError: (m: string) => void }) {
+function PayForm({ intentId, clientSecret, email, onPaid, onError }: { intentId: string; clientSecret: string; email?: string; onPaid: () => void; onError: (m: string) => void }) {
   const tl = useLabelT()
  const stripe = useStripe()
  const elements = useElements()
@@ -22,17 +22,30 @@ function PayForm({ intentId, email, onPaid, onError }: { intentId: string; email
  if (!stripe || !elements) return
  setBusy(true)
  onError("")
- const { error, paymentIntent } = await stripe.confirmPayment({ elements, redirect: "if_required" })
+    /**
+     * confirmCardPayment, NOT confirmPayment — the Card Element's own confirm.
+     *
+     * confirmPayment({ elements }) is the Payment Element's call and it throws outright
+     * against a card element, so the two have to move together: the element and the confirm
+     * are one integration, not two choices.
+     *
+     * 3-D Secure is unaffected. This still opens the bank's challenge and resolves to
+     * requires_action → succeeded exactly as before; the verify below is what credits.
+     */
+ const card = elements.getElement(CardElement)
+ if (!card) { onError("The card form didn't load. Reload and try again."); setBusy(false); return }
+ const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+ payment_method: { card, billing_details: email ? { email } : undefined },
+    })
  if (error) {
       /**
-       * SAID ONCE. The Payment Element prints card and validation errors under the card row
-       * itself — that is its job and it does it in Stripe's own wording — so passing those
-       * up printed "Your card has insufficient funds" twice, once inside the element and
-       * once under the button, which reads as two problems rather than one.
+       * SAID ONCE, where the element says it. The card element prints card and validation
+       * errors under the row itself, in Stripe's own wording, so passing those up printed
+       * "Your card has insufficient funds" twice — once inside the element and once under
+       * the button — which reads as two problems rather than one.
        *
-       * Only those two types. An api_error or a network failure has NO inline home in the
-       * element, and swallowing one would leave the button falling silent with nothing said
-       * anywhere — the exact defect the note further down guards against.
+       * Only those two types. An api_error or a network failure has NO inline home, and
+       * swallowing one would leave the button falling silent with nothing said anywhere.
        */
  const shown = error.type === "card_error" || error.type === "validation_error"
  onError(shown ? "" : error.message || "Payment failed.")
@@ -60,22 +73,39 @@ function PayForm({ intentId, email, onPaid, onError }: { intentId: string; email
  return (
     <div className="space-y-4">
       {/**
-        * THE SIGNED-IN ADDRESS, HANDED TO LINK ON PURPOSE.
+        * JUST THE CARD FIELDS, AND LINK OFF (owner, 2026-09-09: "can we hide the link? why
+        * don't you just show the card fields?").
         *
         * Link identifies a returning customer by "email address, phone number, or BROWSER
-        * COOKIE", and it autofills a saved card "regardless of whether they initially saved
-        * their information in Link with another business" — Stripe's words. So on a shared
-        * machine the next person to open this form was shown the previous person's Link email
-        * and their card's brand and last four, with nothing about our own accounts involved:
-        * the cookie belongs to the browser, not to the session.
+        * COOKIE" and autofills their saved card "regardless of whether they initially saved
+        * their information in Link with another business" — Stripe's words. The cookie
+        * belongs to the browser, not to our session, which is why a brand-new EGFULFILL
+        * account was shown somebody's Mastercard: on a shared machine the next person sees
+        * the previous one's email plus card brand and last four.
         *
-        * Seeding the current user's email makes Link look THAT person up rather than falling
-        * back to whoever the browser remembers. It is a mitigation, not a fix — the only
-        * complete answer is turning Link off in the Stripe Dashboard, which also gives up
-        * accelerated checkout for genuine returning customers, and that is an account-level
-        * trade-off for the owner to make rather than something to switch on their behalf.
+        * THE PAYMENT ELEMENT CANNOT TURN IT OFF. Stripe is explicit: "To manage Link in the
+        * Payment Element, go to your payment method settings" — Dashboard only, account-wide,
+        * and it costs accelerated checkout for real returning customers.
+        *
+        * The CARD ELEMENT can, per element, in code: `disableLink: true`. That is the whole
+        * reason for the switch. We only ever accept cards — the intent is created with
+        * `payment_method_types[]: 'card'` — so nothing is given up by leaving the Payment
+        * Element behind, and the fields are the ones a person expects to see anyway.
+        *
+        * `hidePostalCode` is FALSE on purpose: the postal code is an AVS check the issuer
+        * runs, and dropping it raises the decline rate on exactly the cards worth having.
         */}
-      <PaymentElement options={email ? { defaultValues: { billingDetails: { email } } } : undefined} />
+      <div className="rounded-lg border border-input bg-background px-3 py-3">
+        <CardElement
+          options={{
+            disableLink: true,
+            hidePostalCode: false,
+            /* Inherits the app's own type rather than Stripe's default sans, so the row does
+               not read as an embedded third-party widget sitting in our form. */
+            style: { base: { fontSize: "15px", fontFamily: "inherit", color: "#18181b", "::placeholder": { color: "#a1a1aa" } } },
+          }}
+        />
+      </div>
       <Button className="w-full" onClick={pay} disabled={busy || !stripe}>
         {busy ? tl("stripeCardForm", "Processing…") : tl("stripeCardForm", "Pay now")}
       </Button>
@@ -135,7 +165,13 @@ export function StripeCardForm({ amount, save, onPaid, onError }: { amount: numb
  if (!stripePromise || !clientSecret) return null
 
  return (
-    <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
+    /* NO clientSecret ON <Elements>. That option exists so the Payment Element can ask the
+       intent which methods to offer; a Card Element offers one thing and never asks. Passing
+       it here while confirming with confirmCardPayment(clientSecret, …) below would be the
+       same secret handed to two integrations, and it is the Payment Element's shape Stripe
+       then expects to find mounted. `appearance` goes with it — that is the Payment
+       Element's theming API; the Card Element is styled by its own `style` option. */
+    <Elements stripe={stripePromise}>
       {/**
         * WHAT THE CARD IS BILLED, BEFORE IT IS BILLED.
         *
@@ -166,7 +202,7 @@ export function StripeCardForm({ amount, save, onPaid, onError }: { amount: numb
           </div>
         </dl>
       )}
-      <PayForm intentId={intentId} email={getUser()?.email as string | undefined} onPaid={onPaid} onError={onError} />
+      <PayForm intentId={intentId} clientSecret={clientSecret} email={getUser()?.email as string | undefined} onPaid={onPaid} onError={onError} />
     </Elements>
   )
 }

@@ -69,6 +69,19 @@ function readNum(k: string): number | null {
   try { const v = sessionStorage.getItem(k); return v == null ? null : Number(v) } catch { return null }
 }
 function write(k: string, v: string) { try { sessionStorage.setItem(k, v) } catch { /* private mode */ } }
+
+/**
+ * SAY IT OUTRIGHT WHEN A TOP-UP LANDS, as well as inferring it from a rise.
+ *
+ * The rise check alone has a hole, and it is the case people actually hit: it compares
+ * against the last balance THIS TAB saw, so the very first read of a fresh page has nothing
+ * to compare with and cannot snooze. Top up, reload — or top up on the wallet page and open
+ * the app again — and the warning is back, which is the complaint this was meant to answer.
+ *
+ * So the two paths that take money say so directly, and the rise check stays as the net for
+ * everything else (an admin confirming a transfer, a refund) that never calls anything here.
+ */
+export function snoozeLowBalance() { write(SNOOZE_KEY, "1") }
 export function LowBalanceBanner() {
   const tl = useLabelT()
  const [w, setW] = useState<{ balance: number; low?: boolean; lowBelow?: number | null } | null>(null)
@@ -155,6 +168,7 @@ export function LowBalanceBanner() {
           open={topUpOpen}
           onOpenChange={setTopUpOpen}
           onFunded={() => {
+            snoozeLowBalance(); setSnoozed(true)
             // The same event the wallet page fires: the topbar and this banner both read the
             // balance once and would otherwise hold the pre-top-up figure until a reload.
             load()
