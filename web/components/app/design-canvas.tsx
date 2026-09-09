@@ -3639,13 +3639,10 @@ export function DesignCanvasDialog({
                         .filter(Boolean).join(" · ")
                     : tl("canvas", "Nothing new to send — add artwork or a face and this comes back")}
               >
-                {sending
-                  ? tl("canvas", "Sending…")
-                  : !going.length
-                    ? tl("canvas", "Sent")
-                    : going.length === 1
-                      ? tl("canvas", "Send 1 design to the board")
-                      : `${tl("canvas", "Send")} ${going.length} ${tl("canvas", "designs to the board")}`}
+                {/* THREE WORDS, and no count. The list directly above already shows what is
+                    going, one row each — putting the number in the label as well is the same
+                    fact twice, and it made the button grow and shrink as faces were ticked. */}
+                {sending ? tl("canvas", "Sending…") : !going.length ? tl("canvas", "Sent") : tl("canvas", "Send to Board")}
               </Button>
             </div>
           )}
