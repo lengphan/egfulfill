@@ -205,7 +205,16 @@ async function reconcileRefunds(limit = 50) {
  * point is a steady trickle that converges, not a stampede when someone opens the page.
  */
 let _trackPollRunning = false;
-async function refreshStaleTracking(limit = 12) {
+/**
+ * EXPORTED so the ORDERS list can drive it too (owner's call, 2026-09-09).
+ *
+ * The delivery badge lives on the order rows, not on this list — so the parcels a person
+ * was actually looking at were the ones nothing ever refreshed, and a badge could read
+ * "never asked" for a week while the queue was open all day. The guard flag, the 6-hour
+ * window and the row limit are what make it safe to call from a second hot route: a second
+ * caller returns immediately rather than starting a second sweep.
+ */
+export async function refreshStaleTracking(limit = 12) {
   if (_trackPollRunning) return { checked: 0 };
   _trackPollRunning = true;
   try {

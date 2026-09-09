@@ -27,6 +27,19 @@ export function DeliveryBadge({ order, onRefreshed, className }: {
   // Only meaningful once it's left us — before that, the pipeline stage is the answer.
   if (!order.tracking) return null
 
+  /**
+   * NO PILL FOR "WE HAVEN'T ASKED" (owner's call, 2026-09-09).
+   *
+   * This drew a grey "Not asked yet" chip whenever a parcel had a tracking number and no
+   * carrier status. It looked like a delivery state and it is not one — it is a fact about
+   * OUR polling, printed in the column where the CARRIER speaks, and §4 is explicit that a
+   * pill must carry meaning. Worse, it was usually a lie about to be corrected: the status
+   * arrives on its own now, because the staff orders read sweeps stale parcels the same way
+   * the Shipments list already did (refreshStaleTracking, server/src/routes/orders.js).
+   *
+   * So an unanswered parcel shows the refresh control alone — the way to ask, and nothing
+   * claimed. The five states it can come back as are in lib/delivery-status.ts.
+   */
   const word = deliveryWord(order.delivery_status)
 
   const check = async () => {
@@ -43,11 +56,7 @@ export function DeliveryBadge({ order, onRefreshed, className }: {
                 + (DELIVERY_PILL_TONE[order.delivery_status ?? ""] ?? "bg-muted text-muted-foreground")}>
           {word}
         </span>
-      ) : (
-        <span className="rounded bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
-          {tl("deliveryBadge", "Not asked yet")}
-        </span>
-      )}
+      ) : null}
       <button
         onClick={(e) => { e.stopPropagation(); check() }}
         disabled={busy}

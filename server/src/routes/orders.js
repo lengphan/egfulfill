@@ -6,6 +6,7 @@ import { q } from '../db.js';
 import { orderLabel, orderLabelOf } from '../order-label.js';
 import { hashOf, isPhash } from '../fingerprint.js';
 import { isStaff, resolveSeller as _resolveSeller, canSurface, canSeeMoney } from '../auth.js';
+import { refreshStaleTracking } from './dispatch.js';
 import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
 import { aiComplete } from './support_ai.js';
@@ -1777,6 +1778,21 @@ export function ordersRoutes(app, requireAuth) {
     };
 
     if (isStaff(req.user)) {
+      /*
+       * ASK THE CARRIER FOR THE PARCELS ON THIS SCREEN.
+       *
+       * There is no Shippo webhook (checked live: zero subscriptions), so a parcel's status
+       * only ever moves when something asks. That sweep already ran on the Shipments list —
+       * but the delivery badge is HERE, on the order rows, so the parcels a person actually
+       * looks at were the ones nothing refreshed, and the badge sat unanswered for as long
+       * as nobody opened Shipments.
+       *
+       * Off the critical path, and bounded three ways by refreshStaleTracking itself: one
+       * sweep at a time, twelve rows, and only parcels unchecked for six hours whose status
+       * is not already final. STAFF ONLY — a seller's read must not spend carrier calls on
+       * other sellers' parcels, and this sweep is not seller-scoped.
+       */
+      refreshStaleTracking(12).catch(() => {});
       // Staff (factory) see factory-OWNED orders (the admin marketplace shops, which
       // need factory setup) PLUS any SELLER order that's been PUSHED to production.
       // A seller order sits at factory_status 'new'/'draft' while the seller is still
