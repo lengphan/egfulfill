@@ -157,7 +157,7 @@ export function SendToBoardDialog({
               What is NOT allowed is a silent default: a card priced by omission is how a
               digitise gets paid at the Easy rate. */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium">{tl("sendBoard", "Payout band")}</label>
+            <label className="mb-1.5 block text-xs font-medium">{tl("sendBoard", "Payout")}</label>
             <BandPills value={band} onPick={setBand} rates={rates} flat={flat} />
           </div>
 

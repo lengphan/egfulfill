@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { SearchField } from "@/components/app/search-field"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
+import { BandPills } from "@/components/app/band-pills"
 import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, getEmbPreview, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
 import { designLabel } from "@/lib/design-id"
 import { shortOrderRef } from "@/lib/order-format"
@@ -933,25 +933,16 @@ export function DesignerBoard() {
  what the outsourced task costs us. Neutral text, NO colour — " · paid"
  once actually credited, " · partner" for an outsourced card, else the
  plain rate. */}
-                          {/* PILLS ONLY WHILE IT IS UNPRICED (owner's call, 2026-09-09).
-                              A card dropped on the board or sent without a band arrives with no
-                              rate, and nothing forced anyone to give it one — it would simply pay
-                              the old flat fallback at approval, silently. So an unbanded card asks
-                              here, in one click, without opening anything.
-                              They go the moment it is priced: once a band is chosen the figure
-                              below says what it pays, and the band itself is in the card. A control
-                              that has done its job is clutter. */}
-                          {!isDesigner && !isEmbCard(c) && !c.vendor && !c.band && canDeleteCard() && (
-                            <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
-                              <BandPills
-                                value={null}
-                                size="sm"
-                                rates={bandRates}
-                                flat={designFee}
-                                onPick={(b) => patch(c.id, { band: b })}
-                              />
-                            </div>
-                          )}
+                          {/* NO PILLS ON THE TILE (owner's call, 2026-09-09).
+                              They were here so an unbanded card could be priced in one click
+                              without opening anything — and three of them under every unpriced
+                              card turned a board you scan into a board you read. A tile carries
+                              the artwork, its number and its files; pricing is a decision, and a
+                              decision belongs inside the card.
+                              The cost is worth naming: nothing on the board now says a card is
+                              unpriced, so one can still reach approval and pay the flat fallback
+                              silently. The figure below is the tell — it shows the band's rate
+                              once there is one. */}
                           <div className="mt-auto flex items-center justify-end gap-1.5 pt-1.5 text-xs text-muted-foreground">
                             {/* NO `DSN-{c.id}` HERE ANY MORE. That was the card ROW's key wearing
                                 the artwork prefix — `DSN-1787136256067`, a millisecond timestamp —
@@ -1578,7 +1569,7 @@ function CardDialog({ card, me, designFee, bandRates, onClose, patch, onMove, re
              explains itself in its label). */
  return canFee ? (
             <div>
-              <div className="mb-1.5 text-sm font-medium">{tl("designer", "Payout band")}</div>
+              <div className="mb-1.5 text-sm font-medium">{tl("designer", "Payout")}</div>
               <BandPills value={band || null} onPick={(b) => patch(card.id, { band: b })} rates={bandRates} flat={designFee} />
               {/* An unbanded card is not "Easy" — it is every card made before bands, and it
                   pays what it always would have. Said once, where the choice is. */}
