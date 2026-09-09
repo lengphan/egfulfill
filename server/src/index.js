@@ -391,6 +391,98 @@ function authThrottled(req, reply, identity) {
   return limited(reply, `auth-id:${key}`, AUTH_ID_MAX, AUTH_WINDOW);
 }
 
+/**
+ * WHAT AN UNCONFIRMED ADDRESS MAY NOT DO.
+ *
+ * Confirmation is a control on the ADDRESS, so the things it gates are the things that go
+ * wrong when the address is dead or is not the account holder's:
+ *
+ *   MONEY IN     a top-up we cannot send a receipt for, on an account whose owner cannot
+ *                reset their password, is a support case waiting to happen.
+ *   MONEY OUT    the worst case, and the reason this list exists at all. Someone who signs
+ *                up with an address they do not own and adds a payout account is one step
+ *                from draining a wallet, and every notice we would send about it goes to
+ *                a mailbox they control.
+ *   CONNECTIONS  linking a real seller's shop is a claim about who you are, and OAuth's
+ *                consent screen is the only other place that is checked.
+ *
+ * DELIBERATELY NOT SIGNING IN, not reading, not placing an order against money already in
+ * the wallet. Blocking those makes an unconfirmed account useless, and someone whose code
+ * went to spam is then locked out of the product with no way to ask for help — a customer
+ * lost to deliverability rather than to anything they chose.
+ *
+ * A PATH LIST, IN ONE PLACE, ON PURPOSE. The alternative is a preHandler threaded through
+ * nine route modules, and then the answer to "what does confirmation actually stop?" is a
+ * grep across the codebase. Policy that nobody can read in one sitting is policy nobody
+ * checks. It is exact-match: a prefix would silently swallow routes added later under the
+ * same stem, which is the opposite of a list you can audit.
+ *
+ * STAFF ARE EXEMPT. Operators, warehouse, designers and admins are provisioned by hand in
+ * the database (auth.js pins public signup to `seller`), so there is no signup flow that
+ * would ever have confirmed them, and gating them locks the factory out of its own tools.
+ */
+const VERIFIED_ONLY = new Set([
+  // Money in
+  'POST /api/topups',
+  'POST /api/stripe/create-intent',
+  'POST /api/stripe/setup-intent',
+  'POST /api/stripe/charge-saved',
+  'POST /api/paypal/create-order',
+  'POST /api/paypal/charge-saved',
+  'POST /api/vietqr/create-payment',
+  // Money out
+  'POST /api/paypal/payout',
+  'POST /api/paypal/payout-account',
+  // Connecting somebody's shop
+  'POST /api/etsy/exchange',
+  'POST /api/shopify/exchange',
+  'POST /api/tiktok/exchange',
+]);
+
+/**
+ * EVERY ACCOUNT THAT EXISTED BEFORE THIS FEATURE IS ALREADY CONFIRMED.
+ *
+ * `email_verified_at` starts NULL, and without this the deploy that adds the column would
+ * lock every existing seller out of topping up and out of their own store connections — for
+ * failing a step that did not exist when they signed up. That is not a gate, it is an
+ * outage.
+ *
+ * A ONE-SHOT, marked in its own table rather than inferred. "Backfill rows older than now"
+ * re-run on every boot would keep confirming accounts that had genuinely never confirmed,
+ * which is the same as having no gate. The mark is what makes it happen exactly once.
+ */
+let _grandfathered = null;
+function grandfatherExistingAccounts() {
+  if (_grandfathered) return _grandfathered;
+  _grandfathered = (async () => {
+    await q(`create table if not exists schema_marks (key text primary key, at timestamptz default now())`);
+    const done = await q(`select 1 from schema_marks where key='email_verify_backfill'`).then((r) => r.rowCount > 0);
+    if (done) return;
+    const r = await q(`update users set email_verified_at = coalesce(created_at, now()) where email_verified_at is null`);
+    await q(`insert into schema_marks (key) values ('email_verify_backfill') on conflict do nothing`);
+    app.log.info({ rows: r.rowCount }, 'grandfathered existing accounts as email-confirmed');
+  })().catch((e) => { _grandfathered = null; app.log.warn({ err: e.message }, 'email-verify backfill failed'); });
+  return _grandfathered;
+}
+
+app.addHook('preHandler', async (req, reply) => {
+  const key = `${req.method} ${(req.raw.url || '').split('?')[0]}`;
+  if (!VERIFIED_ONLY.has(key)) return;
+  if (!req.user || isStaff(req.user)) return;
+  await ensureEmailVerifyColumns().catch(() => {});
+  await grandfatherExistingAccounts();
+  const row = await q('select email_verified_at from users where id=$1', [req.user.sub])
+    .then((r) => r.rows[0]).catch(() => null);
+  /* A LOOKUP THAT FAILS MUST NOT REFUSE. If the column or the row cannot be read, the honest
+     state is "we do not know", and turning that into a blocked payment would make a database
+     hiccup look like a policy. The gate is a safeguard, not the thing holding the product up. */
+  if (!row || row.email_verified_at) return;
+  reply.code(403).send({
+    error: 'Confirm your email first — we sent you a six-digit code.',
+    needsEmailVerification: true,
+  });
+});
+
 app.post('/api/auth/login', async (req, reply) => {
   const b = req.body || {};
   const stop = authThrottled(req, reply, b.username || b.email);
