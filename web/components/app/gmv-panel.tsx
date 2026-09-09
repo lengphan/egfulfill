@@ -170,15 +170,28 @@ export function GmvPanel({
               n != null ? `${n} ${n === 1 ? "order" : "orders"}` : null,
               money ? `$${Math.round(money).toLocaleString("en-US")}` : null,
             ].filter(Boolean)
+            /* ONE HEIGHT, READ TWICE — the bar is drawn at it and the label is parked on
+               top of it. They were separate expressions, which is how the label came to sit
+               at a fixed height while the column under it moved. */
+            const pct = Math.max(3, h * 100)
+            const prevPct = barsPrev && barsPrev[i] !== undefined ? Math.max(3, barsPrev[i] * 100) : 0
             return (
             <span key={i} className="group relative flex-1" title={parts.join(" · ") || undefined}>
-              {/* ON TOP OF THE COLUMN, on hover. Pointer-events off so moving along the row
-                  never lands on the label instead of the next bar, and z-10 so it is not
-                  painted over by the bars after it. */}
+              {/* ON TOP OF THE COLUMN — of the COLUMN, not of the chart.
+                  This was `bottom-full`, which is the top of the SLOT: every slot is the full
+                  height of the plot area, so the label hung at one fixed altitude while the
+                  bar it described sat anywhere beneath it, sometimes a chart's-worth away.
+                  It is parked on the taller of the two bars instead, so it rides up and down
+                  with the data and never lands on the comparison series.
+                  Pointer-events off so moving along the row never lands on the label instead
+                  of the next bar, and z-10 so it is not painted over by the bars after it. */}
               {parts.length > 0 && (
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden
-                                 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-1.5 py-1
-                                 text-2xs font-medium text-background shadow-sm group-hover:block">
+                <span
+                  className="pointer-events-none absolute left-1/2 z-10 hidden -translate-x-1/2
+                             whitespace-nowrap rounded-md bg-foreground px-1.5 py-1
+                             text-2xs font-medium text-background shadow-sm group-hover:block"
+                  style={{ bottom: `calc(${grown ? Math.max(pct, prevPct) : 0}% + 0.375rem)` }}
+                >
                   {parts.join(" · ")}
                 </span>
               )}
@@ -188,7 +201,7 @@ export function GmvPanel({
                 <span
                   className={cn("absolute inset-x-0 bottom-0 rounded-t-md transition-[height] duration-700 ease-out motion-reduce:transition-none",
                     dark ? "bg-brand/30" : "bg-brand/10 dark:bg-brand/25")}
-                  style={{ height: grown ? `${Math.max(3, barsPrev[i] * 100)}%` : "0%", transitionDelay: `${i * 18}ms` }}
+                  style={{ height: grown ? `${prevPct}%` : "0%", transitionDelay: `${i * 18}ms` }}
                 />
               )}
               <span
@@ -198,7 +211,7 @@ export function GmvPanel({
                    would make the chart shout over the figures it exists to support. */
                 className={cn("absolute inset-x-0 bottom-0 rounded-t-md transition-[height] duration-700 ease-out motion-reduce:transition-none",
                   dark ? "bg-brand/80" : "bg-brand/30 dark:bg-brand/70")}
-                style={{ height: grown ? `${Math.max(3, h * 100)}%` : "0%", transitionDelay: `${i * 18}ms` }}
+                style={{ height: grown ? `${pct}%` : "0%", transitionDelay: `${i * 18}ms` }}
               />
             </span>
             )
