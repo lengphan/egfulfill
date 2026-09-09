@@ -1004,6 +1004,52 @@ td[align="right"] {
   .eg-sway { animation: none; }
 }
 
+/* ── THE BAND'S OBJECTS — adrift, until you reach for one ──────────────────────
+   The header band's balloons are never still. That is the point: a cluster that
+   holds position reads as a picture pasted into the corner, and a cluster that
+   drifts reads as objects in a space you could reach into — which is exactly what
+   you can then do, because each one is draggable.
+
+   PAUSE ON THE OBJECT, not on the band. This is the opposite call to `.eg-rail`
+   above, and the reason is what you are aiming at. On the rail you are picking a
+   garment OUT OF A ROW, so the neighbour has to hold still too. Here you are
+   picking up ONE THING; freezing the whole cluster because the pointer crossed a
+   corner would kill the only motion on the page for a gesture aimed at a single
+   object. So the one under the pointer stops — which is also what "selected"
+   means here, with no ring, no chip, and nothing else added to say it.
+
+   TRANSFORM ONLY, and no JavaScript in the loop: a composited property, no
+   layout, no paint, no React render. The drag is motion's, on the element
+   ABOVE this one — §4's rule that no element may own the same property twice is
+   the whole reason for that split, and it applies just as hard to a CSS
+   animation as to a second MotionValue.
+
+   Percentages in the translate resolve against the OBJECT, so a big cloud and a
+   small chrome bead drift by the same proportion of themselves rather than the
+   same number of pixels — which is what keeps a cluster of mixed sizes from
+   looking like the small ones are in a hurry.
+
+   REDUCED MOTION STOPS IT COMPLETELY. Continuous ambient movement with no
+   finishing moment is close to the definition of what that setting asks us not
+   to do. Dragging still works: that is the person's own hand, not decoration. */
+@keyframes eg-band-float {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+  22%  { transform: translate3d(2.5%, -8%, 0) rotate(2.4deg); }
+  45%  { transform: translate3d(-2%, -13%, 0) rotate(-1.8deg); }
+  68%  { transform: translate3d(-4.5%, -4%, 0) rotate(1.2deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+.eg-band-float {
+  animation: eg-band-float var(--float-dur, 9s) ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+  will-change: transform;
+}
+.eg-band-object:hover .eg-band-float,
+.eg-band-object:focus-visible .eg-band-float { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .eg-band-float { animation: none; }
+}
+
 /* ── THE PRESS — the decorated garment shows through under the pointer ─────────
    A radial mask whose centre and radius are written by pointer events straight
    onto the element as custom properties. No React state is involved, so a
