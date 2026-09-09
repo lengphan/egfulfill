@@ -13,6 +13,16 @@ const SECRET_DEFS = [
   { name: 'SHOPIFY_API_SECRET',    label: 'API secret',       integration: 'shopify' },
   { name: 'TIKTOK_APP_KEY',        label: 'App key',          integration: 'tiktok' },
   { name: 'TIKTOK_APP_SECRET',     label: 'App secret',       integration: 'tiktok' },
+  /**
+   * THE PUBLISH GATE, and the label states the consequence rather than the flag.
+   *
+   * Off, "Make product" assembles the payload and returns it for review without touching the
+   * shop — which is why the publish card reads "dry run". On, a real product is created on a
+   * real TikTok shop. The payload has never been validated against a live shop, and §2.6
+   * says nothing may risk a connected account, so the default stays off and the wording says
+   * what turning it on does instead of naming an env var nobody can act on.
+   */
+  { name: 'TIKTOK_PUBLISH_LIVE', label: 'Publish for real (off = dry run, nothing reaches the shop)', integration: 'tiktok', kind: 'toggle' },
   { name: 'STRIPE_SECRET_KEY',     label: 'Secret key',       integration: 'stripe' },
   { name: 'STRIPE_PUBLISHABLE_KEY', label: 'Publishable key', integration: 'stripe' },
   { name: 'PAYPAL_CLIENT_ID',      label: 'Client ID',        integration: 'paypal' },

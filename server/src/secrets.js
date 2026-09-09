@@ -11,7 +11,10 @@ import { q } from './db.js';
 export const SECRET_NAMES = [
   'ETSY_KEYSTRING', 'ETSY_SHARED_SECRET',
   'SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET',
-  'TIKTOK_APP_KEY', 'TIKTOK_APP_SECRET',
+  /* The publish gate belongs here for the same reason the PayPal ones do: .env did not
+     survive the August rebuild and app_secrets did, and flipping a switch should not need an
+     SSH session. tiktok.js reads it at CALL time, so a save applies to the next publish. */
+  'TIKTOK_APP_KEY', 'TIKTOK_APP_SECRET', 'TIKTOK_PUBLISH_LIVE',
   'META_APP_ID', 'META_APP_SECRET',
   'GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_LOGIN_CUSTOMER_ID',
   'STRIPE_SECRET_KEY', 'STRIPE_PUBLISHABLE_KEY',
