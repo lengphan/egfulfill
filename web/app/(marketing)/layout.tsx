@@ -71,6 +71,9 @@ export default async function MarketingLayout({ children }: { children: React.Re
           and run longer than the redrawn ones. That is the right way round: those pages are
           being replaced, and the alternative is editing five files that are about to go. The
           converted pages, which add none of their own, land where this says. */}
+      {/* `pb-14 md:pb-20` is PAIRED with the CTA mound's `-bottom-14 md:-bottom-20` in
+          ploy/drop.tsx, which reaches down through it so the pile lands on the footer's top
+          edge instead of floating above it. Move one and move the other. */}
       <main className="flex-1 pb-14 pt-16 md:pb-20">{children}</main>
 
       {/* MOST ASKED MOVED INTO THE BUBBLE.

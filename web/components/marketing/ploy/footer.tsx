@@ -1,18 +1,23 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
-import { BACK, reveal, rise } from "./motion"
+import { reveal, rise } from "./motion"
 import { Wordmark } from "@/components/marketing/wordmark"
 
 /**
- * THE FOOTER — a slate plate with the word set as five cut-out letters you can throw.
+ * THE FOOTER — a slate plate, the mark, and the links. Nothing else.
  *
- * The letters are the footer's TOY, not its logo: each drifts on its own loop, springs back
- * when thrown, and the real wordmark is the small one in the column below. That is why they
- * carry `alt=""` and the row carries the accessible name — five images spelling a word are
- * one word to a screen reader, not five.
+ * IT USED TO SPELL "EGFUL" IN BALLOON LETTERS ACROSS THE TOP, five draggable images at up to
+ * 300px tall, and they are gone (owner, 2026-09-09). A footer is where someone goes when they
+ * are looking for a specific link — a terms page, a contact route, a login — and the toy put
+ * a screen of decoration between them and the only thing on it that does a job. It also said
+ * the brand's name a third time, under a page that has already said it in the header and in
+ * the mark below.
+ *
+ * The mark in the column IS the wordmark. The footer used to set "EGFUL" in the display face
+ * as well, so the site carried two different wordmarks — the real one in the header and a
+ * typographic impostor down here. One brand, one mark.
  *
  * The links are the app's REAL routes. The prototype pointed at absolute `egful.store` URLs
  * and at `#engines` anchors that only existed on its own page; here they are `next/link`
@@ -55,13 +60,6 @@ const COLUMNS: { head: string; items: [string, string][] }[] = [
   },
 ]
 
-const LETTERS = [
-  { src: "/ploy/letter-e.webp", drift: [-10, -2], dur: 7 },
-  { src: "/ploy/letter-g.webp", drift: [12, 3], dur: 8 },
-  { src: "/ploy/letter-f.webp", drift: [-8, 2], dur: 6.5 },
-  { src: "/ploy/letter-u.webp", drift: [10, -3], dur: 7.5 },
-  { src: "/ploy/letter-l.webp", drift: [-12, 2], dur: 8.5 },
-] as const
 
 export function PloyFooter() {
   return (
@@ -70,53 +68,17 @@ export function PloyFooter() {
         {...rise(0)}
         className="overflow-hidden rounded-[32px] bg-ploy-slate px-8 pt-10 text-ploy-ground md:px-14"
       >
-        <div aria-label="EGFUL" role="img" className="flex items-end justify-center gap-[2vw] md:gap-[2.5vw]">
-          {LETTERS.map((l) => (
-            <motion.div
-              key={l.src}
-              initial={{ opacity: 0, y: 60, scale: 0.7 }}
-              whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.9, delay: 0.1 + LETTERS.indexOf(l) * 0.09, ease: BACK }}
-              drag
-              dragSnapToOrigin
-              dragElastic={0.5}
-              dragTransition={{ bounceStiffness: 300, bounceDamping: 16 }}
-              whileHover={{ scale: 1.06 }}
-              whileDrag={{ scale: 1.1, cursor: "grabbing", zIndex: 10 }}
-              className="cursor-grab touch-none select-none"
-            >
-              {/* The idle drift is its OWN element under the entrance — two animations owning
-                  `y` and `scale` on one node fight, and the letter never appears. */}
-              <motion.div
-                animate={{ y: [0, l.drift[0], 0], rotate: [0, l.drift[1], 0] }}
-                transition={{ duration: l.dur, repeat: Infinity, ease: "easeInOut" }}
-                className="pointer-events-none"
-              >
-                <Image
-                  src={l.src}
-                  alt=""
-                  width={690}
-                  height={900}
-                  unoptimized
-                  draggable={false}
-                  className="h-[clamp(72px,17vw,300px)] w-auto"
-                />
-              </motion.div>
-            </motion.div>
-          ))}
-        </div>
-
-        <div className="mt-10 grid gap-12 border-t border-ploy-ground/15 pt-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        {/* NO RULE ACROSS THE TOP ANY MORE. It divided the balloon letters from the links;
+            with the letters gone it was a hairline under nothing, with a band of empty slate
+            above it — a divider is a relationship between two things and there was only one
+            thing left. */}
+        <div className="grid gap-12 pt-2 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
-            {/* THE MARK, NOT THE WORD SET IN ANTON. The footer spelled "EGFUL" in the display
-                face, so the site carried two different wordmarks — the real one in the header
-                and a typographic impostor down here. One brand, one mark. The balloon letters
-                above are the toy; this is the signature. */}
+            {/* THE MARK ALONE. The line under it — "Print-on-demand fulfilment for Etsy,
+                Shopify and TikTok Shop" — was a caption on a logo, in a footer, at the bottom
+                of a page that has spent its whole length saying exactly that. §4: a thing
+                explains itself or the label is wrong, and a wordmark needs no label. */}
             <Wordmark className="h-[34px] w-auto" />
-            <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-ploy-ground/60">
-              Print-on-demand fulfilment for Etsy, Shopify and TikTok Shop.
-            </p>
           </div>
 
           {COLUMNS.map((col) => (

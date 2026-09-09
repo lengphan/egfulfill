@@ -58,28 +58,41 @@ type Piece = { src: string; x: number; y: number; w: number; rot: number; delay:
  * before anything lands on it, which is the order gravity would deliver and the reason it
  * reads as settling rather than as a swarm arriving.
  */
-function buildMountain(seed: number, courses = 8, baseCount = 9): Piece[] {
+function buildMountain(seed: number, courses = 9, baseCount = 13): Piece[] {
   const r = mulberry32(seed)
   const out: Piece[] = []
   for (let c = 0; c < courses; c++) {
     const t = c / (courses - 1)
     // How many in this course, and how wide it spreads: both taper toward the summit.
-    /* ENOUGH TO READ, NOT ENOUGH TO BECOME TEXTURE. Six hundred pieces filled the margin but
-       nothing in it could be seen to FALL — at that density it is a moving surface, and the
-       whole point is watching separate objects arrive and settle. Around forty a side is the
-       number where each one is still its own shape and the pile is still a pile. */
-    const n = Math.max(2, Math.round(baseCount * (1 - t) ** 0.9))
-    const spread = 1 - t * 0.42
+    /* ENOUGH TO READ, NOT ENOUGH TO BECOME TEXTURE — and forty a side was under the line,
+       not over it. Six hundred pieces made a moving surface nobody could watch a single
+       object fall through; forty made a pile you could see THROUGH, holes of page ground
+       between the shapes, and a heap with daylight in it does not read as settled matter.
+       Around seventy is where the pieces still arrive one at a time and still touch.
+
+       The taper is what actually closes the gaps. At `** 0.9` the count collapsed almost
+       linearly — the upper courses were down to two pieces spread across most of the width,
+       which is the row of isolated objects at the summit. `** 0.55` keeps a course's worth of
+       overlap much further up, so the mound narrows by getting NARROWER rather than by
+       getting sparser, which is how a real pile does it. */
+    const n = Math.max(2, Math.round(baseCount * (1 - t) ** 0.55))
+    const spread = 1 - t * 0.52
     for (let i = 0; i < n; i++) {
       const jitter = (r() - 0.5) * 0.16
       out.push({
         src: SRCS[Math.floor(r() * SRCS.length)],
         // 0..1 across the mountain's own width, centred and narrowing as it climbs
-        /* Held to 0.12..0.88 so a piece's half-width never hangs past the container. That
-           is what lets the section drop `overflow` entirely — nothing has to be cut off to
-           keep the page from scrolling sideways. */
-        x: Math.min(0.88, Math.max(0.12, 0.5 + ((i + 0.5) / n - 0.5) * spread + jitter)),
-        y: c * 52 + (r() - 0.5) * 16,
+        /* Held to 0.2..0.8, in from 0.12..0.88. The bound is meant to keep a piece's HALF
+           WIDTH inside the container, and it never did: at 0.12 of a 400px column a 150px
+           piece hangs 28px past the edge, which on the outer side of each mound is the
+           viewport edge — so the heap ended in a straight vertical cut down the side of the
+           screen. A pile with a razor edge is not a pile. Denser courses only made more
+           pieces land on it. */
+        x: Math.min(0.8, Math.max(0.2, 0.5 + ((i + 0.5) / n - 0.5) * spread + jitter)),
+        /* 42, not 52. The courses are shorter than the pieces are tall, so each one beds
+           into the one below instead of resting on its shoulders — the vertical half of the
+           same gap problem. */
+        y: c * 42 + (r() - 0.5) * 14,
         w: Math.round((132 - t * 46) * (0.8 + r() * 0.36)),
         rot: Math.round((r() - 0.5) * 54),
         delay: t * 0.9 + r() * 0.22,
@@ -153,7 +166,14 @@ function Mountain({ pieces, side, progress }: { pieces: Piece[]; side: "left" | 
            this layer and can never beat the CTA content's z-10 — without it a piece painted
            straight over the headline. Narrower than the margin looks, so the two mountains
            never meet the centred card and bury the heading's first and last letters. */
-        "pointer-events-none absolute bottom-0 z-0 hidden h-full w-[clamp(260px,27vw,400px)] md:block " +
+        /* IT RESTS ON THE FOOTER, not 56px above it. The mound's base course sits at this
+           layer's bottom, and this layer used to stop where the CTA section stops — while the
+           marketing layout's <main> carries `pb-14 md:pb-20` underneath, so the whole pile
+           floated a clear band of page ground above the footer's top edge and read as
+           suspended rather than settled.
+           These two values ARE that padding, negated. If the layout's bottom padding moves,
+           this moves with it — they are a pair, and grepping either number finds both. */
+        "pointer-events-none absolute -bottom-14 z-0 hidden h-full w-[clamp(260px,27vw,400px)] md:-bottom-20 md:block " +
         (side === "left" ? "left-0" : "right-0")
       }
     >

@@ -21,17 +21,23 @@
  * the two relationships it has — not what number looks right.
  */
 
-/** One idea continued. */
-export const STACK = "pt-4"
+/** One idea continued. 8px — a seam, not a gap. */
+export const STACK = "pt-2"
 
 /** A new argument.
  *
- * 48px, down from 128 then 80. Every band here is a rounded fill on the page ground, so this
- * gap is the GUTTER BETWEEN TWO CARDS, not the air above a heading — and a card gutter is
- * small. At 128 two bands read as two pages that happened to follow each other; at 80 there
- * was still a corridor of ground between them. It only has to be unmistakably larger than
- * STACK (16px), and 48 is. */
-export const SECTION = "pt-8 md:pt-12"
+ * 20px, down from 128 → 80 → 48. Every band here is a rounded fill on the page ground, so
+ * this gap is the GUTTER BETWEEN TWO CARDS, not the air above a heading — and a card gutter
+ * is small. Each step down was the same note from the owner and 48 still got it: "section
+ * gaps feel very disconnected". The reason 48 still read as a corridor is that these bands
+ * are ENORMOUS — 700px and more of saturated colour — and a gap reads relative to what it
+ * separates, not in absolute pixels. Against a band that size, 48px of pale ground is a
+ * stripe you notice; 20px is a seam you do not.
+ *
+ * It still has to be unmistakably larger than STACK, which is why STACK moved to 8px with it.
+ * The two are a RATIO, not two numbers: 2.5× apart before and 2.5× apart now. Shrinking one
+ * without the other is what would actually break the distinction. */
+export const SECTION = "pt-5 md:pt-6"
 
 /** The first section on a page — clears the fixed header (h-16) plus a breath. */
 export const TOP = "pt-20 md:pt-24"

@@ -230,9 +230,14 @@ export async function signup({ email, password, role = 'seller', name = '', stor
     // Two unique constraints now — say which one actually collided rather than
     // blaming the email for a username clash.
     if (e.code === '23505') {
+      /* SAY WHAT TO DO, not just what is wrong. "That email is already registered" is a
+         dead end phrased as a fact — the person is at a signup form because they want in, and
+         the answer to an address that already has an account is to sign in with it, or to
+         reset the password if that is why they were making a second one. A refusal that names
+         the way forward is the difference between a fixed problem and a support ticket. */
       throw new Error(String(e.detail || e.constraint || '').includes('username')
-        ? 'That username is already taken'
-        : 'That email is already registered');
+        ? 'That username is taken — pick another.'
+        : 'This email already has an account. Log in instead, or reset your password.');
     }
     throw e;
   }
