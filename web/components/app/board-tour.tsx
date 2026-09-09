@@ -7,6 +7,7 @@ import { motion, useReducedMotion, type PanInfo } from "motion/react"
 import { CaretRight, Minus } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { getUser } from "@/lib/auth"
+import { staffNavTitle } from "@/lib/staff-nav"
 
 /**
  * THE BOARD TOUR — three cards naming the board, the one thing you do on it, and where the
@@ -62,10 +63,22 @@ const PANEL_POS: Record<Corner, string> = {
   br: "sm:right-5 sm:bottom-20 sm:top-auto",
 }
 
-type Card = { title: string; body: string; where: string; href: string }
+type Card = { title: string; body: string; href: string; tab?: string }
 
 /**
  * EVERY LINE NAMES A PLACE THAT EXISTS TODAY, and `href` is where the person is sent.
+ *
+ * `href` IS THE ONLY ADDRESS, and the row's last words are READ OUT OF IT. The destination
+ * used to be a second hand-typed string — "/designer", "card details", "/inventory › Scan" —
+ * which was a route path shown to someone who never types one AND a copy free to disagree
+ * with the link underneath it: "card details" is not a page, and the two "› Scan" / "›
+ * Dispatch" rows named a tab their href did not open. Now `staffNavTitle` resolves the page
+ * name from the href, so the row says exactly what the sidebar and the top bar say, in the
+ * reader's language, and lands on exactly that page.
+ *
+ * `tab` is the query value AND the word — every one of these tab bars deep-links on `?tab=`
+ * (shipping-view, inventory-section, settings-view all read it), so a card that names a tab
+ * OPENS that tab rather than dropping the reader on the board's first one.
  *
  * These are not feature blurbs. Each card is one thing the board will not tell you by
  * looking at it: which queue is actually yours, what has to happen before yours can, and
@@ -74,24 +87,24 @@ type Card = { title: string; body: string; where: string; href: string }
  */
 const TOUR: Record<string, Card[]> = {
   operator: [
-    { title: "Your queue is Orders", body: "Everything the floor is making, by stage.", where: "/production", href: "/production" },
-    { title: "Artwork gets approved first", body: "A card has to clear the design board before anything prints.", where: "/designer", href: "/designer" },
-    { title: "Your zone ends at scan", body: "Stage changes are yours. Anything that moves money is not.", where: "/inventory › Scan", href: "/inventory" },
+    { title: "Your queue is Orders", body: "Everything the floor is making, by stage.", href: "/production" },
+    { title: "Artwork gets approved first", body: "A card has to clear the design board before anything prints.", href: "/designer" },
+    { title: "Your zone ends at scan", body: "Stage changes are yours. Anything that moves money is not.", href: "/inventory?tab=scan", tab: "Scan" },
   ],
   warehouse: [
-    { title: "Stock lives in Inventory", body: "Levels on hand, and the in/out station beside them.", where: "/inventory", href: "/inventory" },
-    { title: "Today's parcels are Dispatch", body: "A short queue you empty; the archive is the tab next to it.", where: "/shipping", href: "/shipping" },
-    { title: "Labels are rate-shopped for you", body: "Cheapest across four carriers, bought at cost. You never pick one.", where: "/shipping › Dispatch", href: "/shipping" },
+    { title: "Stock lives in Inventory", body: "Levels on hand, and the in/out station beside them.", href: "/inventory" },
+    { title: "Today's parcels are Dispatch", body: "A short queue you empty; the archive is the tab next to it.", href: "/shipping?tab=dispatch", tab: "Dispatch" },
+    { title: "Labels are rate-shopped for you", body: "Cheapest across four carriers, bought at cost. You never pick one.", href: "/shipping?tab=rates", tab: "Rates" },
   ],
   designer: [
-    { title: "Claim a card to start", body: "An unclaimed card is anyone's; a claimed one is yours.", where: "/designer", href: "/designer" },
-    { title: "The file goes on the card", body: "Not on the order. The card carries it through review.", where: "card details", href: "/designer" },
-    { title: "You are credited on approval", body: "Not on submission — approval is what pays.", where: "/earnings", href: "/earnings" },
+    { title: "Claim a card to start", body: "An unclaimed card is anyone's; a claimed one is yours.", href: "/designer" },
+    { title: "The file goes on the card", body: "Not on the order. The card carries it through review.", href: "/designer" },
+    { title: "You are credited on approval", body: "Not on submission — approval is what pays.", href: "/earnings" },
   ],
   admin: [
-    { title: "Put every key in the UI", body: "Keys saved here survived the August rebuild. Keys in .env did not.", where: "Settings › Integrations", href: "/settings" },
-    { title: "Roles decide what people see", body: "Invite, then set the nav each role gets.", where: "Settings › Users · Permissions", href: "/settings" },
-    { title: "Check a backup exists", body: "The nightly dump is what a rebuild restores from.", where: "Settings › Backups", href: "/settings" },
+    { title: "Put every key in the UI", body: "Keys saved here survived the August rebuild. Keys in .env did not.", href: "/settings?tab=keys", tab: "API keys" },
+    { title: "Roles decide what people see", body: "Invite, then set the nav each role gets.", href: "/settings?tab=users", tab: "Users" },
+    { title: "Check a backup exists", body: "The nightly dump is what a rebuild restores from.", href: "/settings?tab=backups", tab: "Backups" },
   ],
 }
 
@@ -210,8 +223,9 @@ export function BoardTour() {
           checkable, so it carries the step's number instead — a tick here would claim a
           progress that does not exist.
 
-          `where` rides on the end of the sub rather than taking a line of its own, so the row
-          stays two lines like the seller's. */}
+          The destination rides on the end of the sub rather than taking a line of its own,
+          so the row stays two lines like the seller's — and it is the page's NAME, resolved
+          from the href, never the route. */}
       <ol className="grid gap-2 overflow-y-auto p-2.5">
         {cards.map((c, n) => (
           <li key={c.title}>
@@ -229,7 +243,11 @@ export function BoardTour() {
               <span className="min-w-0">
                 <span className="block text-sm font-semibold">{tl("tour", c.title)}</span>
                 <span className="block text-xs text-muted-foreground">
-                  {tl("tour", c.body)} <span className="text-foreground">{c.where}</span>
+                  {tl("tour", c.body)}{" "}
+                  <span className="text-foreground">
+                    {tl("nav", staffNavTitle(c.href.split("?")[0]))}
+                    {c.tab ? ` \u203A ${tl("settings", c.tab)}` : ""}
+                  </span>
                 </span>
               </span>
               <CaretRight size={12} weight="bold" className="text-muted-foreground" />
