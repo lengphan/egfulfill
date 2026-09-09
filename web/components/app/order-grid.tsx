@@ -24,7 +24,7 @@ import { useLabelT } from "@/lib/i18n"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { ArrowCounterClockwise, ArrowClockwise } from "@phosphor-icons/react"
+import { ArrowCounterClockwise, ArrowClockwise, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   CSV_COLUMNS,
@@ -146,9 +146,13 @@ export type OrderGridProps = {
    * is also what every other caller gets.
    */
   toolbarTarget?: HTMLElement | null
+  /** A control belonging to the PAGE, rendered in the toolbar between the history icons and
+   *  Back — the slot Add rows vacated when it became a plus under the last row. The sheet
+   *  page puts its Save there; a caller with nothing to add passes nothing. */
+  saveSlot?: React.ReactNode
 }
 
-export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRows, onRowsChange, toolbarTarget }: OrderGridProps) {
+export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRows, onRowsChange, toolbarTarget, saveSlot }: OrderGridProps) {
   const tl = useLabelT()
   /**
    * ONE FETCH, ON MOUNT. Deliberately not keyed to anything the fetch itself writes — see
@@ -796,7 +800,9 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         aria-label={tl("orderGrid", "Redo")} title={tl("orderGrid", "Redo (⇧⌘Z)")}>
         <ArrowClockwise size={15} weight="bold" />
       </Button>
-      <Button variant="outline" size="sm" onClick={addRows} disabled={busy}>{tl("orderGrid", "Add rows")}</Button>
+      {/* Where Add rows used to be. The sheet page owns saving, so it hands the control in
+          rather than this file learning what a save is. */}
+      {saveSlot}
       {onBack && (
         <Button variant="outline" size="sm" onClick={onBack} disabled={busy}>
           {backLabel || tl("orderGrid", "Back")}
@@ -1024,6 +1030,35 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
               )
             })}
           </tbody>
+          {/**
+            * ADD ROWS IS A PLUS UNDER THE LAST ROW (owner's call, 2026-09-09).
+            *
+            * It was a button in the toolbar, which put "make the sheet longer" at the top of
+            * a sheet you lengthen at the BOTTOM — so the answer to running out of rows was
+            * to scroll back up, away from the place you had run out. Every spreadsheet this
+            * is modelled on puts it under the last row, where the need appears.
+            *
+            * A `tfoot` ROW rather than a control below the table, so it scrolls with the
+            * grid and stays attached to the last row instead of pinning itself to the
+            * viewport. It spans every column: the target is the width of the sheet, which
+            * is what makes it hittable without aiming.
+            */}
+          <tfoot>
+            <tr>
+              <td colSpan={CSV_COLUMNS.length + 2} className="border-b border-border p-0">
+                <button
+                  type="button"
+                  onClick={addRows}
+                  disabled={busy}
+                  title={tl("orderGrid", "Add five more rows")}
+                  className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+                >
+                  <Plus size={14} weight="bold" className="shrink-0" />
+                  {tl("orderGrid", "Add rows")}
+                </button>
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 

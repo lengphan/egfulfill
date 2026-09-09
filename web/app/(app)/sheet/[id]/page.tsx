@@ -38,6 +38,9 @@ import {
 
 /** Long enough that typing a street name is one save, short enough to survive a closed tab. */
 const AUTOSAVE_MS = 1200
+/** How long "Saved" stays on screen before the control goes quiet. Long enough to read at a
+ *  glance, short enough that it is not a permanent label by another name. */
+const SAVED_MS = 2000
 
 export default function SheetPage() {
   const tl = useLabelT()
@@ -70,7 +73,16 @@ export default function SheetPage() {
   const [missing, setMissing] = useState(false)
   const [name, setName] = useState("")
   const [handoff, setHandoff] = useState<string[][] | null>(null)
-  const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "failed">("idle")
+  /**
+   * FIVE STATES, because the old four told one small lie.
+   *
+   * `push()` set "saving" the moment a key was pressed, while the request was still a
+   * debounce away from being sent — so the sheet said it was saving during the window in
+   * which it demonstrably was not. `dirty` is that window, and it is the state the Save
+   * control is FOR: there are changes, they are going out shortly, and pressing sends them
+   * now instead of waiting.
+   */
+  const [saved, setSaved] = useState<"idle" | "dirty" | "saving" | "saved" | "failed">("idle")
   const [busy, setBusy] = useState(false)
   /**
    * The title row's right-hand slot, handed to the grid so it can render its toolbar there.
@@ -100,17 +112,49 @@ export default function SheetPage() {
    * warns about.
    */
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const push = useCallback((body: { name?: string; rows?: string[][] }) => {
-    if (timer.current) clearTimeout(timer.current)
+  /** The edit waiting to go out. Held so Save can send THIS body immediately rather than
+   *  re-deriving what changed, and so a retry after a failure re-sends the same thing. */
+  const pending = useRef<{ name?: string; rows?: string[][] } | null>(null)
+  /** Clears "Saved" back to quiet. A ref so unmount can cancel it — a setState after unmount
+   *  is a warning nobody ever fixes because it only appears when you navigate away fast. */
+  const quiet = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const send = useCallback(() => {
+    const body = pending.current
+    if (!body) return
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    pending.current = null
     setSaved("saving")
-    timer.current = setTimeout(() => {
-      saveOrderSheet(id, body)
-        .then((r) => setSaved(r && "error" in r && r.error ? "failed" : "saved"))
-        .catch(() => setSaved("failed"))
-    }, AUTOSAVE_MS)
+    saveOrderSheet(id, body)
+      .then((r) => {
+        if (r && "error" in r && r.error) { pending.current = body; setSaved("failed"); return }
+        setSaved("saved")
+        /* SAY IT, THEN STOP SAYING IT. A permanent "Saved" is a word that is true from the
+           moment the page loads until you close it, so it stops being read — and it was the
+           only thing on this row that never changed. It goes quiet after a beat; the state
+           that MATTERS (unsaved, failing) is the one that stays on screen. */
+        if (quiet.current) clearTimeout(quiet.current)
+        quiet.current = setTimeout(() => setSaved("idle"), SAVED_MS)
+      })
+      /* A FAILURE KEEPS THE BODY and never goes quiet. Losing a sheet is the one outcome
+         this screen exists to prevent, so the control stays there saying so, and pressing it
+         re-sends exactly what did not land. */
+      .catch(() => { pending.current = body; setSaved("failed") })
   }, [id])
 
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  const push = useCallback((body: { name?: string; rows?: string[][] }) => {
+    if (timer.current) clearTimeout(timer.current)
+    /* Merged, not replaced: a rename followed by an edit inside one debounce window would
+       otherwise send only the second half. */
+    pending.current = { ...(pending.current ?? {}), ...body }
+    setSaved("dirty")
+    timer.current = setTimeout(send, AUTOSAVE_MS)
+  }, [send])
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+    if (quiet.current) clearTimeout(quiet.current)
+  }, [])
 
   const rename = (v: string) => { setName(v); push({ name: v }) }
 
@@ -160,14 +204,8 @@ export default function SheetPage() {
           />
         )}
 
-        {done ? (
+        {done && (
           <span className="rounded-lg bg-shipped/10 px-2 py-0.5 text-2xs font-medium text-shipped">{tl("sheet_[id]", "Sent")}</span>
-        ) : (
-          /* State, not decoration: without it autosave is invisible and the only way to
-             believe it is to close the tab and find out. */
-          <span className="text-xs text-muted-foreground">
-            {saved === "saving" ? tl("sheet_[id]", "Saving…") : saved === "saved" ? tl("sheet_[id]", "Saved") : saved === "failed" ? tl("sheet_[id]", "Not saved") : ""}
-          </span>
         )}
 
         {/* ONE ROW OF CONTROLS, AND IT IS THIS ONE.
@@ -201,6 +239,36 @@ export default function SheetPage() {
             onComplete={complete}
             onBack={goBack}
             backLabel={fromImport ? tl("sheet_[id]", "Back to import") : tl("sheet_[id]", "Back")}
+            /* SAVE IS A CONTROL NOW, and it is still not the thing that saves.
+               The autosave is unchanged and remains the guarantee — a sheet you can lose by
+               forgetting to press something is the failure this screen exists to remove.
+               What this adds is the ability to stop WAITING for it, and a state you can read:
+               "Save" while an edit is pending, "Saving…" while it is in flight, "Saved" for
+               two seconds, then nothing at all.
+               QUIET WHEN IDLE, deliberately. The word this replaced was true from the moment
+               the page loaded until you closed it, which is how a status stops being read.
+               The slot keeps its width so the buttons beside it do not jump as it changes. */
+            saveSlot={
+              <div className="flex min-w-[6.25rem] justify-end">
+                {saved !== "idle" && (
+                  <Button
+                    variant={saved === "failed" ? "outline" : "ghost"}
+                    size="sm"
+                    onClick={send}
+                    disabled={saved === "saving" || saved === "saved"}
+                    title={saved === "failed"
+                      ? tl("sheet_[id]", "That change did not reach the server. Press to send it again.")
+                      : tl("sheet_[id]", "Saves on its own — press to send it now")}
+                    className={saved === "failed" ? "border-alert/40 text-alert hover:bg-alert/10" : "text-muted-foreground"}
+                  >
+                    {saved === "saving" ? tl("sheet_[id]", "Saving…")
+                      : saved === "saved" ? tl("sheet_[id]", "Saved")
+                      : saved === "failed" ? tl("sheet_[id]", "Not saved · Retry")
+                      : tl("sheet_[id]", "Save")}
+                  </Button>
+                )}
+              </div>
+            }
           />
         )}
       </div>
