@@ -976,41 +976,56 @@ export default function OrderDetailPage() {
  note: `Reversed price adjustment${line.note ? ` — ${line.note}` : ""}`,
  clientId: `revfee-${id}-${key}`,
       })
- if (!r?.error) reloadAll()
+ if (!r?.error) {
+        /**
+         * PAINT FROM THE ANSWER WE ALREADY HAVE.
+         *
+         * This called reloadAll() and waited, which is why the row took a beat to change:
+         * reloadAll refetches the order AND the whole orders list, the order landing sets
+         * `one`, that re-runs the effect that fetches charges — so the strike-through was
+         * three sequential round trips away, one of them a list this card does not use.
+         *
+         * The refund route already returns the recomputed charge state (it re-reads it after
+         * the money moves, precisely so the caller does not have to). Setting it is instant
+         * and it is the same object the next fetch would produce.
+         */
+ setCharges((prev) => ({ ...(prev ?? {} as OrderCharges), ...r }))
+ reloadAll()
+      }
     } catch { /* the row stays; the reload below is what would have changed it */ }
  finally { setReversing(null) }
   }
 
   /**
-   * WHICH ADJUSTMENT A REVERSAL CANCELLED — matched here, because the ledger cannot say it.
+   * WHICH ADJUSTMENTS HAVE BEEN SENT BACK — allocated, not matched by text.
    *
-   * A reversed adjustment used to leave the charge at full price and a lone "Refunded
-   * −$9.00" at the bottom of the card, with nothing tying the two together. On an order
-   * carrying five adjustments that is unreadable: the money is right, and which of them was
-   * undone is anybody's guess.
+   * The first attempt paired a refund to a line by reading its note, and it only ever worked
+   * for reversals THIS control had written. Anything refunded through the refund panel, or
+   * before the control existed, matched nothing — so five adjustments sat at full price above
+   * a bare "Refunded −$23.00", which reads as if none of them had been touched. That is what
+   * "the fee is still there?" was looking at.
+   *
+   * The ledger cannot say which adjustment a refund cancelled, because it does not record
+   * that: a refund names a PART and an amount. So this allocates the same way the server does
+   * when a refund names no line — top-down, oldest first, until the refunded total is used
+   * up. Only a fully covered line is marked; a partly covered one is still owed something and
+   * must not read as settled.
    *
    * IT CANNOT DISAPPEAR, and that is deliberate. Both movements happened — the wallet went
    * down and came back up — and the seller's statement shows both. A summary that hid them
-   * would disagree with the wallet, which is worse than a line that reads as settled.
-   *
-   * CONSUMED ONE FOR ONE. Two adjustments can share an amount AND a reason (the same charge
-   * entered twice is exactly how this comes up), so a reversal is claimed by the first line
-   * it matches and then removed from the pool. Matching without consuming would strike both
-   * through for one refund and report money back that never came.
+   * would disagree with the wallet the seller can open in the next tab, and two screens
+   * disagreeing about money is worse than a line that reads as settled.
    */
  const reversedLines = (() => {
- const pool = (charges?.refunds ?? []).filter((r) => r.part === "fee").map((r) => ({ ...r, used: false }))
+ let left = (charges?.parts ?? []).find((p) => p.key === "fee")?.refunded ?? 0
  const marked = new Set<number>()
  let claimed = 0
     ;(charges?.lines ?? []).forEach((l, i) => {
  if (l.part !== "fee" || l.amount <= 0) return
- const hit = pool.find((r) => !r.used
-        && Math.abs((Number(r.amount) || 0) - l.amount) < 0.005
-        && (!l.note || String(r.note || "").includes(l.note)))
- if (!hit) return
- hit.used = true
+ if (left + 0.005 < l.amount) return
+ left -= l.amount
  marked.add(i)
- claimed += Number(hit.amount) || 0
+ claimed += l.amount
     })
  return { marked, claimed }
   })()
