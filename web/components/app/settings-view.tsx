@@ -2127,11 +2127,28 @@ const PLANS = ["starter", "pro", "enterprise"]
 // base : Account · Access
 // sm : Account · Balance · Access
 // lg : Account · Joined · Activity · Balance · Access
+/**
+ * THE CONTAINER'S WIDTH, NOT THE WINDOW'S — which is what `sm:`/`lg:` were answering, and
+ * they were answering the wrong question.
+ *
+ * This table never gets the viewport. On Settings the sidebar takes ~350px and the settings
+ * nav card another ~300, so a 1366px window leaves it about 716. `lg:` fires at 1024px of
+ * WINDOW, so the five-column layout switched on with 716px to draw it in — and `table`-less
+ * CSS grid does not clip, it overlaps: ACCOUNT and JOINED printed on top of each other and
+ * the seller's name and email vanished behind the date. The row showed a balance, a role and
+ * a plan with no way to tell whose account it was.
+ *
+ * The numbers are the requirement, not a guess. Fixed tracks sum to 848px, the select column
+ * is 36, and Items has a 178px floor: 1062px for the five-column layout, 542 for the three.
+ * The breakpoints are those figures with a little headroom, written as container queries so
+ * they mean what they say — collapse the sidebar and the table gets wider and switches on its
+ * own, which a viewport breakpoint can never do.
+ */
 const USER_ROW_GRID =
   "grid items-center gap-x-3 gap-y-1 px-5 " +
   "grid-cols-[minmax(0,1fr)_11rem] " +
-  "sm:grid-cols-[minmax(0,1fr)_5.5rem_15rem] " +
-  "lg:grid-cols-[minmax(0,1fr)_6.5rem_10rem_5.5rem_17rem]"
+  "@[560px]:grid-cols-[minmax(0,1fr)_5.5rem_15rem] " +
+  "@[1080px]:grid-cols-[minmax(0,1fr)_6.5rem_10rem_5.5rem_17rem]"
 
 /**
  * The seller's Activity cell: today's uploads over their daily limit, plus the recent
@@ -2717,16 +2734,21 @@ function UsersPanel() {
  identical column edges, which the old flex layout did not. Identity is one cell
              (avatar + name + email + badges); a team member sits under its leader with a
  left accent INSIDE that cell, so the indent never shifts the columns beside it. */
-          <div className="divide-y divide-border">
+          /* THE QUERY CONTAINER. Without this the @[…] breakpoints above have nothing to
+             measure against and every one of them is simply never true — the table would
+             render permanently in its narrowest two-column form, which is a different bug
+             wearing the same clothes. It goes here rather than on the card so the width being
+             measured is the one the rows actually occupy. */
+          <div className="@container divide-y divide-border">
             {/* Header — labels the columns the rows carry, so a bare "$0.00" or a date reads
  as a claim, not a loose number. Same grid + same per-cell breakpoints as the
  rows, so each label sits exactly above its values. */}
             {paged.pageItems.length > 0 && (
               <div className={USER_ROW_GRID + " py-2 eg-label text-muted-foreground"}>
                 <span className="min-w-0">{tl("settings", "Account")}</span>
-                <span className="hidden lg:block">{tl("settings", "Joined")}</span>
-                <span className="hidden lg:block">{tl("settings", "Order limit (/day)")}</span>
-                <span className="hidden text-right sm:block">{tl("settings", "Balance")}</span>
+                <span className="hidden @[1080px]:block">{tl("settings", "Joined")}</span>
+                <span className="hidden @[1080px]:block">{tl("settings", "Order limit (/day)")}</span>
+                <span className="hidden text-right @[560px]:block">{tl("settings", "Balance")}</span>
                 {/* Same 3-col sub-grid as the row's Access cell, so Role / Plan sit exactly
  over their selects. */}
                 <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-1.5">
@@ -2795,13 +2817,13 @@ function UsersPanel() {
                   </button>
 
                   {/* Joined — context, not a control, so it stays quiet. */}
-                  <span className="hidden truncate text-sm text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
+                  <span className="hidden truncate text-sm text-muted-foreground @[1080px]:block">{fmtDate(u.created_at)}</span>
 
                   {/* Order limit — sellers, plus any account that syncs its own orders (the
  factory/admin shop). Edit inline; amber once today hits the limit. A
  seller with none set inherits the platform default; a factory account
  shows "No limit" until you set one. Staff with no orders stay "—". */}
-                  <div className="hidden min-w-0 text-xs lg:block">
+                  <div className="hidden min-w-0 text-xs @[1080px]:block">
                     {isSeller || hasOwnOrders(u) ? (
                       <>
                         <LimitCell user={u} canEdit={isAdminCaller} defaultLimit={isSeller ? defaultLimit : 0} saving={busy === u.id} onSave={(v) => saveOrderLimit(u, v)} />
@@ -2819,14 +2841,14 @@ function UsersPanel() {
  can't submit work. */}
                   {isSeller ? (
                     <span
- className={"hidden text-right text-sm tabular-nums sm:block " +
+ className={"hidden text-right text-sm tabular-nums @[560px]:block " +
                         ((u.balance ?? 0) <= 0 ? "font-medium text-primary" : "text-muted-foreground")}
  title={(u.balance ?? 0) <= 0 ? tl("settings", "No funds — this account can't submit orders") : tl("settings", "Wallet balance")}
                     >
                       {usd2(u.balance ?? 0)}
                     </span>
                   ) : (
-                    <span className="hidden text-right text-sm text-muted-foreground/50 sm:block">—</span>
+                    <span className="hidden text-right text-sm text-muted-foreground/50 @[560px]:block">—</span>
                   )}
 
                   {/* Access — role + plan + the manage menu, right-aligned under the header.
