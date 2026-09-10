@@ -193,6 +193,23 @@ function skipsPipeline(current, target, isFactory = false) {
  * derived from the owner's role). It selects which line the adjacency rules read; see the note
  * on FACTORY_LINE. Defaults false, so a caller that doesn't know is held to the stricter line.
  */
+/**
+ * WHERE A HOLD CAME FROM — and it is spelled two ways in the database.
+ *
+ * This route writes `held_from`; the web hub used to write `hold_from` on the same jsonb
+ * field, so orders held from a board and orders held from the hub carry different keys.
+ * Reading only one of them made the gate compute "back to Draft" for a hold whose button
+ * correctly offered "Back to Pending" — a refusal on the one control that lifts the hold.
+ *
+ * Mirrors heldFromOf in web/shared/order-rules.js. New holds write `held_from` only; this
+ * exists for the rows already in the table.
+ */
+export function heldFromOf(meta) {
+  if (!meta || typeof meta !== 'object') return '';
+  const v = meta.held_from ?? meta.hold_from;
+  return typeof v === 'string' ? v : '';
+}
+
 export function stageDenial(role, current, target, isFactory = false, holdFrom = null) {
   const at = normalizeStage(current), to = normalizeStage(target);
 
@@ -2369,7 +2386,7 @@ export function ordersRoutes(app, requireAuth) {
         .then((r) => r.rows[0]).catch(() => null);
       const recordingLabel = body.tracking !== undefined && want === 'shipped';
       if (cur && !recordingLabel) {
-        const denial = stageDenial(String(req.user.role || ''), cur.factory_status, want, cur.factory_order === true, cur.meta && cur.meta.held_from);
+        const denial = stageDenial(String(req.user.role || ''), cur.factory_status, want, cur.factory_order === true, heldFromOf(cur.meta));
         if (denial) { reply.code(403); return { error: denial }; }
       }
     }
@@ -2800,7 +2817,7 @@ export function ordersRoutes(app, requireAuth) {
     if (!pre.rows[0]) { reply.code(404); return { error: 'item not found' }; }
     // Role gate — see stageDenial. Read the CURRENT stage first: an operator's reach
     // depends on where the item already is, not just where they're sending it.
-    const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status, pre.rows[0].factory_order, pre.rows[0].meta && pre.rows[0].meta.held_from);
+    const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status, pre.rows[0].factory_order, heldFromOf(pre.rows[0].meta));
     if (denial) { reply.code(403); return { error: denial }; }
     // Shipping is an ORDER-level claim even when set per item: a parcel can't go out
     // half-made. Everything before shipped stays per-item and unrestricted.
