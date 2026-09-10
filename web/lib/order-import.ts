@@ -264,6 +264,13 @@ export const SIDE_OPTIONS: string[] = PRINT_SIDES.map((s) => SIDE_LABEL[s])
  */
 const SIDE_ALIASES: Record<string, string> = {
   front: "front", frontside: "front", fullfront: "front", chest: "front",
+  /* LEFT CHEST AND RIGHT CHEST ARE FRONT PLACEMENTS, which the note above this table already
+     says outright — "left chest is a front placement in every POD" — and which the table then
+     did not carry, so the two most common terms on a POD order form warned and fell back
+     instead of resolving. They go in as WHOLE keys, not by substring: matching "left chest"
+     on a contained "left" is the exact trap that note is warning about, and would print a
+     chest logo on the sleeve. */
+  leftchest: "front", rightchest: "front",
   back: "back", backside: "back", rear: "back", fullback: "back",
   left: "left", leftsleeve: "left", sleeveleft: "left", leftarm: "left", leftside: "left",
   right: "right", rightsleeve: "right", sleeveright: "right", rightarm: "right", rightside: "right",
