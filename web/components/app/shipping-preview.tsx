@@ -63,7 +63,7 @@ export function ShippingPreview() {
           number exists to be compared against a parcel, and a truncated one cannot be. The
           row has no spare width, so this needs the store name to move cell rather than the
           column to grow. Left alone until then. */}
-      {tab === "dispatch" ? <DispatchBoard segmented /> : tab === "shipments" ? <ShipmentsView /> : <RateCalculatorView />}
+      {tab === "dispatch" ? <DispatchBoard /> : tab === "shipments" ? <ShipmentsView /> : <RateCalculatorView />}
     </ConsoleShell>
   )
 }

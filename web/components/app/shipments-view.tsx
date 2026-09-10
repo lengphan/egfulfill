@@ -8,6 +8,7 @@ import { SearchField } from "@/components/app/search-field"
 import { ShipmentDetailDialog } from "@/components/app/shipment-detail-dialog"
 import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
+import { TabBar } from "@/components/app/tab-bar"
 import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { deliveryWord, DELIVERY_TEXT_TONE } from "@/lib/delivery-status"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -356,32 +357,40 @@ export function ShipmentsView() {
             means nothing without knowing what is filtering it, and up in a card header it was
             a number floating beside a title. `ml-auto` puts it at the far end of the pill row
             so it reads as the row's total rather than as another pill. */}
-        {/* Each pill carries its own count, so the answer to "is anything stuck?" is on
- screen before you click anything. A pill with nothing behind it is disabled
- rather than hidden — a filter that appears and disappears as data changes is a
- moving target, and "Needs a look: 0" is the good news worth being able to read. */}
-        <div className="flex flex-wrap gap-1.5">
-          {FILTERS.map((f) => {
+        {/**
+         * ONE FILTER ROW FOR THE WHOLE APP (owner, 2026-09-10: "the filter layout look
+         * different on both of these pages").
+         *
+         * This row was outlined lozenges with the count in a faded span; Dispatch's, one tab
+         * away, was `rounded-md` with the count appended to the label as "· 25". Same job,
+         * same shell, two hand-rolled treatments — and §4 already says what a filter row is:
+         * a rule under the live word, and `tab-bar.tsx` is that rule. Both were violating it
+         * in different directions, which is why switching tab felt like changing product.
+         *
+         * `disabled` moved INTO the primitive rather than staying here. Both rows had
+         * independently decided a zero filter is disabled and not hidden — when two callers
+         * reach the same conclusion alone, it belongs in the thing they share.
+         *
+         * Each pill still carries its own count, so "is anything stuck?" is answered before
+         * you click anything.
+         */}
+        <TabBar
+          spacing="none"
+          className="border-b-0"
+          size="sm"
+          ariaLabel={tl("shipments", "Filter shipments")}
+          value={status}
+          onChange={setStatus}
+          items={FILTERS.map((f) => {
  const n = f.key === "all" ? (rows ?? []).length : (rows ?? []).filter(f.match).length
- const on = status === f.key
- return (
-              <button
- key={f.key}
- onClick={() => setStatus(f.key)}
- disabled={!on && n === 0 && f.key !== "all"}
- className={
-                  "rounded-lg border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
-                  (on
-                    ? "border-selected eg-selected"
- : "border-border bg-card text-muted-foreground hover:text-foreground")
-                }
-              >
-                {tl("shipments", f.label)}
-                <span className={"ml-1.5 tabular-nums " + (on ? "opacity-80" : "opacity-60")}>{n}</span>
-              </button>
-            )
+ return {
+ id: f.key,
+ label: tl("shipments", f.label),
+ count: n,
+ disabled: status !== f.key && n === 0 && f.key !== "all",
+            }
           })}
-        </div>
+        />
         {q && <Button size="sm" variant="ghost" onClick={() => setQ("")}>{tl("shipments", "Clear")}</Button>}
         <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
           {busy && <CircleNotch size={14} className="animate-spin" />}

@@ -2610,6 +2610,8 @@ const vi: Dict = {
   "shipments.Manual label": "Nhãn thủ công",
   "label.USPS format": "Định dạng USPS",
   "label.Undo": "Hoàn tác",
+  "shipments.Filter shipments": "Lọc lô hàng",
+  "dispatch.Filter the queue": "Lọc hàng chờ",
   "canvas.every face": "mọi mặt",
   "canvas.Recent files": "Tệp gần đây",
   "canvas.Pick a blank to start designing.": "Chọn một phôi để bắt đầu thiết kế.",

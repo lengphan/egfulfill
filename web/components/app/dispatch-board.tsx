@@ -226,14 +226,11 @@ const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
   { key: "attention", label: "Needs a look" },
 ]
 
-export function DispatchBoard({ segmented }: {
-  /** ONE IDIOM FOR THE FILTER ROW. Measured on this strip: five filters wearing two
-   *  different treatments — "All" a filled chip, the other four bare grey text, so four
-   *  controls doing the same job did not read as controls at all. Segmented gives them one
-   *  track, one height with the search field beside them, and an active state that is a
-   *  raised tile rather than a colour. Off by default; /shipping is unchanged. */
-  segmented?: boolean
-} = {}) {
+/** `segmented` is GONE. It existed to give this strip one idiom instead of two — "All" a
+ *  filled chip and the rest bare grey text — and the filter row is now the shared TabBar,
+ *  which has exactly one idiom by construction. A prop whose whole job was to pick between
+ *  two hand-rolled treatments has nothing left to pick between. */
+export function DispatchBoard() {
   const tl = useLabelT()
  const role = getUser()?.role || ""
   /* Is a ConsoleShell above us? If so the page already has a title and an action band, and
@@ -1208,32 +1205,32 @@ export function DispatchBoard({ segmented }: {
           {/* Filter chips, the same shape History already uses — one screen, one idiom.
               Counted, so an empty list is never ambiguous between "nothing matches this
  filter" and "nothing is here at all". */}
+          {/* THE SAME FILTER ROW SHIPMENTS USES, one tab away — see the note there. This was
+              hand-rolled in two shapes of its own (`segmented` or not), with the count glued
+              onto the label as "· 25", against Shipments' outlined lozenges and a faded count
+              span. §4 already says a filter row is a rule under the live word and names the
+              primitive; both callers were violating it in different directions, which is why
+              changing tab felt like changing product. */}
           {view === "queue" && (
-            <div className={(segmented
-              ? "flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
-              : "flex flex-wrap items-center gap-1") + (inShell ? " order-2" : "")}>
-              {QUEUE_FILTERS.map((f) => (
-                <button
- key={f.key}
- onClick={() => setQFilter(f.key)}
- disabled={f.key !== "all" && !filterCounts[f.key]}
-                 /* The sentence that used to sit above the whole queue, on the one control
-                    it was ever about. */
-                 title={f.key === "external"
-                   ? tl("dispatch", "Labels from outside — not attached to an EGFUL order, and nothing is charged for them. Tick one and press Send to byeastside to put it in their pre-scan queue.")
-                   : undefined}
-                  className={segmented
-                    ? ("h-8 rounded-md px-2.5 text-sm font-medium transition-colors disabled:opacity-40 " +
-                       (qFilter === f.key
-                         ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                         : "text-muted-foreground hover:text-foreground"))
-                    : ("rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
-                       (qFilter === f.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"))}
-                >
-                  {tl("dispatch", f.label)}{filterCounts[f.key] ? ` · ${filterCounts[f.key]}` : ""}
-                </button>
-              ))}
-            </div>
+            <TabBar
+              spacing="none"
+              className={"border-b-0" + (inShell ? " order-2" : "")}
+              size="sm"
+              ariaLabel={tl("dispatch", "Filter the queue")}
+              value={qFilter}
+              onChange={setQFilter}
+              items={QUEUE_FILTERS.map((f) => ({
+                id: f.key,
+                label: tl("dispatch", f.label),
+                count: filterCounts[f.key] || 0,
+                disabled: f.key !== "all" && !filterCounts[f.key],
+                /* The sentence that used to sit above the whole queue, on the one control it
+                   was ever about. */
+                title: f.key === "external"
+                  ? tl("dispatch", "Labels from outside — not attached to an EGFUL order, and nothing is charged for them. Tick one and press Send to byeastside to put it in their pre-scan queue.")
+                  : undefined,
+              }))}
+            />
           )}
           {/* ml-auto: with the filter chips added, the batch count and Select all were being
  wrapped to a second line one at a time and reading as stray controls. Pinned

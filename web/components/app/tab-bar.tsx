@@ -28,8 +28,24 @@ export type TabBarItem<T extends string> = {
   id: T
   label: string
   icon?: Icon
+  /** A sentence for the hover, when a filter's name cannot carry what it does. Not a
+   *  subtitle — §4 — this is the one place a longer explanation is allowed to live. */
+  title?: string
   /** A number beside the label. Genuinely round, so it keeps the pill the tabs gave up. */
   count?: number
+  /**
+   * Nothing behind this one.
+   *
+   * DISABLED RATHER THAN HIDDEN, and the reason is worth stating because the alternative is
+   * tempting: a filter that appears and disappears as data changes is a moving target, and
+   * the reader has to re-find the row every time. "Needs a look · 0" is also the good news
+   * — it is the answer to the question the row exists to ask, and hiding it makes an empty
+   * result ambiguous between "nothing matches" and "that filter isn't a thing".
+   *
+   * Both filter rows this primitive replaced had already reached this conclusion
+   * independently, which is the sign it belongs in the primitive rather than in a caller.
+   */
+  disabled?: boolean
 }
 
 export function TabBar<T extends string>({
@@ -143,6 +159,8 @@ export function TabBar<T extends string>({
             key={t.id}
             type="button"
             onClick={() => onChange(t.id)}
+            disabled={t.disabled}
+            title={t.title}
             aria-current={on ? "page" : undefined}
             className={cn(
               // shrink-0 + nowrap: a tab LABEL never wraps. In a narrow column the flex
@@ -150,7 +168,7 @@ export function TabBar<T extends string>({
               // and the ::after rule — which spans the button — was drawn under the second
               // line, half the width of the word above it. A bar that does not fit should
               // overflow, not fold.
-              "eg-tap relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors", text,
+              "eg-tap relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-40", text,
               look === "segmented" ? "rounded-md px-2.5 py-1" : pad,
               look === "segmented"
                 ? (on
