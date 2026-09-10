@@ -67,6 +67,24 @@ export function OrderNumber({
 }) {
   const tl = useLabelT()
   const label = numOf(order)
+  /**
+   * THE NUMBER THE SELLER GAVE US, beside the one we minted.
+   *
+   * An import sheet's Order Number column is stored on every order that carried one — 46 of
+   * them on this floor — and until now nothing read it back. It was written, grouped lines
+   * into orders, and then vanished: a seller typed 56232323, opened the order and found #2.
+   *
+   * BESIDE, never instead. `#seq` is what staff quote in messages, what the design-fee notes
+   * reference and what the boards sort on; swapping it for a seller's own reference would
+   * break every one of those. This is the buyer's number in the marketplace sense — the same
+   * job an Etsy receipt number does on an Etsy order — so it sits where that would.
+   *
+   * Nothing shows for an order that never carried one, which is most of them: an empty
+   * caption under every number is worse than the omission it is fixing.
+   */
+  const sheetRef = String(
+    (order.meta as { sourceOrderNumber?: unknown } | undefined)?.sourceOrderNumber ?? ""
+  ).trim()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
   const [busy, setBusy] = useState(false)
@@ -98,7 +116,19 @@ export function OrderNumber({
   const unsubmitted = ["", "new", "draft"].includes(String(order.factory_status ?? "").toLowerCase())
   const mayEdit = editable && !!role && (role !== "seller" || unsubmitted)
 
-  if (!mayEdit) return <span className={cn(BASE, className)}>{label}</span>
+  if (!mayEdit) {
+    if (!sheetRef) return <span className={cn(BASE, className)}>{label}</span>
+    return (
+      <span className={cn("inline-flex flex-col leading-tight", className)}>
+        <span className={BASE}>{label}</span>
+        {/* A VALUE, so text-xs and not smaller — it is a reference somebody reads off a sheet
+            and matches against ours, which §4 puts at 12px minimum and never at 11. */}
+        <span className="text-xs font-normal tabular-nums text-muted-foreground" title={tl("orderNumber", "The number from the import sheet")}>
+          {sheetRef}
+        </span>
+      </span>
+    )
+  }
 
   const open = () => {
     setDraft(order.seq ? String(order.seq) : "")
@@ -136,6 +166,11 @@ export function OrderNumber({
         className={cn("-mx-1 rounded px-1 text-left hover:bg-accent", BASE, className)}
       >
         {label}
+        {/* The editable state shows it too, or pressing the number would make the seller's own
+            reference disappear — a control that hides a fact while you use it. */}
+        {sheetRef && (
+          <span className="ml-1.5 text-xs font-normal tabular-nums text-muted-foreground">{sheetRef}</span>
+        )}
       </button>
     )
   }
