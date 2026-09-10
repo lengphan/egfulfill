@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { CaretRight, Package, Storefront, Wallet, ChartBar, Gear, SignOut, PenNib, Truck } from "@phosphor-icons/react"
-import { getUser, clearSession } from "@/lib/auth"
+import { getUser, endSession } from "@/lib/auth"
 import { useMounted } from "@/lib/use-mounted"
 
 /*
@@ -77,7 +77,9 @@ export default function MorePage() {
 
       <div className="px-5 pb-8">
         <button
-          onClick={() => { clearSession(); window.location.href = "/login" }}
+          /* `replace`, via endSession — this already did a hard load, which was right, but
+             `href` leaves the signed-in page one Back button away. */
+          onClick={() => endSession()}
           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-3.5 text-sm font-medium text-muted-foreground transition-colors active:bg-accent"
         >
           <SignOut size={16} /> Sign out

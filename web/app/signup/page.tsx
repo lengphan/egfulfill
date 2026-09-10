@@ -11,7 +11,7 @@ import { PasswordInput } from "@/components/ui/password-input"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
 import { signupUser } from "@/lib/api"
-import { getUser, setSession } from "@/lib/auth"
+import { getUser, setSession, hardNavigate } from "@/lib/auth"
 
 /** Same-origin relative paths only — see the note in app/login/page.tsx. */
 function safeNext(raw: string | null): string | null {
@@ -130,8 +130,12 @@ export default function SignupPage() {
       <AuthShell subtitle="Confirm your email">
         <VerifyCode
           email={email.trim()}
-          onDone={() => router.push(landTo)}
-          onSkip={() => router.push(landTo)}
+          /* A HARD LOAD into the app. Signing up creates a SESSION, and if this tab had one
+             before — somebody registering a second account without signing out — a client
+             navigation would carry the old user's cached segments and component state into
+             the new one. Same rule as login; see hardNavigate in lib/auth.ts. */
+          onDone={() => hardNavigate(landTo)}
+          onSkip={() => hardNavigate(landTo)}
         />
       </AuthShell>
     )

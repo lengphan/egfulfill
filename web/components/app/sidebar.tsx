@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { SignOut, LockSimple , CaretLineLeft } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { sellerNav, allowedByPerms } from "@/lib/nav"
@@ -10,7 +10,7 @@ import { useNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
 import { useLabelT } from "@/lib/i18n"
 import { useEntitlements } from "@/lib/entitlements"
 import { getMyAccess } from "@/lib/api"
-import { clearSession, getToken } from "@/lib/auth"
+import { endSession, getToken } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
 import { Wordmark, WordmarkE } from "@/components/marketing/wordmark"
 
@@ -20,12 +20,8 @@ export function Sidebar({ collapsed = false, onToggle }: {
   onToggle?: () => void
 }) {
   const pathname = usePathname()
-  const router = useRouter()
   const nl = useLabelT()
-  const logout = () => {
-    clearSession()
-    router.push("/login")
-  }
+  const logout = () => endSession()
   // Plan-gated items (SpyDeck). Resolved SERVER-side via useEntitlements, not from the
   // cached session: a team member's own row is always 'starter', so the cached answer
   // drew a padlock next to a feature their leader had already paid for.

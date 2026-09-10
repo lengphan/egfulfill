@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react"
 import { Check } from "@phosphor-icons/react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
-import { getUser, setSession, getRememberedIdentifier, setRememberedIdentifier } from "@/lib/auth"
+import { getUser, setSession, hardNavigate, getRememberedIdentifier, setRememberedIdentifier } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
@@ -28,7 +27,6 @@ function safeNext(raw: string | null): string | null {
 }
 
 export default function LoginPage() {
-  const router = useRouter()
   const [next, setNext] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -93,7 +91,11 @@ export default function LoginPage() {
       // Only after the credentials were accepted. Storing it on submit would leave a
       // typo remembered as though it were the account.
       setRememberedIdentifier(remember ? email.trim() : null)
-      router.push(next ?? landingFor(typeof user.role === "string" ? user.role : null))
+      /* A HARD LOAD, not router.push — see hardNavigate in lib/auth.ts. Signing in as a
+         different person in a tab that already rendered somebody else's boards left their
+         segments in Next's client Router Cache and their rows in component state, so the new
+         session opened on the previous one's data until a manual refresh. */
+      hardNavigate(next ?? landingFor(typeof user.role === "string" ? user.role : null))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed")
     } finally {
@@ -177,7 +179,8 @@ export default function LoginPage() {
           <GoogleSignIn
             onSuccess={() => {
               const role = getUser()?.role
-              router.push(next ?? landingFor(typeof role === "string" ? role : null))
+              // Same hard load as the password path: a new session starts on a new tab.
+              hardNavigate(next ?? landingFor(typeof role === "string" ? role : null))
             }}
             onError={setError}
           />

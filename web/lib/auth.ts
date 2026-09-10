@@ -157,6 +157,34 @@ export function setRememberedIdentifier(value: string | null) {
   }
 }
 
+/**
+ * A SESSION CHANGE IS A FULL PAGE LOAD, NOT A ROUTE CHANGE.
+ *
+ * Logging out and back in as somebody else used `router.push`, which is a CLIENT navigation:
+ * the JS context is never torn down, so Next's client Router Cache can serve a segment
+ * rendered for the previous user, and any component state, module-level cache or in-flight
+ * request from that session is still sitting there. Reported 2026-09-10 — pages of the admin's
+ * orders on a seller account, correct only after a manual refresh.
+ *
+ * Nothing about that is fixable by clearing more keys, because the leak is not in storage: it
+ * is the rendered tree and everything the tab is still holding. `location.replace` is the only
+ * thing that guarantees the next user starts from nothing.
+ *
+ * `replace`, not `assign`: the previous session's page must not be one Back button away.
+ *
+ * api.ts already does exactly this on a 401 — this makes the deliberate path match the
+ * accidental one.
+ */
+export function hardNavigate(to: string) {
+  try { window.location.replace(to) } catch { /* SSR or a locked-down context */ }
+}
+
+/** Sign out and leave, in that order, with the tab torn down behind it. */
+export function endSession(to = "/login") {
+  clearSession()
+  hardNavigate(to)
+}
+
 export function clearSession() {
   try {
     for (const s of stores()) {

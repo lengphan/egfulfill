@@ -2,13 +2,13 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { SignOut, ChatCircleDots, Gear, CaretLineLeft } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { staffNav, staffTools, type StaffNavItem } from "@/lib/staff-nav"
 import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
 import { useLabelT } from "@/lib/i18n"
-import { getUser, clearSession } from "@/lib/auth"
+import { getUser, endSession } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
 import { Wordmark, WordmarkE } from "@/components/marketing/wordmark"
 
@@ -19,7 +19,6 @@ export function StaffSidebar({ collapsed = false, onToggle }: {
 }) {
   const tl = useLabelT()
   const pathname = usePathname()
-  const router = useRouter()
   const itemCls = cn(
     "flex items-center rounded-lg py-2 text-sm font-medium transition-colors",
     collapsed ? "justify-center px-0" : "gap-3 px-3",
@@ -47,7 +46,7 @@ export function StaffSidebar({ collapsed = false, onToggle }: {
     return () => { alive = false; clearTimeout(id) }
   }, [])
 
-  const logout = () => { clearSession(); router.push("/login") }
+  const logout = () => endSession()
 
   const mobileSections: MobileNavSection[] = [
     { items: items.map((i) => ({ label: i.label, href: i.href, icon: i.icon })) },

@@ -25,7 +25,7 @@ import { navTitle } from "@/lib/nav"
 import { staffNavTitle } from "@/lib/staff-nav"
 import { getWallet, getFactoryList, getOrderLimitStatus, getFactoryCapacity } from "@/lib/api"
 import { onLive } from "@/lib/live"
-import { getUser, clearSession, type User } from "@/lib/auth"
+import { getUser, endSession, type User } from "@/lib/auth"
 import { UserAvatar } from "@/components/app/user-avatar"
 import { NotificationBell } from "@/components/app/notification-bell"
 import { OrderSearch } from "@/components/app/order-search"
@@ -123,10 +123,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
     }
   }, [])
 
- const logout = () => {
- clearSession()
- router.push("/login")
-  }
+ const logout = () => endSession()
 
   /**
    * ⌘K IS THE COMMAND PALETTE'S, AND ONLY ITS — this bound it too, and BOTH opened.
