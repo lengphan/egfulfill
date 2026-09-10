@@ -2866,13 +2866,13 @@ function UsersPanel() {
                             setMvFor(u); setMvTo(""); setMvQuery(""); setMvOrders(false); setMvErr(null); setMvDone(null)
                             setMvRef(`acct-move:${u.id}:${Date.now()}`)
                           }}>
-                            {tl("settings", "Move balance to another account…")}
+                            {tl("settings", "Move balance…")}
                           </DropdownMenuItem>
                         )}
                         {u.active === false ? (
-                          <DropdownMenuItem onClick={() => setActive(u, true)}>{tl("settings", "Reactivate account")}</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setActive(u, true)}>{tl("settings", "Reactivate…")}</DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem onClick={() => setActive(u, false)}>{tl("settings", "Deactivate (blocks sign-in)")}</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setActive(u, false)}>{tl("settings", "Deactivate…")}</DropdownMenuItem>
                         )}
                         {isAdminCaller && (
                           <>
