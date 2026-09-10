@@ -1173,7 +1173,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                             aria-hidden
                             onPointerDown={startFill(r, c)}
                             title={tl("grid", "Drag down to copy this value")}
-                            className="absolute -bottom-[3px] -right-[3px] z-20 size-[7px] cursor-crosshair touch-none rounded-[1px] bg-brand ring-1 ring-background"
+                            className="absolute -bottom-[4px] -right-[4px] z-20 size-[9px] cursor-crosshair touch-none rounded-full bg-brand ring-2 ring-background"
                           />
                         )}
                       </td>
