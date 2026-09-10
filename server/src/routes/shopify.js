@@ -6,6 +6,7 @@
 import crypto from 'node:crypto';
 import { descriptionHtml } from '../listing-description.js';
 import { q } from '../db.js';
+import { takenByAnother } from '../connections.js';
 import { recordUsage } from '../usage.js';
 import { clampDays, windowStartSec } from '../backfill.js';
 import { audit } from '../audit.js';
@@ -470,6 +471,10 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
         const sd = await sr.json().catch(() => ({}));
         if (sd && sd.shop && sd.shop.name) shopName = sd.shop.name;
       } catch (e) {}
+      // ALREADY SOMEBODY ELSE'S? Refuse before the upsert — see connections.js. The upsert
+      // moves ownership silently, and this is the last point at which that can be stopped.
+      const taken = await takenByAnother('shopify', shop, req.user);
+      if (taken) { reply.code(409); return { error: taken.error }; }
       // Offline token → no expiry; refresh_token stays null.
       await q(
         `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by, backfill_days)

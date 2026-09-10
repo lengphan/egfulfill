@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import { descriptionHtml } from '../listing-description.js';
 import { q } from '../db.js';
+import { takenByAnother } from '../connections.js';
 import { recordUsage } from '../usage.js';
 import { clampDays, windowStartSec } from '../backfill.js';
 import { imageBytesFrom } from '../images.js';
@@ -706,6 +707,10 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       // open_id is a stable per-seller-per-app id → our shop_id. seller_name → label.
       const shopId   = String(d.open_id || d.seller_name || ('tt-' + Date.now().toString(36)));
       const shopName = d.seller_name || ('TikTok shop ' + shopId.slice(0, 8));
+      // ALREADY SOMEBODY ELSE'S? Refuse before the upsert — see connections.js. The upsert
+      // moves ownership silently, and this is the last point at which that can be stopped.
+      const taken = await takenByAnother('tiktok', shopId, req.user);
+      if (taken) { reply.code(409); return { error: taken.error }; }
       const scopes   = Array.isArray(d.granted_scopes) ? d.granted_scopes.join(' ') : (d.granted_scopes || '');
       await q(
         `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by, backfill_days)

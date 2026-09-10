@@ -1,6 +1,7 @@
 "use client"
 
 import { useLabelT, useDateFormat } from "@/lib/i18n"
+import { useConfirm } from "@/components/app/confirm-dialog"
 import { useCallback, useEffect, useState } from "react"
 import { ArrowsClockwise, Trash, Plus, CheckCircle, Storefront, Warning, Prohibit } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
@@ -142,6 +143,7 @@ const soonChannels = CHANNELS.filter((c) => !c.live)
 
 export function StoresManager() {
   const fmtDate = useFmtDate()
+  const confirm = useConfirm()
   const tl = useLabelT()
  const reduce = useReducedMotion()
  const [conns, setConns] = useState<EtsyConnection[] | null>(null)
@@ -375,6 +377,21 @@ export function StoresManager() {
   }
 
  const onDisconnect = async (c: EtsyConnection) => {
+    /**
+     * DISCONNECTING DELETES THE CONNECTION ROW, and it fired on one click.
+     *
+     * This is the most expensive undo on the screen and it read as the cheapest. Getting a
+     * shop back is not a button here — it is the seller going to Etsy/Shopify/TikTok and
+     * authorising us again, so an accidental press on someone else's row costs a
+     * conversation and a consent screen. Orders already imported stay; what stops is the
+     * sync, silently, which is exactly how "why did orders stop arriving" starts.
+     */
+ const ok = await confirm({
+ title: tl("stores", "Disconnect this shop?"),
+ body: `${c.shop_name || c.shop_id} ${tl("stores", "stops syncing new orders. Orders already imported stay. Reconnecting means signing in at the marketplace again — it can't be undone from here.")}`,
+ confirmLabel: tl("stores", "Disconnect"),
+    })
+ if (!ok) return
  setBusy(c.shop_id)
  setNotice(null)
  try {

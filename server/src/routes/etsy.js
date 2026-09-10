@@ -2,6 +2,7 @@
 // Etsy v3 uses PKCE with the keystring as client_id; NO client secret is needed
 // for the token exchange. Access tokens last ~1h and are refreshed automatically.
 import { q } from '../db.js';
+import { takenByAnother } from '../connections.js';
 import { descriptionText } from '../listing-description.js';
 import { recordUsage } from '../usage.js';
 import { isStaff } from '../auth.js';
@@ -1490,6 +1491,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         return { error: 'That Etsy account has no shop we can access — you likely authorized while logged in as the wrong Etsy account (a buyer account, or one that doesn’t own your shop). Log in to Etsy as the shop OWNER, then connect again.' };
       }
 
+      // ALREADY SOMEBODY ELSE'S? Refuse before the upsert — see connections.js. The upsert
+      // moves ownership silently, and this is the last point at which that can be stopped.
+      const taken = await takenByAnother('etsy', shopId, req.user);
+      if (taken) { reply.code(409); return { error: taken.error }; }
       // NB: last_sync_at=null on reconnect → the next sync is a FULL pull, so a newly-granted scope
       // (e.g. address_r just approved by Etsy) BACKFILLS shipping addresses onto existing unshipped orders.
       await q(

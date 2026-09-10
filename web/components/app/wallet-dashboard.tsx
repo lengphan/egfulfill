@@ -1,6 +1,7 @@
 "use client"
 
 import { useLabelT, useDateFormat } from "@/lib/i18n"
+import { useConfirm } from "@/components/app/confirm-dialog"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { labelRail, PAYOUT_RAILS } from "@/lib/payment-method"
 import { Plus, DownloadSimple, X } from "@phosphor-icons/react"
@@ -135,7 +136,20 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
   /** Fee per pending row, typed before confirming. Keyed by id so two rows on screen never
    * share a value — the classic way one transfer's fee lands on another's. */
  const [fees, setFees] = useState<Record<string, string>>({})
+ const confirmDlg = useConfirm()
  const review = async (t: TopupRequest, action: "confirm" | "reject") => {
+    /* REJECTING CLOSES THE REQUEST and the seller has to submit it again — with, in the
+       VietQR case, a transfer they have already made sitting against a reference we just
+       stopped watching. Confirming is not gated: it is the affirmative half of a review
+       queue, it credits rather than destroys, and an adjustment can undo it. */
+ if (action === "reject") {
+ const ok = await confirmDlg({
+ title: tl("wallet", "Reject this top-up?"),
+ body: `${usd2(Number(t.amount_usd) || 0)} ${tl("wallet", "from")} ${t.seller_name || t.seller_email || tl("wallet", "this seller")}. ${tl("wallet", "Nothing is credited and the request is closed — they have to submit it again.")}`,
+ confirmLabel: tl("wallet", "Reject"),
+      })
+ if (!ok) return
+    }
     // Close it out of the pending list immediately (optimistic), then record the decision.
     // On success refresh the wallet so the credit lands in the history right away; on
     // failure put it back by reloading the true pending list.
@@ -293,6 +307,7 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
  const [err, setErr] = useState<string | null>(null)
   // The request being settled — paying now asks WHICH RAIL and for the confirmation first.
  const [settling, setSettling] = useState<PayoutRequest | null>(null)
+ const confirmDlg = useConfirm()
  const load = useCallback(() => { if (canPay) getPayoutRequests("pending").then((r) => setRows(r ?? [])).catch(() => setRows([])) }, [canPay])
  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
  const settle = async (p: PayoutRequest, done: { paid_method: { type: string }; proof?: string; paid_note?: string }) => {
@@ -306,6 +321,14 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
     } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't update that payout."); load() } finally { setBusy(null) }
   }
  const reject = async (p: PayoutRequest) => {
+    /* Rejecting DESTROYS the request — the seller has to raise it again, and they are
+       waiting on money. One click away from Pay, which is the button beside it. */
+ const ok = await confirmDlg({
+ title: tl("wallet", "Reject this payout request?"),
+ body: `${usd2(Number(p.amount_usd) || 0)} ${tl("wallet", "for")} ${p.seller_name || p.seller_email || tl("wallet", "this seller")}. ${tl("wallet", "The request is closed and they have to submit it again. No money moves.")}`,
+ confirmLabel: tl("wallet", "Reject"),
+    })
+ if (!ok) return
  setBusy(p.id); setErr(null)
  try {
  const r = await rejectPayout(p.id)

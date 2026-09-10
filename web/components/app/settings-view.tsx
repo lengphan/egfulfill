@@ -2270,11 +2270,15 @@ function UserDetail({ u, isSeller, hasOrders }: { u: AdminUser; isSeller: boolea
 function UsersPanel() {
   const fmtDate = useFmtDate()
   const tl = useLabelT()
+  const confirm = useConfirm()
  const [users, setUsers] = useState<AdminUser[]>([])
  const [loaded, setLoaded] = useState(false)
  const [busy, setBusy] = useState<string | null>(null)
  const [nu, setNu] = useState({ email: "", password: "", role: "operator" })
  const [nuErr, setNuErr] = useState<string | null>(null)
+  /* A row action that FAILED. These were optimistic-then-reload, so the row sprang back to
+     where it was with nothing said — indistinguishable from a change that never registered. */
+ const [usersErr, setUsersErr] = useState<string | null>(null)
   // A real directory gets long fast (sellers outnumber staff), so it needs finding, not
   // just listing. Search covers name/email/store; the role chips answer "show me staff".
  const [qStr, setQStr] = useState("")
@@ -2348,9 +2352,35 @@ function UsersPanel() {
  try { await updateUserAdmin(u.id, { plan }) } catch { loadUsers() } finally { setBusy(null) }
   }
  const setActive = async (u: AdminUser, active: boolean) => {
+    /**
+     * DEACTIVATING LOCKS SOMEBODY OUT, and it used to happen on one menu click with nothing
+     * in between — the same click distance as "Set a new password", which changes nothing
+     * until you type. The person is signed out of a product they may be mid-shift in, and
+     * the only signal is that their next sign-in says "contact an admin".
+     *
+     * Reactivating is asked for too, without the warning styling: it is not destructive, but
+     * it does hand access back, and an admin should mean it. The confirm carries which one
+     * this is rather than a generic "Are you sure?".
+     */
+ const ok = await confirm(active
+      ? { title: tl("settings", "Let them sign in again?"),
+ body: `${u.email} ${tl("settings", "gets access back immediately. Everything on the account is exactly as they left it.")}`,
+ confirmLabel: tl("settings", "Reactivate"), destructive: false }
+      : { title: tl("settings", "Block this account from signing in?"),
+ body: `${u.email} ${tl("settings", "is signed out and cannot sign back in until an admin reactivates them. Their orders, balance and connected shops are untouched.")}`,
+ confirmLabel: tl("settings", "Deactivate") })
+ if (!ok) return
  setBusy(u.id)
  setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, active } : x)))
- try { await updateUserAdmin(u.id, { active }) } catch { loadUsers() } finally { setBusy(null) }
+ try {
+ const r = await updateUserAdmin(u.id, { active })
+ if (r?.error) throw new Error(r.error)
+    } catch (e) {
+      // The optimistic row is put back by the reload; the reason is said out loud rather
+      // than left as a row that quietly springs back to where it was.
+ setUsersErr(e instanceof Error ? e.message : "Couldn't change that account.")
+ loadUsers()
+    } finally { setBusy(null) }
   }
   // Per-seller daily order limit: blank = platform default, 0 = unlimited. Edited inline in
   // each row (no bulk "suggest" button — a seller with no limit set already inherits the
@@ -2550,6 +2580,12 @@ function UsersPanel() {
         </div>
       </SectionCard>
       <SectionCard title={tl("settings", "Users")}>
+        {usersErr && (
+          <div className="flex items-start gap-2 border-b border-border bg-alert/12 px-5 py-2.5 text-xs text-alert">
+            <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+            <span>{usersErr}</span>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
           <SearchField
             value={qStr}
