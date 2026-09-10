@@ -2572,9 +2572,21 @@ function UsersPanel() {
   // The chip counts read off this set, so each chip shows exactly how many rows selecting
   // it would reveal — and they react to a search the same way the list does.
  const countBase = users.filter((u) => {
- if (!showInactive && u.active === false) return false
- if (!term) return true
- return [u.name, u.email, u.store_name, u.role].some((f) => String(f ?? "").toLowerCase().includes(term))
+    /**
+     * A SEARCH REACHES EVERYTHING. The hide-deactivated toggle ran BEFORE the term, so
+     * typing a deactivated account's own email returned nothing at all — the list answered
+     * "no such account", which is false, and is the one thing §4 says a UI may never do:
+     * a thing that cannot be seen must not look like a thing that does not exist.
+     *
+     * It bit immediately after a transfer, which is exactly when it would: the account you
+     * just emptied is the one you deactivate, and then the one you go looking for.
+     *
+     * The toggle governs the DEFAULT VIEW — "don't clutter the directory with people who
+     * left" — not what a name you typed is allowed to match. A revealed row is unmistakable
+     * either way: dimmed to 55% and carrying a "Deactivated" badge.
+     */
+ if (term) return [u.name, u.email, u.store_name, u.username, u.role].some((f) => String(f ?? "").toLowerCase().includes(term))
+ return showInactive || u.active !== false
   })
   // "Staff" is every non-seller, so operator + warehouse + designer + admin all fall under
   // it — they are factory roles, not a seller's team, so this is a role tally, not a
@@ -2682,7 +2694,9 @@ function UsersPanel() {
           )}
           {/* Deactivated accounts are hidden by default — they're kept so their orders
  stay attached, not because anyone needs to see them daily. */}
-          {inactiveCount > 0 && (
+          {/* Hidden while searching: the search already spans deactivated accounts, so the
+              button would be a control with nothing left to do. */}
+          {inactiveCount > 0 && !term && (
             <button
  onClick={() => setShowInactive((v) => !v)}
  className={"eg-tap rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " + (showInactive ? "border-border bg-accent" : "border-border text-muted-foreground hover:bg-accent")}
