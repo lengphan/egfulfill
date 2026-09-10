@@ -183,9 +183,16 @@ export function actionDetail(r: AuditRow, resolveLine?: (key: string) => string 
      * The adjustment's own reason likewise: it is the sentence the seller reads on their
      * statement, and the log should show the same words.
      */
+    /* THE AMOUNT, THEN THE REASON — the wallet's two rows read "$2.00 · qua soi" and
+       "$2.00 · Reversed price adjustment — qua soi", and Activity printed the reasons alone.
+       Two log rows, both saying "qua soi", with nothing to say which was the charge and
+       which sent it back, and no figure at all on the record you reach for when the money is
+       in question. The audit has carried both numbers since it was written — `charged` on
+       the fee, `refunded` on the reversal — and nothing read them. */
     case "order.fee":
+      return [a.charged != null ? usd(Number(a.charged)) : "", str("note")].filter(Boolean).join(" · ")
     case "order.refund":
-      return str("note")
+      return [a.refunded != null ? usd(Number(a.refunded)) : "", str("note")].filter(Boolean).join(" · ")
     case "order.tracking":
       return str("tracking")
     /* THEIR time, not ours. The poll can run hours after the parcel was picked, so the row
