@@ -1160,7 +1160,13 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                                once, cleared once, in the same handler. */
                             /* Focus resets the selection to THIS cell. Shift-click extends it
                                sideways — see the cell's onMouseDown. */
-                            setFillFrom((cur) => (shiftRef.current && cur && cur.r === r ? { ...cur, c1: c } : { r, c0: c, c1: c }))
+                            /* READ ONCE, CLEARED ONCE, like pointerSel above. Left set, a
+                               shift-click would make the NEXT ordinary click extend the
+                               selection instead of starting a new one — a modifier that
+                               outlives the gesture that pressed it. */
+                            const withShift = shiftRef.current
+                            shiftRef.current = false
+                            setFillFrom((cur) => (withShift && cur && cur.r === r ? { ...cur, c1: c } : { r, c0: c, c1: c }))
                             const byPointer = pointerSel.current
                             pointerSel.current = false
                             if (editing !== `${r}-${c}` && !byPointer) e.currentTarget.select()
@@ -1213,6 +1219,27 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                              character by character. */
                           className="h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none focus:bg-accent focus:ring-1 focus:ring-ring"
                         />
+                        {/**
+                          * THE SELECTION ITSELF. Shift-click extends the anchor sideways, and
+                          * until this there was nothing on screen to show for it: the dot
+                          * moved to the last column and every cell looked exactly as before,
+                          * so the feature was indistinguishable from a click that had missed.
+                          *
+                          * Only drawn for a range of two or more. A single cell already has
+                          * the input's own focus ring, and a second mark on top of it would
+                          * say the same thing twice.
+                          *
+                          * Same per-edge technique as the drag preview below, for the same
+                          * reason: one rectangle around the range rather than a box per cell.
+                          */}
+                        {fillCols && fillFrom?.r === r && fillCols[1] > fillCols[0]
+                          && c >= fillCols[0] && c <= fillCols[1] && !fillTo && (
+                          <span
+                            aria-hidden
+                            className={`pointer-events-none absolute inset-0 z-10 border-y border-brand/60 bg-brand/10${
+                              c === fillCols[0] ? " border-l" : ""}${c === fillCols[1] ? " border-r" : ""}`}
+                          />
+                        )}
                         {/**
                           * THE RANGE A RELEASE WOULD WRITE — a grey wash and ONE dashed
                           * rectangle around it, which is what a sheet draws and therefore what
