@@ -1148,7 +1148,23 @@ export function DispatchBoard() {
  title={inShell ? undefined : tl("dispatch", "Dispatch")}
  actions={inShell ? undefined : headActions}
       >
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+        {/**
+         * TWO LEVELS, TWO ROWS (owner, 2026-09-10: "2 sets of filters? … not sure of
+         * hierarchy").
+         *
+         * These were one strip of seven controls at one size, and they are not peers.
+         * "To scan / History" swaps the WHOLE TABLE for a different query; "All / To scan
+         * here / With byeastside / …" narrows whichever table that produced. Side by side
+         * and identically weighted, History read as a sixth filter — and it is the one
+         * control on the row that changes what the other five are filtering.
+         *
+         * Making them the SAME SHAPE was a deliberate earlier decision, taken to stop the row
+         * looking like two kinds of control jammed together. It solved the wrong half: they
+         * genuinely ARE two kinds, and the mess was that nothing said which governed which.
+         * A line break says it — the top row decides the list, the row under it narrows it —
+         * which is what Mercury does with its status tabs above a separate filter bar.
+         */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 pb-2 pt-3">
           {/* Waiting-to-scan vs. history: two VIEWS of this card, kept here rather than on a
               second page so the search box and stat cards above stay put. It was a boxed
               segmented control whose active half went solid `bg-primary` — the same fill as
@@ -1160,9 +1176,13 @@ export function DispatchBoard() {
               list, so both take the same shape and the row reads as one strip. */}
           <TabBar
             size="sm"
-            look={inShell ? "segmented" : "line"}
+            /* A LINE, NOT A TRACK, on both. This is navigation between two lists — the same
+               job the page tabs above it do — and the underline is the app's one active-tab
+               treatment. The segmented tray was picked when it shared a row with the filters
+               and needed to look different from them; on its own row it does not. */
+            look="line"
             ariaLabel="Dispatch view"
-            className={"shrink-0 " + (inShell ? "order-1 mb-0" : "border-b-0")}
+            className={"shrink-0 border-b-0 " + (inShell ? "order-1 mb-0" : "")}
             items={[
               { id: "queue" as const, label: tl("dispatch", "To scan") },
               { id: "history" as const, label: tl("dispatch", "History"), count: history.length || undefined },
@@ -1214,7 +1234,11 @@ export function DispatchBoard() {
           {view === "queue" && (
             <TabBar
               spacing="none"
-              className={"border-b-0" + (inShell ? " order-2" : "")}
+              /* `basis-full` is what actually breaks the line: the wrapper is a wrap-flex, so
+                 without it the filters sit beside the view switcher again the moment there is
+                 room, and the hierarchy comes and goes with the window width. A level is not
+                 a level if it only holds on narrow screens. */
+              className={"basis-full border-b-0" + (inShell ? " order-2" : "")}
               size="sm"
               ariaLabel={tl("dispatch", "Filter the queue")}
               value={qFilter}

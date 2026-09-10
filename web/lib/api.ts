@@ -4080,6 +4080,24 @@ export function validateAddress(a: {
 }) {
   const p = new URLSearchParams()
   Object.entries(a).forEach(([k, v]) => v && p.set(k, v))
+  /**
+   * FIVE DIGITS, ALWAYS — the API's own schema is `^\d{5}$` on ZIPCode, and a ZIP+4 in that
+   * field is a 400, not a lookup:
+   *
+   *   OASValidation … regex ^d{5}$ does not match input string 20878-3352
+   *
+   * Which is self-inflicted. Standardising an address writes USPS's own ZIP+4 back into the
+   * box — correct, and better for delivery — and the very next validation then sent
+   * "20878-3352" straight back at a field that only takes five. So an address USPS had just
+   * confirmed came back unvalidatable for ever after, and reopening the dialog on an order
+   * whose address was already standardised failed the same way from the first keystroke.
+   *
+   * Trimmed HERE rather than at the one caller, because the rule belongs to the endpoint:
+   * ZIPPlus4 is a separate field in this API and no caller should have to know that a ZIP
+   * with a hyphen in it is a different shape from the one it displays.
+   */
+  const z = p.get("ZIPCode")
+  if (z) p.set("ZIPCode", z.replace(/\D/g, "").slice(0, 5))
   return api<{ ok?: boolean; address?: ValidatedAddress; error?: string }>(`/api/usps/validate-address?${p.toString()}`)
 }
 
@@ -5633,6 +5651,10 @@ export function getDispatchHistory(p: { days?: number; search?: string } = {}) {
 
 export type ShipmentRow = {
   id: string; num: string; customer: string | null; state: string | null
+  /** The readable label number — `LBL-7`, not `LBL-3VDA5O`. Assigned by the database, so it
+   *  survives filtering and sorting the way a row index never could. Null on a loose label
+   *  written before the column existed; the view falls back to the id's tail for those. */
+  seq?: number | null
   /** One-line destination — street, city, state zip. A loose label has no street, so it
    *  carries city/state/zip only. Null when the order has no address at all. */
   address: string | null
