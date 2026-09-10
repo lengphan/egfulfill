@@ -298,6 +298,10 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * Enter, or moving away. Clicking or arrowing to a cell only SELECTS it.
    */
   const [editing, setEditing] = useState<string | null>(null)
+  /** Did this focus come from a pointer? A ref, not state — it is read inside the same
+   *  gesture that sets it, and a re-render between mousedown and click would be a bug of its
+   *  own. See the cell's onMouseDown / onClick. */
+  const pointerSel = useRef(false)
   /** Which whole row is selected, by index. Cleared the moment a cell takes focus — a
    *  sheet cannot have both a live cell and a live row without the next keypress being
    *  ambiguous about which one it means. */
@@ -991,12 +995,43 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                            * enters editing would immediately re-select the whole value and
                            * undo the point of double-clicking.
                            */
+                          /* A DRAG IS A SELECTION, NOT A CELL PICK (owner, 2026-09-10:
+                             "enable copy just a few characters… right now it copies the whole
+                             word").
+                             Selecting part of a value was impossible: a drag ends in a click,
+                             and the click handler below called select() — so the moment the
+                             mouse came up, the whole value was reselected and ⌘C took all of
+                             it. `pointerSel` is set on mousedown and read after, which is the
+                             only point at which the browser's own selection reflects what was
+                             actually dragged. */
+                          onMouseDown={() => { pointerSel.current = true }}
                           onFocus={(e) => {
                             setSel(null)
-                            if (editing !== `${r}-${c}`) e.currentTarget.select()
+                            /* Skip the select-all when focus came from a POINTER: the click
+                               handler decides, once it can see whether anything was dragged.
+                               Keyboard focus (Tab, arrows) still selects the whole value,
+                               which is what makes typing replace it. */
+                            /* CONSUMED HERE, not in the click. A mousedown that never
+                               produces a click on this input — the pointer leaves the cell
+                               before release — would otherwise leave the flag set, and the
+                               next KEYBOARD focus would silently skip its select-all. Read
+                               once, cleared once, in the same handler. */
+                            const byPointer = pointerSel.current
+                            pointerSel.current = false
+                            if (editing !== `${r}-${c}` && !byPointer) e.currentTarget.select()
                             if (list?.length) openMenu(e.currentTarget, `${r}-${c}`, false)
                           }}
-                          onClick={(e) => { if (editing !== `${r}-${c}`) e.currentTarget.select() }}
+                          onClick={(e) => {
+                            const el = e.currentTarget
+                            if (editing === `${r}-${c}`) return
+                            const from = el.selectionStart ?? 0
+                            const to = el.selectionEnd ?? 0
+                            // Anything the pointer actually dragged is left alone. A plain
+                            // click leaves a caret (from === to) and still selects the whole
+                            // value, so "click picks the cell, typing replaces it" survives.
+                            if (to > from) return
+                            el.select()
+                          }}
                           onChange={(e) => {
                             setEditing(`${r}-${c}`)
                             setCell(r, c, e.target.value)
