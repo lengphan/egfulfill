@@ -104,13 +104,36 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   // Live recipient validation — visible ✓/⚠ before spending. Debounced, warn-not-block.
   /** `unknown` = nobody could check — see lib/address-check.ts. It used to fall to `idle`,
    *  which made a failed check look exactly like an address nobody had typed yet. */
- const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid" | "unknown"; msg?: string }>({ status: "idle" })
+ const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid" | "unknown" | "unreadable"; msg?: string }>({ status: "idle" })
  useEffect(() => {
  const complete = addrComplete(to)
  let alive = true
  const t = setTimeout(() => {
  if (!alive) return
- if (!complete) { setAddrCheck({ status: "idle" }); return }
+      /**
+       * AN UNREADABLE ADDRESS IS NOT AN EMPTY ONE.
+       *
+       * `idle` shows no badge, which is right for a box nobody has typed in and wrong for a
+       * box full of text the parser could not read — and those were the same state. So a
+       * pasted address that did not parse showed NOTHING, while Get rates sat quietly
+       * disabled beside it. That is the whole of "some addresses just don't show any rates":
+       * the reason was on screen all along, in a field that had failed silently.
+       *
+       * It names the PART that is missing, because that is what tells someone what to fix.
+       */
+ if (!complete) {
+ const missing = ([
+          [to.street, tl("label", "street")],
+          [to.city, tl("label", "city")],
+          [to.state, tl("label", "state")],
+          [to.zip, tl("label", "ZIP")],
+        ] as const).filter(([v]) => !v).map(([, w]) => w)
+ const typed = pasteText.trim().length > 0
+ setAddrCheck(typed
+          ? { status: "unreadable", msg: `${tl("label", "Couldn’t read the")} ${missing.join(", ")} ${tl("label", "— check the format above.")}` }
+          : { status: "idle" })
+ return
+      }
  setAddrCheck({ status: "checking" })
  validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
         .then((v) => {
@@ -126,7 +149,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
         .catch((e) => { if (alive) setAddrCheck({ status: "unknown", msg: friendlyValidationError(e instanceof Error ? e.message : "") }) })
     }, 600)
  return () => { alive = false; clearTimeout(t) }
-  }, [to.street, to.street2, to.city, to.state, to.zip])
+  }, [to.street, to.street2, to.city, to.state, to.zip, pasteText, tl])
 
   /**
    * STRAIGHT TO THE PRINTER once the label exists.
@@ -482,6 +505,10 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   {/* GREY, NO ICON. Nobody could check — there is nothing to fix, and the
                       label buys against the address as typed either way. */}
                   {addrCheck.status === "unknown" && <span className="rounded-lg bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground" title={addrCheck.msg || undefined}>{tl("label", "Not validated")}</span>}
+                  {/* AMBER, like `invalid`, and for the same reason: something is wrong and
+                      the person can fix it. Distinct from `unknown` (grey — nobody could
+                      check) because this one is not about the validator at all. */}
+                  {addrCheck.status === "unreadable" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {tl("label", "Can’t read this")}</span>}
                 </div>
               </div>
               <p className="text-2xs text-muted-foreground">{tl("label", "Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).")}</p>

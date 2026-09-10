@@ -64,9 +64,25 @@ const isLoose = (s: ShipmentRow) => /^sh_/.test(s.id)
  */
 const looseRef = (id: string) => "LBL-" + id.replace(/^sh_/, "").slice(-8).toUpperCase()
 
-const shipNum = (s: ShipmentRow, loose = "Loose label") =>
- isLoose(s) ? loose : s.num.startsWith("#") ? s.num : plainNum(s.id)
-const shipOrigin = (s: ShipmentRow) => (isLoose(s) ? looseRef(s.id) : platformFromId(s.id))
+/**
+ * THE IDENTIFIER LEADS, AND THE SOURCE CAPTIONS IT — for every row, the same way round.
+ *
+ * These two were inverted against each other. A marketplace row read "#4167160003" over
+ * "Etsy": the number you would quote, then where it came from. A loose one read "Loose
+ * label" over "LBL-3SE825JR": a CATEGORY over the number. So the column meant different
+ * things on different rows, and the one line you would actually copy was the small grey one
+ * on exactly the rows that have no other handle.
+ *
+ * The LBL- ref is a loose label's "#4167160003" — it is the thing to search for, read down
+ * the phone, or match against a printout — so it goes where every other identifier goes.
+ *
+ * "Manual label" rather than "no order ID". A manual label is by definition not attached to
+ * an order, so the absence is already stated; printing both is saying it twice, and a row
+ * whose headline is "No order ID" cannot be referred to at all.
+ */
+const shipNum = (s: ShipmentRow, loose = "Manual label") =>
+ isLoose(s) ? looseRef(s.id) : s.num.startsWith("#") ? s.num : plainNum(s.id)
+const shipOrigin = (s: ShipmentRow, loose = "Manual label") => (isLoose(s) ? loose : platformFromId(s.id))
 
 /** What the CARRIER says. Kept visually distinct from the factory stage, because the whole
  * reason to open this page is usually that the two disagree. */
@@ -426,8 +442,8 @@ export function ShipmentsView() {
  receipt number leads, and the marketplace becomes a caption, which is
  the same shape the Customer column beside it already uses. */}
                     <td className="px-5 py-2.5">
-                      <div className="max-w-[9.5rem] truncate text-sm font-semibold tabular-nums" title={s.id}>{shipNum(s, tl("shipments", "Loose label"))}</div>
-                      <div className="text-2xs text-muted-foreground">{shipOrigin(s)}</div>
+                      <div className="max-w-[9.5rem] truncate text-sm font-semibold tabular-nums" title={s.id}>{shipNum(s)}</div>
+                      <div className="text-2xs text-muted-foreground">{shipOrigin(s, tl("shipments", "Manual label"))}</div>
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex max-w-[14rem] items-center gap-1.5">
