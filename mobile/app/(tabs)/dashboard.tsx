@@ -444,8 +444,87 @@ function Column({ height, today, letter, loading, reduced, delay, dark }: {
   )
 }
 
-function Trend({ days, loading, reduced }: {
+/**
+ * A PHOTO CARD — the picture is INSIDE it, not behind the page.
+ *
+ * Behind the page a photograph fights every word on top of it: on the sky used here, ink
+ * measured 1.7:1 and white 1.1:1, because a mid blue sits between both and neither wins.
+ * Inside a card the crop is a decision — each of these was chosen by scanning every window
+ * of the source and taking the highest contrast under the type block, then softening the
+ * lower third where the words actually sit. Ink clears 5.9:1 on both.
+ *
+ * The card IS the action. An earlier draft put a circular button on the corner, which is
+ * one more thing to explain when the whole card is already pressable.
+ */
+function PhotoCard({ art, title, note, thumbs, onPress, height }: {
+  art: number; title: string; note?: string | null
+  thumbs?: string[]; onPress: () => void
+  /* AN EXPLICIT HEIGHT, not an aspectRatio. aspectRatio on an <Image> resolved against the
+     file's own dimensions rather than the given width, and a 4:3 crop drew 555pt tall on a
+     414pt screen — one card filling the whole home screen. A card's height is a layout
+     decision anyway; it should not change because someone re-crops the art. */
+  height: number
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        marginHorizontal: S.xl, borderRadius: 26, overflow: "hidden",
+        opacity: pressed ? 0.92 : 1, backgroundColor: C.accent,
+      })}
+    >
+      <Image source={art} style={{ width: "100%", height }} resizeMode="cover" />
+      <View style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
+        {thumbs && thumbs.length > 0 && (
+          <View style={{ flexDirection: "row", marginBottom: 10 }}>
+            {thumbs.slice(0, 3).map((u, i) => (
+              <Image
+                key={i}
+                source={{ uri: u }}
+                style={{
+                  width: 38, height: 38, borderRadius: R.control, backgroundColor: C.accent,
+                  marginLeft: i === 0 ? 0 : -12, borderWidth: 2, borderColor: "#fff",
+                }}
+                resizeMode="cover"
+              />
+            ))}
+          </View>
+        )}
+        <Text style={{ fontSize: height >= 200 ? 25 : 22, fontFamily: F.bold, color: C.fg, letterSpacing: -0.6 }}>
+          {title}
+        </Text>
+        {note ? (
+          <Text style={{ fontSize: 13, lineHeight: 19, fontFamily: F.body, color: C.fg, opacity: 0.75, marginTop: 5 }}>
+            {note}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  )
+}
+
+/** A heading in sentence case with its way out on the right. The tracked-out caps this
+ *  replaces read as technical rather than spoken, which is the wrong register for a screen
+ *  whose whole job is to say good morning and point at two numbers. */
+function CardHead({ label, action, onPress }: { label: string; action: string; onPress: () => void }) {
+  return (
+    <View style={{
+      flexDirection: "row", alignItems: "baseline", justifyContent: "space-between",
+      marginHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm,
+    }}>
+      <Text style={{ fontSize: 15.5, fontFamily: F.displaySemi, color: C.fg, letterSpacing: -0.2 }}>{label}</Text>
+      <Pressable onPress={onPress} hitSlop={8}>
+        <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: C.muted }}>{action}</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+function Trend({ days, loading, reduced, dark = true }: {
   days: { key: string; letter: string; n: number }[]; loading: boolean; reduced: boolean
+  /** It was drawn only for the ink hero. It now also runs on the page, so the two colour
+   *  choices below have to follow the ground rather than assume it. */
+  dark?: boolean
 }) {
   const peak = Math.max(1, ...days.map((d) => d.n))
   const total = days.reduce((n, d) => n + d.n, 0)
@@ -455,7 +534,7 @@ function Trend({ days, loading, reduced }: {
         {days.map((d, i) => (
           <Column
             key={d.key}
-            dark
+            dark={dark}
             /* A day with nothing gets a 2pt baseline rather than no bar: an absent column
                and a zero column must not look like the same day. */
             height={loading ? 2 : Math.max(2, Math.round((d.n / peak) * 26))}
@@ -470,7 +549,7 @@ function Trend({ days, loading, reduced }: {
       {/* Silent while loading: the block already says "Loading…" once above, and the same
           word twice in one object reads as two things failing rather than one waiting. */}
       {loading ? null : (
-        <Text style={{ marginTop: S.sm, fontSize: 12.5, fontFamily: F.body, color: C.onInk, opacity: 0.7 }}>
+        <Text style={{ marginTop: S.sm, fontSize: 12.5, fontFamily: F.body, color: dark ? C.onInk : C.muted, opacity: dark ? 0.7 : 1 }}>
           {`${total} in seven days`}
         </Text>
       )}
@@ -579,11 +658,31 @@ export default function Dashboard() {
 
   /* The strip's subjects: overdue first, then rush, deduped, capped at twelve — past that it
      is a queue and the queue is one tab away. */
+  /* The reason, in words — the hero said "overdue and rush" under a bar, which names the
+     two buckets without saying how many are in either. */
+  const needsNote = useMemo(() => {
+    const lateN = open.filter(isOverdue).length
+    const rushN = open.filter((o) => o.rush && !isOverdue(o)).length
+    if (lateN && rushN) return `${lateN} overdue and ${rushN} marked rush.`
+    if (lateN) return `${lateN} overdue.`
+    if (rushN) return `${rushN} marked rush.`
+    return null
+  }, [open])
+
   const urgent = useMemo(() => {
     const late = open.filter(isOverdue)
     const rush = open.filter((o) => o.rush && !late.includes(o))
     return [...late, ...rush].slice(0, 12)
   }, [open])
+
+  /* The strip survives as three faces on the card — enough to recognise what is waiting,
+     which is all the strip was ever doing at twelve. */
+  const urgentThumbs = useMemo(
+    () => urgent
+      .map((o) => { const it = (o.items ?? [])[0]; return it ? assetUrl(it.img_ref || it.img) : null })
+      .filter(Boolean).slice(0, 3) as string[],
+    [urgent],
+  )
 
   return (
     <ScrollView
@@ -646,17 +745,40 @@ export default function Dashboard() {
         <FilterRow value={channel} options={channels} onPick={setChannel} />
       ) : null}
 
-      <HeroFigure
-        needsYou={needsYou}
-        openTotal={open.length}
-        loading={loading}
-        reduced={reduced}
-        urgent={urgent}
-        days={days}
+      {/* TWO CARDS, AND THEY ARE THE SCREEN.
+          What stood here was one ink block carrying a 4-digit figure, a progress bar, a
+          photo strip and a seven-day chart — four readouts stacked inside one object, which
+          is a report rather than a home screen. The two questions a morning actually asks
+          are "is anything waiting on me" and "how much is being made", so each gets a card,
+          and everything that block also carried is still on this screen, further down. */}
+      <CardHead label="Needs you" action="View all" onPress={() => router.push("/(tabs)/orders")} />
+      <PhotoCard
+        height={228}
+        art={require("../../assets/card-sky.webp")}
+        title={loading ? "Counting…" : needsYou === 0 ? "Nothing needs you" : `${needsYou} ${needsYou === 1 ? "order needs" : "orders need"} you`}
+        note={loading ? null : needsYou === 0 ? "Everything open is on time." : needsNote}
+        thumbs={urgentThumbs}
+        onPress={() => router.push("/(tabs)/orders")}
+      />
+
+      <CardHead label="In production" action="View all" onPress={() => router.push("/(tabs)/orders")} />
+      <PhotoCard
+        height={132}
+        art={require("../../assets/card-hill.webp")}
+        title={loading ? "Counting…" : `${stageCounts.working ?? 0} being made`}
+        note={loading ? null : awaitingScan ? `${awaitingScan} waiting to be scanned.` : null}
+        onPress={() => router.push("/(tabs)/orders")}
       />
 
       <Text style={SECTION_LABEL}>WHERE THE WORK IS</Text>
       <Funnel counts={stageCounts} loading={loading} awaitingScan={awaitingScan} />
+
+      {/* THE SEVEN-DAY CHART KEPT ITS JOB, not its address. It was inside the ink block; it
+          is on the page now, which is the only reason Trend learned a light ground. */}
+      <View style={{ marginHorizontal: S.xl }}>
+        <Text style={[SECTION_LABEL, { marginHorizontal: 0 }]}>ARRIVING</Text>
+        <Trend days={days} loading={loading} reduced={reduced} dark={false} />
+      </View>
 
       {/* Say WHICH state this is: a failed fetch and an empty queue must never look alike. */}
       {err ? (

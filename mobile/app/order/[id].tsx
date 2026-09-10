@@ -8,7 +8,7 @@ import {
   type Order, type OrderDesign, type ChatEntry, type User,
 } from "@/lib/api"
 import {
-  normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines,
+  normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines, PIPELINE,
   STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder, recordedRevenue,
 } from "@/lib/orders"
 import { F,C, R, CARD_INK, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
@@ -240,10 +240,44 @@ export default function OrderDetail() {
         >
           {/* ── THE JOB, in one block ──────────────────────────────────────────── */}
           <View style={{ ...CARD_INK, padding: 22 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.onInk, opacity: 0.55, letterSpacing: 1.4 }}>
-                {platformOf(o).toUpperCase()}
+            {/*
+             * THE HEADER ANSWERS ONE QUESTION: where has this got to.
+             *
+             * It used to open with the marketplace in tracked-out caps, then the number, then
+             * a line reading "New · 1 item · $40.48" — ten facts at two weights, none of which
+             * is the thing you opened the order to find out. The channel, the item count and
+             * the money are all LOOKUPS: they belong in a group you scroll to, and each of
+             * them already has a home further down (Details, the ITEMS heading, Details).
+             */}
+            <Text selectable style={{ fontSize: 42, fontFamily: F.bold, color: C.onInk, letterSpacing: -1.6 }}>
+              {numOf(o)}
+            </Text>
+
+            {/* HOW FAR ALONG, as a shape. Four segments because PIPELINE has four stages —
+                the ladder is not re-declared here, so a stage added upstream draws itself.
+                An off-pipeline order (on hold, cancelled) indexes to -1 and lights none of
+                them, which is true: it is not on the ladder. */}
+            <View style={{ flexDirection: "row", gap: 6, marginTop: 18 }}>
+              {PIPELINE.map((st, i) => (
+                <View key={st} style={{
+                  flex: 1, height: 3, borderRadius: R.pill,
+                  backgroundColor: C.onInk, opacity: i <= PIPELINE.indexOf(stage as never) ? 0.92 : 0.2,
+                }} />
+              ))}
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
+              {/* THE STAGE IS A WORD, in one of three registers — see STATUS_REGISTER_INK.
+                  It was a tinted capsule drawn from a table of eight hues, and the web
+                  measured that vocabulary and retired it: 16 of its 36 pairs sat under the
+                  0.150 OKLab separation floor. Weight and a rule carry it now, and both
+                  survive a bad screen. */}
+              <Text style={{ fontSize: 13, letterSpacing: 0.2, ...tone }}>
+                {STAGE_LABEL[stage] ?? stage}
               </Text>
+              <View style={{ flex: 1 }} />
+              {/* The two chips stay in the header, and only these two: they are the only
+                  facts here that are not a lookup — they are the reason to act today. */}
               {o.rush && (
                 <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: C.warn }}>
                   <Text style={{ fontSize: 10, fontFamily: F.bold, color: "#fff", letterSpacing: 0.6 }}>RUSH</Text>
@@ -254,26 +288,6 @@ export default function OrderDetail() {
                   <Text style={{ fontSize: 10, fontFamily: F.bold, color: "#fff", letterSpacing: 0.6 }}>LATE</Text>
                 </View>
               )}
-            </View>
-
-            <Text selectable style={{ fontSize: 42, fontFamily: F.bold, color: C.onInk, letterSpacing: -1.6, marginTop: 6 }}>
-              {numOf(o)}
-            </Text>
-
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
-              {/* THE STAGE IS A WORD, in one of three registers — see STATUS_REGISTER_INK.
-                  It was a tinted capsule drawn from a table of eight hues, and the web
-                  measured that vocabulary and retired it: 16 of its 36 pairs sat under the
-                  0.150 OKLab separation floor. On this block in particular the tint drained
-                  to a near-white blob and violet-on-lavender read as a mistake rather than a
-                  status. Weight and a rule carry it now, and both survive a bad screen. */}
-              <Text style={{ fontSize: 13, letterSpacing: 0.2, ...tone }}>
-                {STAGE_LABEL[stage] ?? stage}
-              </Text>
-              <Text style={{ fontSize: 13, color: C.onInk, opacity: 0.65 }}>
-                {sizeText}
-                {o.total != null ? ` · $${(Number(o.total) || 0).toFixed(2)}` : ""}
-              </Text>
             </View>
           </View>
 
@@ -518,6 +532,8 @@ export default function OrderDetail() {
                 Etsy dashboard shows, and not what support asks for. Same formatter the web
                 uses, out of shared/order-rules.ts, so the phone and the browser name an
                 order identically. */}
+            <Row label="Channel" value={platformOf(o)} />
+            {o.customer?.name ? <Row label="Buyer" value={o.customer.name} /> : null}
             <Row label="Order id" value={orderRefLabel(String(o.id))} />
           </View>
 
