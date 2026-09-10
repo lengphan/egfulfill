@@ -6,14 +6,13 @@ import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { SearchField } from "@/components/app/search-field"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, UploadSimple, X, XCircle, Clock, FilePdf, Barcode, CaretDown, CaretRight, Package, type Icon } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ArrowUUpLeft, XCircle, Clock, Barcode, CaretDown, type Icon } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { Input } from "@/components/ui/input"
 import { fetchShipmentLabel } from "@/lib/api"
 import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { getOrders, cachedOrders, streamOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
@@ -26,7 +25,6 @@ import {
 import { ColumnsMenu } from "@/components/app/columns-menu"
 import { loadColumnOrder, loadHiddenColumns, saveColumnIds } from "@/lib/table-columns"
 import { getUser } from "@/lib/auth"
-import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine, shipAddressOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { printPackingSlips as printSlips } from "@/lib/packing-slip"
@@ -110,54 +108,6 @@ const DISP_MARK: Record<DispKey, { icon: Icon; cls: string; weight?: "fill" | "b
  cancelled: { icon: XCircle, cls: "text-alert", weight: "fill" },
  attention: { icon: Warning, cls: "text-hold", weight: "fill" },
 }
-/**
- * WHAT A DROPPED LABEL BECAME, in the same vocabulary as an order's.
- *
- * `total_labels` null and 0 are different facts and stay different here: null is "their
- * extractor hasn't read it yet", 0 is "it read it and there was no label on the page". The
- * first is a wait, the second is a file to re-send.
- *
- * The scanned/total ratio is deliberately NOT shown — one PDF is one parcel, so it only
- * ever read "0 of 1" or "1 of 1". See progressOf in external-labels.tsx.
- */
-function extDisposition(u: DispatchUpload): { key: DispKey; label: string } {
- if (u.total_labels == null) return { key: "awaiting", label: "Reading the file" }
- if (u.total_labels === 0) return { key: "attention", label: "No label found" }
- if (u.scanned_labels >= u.total_labels) return { key: "scanned", label: "Picked" }
- return { key: "awaiting", label: "Waiting to be picked" }
-}
-
-/**
- * History holds two kinds of thing that are NOT the same shape: our orders, and labels
- * dropped in that belong to no order. They are interleaved rather than given separate
- * tabs, because the question the floor asks is "what went to byeastside and what came
- * back", and splitting the answer in two makes it unanswerable in one glance. Each row
- * still says plainly which kind it is.
- */
-type HistRow =
-  | { kind: "order"; id: string; at: string; disp: { key: DispKey; label: string }; o: OrderRow }
-  | { kind: "external"; id: string; at: string; disp: { key: DispKey; label: string }; u: DispatchUpload }
-
-/**
- * How this label reached the dispatch queue. Four answers, and they are mutually exclusive:
- *
- *   Drop zone     — dropped in as an external label; belongs to no order.
- * byeastside    — pushed to the partner from the queue (or picked by them).
- *   Scanned here  — someone scanned it on our own bench.
- *   Carrier       — the carrier's acceptance scan came back through tracking. The only one
- * of the four nobody here asserted, which is exactly why it is named.
- *
- * A label bought but not yet moved has no method yet, and says so with a dash rather than
- * guessing at one.
- */
-function methodOf(o: OrderRow): { label: string; icon: Icon } | null {
- const via = (o as { scanned_via?: string | null }).scanned_via
- if (via === "partner" || o.dispatch_pdf_id) return { label: "byeastside", icon: TrayArrowDown }
- if (via === "in-house") return { label: "Scanned here", icon: Barcode }
- if (via === "carrier") return { label: "Carrier", icon: Truck }
- return null
-}
-
 /** Status as an icon plus a word. Module scope, not defined inside the board — a component
  * declared during render is remounted every frame and the lint rule that forbids it exists
  * because that has bitten this codebase before. */
@@ -183,23 +133,9 @@ function DispStatus({ k, label }: { k: DispKey; label: string }) {
 
 // Shared column template for the history table — the header and every row use it so the
 // columns line up. Scrolls horizontally inside the card rather than cramming on narrow.
-/**
- * HOW THE LABEL GOT HERE — a column, because the row could not say it.
- *
- * "Channel" answers where the ORDER came from (Etsy, Shopify, Manual). It cannot answer
- * how the LABEL reached the queue, and those are different questions with the same-shaped
- * answer, which is why one column could not carry both: an order pushed to byeastside and
- * one scanned on our own bench were indistinguishable on the row, and the only place the
- * difference existed was inside the expanded timeline.
- *
- * Widths come out of `when` (10rem -> 9rem — a date needs less than it had) and the
- * customer floor (7rem -> 6rem), so the row's minimum grows by ~1.5rem rather than 7.5.
- */
-const HIST_GRID = "grid items-center gap-3 px-5 grid-cols-[1rem_9.5rem_12rem_minmax(6rem,1fr)_8rem_7.5rem_9rem_2rem]"
 // The per-label timeline shows DISPATCH actions only — scans, hand-offs to byeastside,
 // pull-backs, label prints/voids, manifests. Order-level noise (order saved/updated, design
 // files, charges) belongs on the order page, not the scan floor.
-const DISPATCH_ACTIONS = /^order\.scan|^dispatch\.|^label\.|^order\.manifested|^order\.(shipped|tracking)/
 /**
  * FILTERS FOR THE SCAN QUEUE, which had none — only a search box, which answers "where is
  * THIS parcel" and not "show me the ones I can act on".
@@ -217,13 +153,6 @@ const QUEUE_FILTERS: { key: QueueFilter; label: string }[] = [
   { key: "partner", label: "With byeastside" },
   { key: "unsent", label: "Not sent yet" },
   { key: "external", label: "External" },
-]
-
-const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
-  { key: "all", label: "All" }, { key: "scanned", label: "Scanned" }, { key: "awaiting", label: "To scan" },
-  { key: "production", label: "In production" }, { key: "shipped", label: "Shipped" },
-  { key: "removed", label: "Off board" }, { key: "cancelled", label: "Cancelled" },
-  { key: "attention", label: "Needs a look" },
 ]
 
 /** `segmented` is GONE. It existed to give this strip one idiom instead of two — "All" a
@@ -283,8 +212,6 @@ export function DispatchBoard() {
   // second is a read-only history — "did this order actually get scanned?" was a question
   // that could only be answered by leaving for the Shipments page, so the floor now has it
   // where the scan happens.
- const [view, setView] = useState<"queue" | "history">("queue")
- const [histFilter, setHistFilter] = useState<"all" | DispKey>("all")
  const [qFilter, setQFilter] = useState<QueueFilter>("all")
   // Expandable per-label action timeline (lazy-loaded from the audit log). undefined = not
   // fetched, null = loading, [] = fetched-empty.
@@ -501,30 +428,6 @@ export function DispatchBoard() {
   }, [allRows, matchesFilter])
 
 
-  // History — EVERY order that ever had a label (bought → has tracking, or scanned),
-  // whatever became of it, PLUS every label dropped in that belongs to no order. A label
-  // pulled off the board still shows here with its outcome, so nothing vanishes.
-  // Searchable, and filterable by disposition.
- const history = useMemo<HistRow[]>(() => {
- const term = q.trim().toLowerCase()
-
- const orderRows: HistRow[] = (orders ?? [])
-      .filter((o) => o.tracking || o.label_scanned_at)
-      .filter((o) => !term || [numOf(o), customerOf(o), o.store, o.tracking].some((f) => String(f ?? "").toLowerCase().includes(term)))
-      .map((o) => ({ kind: "order", id: o.id, at: String(o.label_scanned_at || o.created_at || ""), disp: disposition(o), o }))
-
- const extRows: HistRow[] = uploads
-      // Searchable by the same terms that make sense for them: the file, and any tracking
-      // number their extractor pulled off it.
-      .filter((u) => !term || [u.file_name, ...(u.labels ?? []).map((l) => l.trackingNumber)]
-        .some((f) => String(f ?? "").toLowerCase().includes(term)))
-      .map((u) => ({ kind: "external", id: `ext-${u.id}`, at: String(u.created_at || ""), disp: extDisposition(u), u }))
-
- const all = [...orderRows, ...extRows]
- const list = histFilter === "all" ? all : all.filter((r) => r.disp.key === histFilter)
-    // Most recent activity first — the scan time if there is one, else when it landed.
- return list.sort((a, b) => b.at.localeCompare(a.at))
-  }, [orders, uploads, q, histFilter])
 
   // A label is what makes an order dispatchable. Without one there is nothing to scan, so
   // these are surfaced separately rather than silently included in a batch.
@@ -953,7 +856,7 @@ export function DispatchBoard() {
       placeholder={tl("dispatch", "Search order, customer or tracking…")}
     />
   )
-  const headActions = view === "history" ? undefined : (
+  const headActions = (
           <div className="flex flex-wrap items-center gap-2">
             {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the
                 USPS SCAN form. All are "produce a document" actions, none touch the scan. */}
@@ -1069,7 +972,7 @@ export function DispatchBoard() {
       {inShell && (
         <ActionsPortal>
           {/* Search first, then the actions — the reading order of /orders' header line. */}
-          {view === "queue" && searchEl}
+          {searchEl}
           {headActions}
         </ActionsPortal>
       )}
@@ -1119,7 +1022,7 @@ export function DispatchBoard() {
           people read all day and read first every time. Inside the console shell it is gone
           and the sentence lives on the External chip's own title, where it is asked for
           rather than served. Outside the shell nothing changes. */}
-      {!inShell && view !== "history" && (staged.length > 0 || uploads.length > 0) && (
+      {!inShell && (staged.length > 0 || uploads.length > 0) && (
         <p className="px-1 text-xs text-muted-foreground">
           {/* The explicit spaces are load-bearing: the compiler drops the one after a
  closing tag mid-line, which shipped as "Externalare labels from outside". */}
@@ -1165,31 +1068,6 @@ export function DispatchBoard() {
          * which is what Mercury does with its status tabs above a separate filter bar.
          */}
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 pb-2 pt-3">
-          {/* Waiting-to-scan vs. history: two VIEWS of this card, kept here rather than on a
-              second page so the search box and stat cards above stay put. It was a boxed
-              segmented control whose active half went solid `bg-primary` — the same fill as
-              the Finish All button four inches to its right, so the row had two black
-              rectangles meaning completely different things. A rule under the live word. */}
-          {/* SAME FAMILY AS THE FILTERS BESIDE IT. An underline bar butted straight against
-              the filters' segmented track read as two different kinds of control jammed into
-              one row — which is what "messy" is here. Both are ways of narrowing the same
-              list, so both take the same shape and the row reads as one strip. */}
-          <TabBar
-            size="sm"
-            /* A LINE, NOT A TRACK, on both. This is navigation between two lists — the same
-               job the page tabs above it do — and the underline is the app's one active-tab
-               treatment. The segmented tray was picked when it shared a row with the filters
-               and needed to look different from them; on its own row it does not. */
-            look="line"
-            ariaLabel="Dispatch view"
-            className={"shrink-0 border-b-0 " + (inShell ? "order-1 mb-0" : "")}
-            items={[
-              { id: "queue" as const, label: tl("dispatch", "To scan") },
-              { id: "history" as const, label: tl("dispatch", "History"), count: history.length || undefined },
-            ]}
-            value={view}
-            onChange={setView}
-          />
           {/* SEARCH SITS WITH THE ACTIONS, NOT UNDER THE FILTERS.
               Splitting the strip in two put the filters on row one and pushed search onto row
               two, so the thing you reach for most moved DOWN every time a filter row grew.
@@ -1209,29 +1087,7 @@ export function DispatchBoard() {
               filters and Select-all: thirteen controls in ~150px, which is the "messy" of it.
               Done with flex `order` and a full-basis break rather than by restructuring the
               JSX, so nothing here changes owner and every control keeps its handler. */}
-          {view === "history" && (
-            <div className={"flex flex-wrap items-center gap-1 " + (inShell ? "order-2" : "")}>
-              {HIST_FILTERS.map((f) => (
-                <button
- key={f.key}
- onClick={() => setHistFilter(f.key)}
- className={"rounded-md px-2 py-1 text-xs font-medium transition-colors " + (histFilter === f.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
-                >
-                  {tl("dispatch", f.label)}
-                </button>
-              ))}
-            </div>
-          )}
-          {/* Filter chips, the same shape History already uses — one screen, one idiom.
-              Counted, so an empty list is never ambiguous between "nothing matches this
- filter" and "nothing is here at all". */}
-          {/* THE SAME FILTER ROW SHIPMENTS USES, one tab away — see the note there. This was
-              hand-rolled in two shapes of its own (`segmented` or not), with the count glued
-              onto the label as "· 25", against Shipments' outlined lozenges and a faded count
-              span. §4 already says a filter row is a rule under the live word and names the
-              primitive; both callers were violating it in different directions, which is why
-              changing tab felt like changing product. */}
-          {view === "queue" && (
+          {(
             <TabBar
               spacing="none"
               /* `basis-full` is what actually breaks the line: the wrapper is a wrap-flex, so
@@ -1271,7 +1127,7 @@ export function DispatchBoard() {
               a line of its own and made one utility row read as two. That wrap is most of
               what "cluttered" was here.
               /orders keeps its "962 orders" because /orders has no counted filter chips. */}
-          {view === "queue" && chosen.length + extPicked.size > 0 && (
+          {chosen.length + extPicked.size > 0 && (
             <span className={"text-muted-foreground " + (inShell ? "order-5 ml-auto text-sm" : "ml-auto text-xs")}>{chosen.length + extPicked.size} in this batch</span>
           )}
           {/* ONE select-all for one table. It used to be two — this one for orders, another
@@ -1279,7 +1135,7 @@ export function DispatchBoard() {
  what was on screen, and the count in each button was a count of half the list. */}
           {/* Columns sits on the utility line beside the count and Select-all — the band whose
               job is reshaping the table, not acting on it. Same place /orders puts it. */}
-          {inShell && view === "queue" && (
+          {inShell && (
             <ColumnsMenu
               /* ml-auto lives on whichever right-hand element comes first: the batch count
                  only exists while something is ticked, so without it here the pair would
@@ -1295,7 +1151,7 @@ export function DispatchBoard() {
               onHidden={(ids) => { setHiddenCols(ids); saveColumnIds("eg_dispatch_hidden", ids) }}
             />
           )}
-          {view === "queue" && (
+          {(
             <Button size="sm" variant="outline" disabled={!selectableAll} onClick={toggleAllRows}
               className={inShell ? "order-7" : undefined}>
               {allSelected ? tl("dispatch", "Clear selection") : `Select all ${selectableAll}`}
@@ -1316,169 +1172,12 @@ export function DispatchBoard() {
           </div>
         )}
 
-        {view === "history" ? (
- history.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
-              <ListChecks size={26} weight="duotone" className="opacity-50" />
-              <div className="text-sm font-medium text-foreground">{q || histFilter !== "all" ? tl("dispatch", "Nothing matches") : tl("dispatch", "No label activity yet")}</div>
-              <div className="text-xs">{tl("dispatch", "Every label and what became of it — scanned, shipped, pulled off the board, or dropped in from outside — shows here.")}</div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <div className={HIST_GRID + " border-b border-border py-2 eg-label text-muted-foreground"}>
-                <span />
-                <span>{tl("dispatch", "Status")}</span>
-                <span>{tl("dispatch", "Order / file")}</span>
-                <span>{tl("dispatch", "Customer")}</span>
-                <span>{tl("dispatch", "Channel")}</span>
-                <span>{tl("dispatch", "Method")}</span>
-                <span>{tl("dispatch", "When")}</span>
-                <span />
-              </div>
-              <div className="divide-y divide-border">
-              {history.map((row) => {
- const open = expanded.has(row.id)
- const when = row.at
-                  ? new Date(row.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
- : "—"
-
-                /* ── A LABEL THAT BELONGS TO NO ORDER ──────────────────────────────
-                   Same columns, filled with what it actually has. It does NOT borrow an
- order number or invent a customer: the file IS the identity, and the
- channel column says plainly where it came from. Expanding shows the
- tracking numbers their extractor pulled off it, which is this row's
- equivalent of an order's dispatch timeline. */
- if (row.kind === "external") {
- const u = row.u
- const tracked = (u.labels ?? []).map((l) => l.trackingNumber).filter(Boolean) as string[]
- return (
-                    <div key={row.id}>
-                      <div onClick={() => toggleTimeline(row.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
-                        <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
-                        <DispStatus k={row.disp.key} label={row.disp.label} />
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <FilePdf size={13} className="shrink-0 text-muted-foreground" />
-                          <span className="truncate text-sm" title={u.file_name || undefined}>{u.file_name || "label.pdf"}</span>
-                        </span>
-                        {/* No customer, and it says so rather than borrowing one. The page
- count goes here because it is the closest thing this row has to
-                            "what's in it". */}
-                        <span className="truncate text-sm text-muted-foreground">
-                          {u.total_pages ? `${u.total_pages} page${u.total_pages === 1 ? "" : "s"}` : "—"}
-                        </span>
-                        <span className="truncate text-xs text-muted-foreground">{tl("dispatch", "External label")}</span>
-                        <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                          <UploadSimple size={12} className="shrink-0 opacity-70" />
-                          <span className="truncate">{tl("dispatch", "Drop zone")}</span>
-                        </span>
-                        <span className="truncate text-xs text-muted-foreground" title={u.created_by ? `Sent by ${u.created_by}` : undefined}>{when}</span>
-                        {u.public_url ? (
-                          <a
- href={u.public_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
- className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
- aria-label={`Open ${u.file_name || "label"}`}
-                          >
-                            <ArrowSquareOut size={13} weight="bold" />
-                          </a>
-                        ) : <span />}
-                      </div>
-                      {open && (
-                        <div className="space-y-1 border-t border-border bg-muted/20 py-2.5 pl-11 pr-5 text-sm">
-                          {tracked.length ? tracked.map((t) => {
- const picked = (u.labels ?? []).find((l) => l.trackingNumber === t)?.status === "PICKED"
- return (
-                              <div key={t} className="flex items-center gap-2 text-xs">
-                                <Barcode size={12} className={"shrink-0 " + (picked ? "text-shipped" : "text-muted-foreground")} />
-                                <span className="tabular-nums">{t}</span>
-                                <span className="text-muted-foreground">{picked ? "picked" : "waiting"}</span>
-                              </div>
-                            )
-                          }) : (
-                            <div className="text-xs text-muted-foreground">
-                              {u.total_labels === 0
-                                ? tl("dispatch", "byeastside read the file and found no tracking label on it — re-send a clearer copy.")
- : tl("dispatch", "No tracking numbers read off this file yet.")}
-                            </div>
-                          )}
-                          <div className="pt-1 text-2xs text-muted-foreground">
-                            Not attached to an EGFUL order{u.created_by ? ` · sent by ${u.created_by}` : ""}.
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                }
-
- const o = row.o
- const d = row.disp
- const events = auditByOrder[o.id]
- return (
-                  <div key={row.id}>
-                    {/* Row toggles the action timeline. Click the label-link separately. */}
-                    <div onClick={() => toggleTimeline(o.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
-                      <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
-                      <DispStatus k={d.key} label={d.label} />
-                      <span className="truncate">
-                        <OrderNumber order={o} />
-                      </span>
-                      <span className="truncate text-sm">{customerOf(o)}</span>
-                      <span className="truncate text-xs text-muted-foreground">{platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}</span>
-                      {(() => {
- const m = methodOf(o)
- if (!m) return <span className="text-xs text-muted-foreground">—</span>
- const I = m.icon
- return (
-                          <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                            <I size={12} className="shrink-0 opacity-70" />
-                            <span className="truncate">{tl("dispatch", m.label)}</span>
-                          </span>
-                        )
-                      })()}
-                      <span className="truncate text-xs text-muted-foreground" title={o.label_scanned_at ? tl("dispatch", "Scanned") : tl("dispatch", "Labelled")}>
-                        {when}
-                      </span>
-                      {o.tracking_label_url ? (
-                        <a
- href={o.tracking_label_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
- className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
- aria-label={`Open label for ${numOf(o)}`}
-                        >
-                          <ArrowSquareOut size={13} weight="bold" />
-                        </a>
-                      ) : <span />}
-                    </div>
-                    {/* Timestamped DISPATCH timeline — scans, hand-offs, pull-backs, labels.
-                        Not the full order history (order edits, design files) — that's the
- order page. Oldest → newest so it reads as the label's story. */}
-                    {open && (() => {
- const evs = Array.isArray(events)
-                        ? events.filter((ev) => DISPATCH_ACTIONS.test(ev.action)).sort((a, b) => String(a.ts).localeCompare(String(b.ts)))
- : null
- return (
-                        <div className="border-t border-border bg-muted/20 py-2 pl-11 pr-5">
-                          {events === null || events === undefined ? (
-                            <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground"><CircleNotch size={14} className="animate-spin" /> {tl("dispatch", "Loading dispatch history…")}</div>
-                          ) : !evs || evs.length === 0 ? (
-                            <div className="py-2 text-sm text-muted-foreground">{tl("dispatch", "No dispatch actions recorded for this label yet.")}</div>
-                          ) : (
-                            <ActivityFeed rows={evs} variant="bare" note />
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </div>
-                )
-              })}
-              </div>
-            </div>
-          )
-        ) : queue.length === 0 && !staged.length && !uploads.length ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
-            <Truck size={26} weight="duotone" className="opacity-50" />
-            <div className="text-sm font-medium text-foreground">{tl("dispatch", "Nothing waiting to go out")}</div>
-            <div className="text-xs">{tl("dispatch", "An order appears here the moment it has a label nobody has scanned — or drop a label PDF anywhere on this page.")}</div>
-          </div>
-        ) : (
+        {/* NO HISTORY VIEW. It was a second table behind a view switch on this card,
+            and its two halves have better homes: an order that has been labelled or
+            scanned is a row on Shipments, and WHO did it and when is the Activity feed,
+            which already filters to label and dispatch actions. A board for work waiting
+            to be done should not also be the archive of work that is finished.
+            See the commit for the one thing this does lose. */}
           /* ONE COLUMN PER FACT — the same nine the external-label list uses, so the two
  cards read as one screen (see dispatch-grid.ts). Channel, units, address and
  status used to share a single wrapping line under the order number, which made
@@ -1595,7 +1294,6 @@ export function DispatchBoard() {
             })}
             </div>
           </div>
-        )}
       </SectionCard>
 
       {/* Drag a file anywhere over this screen and the target is the whole window. Rendered
