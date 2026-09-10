@@ -40,7 +40,6 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
  const [note, setNote] = useState("")
   /* The adjustment, as typed. A STRING, like the per-part amounts beside it: parsing on
  every keystroke turns "5." into 5 and fights the person typing "5.50". */
- const [fee, setFee] = useState("")
  const [busy, setBusy] = useState(false)
  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   // A REF, not the `busy` state, guards re-entry. State updates are async, so a fast
@@ -113,22 +112,17 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
             })),
  note: note.trim() || undefined, clientId,
           }
- const r = await refundOrder(orderId, { ...body, ...(feeAmt > 0 ? { fee: { amount: feeAmt } } : {}) })
+ const r = await refundOrder(orderId, body)
  if (r.error) { setMsg({ ok: false, text: r.error }); return }
       /* `refundedNow`, not `refunded` — the latter is everything this order has ever sent
  back, which is the same number only on the first refund. The fallback covers an API
  that has not been redeployed yet, where the old key is all there is. */
  const sent = r.refundedNow ?? r.refunded ?? 0
-      // BOTH LEGS ARE REPORTED, and a failed fee never gets rounded up into "done". The
-      // refund stands either way, so the message has to say precisely which half landed.
- if (r.fee?.error) {
- setMsg({ ok: false, text: `Refunded ${usd(sent)}, but the ${usd(feeAmt)} adjustment was not charged — ${r.fee.error}` })
-      } else if (r.fee?.charged) {
- setMsg({ ok: true, text: `Refunded ${usd(sent)} and charged ${usd(r.fee.charged)} back — the seller is ${usd(sent - r.fee.charged)} up.` })
-      } else {
+      /* ONE LEG NOW, so one sentence. The three-way message existed to report a refund and
+         a charge landing independently; with the charge gone there is only the refund to
+         report, and a branch for a leg that cannot happen is a branch that rots. */
  setMsg({ ok: true, text: `Refunded ${usd(sent)} to the seller's wallet.` })
-      }
- setPicked(new Set()); setAmounts({}); setNote(""); setFee("")
+ setPicked(new Set()); setAmounts({}); setNote("")
  setState(r)
     } catch {
  setMsg({ ok: false, text: "Couldn't process the refund — nothing was charged back." })
@@ -137,10 +131,6 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
 
   /* "Everything" means every refundable part is ticked AND nobody typed a smaller amount
  into one. A typed-down part is a partial refund even when all the boxes are ticked. */
-  /* Parsed once. Negative and non-numeric collapse to 0, which reads as "no adjustment"
- everywhere below — a fee is money leaving a seller's wallet and there is no sensible
- meaning for a negative one here; that direction is what the refund above is. */
- const feeAmt = Math.max(0, Number(fee) || 0)
 
  const isEverything =
  parts.filter((p) => p.refundable > 0).every((p) => picked.has(p.key)) &&
@@ -224,48 +214,24 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
             <Input
  value={note}
  onChange={(e) => setNote(e.target.value)}
- placeholder={feeAmt > 0 ? tl("orderRefund", "Why the adjustment — required, and the seller sees it") : tl("orderRefund", "Reason (shown on the ledger entry)")}
+ placeholder={tl("orderRefund", "Reason (shown on the ledger entry)")}
  disabled={busy}
  className="h-9"
             />
 
-            {/**
-              * THE KEEP-BACK — money the other way, out of the same press.
-              *
-              * A quote can be wrong upward as well as downward: a heavier parcel than the
-              * estimate, a colour added at the machine, one line re-printed. There was no way
-              * to record that, so it was either never taken or taken as some unrelated ledger
-              * entry with no order against it.
-              *
-              * It sits INSIDE the refund panel rather than in a panel of its own because it
-              * is the same decision with the same authority, made at the same moment, by the
-              * same person — and because keeping a fee back out of a refund is the two of
-              * them together, which two separate panels could not express in one press.
-              *
-              * ONLY while a part is ticked. A plain adjustment with no refund attached is the
-              * Price adjustment card beside this one (order-adjust-panel.tsx), which also
-              * exists on a draft; here the row would just be that card again, under a list
-              * of charges the Summary already prints.
-              */}
-            {selected.length > 0 && (
-            <label className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{tl("orderRefund", "Charge an adjustment")}</div>
-                <div className="text-xs text-muted-foreground">
-                  {tl("orderRefund", "Kept back out of this refund — both are recorded separately")}
-                </div>
-              </div>
-              <Input
- value={fee}
- onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))}
- placeholder="0.00"
- inputMode="decimal"
- disabled={busy}
- aria-label={tl("orderRefund", "Adjustment to charge")}
- className="h-8 w-24 text-right tabular-nums"
-              />
-            </label>
-            )}
+            {/* NO "Charge an adjustment" HERE (owner, 2026-09-10: "we already have charge
+                adjustment down below").
+
+                It let one press do both legs — refund X, keep Y back — and the argument for
+                it was that keeping a fee out of a refund is one decision. But the two were
+                never one MOVEMENT: the note under the field said so itself, "both are
+                recorded separately", because they are always two ledger entries either way.
+                So what it actually saved was a second press, at the cost of a second money
+                field on a panel whose whole job is one number leaving.
+
+                The Price adjustment card below does the charge, on every order and at every
+                stage, which is more than this could — this one only appeared once a part was
+                ticked. Two controls for one act, and the narrower one went. */}
             {/* ONE BUTTON, and it always states the amount it will send.
                 Two buttons made the reader compare them to work out which was which, on a
  panel where the difference is money leaving. The amount follows the ticks:
@@ -282,30 +248,19 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
               <Button
  className="w-full justify-center"
  onClick={() => void send(isEverything ? "full" : "selected")}
-                /* A reason is OPTIONAL on a refund and REQUIRED on a charge: money arriving
- explains itself, money leaving does not. The server refuses it either way;
- this only stops the round trip. */
- disabled={busy || !selected.length || (feeAmt > 0 && !note.trim())}
+                /* A reason is OPTIONAL here. Money arriving explains itself; the case that
+                   required one was the charge leg, and that has moved to the Price
+                   adjustment card, which requires its own. */
+ disabled={busy || !selected.length}
               >
                 {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
-                {/* ONE BUTTON, NAMING ALL OF WHAT IT DOES. With an adjustment typed it is two
- money movements in one press, and a label reading "Full refund" while $5
- goes the other way would be false — so the charge is named too. Every part
- ticked and nothing kept back is still "Full refund": that is the whole
- order going back, and saying so beats restating a figure the header
- already carries. */}
-                {feeAmt > 0
-                    ? `${isEverything ? tl("orderRefund", "Full refund") : `Refund ${usd(planned)}`}, keep ${usd(feeAmt)}`
- : isEverything ? tl("orderRefund", "Full refund") : `Refund ${usd(planned)}`}
+                {/* THE AMOUNT, ALWAYS. One movement now, so the label is the figure that lands —
+                    there is no second leg to name. Every part ticked is still "Full refund":
+                    that is the whole order going back, and saying so beats restating a number
+                    the header already carries. */}
+                {isEverything ? tl("orderRefund", "Full refund") : `Refund ${usd(planned)}`}
               </Button>
             </div>
-            {/* THE NET, stated, because two movements in one press is the one case where the
- figure on the button is not the figure that lands. */}
-            {selected.length > 0 && feeAmt > 0 && (
-              <p className="text-xs font-medium">
-                Seller receives {usd(Math.max(0, planned - feeAmt))} — two entries on their statement, not one.
-              </p>
-            )}
             <p className="text-xs text-muted-foreground">
               {tl("orderRefund", "Goes straight to the seller’s wallet balance. Tick a part to refund it in full, or type an amount to refund some of it.")}
             </p>
