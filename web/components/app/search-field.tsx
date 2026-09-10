@@ -85,7 +85,28 @@ export function SearchField({
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
         autoFocus={autoFocus}
-        className={cn("h-9 pl-8", onClear && value ? "pr-8" : undefined)}
+        /**
+         * A WELL, NOT A BOX — and this was measured before it was changed.
+         *
+         * The field and the outline Button beside it were IDENTICAL: same background, same
+         * border colour, same 1px, no shadow on either. Yet the button reads as a control and
+         * the field vanished into the page. The container was never the problem — the CONTENT
+         * is. A button is full of dark bold type; an empty search field holds a grey glyph and
+         * a grey placeholder, so a white box on a near-white ground has nothing in it for the
+         * eye to catch. Measured on the toolbar: field L* 96.1, page behind it ~95. Those are
+         * the same colour.
+         *
+         * A tint fixes it, and it also fixes something §4 already asks for: shape says KIND. A
+         * button is a raised thing you press, a field is a recessed thing you type into, and
+         * when both are white-with-a-border the two kinds look the same. Every search field
+         * worth copying — GitHub, Linear, Slack — is filled rather than outlined for exactly
+         * this reason.
+         *
+         * `focus:bg-background` so the well lifts to a plain field the moment it is being
+         * used: the tint is there to advertise an empty control, and once there is text in it
+         * the text does that job.
+         */
+        className={cn("h-9 bg-muted/70 pl-8 focus:bg-background", onClear && value ? "pr-8" : undefined)}
       />
       {onClear && value ? (
         <button
