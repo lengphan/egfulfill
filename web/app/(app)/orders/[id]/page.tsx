@@ -1243,7 +1243,11 @@ export default function OrderDetailPage() {
                     identity, so it overrides the primitive's row size explicitly. It used
                     to inherit text-2xl from this h1; the primitive owns the size now, and
                     an inherited size no longer reaches past it. */}
-                <OrderNumber order={order} editable={isStaff} onSaved={() => reloadAll()} className="text-2xl" />
+                {/* `editable` is now "this SURFACE offers it", not "this person may". The
+                    component owns the gate — staff always, the seller while it is still a
+                    draft — so passing isStaff here would have kept the seller out of their
+                    own unsubmitted order. */}
+                <OrderNumber order={order} editable onSaved={() => reloadAll()} className="text-2xl" />
               </h1>
               {/*
                 * THE FACTORY READS ITS OWN VOCABULARY.

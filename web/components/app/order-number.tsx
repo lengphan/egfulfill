@@ -78,15 +78,25 @@ export function OrderNumber({
   }, [editing])
 
   /*
-   * THE ROLE GATE LIVES HERE, not at the call site.
+   * THE GATE LIVES HERE, not at the call site.
    *
    * `editable` says whether this SURFACE wants to offer the edit; this says whether the
-   * person may have it. Mirrors isStaff() on the server, which is the boundary that actually
-   * refuses — a seller pressing this would get a 403, and a control that is always refused is
-   * worse than no control (§4). Deriving it in each board is how one board forgets.
+   * person may have it. It MIRRORS the server, which is the boundary that actually refuses —
+   * a control that is always refused is worse than no control (§4). Deriving it in each board
+   * is how one board forgets.
+   *
+   * STAFF ALWAYS; THE SELLER ONLY WHILE IT IS A DRAFT (owner's call, 2026-09-10). Their draft
+   * is their own document — nobody has quoted it and nothing has been charged — and the
+   * number exists so it can line up with whatever they run their shop on. Once pushed it is
+   * on the floor, in their emails and in the audit trail, so it stops being theirs to move.
+   *
+   * The same three statuses everything else treats as "not submitted yet", and the same test
+   * the PATCH route makes before it will write `seq`.
    */
   const role = getUser()?.role || ""
-  const mayEdit = editable && !!role && role !== "seller"
+  /* `unsubmitted`, not `draft` — the edit box already owns that name in this component. */
+  const unsubmitted = ["", "new", "draft"].includes(String(order.factory_status ?? "").toLowerCase())
+  const mayEdit = editable && !!role && (role !== "seller" || unsubmitted)
 
   if (!mayEdit) return <span className={cn(BASE, className)}>{label}</span>
 

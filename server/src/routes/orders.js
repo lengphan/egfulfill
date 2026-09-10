@@ -2125,9 +2125,15 @@ export function ordersRoutes(app, requireAuth) {
      *
      * Three things have to hold, and none of them are optional:
      *
-     *  · STAFF ONLY. The number appears in the seller's own emails and in audit entries; a
-     *    seller renumbering their orders to match something else is not an edit anyone can
-     *    reconstruct afterwards.
+     *  · THE OWNER, BEFORE SUBMISSION — or staff, always (owner's call, 2026-09-10).
+     *    A draft is the seller's own document: nobody has quoted it, nothing has been
+     *    charged, and the number exists so they can line it up with whatever they run their
+     *    shop on. Once it is pushed it stops being theirs alone — it is on the floor, in
+     *    their emails and in the audit trail — and from then on only staff may move it,
+     *    which is what the original rule was protecting.
+     *    Scoped to their OWN order either way: the ownership check below reads
+     *    seller_id, and the clash check uses the same (seller, factory_order) scope the
+     *    number is minted in.
      *  · NEVER INTO A COLLISION. Nothing joins on seq, so a duplicate does not corrupt
      *    anything — it does something worse and quieter: two orders answer to `#6`, and the
      *    factory picks one. Checked against the same scope the number is MINTED in
@@ -2136,13 +2142,27 @@ export function ordersRoutes(app, requireAuth) {
      *    snapshot and `order.updated` audit cover it exactly like any other field.
      */
     if ((req.body || {}).seq !== undefined) {
-      if (!isStaff(req.user)) { reply.code(403); return { error: 'Only staff can change an order number.' }; }
       const want = Number(req.body.seq);
       if (!Number.isInteger(want) || want < 1) {
         reply.code(400); return { error: 'An order number is a whole number above zero.' };
       }
-      const own = (await q('select seller_id, coalesce(factory_order,false) as fo from orders where id=$1', [req.params.id])).rows[0];
+      const own = (await q(
+        'select seller_id, coalesce(factory_order,false) as fo, coalesce(factory_status,\'\') as fs from orders where id=$1',
+        [req.params.id])).rows[0];
       if (!own) { reply.code(404); return { error: 'Order not found' }; }
+      if (!isStaff(req.user)) {
+        /* THEIR OWN, AND STILL A DRAFT. Both halves matter: the first stops a seller
+           renumbering somebody else's order, the second stops one moving after the floor and
+           the seller's own emails have started quoting it. The same three statuses everything
+           else treats as "not submitted yet". */
+        const mine = await resolveSeller(req.user);
+        if (!mine?.id || String(own.seller_id) !== String(mine.id)) {
+          reply.code(403); return { error: 'Only staff can change an order number.' };
+        }
+        if (!['', 'new', 'draft'].includes(String(own.fs).toLowerCase())) {
+          reply.code(403); return { error: 'The number is fixed once the order is submitted — ask us if it needs changing.' };
+        }
+      }
       const clash = await q(
         `select id from orders where seller_id=$1 and coalesce(factory_order,false)=$2 and seq=$3 and id <> $4 limit 1`,
         [own.seller_id, own.fo, want, req.params.id]);
@@ -2155,7 +2175,12 @@ export function ordersRoutes(app, requireAuth) {
     // Staff-only fields: a seller may PATCH their own order, so the guard is on the FIELD
     // and not only on the route. Without it a seller could write — and by writing, read
     // back — the factory's private note on their own order.
-    if (isStaff(req.user)) { map.internalNote = 'internal_note'; map.seq = 'seq'; }
+    if (isStaff(req.user)) { map.internalNote = 'internal_note'; }
+    /* `seq` is allowed for a seller too, but ONLY because the block at the top of this route
+       has already proved they own it and it is still a draft — a 403 returns before here
+       otherwise. internal_note stays staff-only: a seller who could write it could read it
+       back, and it is the factory's private note on their order. */
+    if (isStaff(req.user) || (req.body || {}).seq !== undefined) { map.seq = 'seq'; }
     const sets = [], vals = []; let n = 1;
     for (const k in (req.body || {})) if (map[k]) { sets.push(`${map[k]}=$${n++}`); vals.push(req.body[k]); }
     const body = req.body || {};
