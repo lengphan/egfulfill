@@ -870,21 +870,29 @@ export default function Dashboard() {
           screen is for. The colour is the tile, not a dot on it. */}
       {/* THE CARD OWNS "needs you", so the tiles are VOLUMES and none of them repeats it.
           Three sayings of one number — a heading, a headline and a tile — was most of what
-          made this screen read as padded. */}
+          made this screen read as padded.
+          THE LABELS ARE THE APP'S OWN WORDS, not descriptions of them. Working and Shipped
+          come straight out of STAGE_LABEL, Open is a lens on the Orders screen and Scan is a
+          tab. "In production" and "On the way" were this screen inventing a second name for
+          a status that already has one — which is how a person ends up learning the same
+          pipeline twice. */}
       <View style={{ flexDirection: "row", gap: 10, marginHorizontal: S.xl, marginTop: S.xl }}>
         <Tile n={open.length} label="Open" bg={C.brand} fg={C.onBrand} reduced={reduced}
               onPress={() => router.push("/(tabs)/orders")} />
-        <Tile n={stageCounts.working ?? 0} label="In production" bg={C.lit} fg={C.onLit} reduced={reduced}
+        <Tile n={stageCounts.working ?? 0} label="Working" bg={C.lit} fg={C.onLit} reduced={reduced}
               onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Working" } })} />
       </View>
       <View style={{ flexDirection: "row", gap: 10, marginHorizontal: S.xl, marginTop: 10 }}>
-        <Tile n={awaitingScan ?? 0} label="Ready to scan" bg={C.acid} fg={C.onAcid} reduced={reduced}
+        <Tile n={awaitingScan ?? 0} label="Scan" bg={C.acid} fg={C.onAcid} reduced={reduced}
               onPress={() => router.push("/(tabs)/scan")} />
-        <Tile n={shipped} label="On the way" bg={C.pop} fg={C.onPop} reduced={reduced}
+        <Tile n={shipped} label="Shipped" bg={C.pop} fg={C.onPop} reduced={reduced}
               onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Shipped" } })} />
       </View>
 
       {/* WHAT IS BEING MADE, as pictures.
+          The heading is a PLACE, not a stage — "Working" is already the tile directly above
+          and printing it twice on one screen is the repetition this pass just removed. The
+          floor is where these orders are; the tile is how many of them there are.
           Two grey blocks stood here — a stage funnel and a seven-day bar chart — and both
           were lists of numbers on a screen whose whole point is not being one. The funnel
           said what the Orders screen's own lens tabs already say, one tap away. The chart
@@ -892,7 +900,7 @@ export default function Dashboard() {
           which is not even what it counted. */}
       {inWorks.length > 0 && (
         <>
-          <CardHead label="In the works" action="View all"
+          <CardHead label="On the floor" action="View all"
                     onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Working" } })} />
           <ScrollView
             horizontal
