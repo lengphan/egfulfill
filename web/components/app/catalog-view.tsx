@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CircleNotch, Warning, DownloadSimple, Percent, Tag } from "@phosphor-icons/react"
@@ -287,6 +288,11 @@ export function CatalogView() {
  side by side is the point — it's how someone sees they are different
  things rather than discovering it later. */}
                   <th className="px-2 py-2">{tl("catalog", "Seller pays")}</th>
+                  {/* THE NUMBER THE OTHER TWO WERE FOR. Two prices side by side is how you
+                      see they are different things — but the question anyone is actually
+                      answering when they type in that box is "what does the seller keep",
+                      and it was left as mental arithmetic across a gap of empty table. */}
+                  <th className="px-2 py-2">{tl("catalog", "Margin")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -329,9 +335,21 @@ export function CatalogView() {
  because those wells have no border, so white there would leave a
  white shirt with nothing to define it. Same photographs, two
  surfaces, and the plate is only load-bearing on one. */}
-                          <ProductThumb src={imageOf(p)} alt={p.name || id} />
+                          {/* BIGGER, and a way in. The photograph is the fastest way to know
+                              which product a row is — faster than the name, which is where
+                              "Unisex Heavy Blend™ Crewneck Sweatshirt" and "Unisex
+                              Colorblast™ Heavyweight T-Shirt" differ in the middle of a long
+                              string. It is also the obvious thing to click and did nothing. */}
+                          <Link href={`/products/${encodeURIComponent(id)}`} className="shrink-0">
+                            <ProductThumb src={imageOf(p)} alt={p.name || id} className="size-28 transition-shadow hover:shadow-md" />
+                          </Link>
                           <div className="min-w-0">
-                            <div className="max-w-[20rem] truncate font-medium">{p.name || id}</div>
+                            {/* NO max-w-[20rem]. The column is far wider than that, so names
+                                were being cut off into the middle of the empty space that
+                                made this page read as spread out — truncated AND spaced. */}
+                            <div className="truncate text-sm font-medium">
+                              <Link href={`/products/${encodeURIComponent(id)}`} className="hover:underline">{p.name || id}</Link>
+                            </div>
                             {/* Just the sku. The "published" pill repeated the tick in this
  row's own first column, and the price warning repeated the
  price cell beside it — three readings of two facts, on the
@@ -377,6 +395,40 @@ export function CatalogView() {
                       </td>
                       <td className="px-2 py-2 text-xs tabular-nums text-muted-foreground">
                         {money(p.base_price ?? p.basePrice ?? p.price)}
+                      </td>
+                      {/**
+                       * LIVE OFF THE DRAFT, not off what is saved.
+                       *
+                       * The price field saves on blur, so a margin read from `catalogPrice`
+                       * would lag one field behind the number being typed — you would set a
+                       * price, look right to see what it earns, and be shown the answer for
+                       * the PREVIOUS price. The whole reason to put it on this row is to
+                       * watch it move while you decide.
+                       *
+                       * Blank, not "$0.00", until there is a price. An unpriced row is not a
+                       * row that earns nothing; it is a row nobody has decided about, and the
+                       * two must not read the same.
+                       */}
+                      <td className="px-2 py-2 text-xs tabular-nums">
+                        {(() => {
+                          const raw = draft[id] ?? (p.catalogPrice == null ? "" : String(p.catalogPrice))
+                          const sell = Number(raw)
+                          const cost = Number(p.base_price ?? p.basePrice ?? p.price)
+                          if (!raw || !isFinite(sell) || sell <= 0 || !isFinite(cost) || cost <= 0) {
+                            return <span className="text-muted-foreground">—</span>
+                          }
+                          const m = sell - cost
+                          const pct = Math.round((m / sell) * 100)
+                          /* NEGATIVE IS THE ONE THAT NEEDS A COLOUR. A catalogue price under
+                             what the seller pays us is a listing that loses money on every
+                             sale, and it is entirely possible to type — the two figures are
+                             in different columns and nothing else compares them. */
+                          return (
+                            <span className={m < 0 ? "font-medium text-destructive" : "text-foreground"}>
+                              {money(m)} <span className="text-muted-foreground">· {pct}%</span>
+                            </span>
+                          )
+                        })()}
                       </td>
                     </tr>
                   )

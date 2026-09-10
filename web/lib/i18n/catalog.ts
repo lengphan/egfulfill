@@ -2612,6 +2612,7 @@ const vi: Dict = {
   "label.Undo": "Hoàn tác",
   "shipments.Filter shipments": "Lọc lô hàng",
   "dispatch.Filter the queue": "Lọc hàng chờ",
+  "catalog.Margin": "Lợi nhuận",
   "canvas.every face": "mọi mặt",
   "canvas.Recent files": "Tệp gần đây",
   "canvas.Pick a blank to start designing.": "Chọn một phôi để bắt đầu thiết kế.",
