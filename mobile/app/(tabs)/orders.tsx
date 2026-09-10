@@ -446,6 +446,13 @@ export default function Orders() {
               {err ?? (search ? `Nothing matches “${search}”.` : `No ${filter.toLowerCase()} orders.`)}
             </Text>
           }
+          /* THE RULE BETWEEN ROWS, drawn by the LIST rather than by each row, because a
+             selected row is a filled object and a filled object must not also be cut in
+             half by its own bottom border. Inset past the thumbnails, the way a printed
+             list indents its rule past the picture column. */
+          ItemSeparatorComponent={() => (
+            <View style={{ height: 1, backgroundColor: C.border, marginLeft: 74, marginRight: 18 }} />
+          )}
           renderItem={({ item }) => (
             <OrderRow
               order={item}

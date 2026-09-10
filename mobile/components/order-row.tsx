@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react"
-import { View, Text, Image, Pressable, Modal, ScrollView, useWindowDimensions, Animated, Easing, PanResponder } from "react-native"
+import { View, Text, Image, Pressable, Modal, Animated, Easing, PanResponder } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, type Order } from "@/lib/api"
-import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, lineFacts, STAGE_LABEL } from "@/lib/orders"
-import { F,C, R, toneOf } from "@/lib/theme"
+import { isOverdue, normalizeStage, units, numOf, lineTitle, STAGE_LABEL } from "@/lib/orders"
+import { F, C, R } from "@/lib/theme"
 /* ImagePeek moved to its own file once it grew pinch-zoom and a dismiss gesture — it
    is a photo viewer, and two screens use it. Re-exported so importers are unchanged. */
 import { ImagePeek } from "@/components/image-peek"
@@ -149,36 +149,6 @@ function RowMenu({ open, onClose, title, actions }: {
  * a component defined during render is a new type on every pass, which defeats recycling.
  */
 
-/** The order's OTHER lines, up to four. The first line's picture is already the row's
- *  thumbnail, so repeating it here reads as a duplicate rather than as a second item.
- *  Beyond four the strip stops being scannable and starts being a texture, so the rest are
- *  counted instead. */
-function Chip({ label, fg, bg, solid }: { label: string; fg: string; bg?: string; solid?: boolean }) {
-  /* NOT A PILL ANY MORE.
-   *
-   * Every row carried two of these and the filter rows carried eight more, so a screen
-   * opened with ~20 lozenges on it and the eye had nowhere to land. The reserved stage
-   * colour is the information; the capsule around it never was. A 6pt dot in that exact
-   * colour beside plain type says the same thing and stops competing with the product name,
-   * which is the one line anyone is actually reading.
-   *
-   * RUSH and LATE keep a fill, because they are the two states that SHOULD interrupt. That
-   * is the whole point of reserving a shape: it means something when almost nothing has it.
-   */
-  if (solid) {
-    return (
-      <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: R.badge, backgroundColor: bg }}>
-        <Text style={{ fontSize: 10.5, fontFamily: F.bold, color: fg, letterSpacing: 0.6 }}>{label}</Text>
-      </View>
-    )
-  }
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-      {bg ? <View style={{ width: 6, height: 6, borderRadius: R.pill, backgroundColor: fg }} /> : null}
-      <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: bg ? C.fg : C.muted }}>{label}</Text>
-    </View>
-  )
-}
 
 export function OrderRow({ order, selecting, selected, onPress, onLongPress, onAdvance, advanceLabel }: {
   order: Order
@@ -195,7 +165,6 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
   const items = order.items ?? []
   const first = items[0]
   const stage = normalizeStage(order.factory_status)
-  const tone = toneOf(stage)
   const late = isOverdue(order)
   const [peek, setPeek] = useState<number | null>(null)
   const [menu, setMenu] = useState(false)
@@ -239,9 +208,24 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
    * line instead, where it reads as what it actually means: this cannot be produced yet. */
   const noArt = shots.length > 0 && !shots.some((s) => s.art)
 
-  /* WHAT MAKES THIS ROW DIFFERENT FROM THE ONE ABOVE IT. A seller with one product gives
-     every row the same truncated title; the variant is the part that differs. */
-  const facts = first ? lineFacts(first) : []
+  /*
+   * ONE FACT, RANKED. The row used to carry the stage, an item count and a "No artwork"
+   * chip side by side, which is three things claiming the same corner. Only one of them is
+   * ever the reason you would stop on this row, so only one is shown, and the order below
+   * is the order of urgency: a thing that BLOCKS production outranks a date, which outranks
+   * where the job has got to.
+   */
+  const fact =
+    noArt ? { text: "No artwork", color: C.alert } :
+    late  ? { text: "Late",       color: C.alert } :
+    order.rush ? { text: "Rush",  color: C.warn  } :
+    { text: STAGE_LABEL[stage] ?? stage, color: C.muted }
+
+  /* Two pictures and a count, not a strip you slide. The strip was 200pt tall and put two
+     orders on a screen; on a queue the job is FINDING the order, and the pictures at this
+     size still say which one it is. The full-size check has not moved — tap a thumbnail. */
+  const lead = shots.slice(0, 2)
+  const rest = shots.length - lead.length
 
   return (
     <Pressable
@@ -249,93 +233,73 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
       onLongPress={onLongPress}
       delayLongPress={220}
       style={({ pressed }) => ({
-        paddingTop: 14, paddingBottom: 14, paddingHorizontal: 18,
-        borderBottomWidth: 1, borderBottomColor: C.border,
+        flexDirection: "row", alignItems: "center", gap: 12,
+        /* Inset by 8 so the selected FILL is an object with corners, while the content
+           still starts at the screen's 18pt gutter — the same line the header and the
+           search field sit on. */
+        paddingVertical: 11, paddingHorizontal: 10, marginHorizontal: 8, borderRadius: R.control,
+        /* NO BORDER. Selection is a FILL, the way Apple Books does it in edit mode: nothing
+           arrives at the edge, the row simply becomes a solid object. A rule between rows
+           is drawn by the list, so a selected row is not also cut in half by one. */
         backgroundColor: selected ? C.accent : pressed ? C.accent : "transparent",
       })}
     >
-      {/* WHO — the identifier, small and above, where an identifier belongs. The tick moved
-          here when the thumbnail stopped being the leading element. */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-        {selecting && (
-          <View style={{
-            width: 19, height: 19, borderRadius: R.pill, marginRight: 1,
-            alignItems: "center", justifyContent: "center",
-            backgroundColor: selected ? C.primary : "transparent",
-            borderWidth: 1.5, borderColor: selected ? C.primary : C.border,
-          }}>
-            {selected && <Ionicons name="checkmark" size={12} color={C.onPrimary} />}
-          </View>
-        )}
-        <Text style={{ fontSize: 13, fontFamily: F.medium, color: C.muted }} numberOfLines={1}>
-          {numOf(order)}
-        </Text>
-        <Text style={{ fontSize: 12, color: C.muted }}>·</Text>
-        <Text style={{ fontSize: 13, fontFamily: F.body, color: C.muted, flex: 1 }} numberOfLines={1}>
-          {platformOf(order)}
-        </Text>
-        {order.rush && <Chip solid label="RUSH" fg="#fff" bg={C.warn} />}
-        {late && <Chip solid label="LATE" fg="#fff" bg={C.alert} />}
-        {/* THE QUIET WAY IN. Everything here is reachable by opening the order, which on a
-            queue of 800 means losing your place to do one thing and coming back. A sheet
-            keeps the scroll position and the hands where they are. */}
-        <Pressable onPress={() => setMenu(true)} hitSlop={12} style={{ paddingLeft: 6, paddingVertical: 2 }}>
-          <Ionicons name="ellipsis-horizontal" size={17} color={C.muted} />
-        </Pressable>
-      </View>
-
-      {/* WHAT — the one line to read. */}
-      <Text numberOfLines={1} style={{ fontSize: 16, fontFamily: F.medium, color: C.fg, marginTop: 4, letterSpacing: -0.2 }}>
-        {first ? lineTitle(first) : "No lines"}
-      </Text>
-      {facts.length > 0 && (
-        <Text numberOfLines={1} style={{ fontSize: 13.5, fontFamily: F.body, color: C.muted, marginTop: 2 }}>
-          {facts.join("  ·  ")}
-        </Text>
-      )}
-
-      {/* THE PICTURES. Slide for the rest; TAP one to see it full size — tap, not long-press,
-          because on a picture a tap is the obvious gesture and the row already owns
-          long-press for selection. It is a Pressable so the tap does NOT fall through and
-          open the order underneath. */}
-      {shots.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginTop: 10, marginHorizontal: -18 }}
-          contentContainerStyle={{ gap: 8, paddingHorizontal: 18 }}
-        >
-          {shots.map((sh, i) => (
+      {lead.length > 0 && (
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {lead.map((sh, i) => (
             <Pressable key={i} onPress={() => setPeek(i)}>
               <Image
                 source={{ uri: sh.uri }}
-                /* THE SAME SIZES THE ORDER PAGE USES, deliberately. A lone picture ran the
-                   full row width here, which on a QUEUE is too much: a feed wants one post
-                   to fill the view, a work list wants several rows visible at once so you
-                   can compare them without scrolling. Square, and the same square in both
-                   places, so an order does not change shape when you open it. */
                 style={{
-                  width: shots.length === 1 ? 200 : 168,
-                  height: shots.length === 1 ? 200 : 168,
-                  borderRadius: R.control, backgroundColor: C.accent,
+                  width: 44, height: 44, borderRadius: R.control, backgroundColor: C.accent,
+                  marginLeft: i === 0 ? 0 : -14,
+                  borderWidth: i === 0 ? 0 : 2, borderColor: C.bg,
                 }}
                 resizeMode="cover"
               />
             </Pressable>
           ))}
-        </ScrollView>
+          {rest > 0 && (
+            <View style={{
+              width: 44, height: 44, borderRadius: R.control, marginLeft: -14,
+              borderWidth: 2, borderColor: C.bg, backgroundColor: C.primary,
+              alignItems: "center", justifyContent: "center",
+            }}>
+              <Text style={{ fontSize: 12, fontFamily: F.medium, color: C.onPrimary }}>+{rest}</Text>
+            </View>
+          )}
+        </View>
       )}
 
-      {/* THE STATE. */}
-      <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
-        {/* THE STAGE IS A WORD, not a dot beside one — see STATUS_REGISTER. The dot was
-            the reserved stage colour, and that colour vocabulary was measured and retired
-            on the web (lib/status-tone.ts): only hue separated its nine members, which is
-            the one channel a factory screen and a colourblind reader both lose. */}
-        <Text style={{ fontSize: 12.5, ...tone }}>{STAGE_LABEL[stage] ?? stage}</Text>
-        <Chip label={`${units(order)} ${units(order) === 1 ? "item" : "items"}`} fg={C.muted} />
-        {noArt && <Chip label="No artwork" fg={C.muted} />}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text numberOfLines={1} style={{ fontSize: 14.5, fontFamily: F.displaySemi, color: C.fg, letterSpacing: -0.15 }}>
+          {numOf(order)}
+        </Text>
+        {/* The buyer, and the size of the job — the two things that tell one row from the
+            next. The platform name is gone: it repeats on every row of a connected shop. */}
+        <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, marginTop: 1 }}>
+          {[order.customer?.name, units(order) > 1 ? `${units(order)} items` : null].filter(Boolean).join("  ·  ") || "No lines"}
+        </Text>
       </View>
+
+      <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.medium, color: fact.color, textAlign: "right" }}>
+        {fact.text}
+      </Text>
+
+      {selecting ? (
+        <View style={{
+          width: 20, height: 20, borderRadius: R.pill,
+          alignItems: "center", justifyContent: "center",
+          backgroundColor: selected ? C.primary : "transparent",
+          borderWidth: selected ? 0 : 1.5, borderColor: C.edge,
+        }}>
+          {selected && <Ionicons name="checkmark" size={12} color={C.onPrimary} />}
+        </View>
+      ) : (
+        <Pressable onPress={() => setMenu(true)} hitSlop={12}>
+          <Ionicons name="ellipsis-horizontal" size={17} color={C.muted} />
+        </Pressable>
+      )}
 
       <ImagePeek shots={shots} index={peek} onClose={() => setPeek(null)} />
       <RowMenu

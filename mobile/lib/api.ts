@@ -1,5 +1,6 @@
 import Constants from "expo-constants"
 import * as SecureStore from "expo-secure-store"
+import { Platform } from "react-native"
 import { remember } from "@/lib/order-cache"
 import type { StoredAddress } from "@shared/order-address"
 
@@ -18,9 +19,31 @@ const API_BASE: string =
 
 const TOKEN_KEY = "eg_token"
 
-export async function getToken() { return SecureStore.getItemAsync(TOKEN_KEY) }
-export async function setToken(t: string) { return SecureStore.setItemAsync(TOKEN_KEY, t) }
-export async function clearToken() { return SecureStore.deleteItemAsync(TOKEN_KEY) }
+/*
+ * WEB IS A PREVIEW TARGET, NOT A SHIPPED ONE. app.json declares no `platforms` and no `web`
+ * block — this app goes to iOS and Android. But `expo start --web` is how the screens get
+ * looked at during a redraw, and SecureStore has NO web implementation, so every session
+ * read threw and the preview never got past "Couldn't read the saved session."
+ *
+ * The keychain is still the only store on a real device; the branch below cannot execute
+ * there. Do not reach for it as a general fallback — a bearer credential for a system that
+ * moves money belongs in the keychain, which is the whole reason this is not AsyncStorage.
+ */
+const webStore = {
+  get: (k: string) => { try { return globalThis.localStorage?.getItem(k) ?? null } catch { return null } },
+  set: (k: string, v: string) => { try { globalThis.localStorage?.setItem(k, v) } catch {} },
+  del: (k: string) => { try { globalThis.localStorage?.removeItem(k) } catch {} },
+}
+
+export async function getToken() {
+  return Platform.OS === "web" ? webStore.get(TOKEN_KEY) : SecureStore.getItemAsync(TOKEN_KEY)
+}
+export async function setToken(t: string) {
+  return Platform.OS === "web" ? webStore.set(TOKEN_KEY, t) : SecureStore.setItemAsync(TOKEN_KEY, t)
+}
+export async function clearToken() {
+  return Platform.OS === "web" ? webStore.del(TOKEN_KEY) : SecureStore.deleteItemAsync(TOKEN_KEY)
+}
 
 export class ApiError extends Error {
   status: number
