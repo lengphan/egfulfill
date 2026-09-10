@@ -4902,6 +4902,7 @@ const vi: Dict = {
   "wallet.Dispatch fee": "Phí xuất hàng",
   "wallet.Design": "Thiết kế",
   "wallet.Sample": "Hàng mẫu",
+  "grid.Drag down to copy this value": "Kéo xuống để sao chép giá trị này",
   "wallet.Order": "Đơn hàng",
   "wallet.Blanks": "Phôi",
   "wallet.Shipping": "Vận chuyển",
