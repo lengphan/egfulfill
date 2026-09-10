@@ -2949,6 +2949,11 @@ export type OrderQuote = {
      *  — it is the blank and the technique, and the row shows both so they can't read as a
      *  disagreement. */
     baseCost?: number | null; methodFee?: number
+    /** How many faces this line prints, and what the EXTRA ones added per unit. The first
+     *  print is inside the base cost, so `sideFee` is 0 on a single-sided line. Its own
+     *  figures for the same reason methodFee is: a line quoting more than its base has to
+     *  be able to say which surcharge did it. */
+    sides?: number; sideFee?: number
     supplierCost?: number | null }[]
   /** Lines with no price, and WHY — the reasons need different people to act.
    *  `no-blank`: nothing named, the seller picks one. `unknown-blank`: a blank IS named and

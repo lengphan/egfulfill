@@ -882,6 +882,43 @@ export default function OrderDetailPage() {
                       <dt className="text-muted-foreground">Base cost</dt>
                       <dd className="tabular-nums">{usd(quote.subtotal)}</dd>
                     </div>
+                    {/**
+                      * WHICH ITEM'S EXTRA FACES, and what they added (owner, 2026-09-10: "the
+                      * summary table right now doesn't show extra surface cost of which
+                      * item").
+                      *
+                      * The per-side charge is INSIDE Base cost — unitCostOf returns base +
+                      * method + sides as one number — so a two-sided line quietly raised the
+                      * subtotal with nothing on the card able to say why. The figures were
+                      * already on the quote (`sideFee`, `sides` per line); nothing computed
+                      * here, nothing re-derived.
+                      *
+                      * A SUB-ROW, NOT A PART. Making it its own Summary line would mean a new
+                      * refundable part threaded through the ledger allocation, the refund
+                      * panel and the reversal logic — a fourth way for the money to disagree
+                      * with itself, to explain a number that has not moved. Indented under the
+                      * charge it is part of, like the Refunded rows below, so the amount
+                      * column still sums to Seller paid.
+                      *
+                      * The item's NUMBER, for the same reason the design fees carry one: a
+                      * marketplace title is a keyword list and this row is about money.
+                      */}
+                    {(quote.lines ?? []).map((l, i) => {
+                      const add = Number(l.sideFee) || 0
+                      if (add <= 0.005) return null
+                      /* Matched on SKU, which is what both shapes carry — the quote line's
+                         `id` is the order_items row id and OrderItem does not expose one. */
+                      const n = items.findIndex((x) => !!l.sku && x.sku === l.sku) + 1
+                      return (
+                        <div key={`side-${i}`} className="flex justify-between">
+                          <dt className="pl-3 text-muted-foreground">
+                            {n > 0 ? `Item ${n}` : (l.sku || "Item")}
+                            <span className="opacity-70"> · {l.sides} sides</span>
+                          </dt>
+                          <dd className="tabular-nums text-muted-foreground">{usd(add * (Number(l.qty) || 1))}</dd>
+                        </div>
+                      )
+                    })}
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">
                         Shipping
