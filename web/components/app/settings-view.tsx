@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useContext, createContext, isValidElement, Children } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useContext, createContext, isValidElement, Children } from "react"
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -2305,6 +2305,10 @@ function UsersPanel() {
      click is one move while opening the dialog again tomorrow is a new one. */
  const [mvFor, setMvFor] = useState<AdminUser | null>(null)
  const [mvTo, setMvTo] = useState("")
+  /* The destination is PICKED, not typed. Typing an address blind means finding out it was
+     wrong from a 409 after the press, and two of this factory's accounts differ by one
+     character — the search is over the directory already in memory, so no extra request. */
+ const [mvQuery, setMvQuery] = useState("")
  const [mvOrders, setMvOrders] = useState(false)
  const [mvRef, setMvRef] = useState("")
  const [mvErr, setMvErr] = useState<string | null>(null)
@@ -2445,10 +2449,45 @@ function UsersPanel() {
     } finally { setBusy(null) }
   }
 
+  /**
+   * WHO THIS COULD GO TO. Filtered from the directory already loaded for the table, so the
+   * picker costs no request and can never disagree with the row behind it.
+   *
+   * The SOURCE is excluded — the server refuses it, and offering a choice that is always
+   * wrong is worse than not offering it. Staff accounts are not: money moves to `factory`
+   * and to designers as well as between sellers, and an admin picking one is deliberate.
+   */
+ const mvCandidates = useMemo(() => {
+ const term = mvQuery.trim().toLowerCase()
+ const pool = users.filter((u) => u.id !== mvFor?.id)
+ const match = term
+      ? pool.filter((u) => [u.email, u.name, u.store_name, u.username].some((f) => (f || "").toLowerCase().includes(term)))
+ : pool
+    // A LIVE ACCOUNT FIRST, then the ones that would be refused — and alphabetical inside
+    // each, so the same search puts the same row in the same place every time.
+ return [...match]
+      .sort((a, b) => Number(a.active === false) - Number(b.active === false)
+        || (a.store_name || a.name || a.email).localeCompare(b.store_name || b.name || b.email))
+      .slice(0, 40)
+  }, [users, mvQuery, mvFor])
+  /* THE ADDRESS IS ALREADY SOMEBODY'S — said while typing, not as a 409 after the press.
+     Same directory, same reason: the answer is already in memory. */
+ const emClash = useMemo(() => {
+ const addr = emValue.trim().toLowerCase()
+ if (!addr || !emFor) return null
+ return users.find((u) => u.id !== emFor.id && u.email.toLowerCase() === addr) || null
+  }, [users, emValue, emFor])
+
+ const destAccount = useMemo(
+    () => users.find((u) => u.email.toLowerCase() === mvTo.trim().toLowerCase()) || null,
+    [users, mvTo])
+
   const runTransfer = async () => {
  if (!mvFor) return
  const to = mvTo.trim()
- if (!to) { setMvErr("Enter the destination account's email."); return }
+    // The button is disabled without a pick, so this is a guard against a future call site,
+    // not a message the dialog can currently show.
+ if (!to) { setMvErr("Pick the account this should move to."); return }
  if (to.toLowerCase() === mvFor.email.toLowerCase()) { setMvErr("That's the same account."); return }
  setBusy(mvFor.id); setMvErr(null)
  try {
@@ -2824,7 +2863,7 @@ function UsersPanel() {
                           /* Minting the ref HERE is what makes a retry idempotent — see the
                              state block. Opening the dialog is the event, not pressing Move. */
                           <DropdownMenuItem onClick={() => {
-                            setMvFor(u); setMvTo(""); setMvOrders(false); setMvErr(null); setMvDone(null)
+                            setMvFor(u); setMvTo(""); setMvQuery(""); setMvOrders(false); setMvErr(null); setMvDone(null)
                             setMvRef(`acct-move:${u.id}:${Date.now()}`)
                           }}>
                             {tl("settings", "Move balance to another account…")}
@@ -2948,11 +2987,16 @@ function UsersPanel() {
                 {tl("settings", "They sign in with this from now on. Their orders, balance, connected shops and team stay exactly as they are.")}
               </p>
             )}
+            {emClash && (
+              <p className="text-sm text-alert">
+                {tl("settings", "Already used by")} {emClash.store_name || emClash.name || emClash.email}.
+              </p>
+            )}
             {emErr && <p className="text-sm text-destructive">{emErr}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setEmFor(null)} disabled={busy === emFor?.id}>{tl("settings", "Cancel")}</Button>
-            <Button size="sm" onClick={saveEmail} disabled={busy === emFor?.id}>
+            <Button size="sm" onClick={saveEmail} disabled={busy === emFor?.id || !!emClash}>
               {busy === emFor?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Change email")}
             </Button>
           </DialogFooter>
@@ -3001,11 +3045,65 @@ function UsersPanel() {
                 <span className="font-medium text-foreground">{mvFor?.email}</span> · {usd2(mvFor?.balance ?? 0)}
                 {(mvFor?.orders_total ?? 0) > 0 ? ` · ${mvFor?.orders_total} ${mvFor?.orders_total === 1 ? "order" : "orders"}` : ""}
               </p>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">{tl("settings", "Destination account email")}</span>
-                <Input value={mvTo} onChange={(e) => { setMvTo(e.target.value); setMvErr(null) }}
- type="email" inputMode="email" autoComplete="off" placeholder="new@seller.com" className="h-9" autoFocus />
-              </label>
+              {mvTo ? (
+                /* CHOSEN. Named back with the same three facts the list showed, so the press
+                   is made against what was picked rather than against a remembered row. */
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-selected eg-selected px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{destAccount?.store_name || destAccount?.name || mvTo}</div>
+                    <div className="truncate text-sm">{mvTo}</div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => { setMvTo(""); setMvQuery(""); setMvErr(null) }}>
+                    {tl("settings", "Change")}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground">{tl("settings", "Send it to")}</span>
+                  <SearchField
+                    value={mvQuery}
+                    onChange={setMvQuery}
+                    placeholder={tl("settings", "Search name, store or email…")}
+                  />
+                  {/* Bounded and scrollable: the directory can be long, and a dialog that grows
+                      past the viewport puts its own Move button off-screen. */}
+                  <div className="max-h-52 overflow-y-auto rounded-lg border border-border">
+                    {mvCandidates.length === 0 ? (
+                      <p className="px-3 py-3 text-xs text-muted-foreground">
+                        {mvQuery.trim()
+                          ? tl("settings", "No account matches that.")
+                          : tl("settings", "Search for the account this should move to.")}
+                      </p>
+                    ) : mvCandidates.map((c) => {
+                      /* A DEACTIVATED DESTINATION IS REFUSED BY THE SERVER, so it is shown and
+                         disabled with the reason rather than hidden — a missing row reads as
+                         "that account does not exist", which is a different and wrong answer. */
+                      const off = c.active === false
+                      return (
+                        <button
+ key={c.id}
+ type="button"
+ disabled={off}
+ onClick={() => { setMvTo(c.email); setMvErr(null) }}
+                          className={"flex w-full items-center justify-between gap-2 border-b border-border px-3 py-2 text-left last:border-b-0 " +
+                            (off ? "cursor-not-allowed opacity-55" : "hover:bg-accent")}
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {c.store_name || c.name || c.email}
+                              {off && <span className="font-normal text-muted-foreground"> · {tl("settings", "deactivated")}</span>}
+                            </div>
+                            <div className="truncate text-sm text-muted-foreground">{c.email}</div>
+                          </div>
+                          <div className="shrink-0 text-right text-sm tabular-nums text-muted-foreground">
+                            {usd2(c.balance ?? 0)}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={mvOrders} onCheckedChange={(v) => setMvOrders(v === true)} />
                 {tl("settings", "Move their orders too")}
@@ -3019,7 +3117,10 @@ function UsersPanel() {
             ) : (
               <>
                 <Button variant="outline" size="sm" onClick={() => setMvFor(null)} disabled={busy === mvFor?.id}>{tl("settings", "Cancel")}</Button>
-                <Button size="sm" onClick={runTransfer} disabled={busy === mvFor?.id}>
+                {/* Not pressable until something is picked. It could only fail — and a refusal
+                    that the button itself could have prevented is a refusal that should not
+                    have been needed. */}
+                <Button size="sm" onClick={runTransfer} disabled={busy === mvFor?.id || !mvTo}>
                   {busy === mvFor?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Move")}
                 </Button>
               </>
