@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { Package, Plus, UploadSimple, CircleNotch, Printer, Warning, ArrowSquareOut, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, BookmarkSimple } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
+import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
@@ -408,6 +409,9 @@ function ageOf(iso: string | null | undefined): string {
 
 export function OrdersHub() {
   const fmtDate = useOrderDate()
+  /** Is a ConsoleShell above us? If so the page owns the title and the action band, and this
+   *  card must not print a second of each — the same test dispatch-board makes. */
+  const inShell = useActionNode() !== null
  const router = useRouter()
  const t = useT()
  const tl = useLabelT()
@@ -1717,17 +1721,43 @@ export function OrdersHub() {
         </div>
       )}
 
+      {/**
+       * SEARCH AND THE ACTIONS GO TO THE PAGE HEADER (owner, 2026-09-10, after seeing the
+       * three grammars drawn side by side at /preview/toolbars — option A).
+       *
+       * This board was the odd one out. Dispatch and Shipments put search and their actions
+       * in the page header through ActionsPortal; Orders kept them in the card, so the same
+       * control changed SURFACE depending on which list you were looking at. The card is for
+       * the data and the filters that narrow it; the page is for what you do to the page.
+       *
+       * `inShell` is the same test Dispatch makes. Outside a ConsoleShell there is no header
+       * to portal into, so they stay where they were — which keeps this component usable on
+       * its own rather than making the shell a hard requirement.
+       *
+       * The card's TITLE goes with them. The shell prints "Orders" above and the tab under
+       * it already says which list this is; a third naming is the duplicate-title defect one
+       * level down, the same one Dispatch's card records.
+       */}
+      {inShell && (
+        <ActionsPortal>
+          {/* Search first, then the actions — the reading order every other board uses.
+              Only once there's something to search: a search box over an empty board is a
+              control that cannot do anything, and it makes "no orders yet" look like a
+              failed query. */}
+          {!!orders?.length && <OrderSearchInput query={query} onChange={setQuery} className="w-full sm:w-72 lg:w-80" />}
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+            <UploadSimple size={14} weight="bold" /> {tl("ui", "Import")}
+          </Button>
+          <Button size="sm" onClick={() => router.push("/orders/new")}>
+            <Plus size={14} weight="bold" /> {tl("ui", "New order")}
+          </Button>
+        </ActionsPortal>
+      )}
+
       <SectionCard
- title={tl("ui", "Production queue")}
- actions={
+ title={inShell ? undefined : tl("ui", "Production queue")}
+ actions={inShell ? undefined : (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {/* Search sits UP HERE, not in the filter row. Sharing that row with the pills
- and five dropdowns squeezed it to a stub against the right edge and made the
- whole strip read as jammed — and "find me this one order" is a header job on
- every other screen in the app anyway.
-                Only once there's something to search: a search box over an empty board is a
- control that cannot do anything, and it makes "no orders yet" look like a
- failed query. */}
             {!!orders?.length && <OrderSearchInput query={query} onChange={setQuery} className="w-full sm:w-72 lg:w-80" />}
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
               <UploadSimple size={14} weight="bold" /> {tl("ui", "Import")}
@@ -1736,7 +1766,7 @@ export function OrdersHub() {
               <Plus size={14} weight="bold" /> {tl("ui", "New order")}
             </Button>
           </div>
-        }
+        )}
       >
         {/* ONE toolbar row: stage pills left, narrowing dropdowns right. Search is up in the
  card header — three kinds of control on one line is what made this read as jammed.

@@ -1,9 +1,7 @@
-import { OrdersHub } from "@/components/app/orders-hub"
+import { OrdersConsole } from "@/components/app/orders-console"
+
+export const metadata = { title: "Orders · EGFUL" }
 
 export default function OrdersPage() {
-  return (
-    <>
-      <OrdersHub />
-    </>
-  )
+  return <OrdersConsole />
 }
