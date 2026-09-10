@@ -96,64 +96,48 @@ const techniquesOf = (methods: string[]) =>
  * row it belongs under — a `flex-wrap` grid has no row to ask about.
  */
 /**
- * EACH CATEGORY OPENS FOUR ACROSS, THEN RUNS SIX.
+ * ONE TILE SIZE, AND ROWS OF FOUR.
  *
- * This started much bigger and came down twice, which is worth recording because the
- * instinct that made it big is the wrong one. Two tiles across the full width, then three:
- * both read as a LOOKBOOK, and a lookbook is a different object from a catalogue. A
- * catalogue's job is comparison — how many blanks are there, which is cheapest, which comes
- * in the colour I want — and comparison needs several products in the eye at once. At
- * three-up on a full-bleed page a single card was 440px and two of them filled the fold.
+ * This went through three shapes and the last two were the same mistake twice, so the
+ * reasoning is worth keeping.
  *
- * The page carries no max width (that is the site's rhythm, not this page's choice), so a
- * span is the only thing holding tile size down. Four-then-six lands at roughly 330px and
- * 215px on a 1440 screen — small enough to scan a row, large enough to read a garment.
+ * It began as a spread — two tiles across the full width, then three — which reads as a
+ * LOOKBOOK. A lookbook and a catalogue are different objects: a catalogue's job is
+ * comparison, and comparison needs several products in the eye at once.
  *
- * The rhythm is still real: the opening row is half again the size of the run, which is what
- * gives a group a beginning instead of just a first item.
+ * Then it was an opening row of four with a run of six, to give each category a beginning.
+ * That looked right until the TAIL. A category rarely divides by four and six: Headwear has
+ * six products, so it opened four and had two left, and those two were re-spanned to close
+ * the row. Capping the span left 8 of 12 columns used — a hole. Not capping it made each
+ * tile half the page — two 690px caps, which is the "crazy large" this kept coming back as.
+ * There is no cap that is both, because the premise was wrong: a row cannot be made to
+ * always fill AND always stay small when the item count is whatever the catalogue happens
+ * to hold.
+ *
+ * So every tile is the same, four across, and the last row of a category is simply short —
+ * the way every product grid on the web ends. A short final row is not the orphan defect;
+ * the orphan defect was ONE item stretched to fill a width it did not need. The editorial
+ * rhythm lives where it should have from the start: in the display word that opens each
+ * category, and in the air around it.
+ *
+ * Rows are still explicit rather than left to wrapping, because the open panel has to know
+ * which row to sit under — a wrapped grid has no row to ask about.
  */
-const OPENING = [3, 3, 3, 3]
-const RUN = [2, 2, 2, 2, 2, 2]
+const PER_ROW = 4
 
-type Cell<T> = { item: T; span: number; centre?: boolean }
+type Cell<T> = { item: T }
 
 function packRows<T>(items: T[]): Cell<T>[][] {
   const rows: Cell<T>[][] = []
-  let i = 0
-  let r = 0
-  while (i < items.length) {
-    const pattern = r === 0 ? OPENING : RUN
-    r += 1
-    const take = Math.min(pattern.length, items.length - i)
-    if (take === pattern.length) {
-      rows.push(pattern.map((span, k) => ({ item: items[i + k], span })))
-    } else {
-      /**
-       * THE TAIL, and the one case that needs saying.
-       *
-       * Re-spanning what is left so the row closes is what keeps a group from ending in the
-       * orphan-above-empty-cells shape. But `12 / take` sends a group of ONE to a full-width
-       * tile — and a category with a single product is not hypothetical, Bags has exactly one
-       * — which would print a 1376×1720 photograph of a duffel bag. That is not emphasis
-       * either; it is the same hole, wearing the product as a hat.
-       *
-       * So the tail is capped at a third of the width, and a lone tile is CENTRED instead of
-       * stretched. A centred tile reads as a decision; a left-aligned one with a void beside
-       * it reads as the layout having run out.
-       */
-      const span = Math.min(4, 12 / take)
-      rows.push(
-        Array.from({ length: take }, (_, k) => ({
-          item: items[i + k],
-          span,
-          centre: take === 1,
-        })),
-      )
-    }
-    i += take
+  for (let i = 0; i < items.length; i += PER_ROW) {
+    rows.push(items.slice(i, i + PER_ROW).map((item) => ({ item })))
   }
   return rows
 }
+
+/** Two up on a phone, three on a tablet, four on a desktop — and the same at every count,
+ *  so a tile never changes size because of how many happen to be beside it. */
+const TILE = "col-span-6 sm:col-span-4 lg:col-span-3"
 
 /**
  * SCALE VARIES, THE CROP DOES NOT — and that is the whole correction.
@@ -172,18 +156,6 @@ function packRows<T>(items: T[]): Cell<T>[][] {
  * feature runs full width and the rest go two-up. Tailwind needs finished class names, so
  * these are a lookup rather than a template.
  */
-const COL: Record<number, string> = {
-  2: "col-span-6 sm:col-span-4 lg:col-span-2",
-  3: "col-span-6 sm:col-span-4 lg:col-span-3",
-  4: "col-span-6 lg:col-span-4",
-  6: "col-span-12 lg:col-span-6",
-  12: "col-span-12",
-}
-/** A lone tail tile, placed in the middle four-of-twelve rather than left against a void. */
-const CENTRED = "col-span-6 sm:col-span-4 lg:col-span-3 lg:col-start-5"
-/** One frame for every tile — portrait, which is the shape the photography already is, and
- *  only just: 5/6 rather than 4/5, because the extra height was white margin baked into the
- *  supplier cut-outs rather than any more garment. */
 const RATIO = "aspect-[5/6]"
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -192,14 +164,10 @@ const RATIO = "aspect-[5/6]"
 
 function Card({
   p,
-  span,
-  centre,
   open,
   onOpen,
 }: {
   p: PublicProduct
-  span: number
-  centre?: boolean
   open: boolean
   onOpen: () => void
 }) {
@@ -210,7 +178,7 @@ function Card({
   const shot = (peek != null && p.colors[peek]?.image) || p.image
 
   return (
-    <motion.div {...reveal(0)} className={centre ? CENTRED : COL[span] ?? COL[3]}>
+    <motion.div {...reveal(0)} className={TILE}>
       <button
         type="button"
         onClick={onOpen}
@@ -231,7 +199,7 @@ function Card({
               src={shot}
               alt={p.name}
               fill
-              sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 18vw"
+              sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw"
               className="object-cover"
               /* The crop set in the product editor — the public surfaces were the last ones
                  still ignoring it, so a product framed for the app arrived here uncropped. */
@@ -892,12 +860,10 @@ export function PloyProducts({
                 const openHere = row.some((c) => c.item.slug === openSlug)
                 return (
                   <div key={ri} className="mb-4 grid grid-cols-12 gap-4 md:mb-6 md:gap-6">
-                    {row.map(({ item, span, centre }) => (
+                    {row.map(({ item }) => (
                       <Card
                         key={item.slug}
                         p={item}
-                        span={span}
-                        centre={centre}
                         open={item.slug === openSlug}
                         onOpen={() => (item.slug === openSlug ? close() : open(item.slug))}
                       />
