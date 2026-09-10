@@ -169,10 +169,17 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{p.label}</div>
                 {/* State what's gone rather than only what's left — a part that's already
- been refunded should say so, not just look unavailable. */}
+ been refunded should say so, not just look unavailable.
+                    EXCEPT AN ADJUSTMENT (owner, 2026-09-10: "don't say the price adjustment
+                    refund line — no need"). That one part now has a second surface saying the
+                    same thing: the Summary prints its refund on the adjustment's own row and
+                    carries the ↩ that made it, so repeating "$3.00 refunded" here is the
+                    third telling of one fact on one screen. The other parts have no such
+                    row, which is why they keep theirs — and the amount still left is on the
+                    input's placeholder either way. */}
                 <div className="text-xs text-muted-foreground">
                   {usd(p.charged)} charged
-                  {p.refunded > 0 && <> · <span className="text-success">{usd(p.refunded)} refunded</span></>}
+                  {p.key !== "fee" && p.refunded > 0 && <> · <span className="text-success">{usd(p.refunded)} refunded</span></>}
                 </div>
               </div>
               {spent ? (
