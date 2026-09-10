@@ -128,15 +128,20 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
  router.push("/login")
   }
 
-  // ⌘K / Ctrl-K opens order search from anywhere.
+  /**
+   * ⌘K IS THE COMMAND PALETTE'S, AND ONLY ITS — this bound it too, and BOTH opened.
+   *
+   * Two overlays answered one chord: this one (orders) and CommandPalette in the app shell
+   * (orders, products, stock and pages). Neither knew about the other, so the shortcut
+   * stacked them — a panel over a panel, each with its own field, each catching different
+   * keys. Seen on screen; the pair is unmistakable once you look for it.
+   *
+   * The palette wins because it is a superset: everything this finds, it finds, plus three
+   * more kinds of thing. This stays reachable from the magnifier beside it, as the scoped
+   * order lookup it has always been — one gesture, one overlay, and neither is removed
+   * without somebody deciding to.
+   */
  const [searchOpen, setSearchOpen] = useState(false)
- useEffect(() => {
- const onKey = (e: KeyboardEvent) => {
- if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearchOpen(true) }
-    }
- window.addEventListener("keydown", onKey)
- return () => window.removeEventListener("keydown", onKey)
-  }, [])
 
   // Real balance (server-authoritative); silently keeps the fallback if no session/API.
   // Re-reads on "eg-wallet-changed" — anything that moves money (a plan purchase, a

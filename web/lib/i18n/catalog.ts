@@ -2664,6 +2664,7 @@ const vi: Dict = {
   "dispatch.Choose label PDFs — or just drop them anywhere on this page": "Chọn tệp PDF nhãn — hoặc thả vào bất kỳ đâu trên trang này",
   "dispatch.Upload these labels to the pre-scan queue — charges the expedite fee per label": "Tải nhãn lên hàng chờ quét trước — tính phí xử lý nhanh cho mỗi nhãn",
   "orders.Filter by stage": "Lọc theo giai đoạn",
+  "orderSearch.No orders yet.": "Chưa có đơn hàng nào.",
   "canvas.every face": "mọi mặt",
   "canvas.Recent files": "Tệp gần đây",
   "canvas.Pick a blank to start designing.": "Chọn một phôi để bắt đầu thiết kế.",

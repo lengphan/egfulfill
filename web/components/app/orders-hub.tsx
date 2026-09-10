@@ -1745,7 +1745,7 @@ export function OrdersHub() {
               Only once there's something to search: a search box over an empty board is a
               control that cannot do anything, and it makes "no orders yet" look like a
               failed query. */}
-          {!!orders?.length && <OrderSearchInput query={query} onChange={setQuery} className="w-full sm:w-72 lg:w-80" />}
+          {!!orders?.length && <OrderSearchInput query={query} onChange={setQuery} className="w-full sm:w-72 lg:w-80" hotkey />}
           <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
             <UploadSimple size={14} weight="bold" /> {tl("ui", "Import")}
           </Button>

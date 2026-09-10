@@ -36,10 +36,14 @@ import { type OrderRow, type CatalogProduct } from "@/lib/api"
  * from the rest: the dropdowns narrow by facets the board already knows about, search is
  * "find me this one order", which is a header job on every other screen in the app.
  */
-export function OrderSearchInput({ query, onChange, className = "" }: {
+export function OrderSearchInput({ query, onChange, className = "", hotkey }: {
   query: OrderQuery
   onChange: (q: OrderQuery) => void
   className?: string
+  /** Press `/` to jump here. Passed through rather than assumed, because this input renders
+   *  on the Orders board AND inside pickers — two of them claiming the key on one screen
+   *  would fight, and the last one mounted would win. Only the board asks for it. */
+  hotkey?: boolean
 }) {
   const tl = useLabelT()
   return (
@@ -52,6 +56,7 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
       placeholder={tl("ui", "Search orders…")}
       ariaLabel={tl("ui", "Search order number, customer, tracking, store, SKU or item name")}
       className={className}
+      hotkey={hotkey}
     />
   )
 }

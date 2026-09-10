@@ -44,9 +44,21 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
     return () => clearTimeout(t)
   }, [open])
 
+  /**
+   * RESULTS BEFORE A KEY IS PRESSED.
+   *
+   * An empty query returned nothing, so opening this gave a box floating on a dimmed page
+   * with no indication it had anything to offer — you had to guess that typing would work.
+   * The most recent orders are the best guess at what somebody is reaching for, and they
+   * make the panel demonstrate itself: it is a list you filter, not a form you submit.
+   *
+   * Same shape and same cap as a real search, so the panel does not resize under the hand
+   * the moment the first character lands.
+   */
   const results = useMemo(() => {
     const term = qy.trim().toLowerCase()
-    if (!term || !orders) return []
+    if (!orders) return []
+    if (!term) return orders.slice(0, 8)
     return orders
       .filter((o) => {
         const hay = [
@@ -78,8 +90,23 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-background/60 pt-[15vh] backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card " onClick={(e) => e.stopPropagation()}>
+    /**
+     * NO SCRIM, NO BLUR (owner, 2026-09-10).
+     *
+     * It washed the whole page out behind a `bg-background/60 backdrop-blur-sm` — and this is
+     * a JUMP box, not a modal. Nothing here is destructive, nothing needs confirming, and the
+     * board underneath is often the reason you opened it: half-remembering a row you can see.
+     * Dimming it removes the context and makes a lookup feel like an interruption.
+     *
+     * The layer stays, transparent, because it is what catches a click outside to close. What
+     * replaces the dim is a real SHADOW — the panel has to lift off an undimmed page, and a
+     * hairline border alone put it on the same plane as the table behind it.
+     */
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose}>
+      {/* max-w-2xl, from lg. An order number, a customer and a store on one row need the
+          width, and the box is the thing being typed into — at 32rem the results were the
+          part that had to truncate. */}
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-[0_28px_70px_-14px_rgb(0_0_0/0.45)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-border px-4">
           <MagnifyingGlass size={18} className="shrink-0 text-muted-foreground" />
           <input
@@ -88,16 +115,21 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
             onChange={(e) => setQy(e.target.value)}
             onKeyDown={onKey}
             placeholder={tl("orderSearch", "Search orders — number, customer, or SKU")}
-            className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="h-14 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
           />
           <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-2xs text-muted-foreground sm:block">esc</kbd>
         </div>
-        {qy.trim() && (
+        {(
           <div className="max-h-[50vh] overflow-y-auto p-1.5">
             {orders === null ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">{tl("orderSearch", "Loading…")}</div>
             ) : results.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-muted-foreground">No orders match “{qy.trim()}”.</div>
+              /* Two different empty states. "No orders match X" is a failed SEARCH; with no
+                 query there is simply nothing to list, and saying "no orders match ''" would
+                 blame a search nobody ran. */
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                {qy.trim() ? `No orders match “${qy.trim()}”.` : tl("orderSearch", "No orders yet.")}
+              </div>
             ) : (
               results.map((o, i) => (
                 <button
