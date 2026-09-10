@@ -452,31 +452,28 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
           One column meant the rates — the thing you came to choose — sat below the fold
  under the parcel fields, so buying a label always began with a scroll. */}
       {/**
-       * A SIDE PANEL, NOT A 1024px MODAL (owner, 2026-09-10).
+       * A CENTRED WINDOW, ONE COLUMN, 576px.
        *
-       * It was two columns — the form left, rates right — sized so a rate row would not
-       * truncate. Two things were wrong with that, and the width was only the symptom.
+       * It has been three shapes in two days and the reasoning is worth keeping, because each
+       * step was a real objection:
        *
-       * THE RIGHT COLUMN IS EMPTY ON ARRIVAL. Rates are the RESULT of the form, not a
-       * sibling of it, so the window opened as half a screen of white beside one button and
-       * asked you to look right at something that could not exist until you had finished
-       * looking left. Every other tool that does this job — Pirate Ship, ShipStation,
-       * Shopify's own buy-label flow — is one column with the rates underneath, for that
-       * reason.
+       *   1024px, two columns  too wide — and the width was the symptom. Rates are the RESULT
+       *                        of this form, not a sibling of it, so the right half was empty
+       *                        on arrival and the window opened as half a screen of white
+       *                        beside one button.
+       *   right-hand panel     fixed the column problem and introduced a form factor nobody
+       *                        asked for: a full-height sheet reads as a different surface
+       *                        from every other dialog in the app.
+       *   this                 a pop-up like the rest, narrow, in the order the job happens —
+       *                        who it goes to, what the parcel is, what it costs.
        *
-       * AND THE WIDTH ARGUMENT DID NOT HOLD. The old note reasoned that "a rate row is
-       * carrier + service + transit + price" and needed ~480px. The markup stacks them —
-       * carrier · service on one line, ETA beneath, price on the right — so a row fits
-       * comfortably in 400 and reads BETTER narrow, because the price sits nearer the name
-       * it belongs to. The other reason, a long list pushing Buy off screen, was already
-       * solved by the list's own max-h scroller and had nothing to do with columns.
-       *
-       * Right-hand rather than centred because this is work done against a list: the
-       * shipments table stays visible, the panel is tall instead of wide, and full height is
-       * where a long rate list actually wants to live. It also leaves the toolbar and the
-       * filter row completely alone, which a centred 1024px window does not.
+       * 576px is chosen, not split. The old note argued a rate row needs ~480px because it is
+       * "carrier + service + transit + price"; the markup stacks them — carrier · service on
+       * one line, ETA beneath, price on the right — so a row fits comfortably here and reads
+       * better narrow, with the price nearer the name it belongs to. The long-list worry was
+       * always answered by the list's own scroller, never by a second column.
        */}
-      <DialogContent side="right" className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : tl("label", "New label")}</DialogTitle></DialogHeader>
 
         {result ? (
@@ -546,7 +543,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
             {/* ONE COLUMN, in the order the job happens: who it goes to, what the parcel is,
                 what it costs. The two-track grid is gone with the second column. */}
             <div className="grid gap-y-3 py-1">
-              <div className="space-y-3 md:col-span-1">
+              {/* `md:col-span-1` went with the second column — a span in a one-track grid
+                  is a leftover that reads as though a layout is still there. */}
+              <div className="space-y-3">
               <div className="eg-label text-muted-foreground">{tl("label", "Ship to")}</div>
               {/* Live validation status sits INSIDE the box, bottom-right; extra bottom padding
  keeps the last address line clear of it. */}

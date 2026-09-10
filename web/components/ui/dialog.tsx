@@ -58,29 +58,13 @@ function DialogOverlay({
 //
 // Per-dialog `max-w-*` patches never fixed this because max-width was never what was
 // breaking; the automatic minimum size overrides it.
-/**
- * A DIALOG CAN ALSO BE A SIDE PANEL — `side="right"`.
- *
- * On the PRIMITIVE, not as a second component, because a sheet and a modal differ in exactly
- * one thing: where they are anchored. Everything else — the portal, the overlay, the close
- * button, the escape and outside-press behaviour, the shadow — is identical, and a fork would
- * be a second copy of all of it that drifts (§4: extend the primitive rather than fork it).
- *
- * WHEN TO REACH FOR IT. A centred modal is for a question. A side panel is for WORK done
- * against a list — you keep the rows in view, the panel is tall rather than wide, and its
- * content reads top to bottom in the order it happens. Full height also means a long result
- * list has somewhere to go, which is the thing a centred dialog cannot give without either
- * growing sideways or hiding its own footer.
- */
 function DialogContent({
   className,
   children,
   showCloseButton = true,
-  side = "center",
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
-  side?: "center" | "right"
 }) {
   return (
     <DialogPortal>
@@ -96,15 +80,17 @@ function DialogContent({
          * them had it.
          * On the shared primitive, not on one caller: every dialog in the app was flat.
          */
+        /* THE SIDE-PANEL VARIANT IS GONE (owner, 2026-09-10, after seeing it: "go back to
+           the previous pop up"). It was added for one caller, that caller went back to a
+           centred window, and a variant nothing uses is a second layout to keep working for
+           free. It is three lines to bring back from git if a list-side panel is ever wanted.
+           It also had a real bug worth recording: `grid` at `h-dvh` STRETCHES its rows to
+           fill, so header, body and footer spread apart down the panel — which is the empty
+           band between the title and "Ship to" in the screenshot. A sheet needs
+           `grid-rows-[auto_1fr_auto]` or `content-start`; a centred dialog is capped by
+           max-h and never hits it. */
         className={cn(
-          "fixed z-50 grid gap-6 overflow-y-auto overscroll-contain *:min-w-0 bg-popover p-6 text-sm text-popover-foreground shadow-[0_28px_70px_-14px_rgb(0_0_0/0.45)] ring-1 ring-foreground/5 duration-100 outline-none dark:ring-foreground/10 data-open:animate-in data-closed:animate-out",
-          side === "right"
-            /* Flush to the edge and full height. It slides rather than zooms — a panel that
-               scaled up from its own centre would read as a modal that landed off-centre.
-               Rounded on the LEFT only: the other three sides meet the viewport, and a corner
-               radius against a screen edge is a gap, not a curve. */
-            ? "inset-y-0 right-0 h-dvh w-full max-w-[calc(100%-3rem)] rounded-l-[min(var(--radius-4xl),24px)] sm:max-w-lg data-open:slide-in-from-right data-open:fade-in-0 data-closed:slide-out-to-right data-closed:fade-out-0"
-            : "top-1/2 left-1/2 max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-[min(var(--radius-4xl),24px)] sm:max-w-md data-open:fade-in-0 data-open:zoom-in-95 data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 overflow-y-auto overscroll-contain *:min-w-0 rounded-[min(var(--radius-4xl),24px)] bg-popover p-6 text-sm text-popover-foreground shadow-[0_28px_70px_-14px_rgb(0_0_0/0.45)] ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
