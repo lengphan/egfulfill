@@ -1067,13 +1067,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                         /* `relative` so the handle can sit on the cell's own corner, and
                            `group` so it can appear on hover as well as on focus — a sheet
                            shows you the grip before you have committed to the cell. */
-                        className={`group relative border-b border-l border-border p-0 ${missing ? "bg-destructive/10" : ""}${
-                          // MID-DRAG PREVIEW: the rows this release would write. Same column
-                          // only — a fill runs down one column, and tinting the whole row
-                          // would promise something wider than what happens.
-                          fillFrom && fillTo != null && c === fillFrom.c && r > fillFrom.r && r <= fillTo
-                            ? " bg-brand/10 ring-1 ring-inset ring-brand/40" : ""
-                        }`}
+                        className={`group relative border-b border-l border-border p-0 ${missing ? "bg-destructive/10" : ""}`}
                       >
                         <input
                           data-cell={`${r}-${c}`}
@@ -1164,6 +1158,35 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                              character by character. */
                           className="h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none focus:bg-accent focus:ring-1 focus:ring-ring"
                         />
+                        {/**
+                          * THE RANGE A RELEASE WOULD WRITE — a grey wash and ONE dashed
+                          * rectangle around it, which is what a sheet draws and therefore what
+                          * the gesture is read against.
+                          *
+                          * An overlay rather than classes on the <td>: the cell already owns
+                          * `border-b border-l border-border`, and a preview that fought those
+                          * would have to win on three properties per side and lose the cell's
+                          * own grid lines while it did. This paints on top and takes nothing
+                          * away — pointer-events-none, so it cannot swallow the drag it is
+                          * describing.
+                          *
+                          * The dashes are drawn PER EDGE so the range reads as one rectangle
+                          * rather than a column of separate boxes: left and right on every
+                          * covered cell, top only on the first, bottom only on the last. A
+                          * fill runs down a single column, so those four edges are the whole
+                          * outline.
+                          *
+                          * The SOURCE cell is deliberately outside it. It keeps focus and its
+                          * own accent while the drag runs, so what is highlighted is exactly
+                          * what is about to change — the row you started from is not.
+                          */}
+                        {fillFrom && fillTo != null && c === fillFrom.c && r > fillFrom.r && r <= fillTo && (
+                          <span
+                            aria-hidden
+                            className={`pointer-events-none absolute inset-0 z-10 border-x border-dashed border-muted-foreground/70 bg-foreground/5${
+                              r === fillFrom.r + 1 ? " border-t" : ""}${r === fillTo ? " border-b" : ""}`}
+                          />
+                        )}
                         {/* THE GRIP. Eight pixels in the cell's bottom-right corner, shown on
                             the focused cell and on hover. `touch-none` because a pointer drag
                             on a touch screen would otherwise scroll the sheet instead. */}
