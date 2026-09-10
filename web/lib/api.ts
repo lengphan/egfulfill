@@ -2935,7 +2935,15 @@ export type OrderQuote = {
      *  disagreement. */
     baseCost?: number | null; methodFee?: number
     supplierCost?: number | null }[]
-  unpriced: { sku: string; name: string }[]
+  /** Lines with no price, and WHY — the reasons need different people to act.
+   *  `no-blank`: nothing named, the seller picks one. `unknown-blank`: a blank IS named and
+   *  our catalogue has no row for it (typing a supplier style into an import sheet does
+   *  this) — ours. `no-cost`: it resolves but carries no cost — also ours. `no-product` is
+   *  the retired name for the first two and is kept so an older server still reads.
+   *  `id` is the order_items row, so a row finds its own reason, not its sku-sibling's. */
+  unpriced: { id?: string | number; line_id?: string | null; sku: string; name: string
+              blank?: string | null
+              reason?: "no-blank" | "unknown-blank" | "no-cost" | "no-product" }[]
   /** The live fee settings the charge itself reads. `method_side` is what each
    *  ADDITIONAL printed face adds per unit — 0 means a second side is free. */
   fees: { ship_extra: number; method_side?: number }

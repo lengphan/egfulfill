@@ -659,13 +659,38 @@ export function priceLines(items, idx, fees, sidesOf = () => 1) {
     let extra = fees.ship_extra;
     if (cost == null || ship == null) {
       const row = matchProduct(idx, it);
-      // No product = no cost. The variants haven't been chosen yet (a marketplace order
-      // arrives with none), so the caller must ask for them rather than invent a price.
-      if (!row) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-product' }); continue; }
+      /*
+       * TWO REASONS, AND THEY ASK THE READER FOR DIFFERENT THINGS.
+       *
+       *   no-blank      nothing named at all — a marketplace order arrives with no variants,
+       *                 so there is nothing to price yet. The seller picks one.
+       *   unknown-blank a blank IS named and catalog_products has no row for it. Typing a
+       *                 supplier's style into an import sheet does exactly this. OURS to fix:
+       *                 the blank has to exist in our catalogue before it can carry a price.
+       *   no-cost       the blank resolves and its row carries no cost. Also ours.
+       *
+       * Two of the three are ours, and all three said "pick a blank first" — a screen sending
+       * the one person who cannot fix it back to a field they had already filled.
+       *
+       * The line id rides along so a row can find its own reason. Keying on sku alone would
+       * put one line's reason on its same-sku sibling, which is the identity rule §5 states.
+       */
+      if (!row) {
+        /* NO BLANK AT ALL and A BLANK WE DO NOT STOCK are different failures with different
+           owners, and they were one reason. A line whose blank was typed into an import sheet
+           — an OTTO or SanMar style we have never added to catalog_products — arrives here
+           with `blank` FILLED and no catalogue row, and the order page told its owner to
+           "pick a blank first". They had. matchProduct only ever searches catalog_products;
+           a supplier's own catalogue is not the same table. */
+        const named = String(it.blank || '').trim() || String(it.sku || '').trim();
+        unpriced.push({ id: it.id, line_id: it.line_id, sku: it.sku || '(no sku)', name: it.name || '',
+                        blank: it.blank || null, reason: named ? 'unknown-blank' : 'no-blank' });
+        continue;
+      }
       if (cost == null) cost = unitCostOf(row, it, fees, sides);
       if (ship == null) ship = shipFeeOf(row, it.size, fees);
       extra = extraFeeOf(row, fees);
-      if (cost == null) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-cost' }); continue; }
+      if (cost == null) { unpriced.push({ id: it.id, line_id: it.line_id, sku: it.sku || '(no sku)', name: it.name || '', blank: it.blank || null, reason: 'no-cost' }); continue; }
     }
     // The supplier's price for this blank, when the catalogue knows it. Read even for a
     // frozen line: the sell price is history once charged, but what we PAID is a fact

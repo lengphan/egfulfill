@@ -1428,6 +1428,10 @@ export default function OrderDetailPage() {
                    */
  const qLine = quote?.lines?.find(
                     (l) => String(l.id) === String((it as { id?: string | number }).id ?? ""))
+                  // ITS OWN reason, matched on the line id for the same reason qLine is: two
+                  // lines of one sku are different jobs and must not share an explanation.
+ const qUnpriced = quote?.unpriced?.find(
+                    (u) => String(u.id ?? "") === String((it as { id?: string | number }).id ?? ""))
                   // THREE SOURCES, most authoritative first: the live quote while the order
                   // can still change, the cost FROZEN on the line once it is charged, and
                   // the buyer's retail price as a last resort. A submitted order stops
@@ -1664,8 +1668,18 @@ export default function OrderDetailPage() {
                             ) : (
                               <>
                                 <div className="font-medium text-muted-foreground">Not priced</div>
+                                {/* THE SERVER SAYS WHY, and this printed "pick a blank first"
+                                    regardless — on lines whose blank was already chosen, which
+                                    is a screen telling you to do something you have done. The
+                                    two reasons need different people to act:
+                                      no-product  no blank yet → the seller picks one
+                                      no-cost     blank chosen, our catalogue has no price
+                                                  against it → ours to fix, and saying "pick a
+                                                  blank" sends them back to a filled field. */}
                                 <div className="text-xs text-muted-foreground">
-                                  {qLine ? "no cost on this blank" : "pick a blank first"}
+                                  {qLine || qUnpriced?.reason === "no-cost" ? "no price set for this blank"
+                                    : qUnpriced?.reason === "unknown-blank" ? "this blank isn’t in the catalogue"
+                                    : "pick a blank first"}
                                 </div>
                               </>
                             )}
