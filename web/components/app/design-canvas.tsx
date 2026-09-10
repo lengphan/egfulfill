@@ -3138,7 +3138,14 @@ export function DesignCanvasDialog({
                  rail, which is where that route already lives. */
               ...(isEmb ? [
                 { id: "threads", label: tl("canvas", "Threads"), count: Object.keys(picks).length || undefined },
-                { id: "board", label: tl("canvas", "Board") },
+                /* BOARD IS STAFF-ONLY, and the tab has to know it. Sending a line to the
+                   design board is a factory act — the route is gated, so a seller who opened
+                   this tab got the panel, filled in the tier and the note, pressed Send and
+                   was told "Staff only" in red underneath. A control that can only refuse is
+                   worse than no control: it advertises a capability, takes the work of using
+                   it, and then withdraws it. The rail's own route to a designer is the one a
+                   seller has, and it is unaffected. */
+                ...(isStaff ? [{ id: "board", label: tl("canvas", "Board") }] : []),
               ] : []),
             ]}
           />
@@ -3665,7 +3672,7 @@ export function DesignCanvasDialog({
  the number implied. Two cards that each say what they are, and tick when they
  are done, carry the same information without instructing anybody. The marker is
  a dot until then: the card is a state, not a task list. */}
-          {ctxTab === "board" && (<>
+          {ctxTab === "board" && isStaff && (<>
           {/**
             * WHAT WOULD GO, AND WHAT IS GOING — the tab that used to be empty.
             *
