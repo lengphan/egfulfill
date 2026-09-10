@@ -31,7 +31,24 @@ export type TabBarItem<T extends string> = {
   /** A sentence for the hover, when a filter's name cannot carry what it does. Not a
    *  subtitle — §4 — this is the one place a longer explanation is allowed to live. */
   title?: string
-  /** A number beside the label. Genuinely round, so it keeps the pill the tabs gave up. */
+  /**
+   * A number beside the label — ONLY WHERE THE NUMBER IS THE NEWS.
+   *
+   * Every filter carrying one was the mistake. A row reading "All 124 · In transit 2 · Not
+   * collected 18 · Delivered 79 · Needs a look 0 · Not asked yet 25 · Refunded 15 · Test 0"
+   * is eight numbers competing to be read, and the two that mean somebody has to DO
+   * something — stuck parcels, problems — are the same weight as the six that are just
+   * inventory. When everything is counted, the count stops being a signal and becomes
+   * texture; that is the same argument §4 makes about pills, one control over.
+   *
+   * So the caller passes a count for the filters where a non-zero value is a call to action,
+   * and leaves it off the neutral ones. Mercury's ledger does exactly this — All, Ready to
+   * Export and Exported carry nothing; Needs review and Sync Error carry the number.
+   *
+   * ZERO IS NOT RENDERED, and the tab stays. "Nothing to act on" is best said by the badge
+   * being absent — a queue at zero is good news and does not need a figure — while the tab
+   * itself remains so the view is still reachable and the row never reflows as data moves.
+   */
   count?: number
   /**
    * Nothing behind this one.
@@ -183,7 +200,7 @@ export function TabBar<T extends string>({
           >
             {I && <I size={size === "sm" ? 14 : 15} />}
             <TabLabel>{t.label}</TabLabel>
-            {t.count != null && (
+            {t.count != null && t.count > 0 && (
               <span className={cn(
                 "ml-0.5 rounded-lg px-1.5 py-0.5 text-2xs font-semibold tabular-nums",
                 on ? "bg-foreground text-background" : "bg-muted text-muted-foreground",

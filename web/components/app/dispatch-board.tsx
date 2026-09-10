@@ -1222,7 +1222,11 @@ export function DispatchBoard() {
               items={QUEUE_FILTERS.map((f) => ({
                 id: f.key,
                 label: tl("dispatch", f.label),
-                count: filterCounts[f.key] || 0,
+                /* THE TWO THAT ARE WORK. "With byeastside" and "External" are states a
+                   parcel is in, not a queue anybody is being asked to clear, and "All" is the
+                   list itself — none of them is news at a glance. To scan here and Not sent
+                   yet are. See the note on TabBarItem.count. */
+                count: f.key === "here" || f.key === "unsent" ? filterCounts[f.key] || 0 : undefined,
                 disabled: f.key !== "all" && !filterCounts[f.key],
                 /* The sentence that used to sit above the whole queue, on the one control it
                    was ever about. */

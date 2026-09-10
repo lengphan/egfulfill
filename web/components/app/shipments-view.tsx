@@ -61,10 +61,23 @@ const isLoose = (s: ShipmentRow) => /^sh_/.test(s.id)
  * it cannot be mistaken for an order number, and matching the `MF-…` shape the machine-file
  * library already uses.
  *
+ * A COUNTER, NOT THE ID'S TAIL (owner's call): LBL-7, not LBL-3VDA5O. Even six characters of
+ * base36 is something you re-read twice while saying it down a phone, and none of that
+ * randomness is information — it is there because the id has to be unguessable, which a label
+ * NUMBER does not.
+ *
+ * It comes from the database (`shipments.seq`), never from the row's position on screen: a
+ * number derived from a list index changes the moment anyone filters or sorts, and an
+ * identifier that moves is not an identifier. Same shape as `templates.seq` behind TPL-12.
+ *
+ * The tail-of-the-id form survives as the fallback for any row written before the column
+ * existed, and the FULL id stays on the row's title for anyone who has to paste it.
+ *
  * The FULL id is still on the row's title attribute, so nothing is lost for anyone who needs
  * to paste it.
  */
-const looseRef = (id: string) => "LBL-" + id.replace(/^sh_/, "").slice(-8).toUpperCase()
+const looseRef = (s: ShipmentRow) =>
+  s.seq != null ? `LBL-${s.seq}` : "LBL-" + s.id.replace(/^sh_/, "").slice(-6).toUpperCase()
 
 /**
  * THE IDENTIFIER LEADS, AND THE SOURCE CAPTIONS IT — for every row, the same way round.
@@ -83,7 +96,7 @@ const looseRef = (id: string) => "LBL-" + id.replace(/^sh_/, "").slice(-8).toUpp
  * whose headline is "No order ID" cannot be referred to at all.
  */
 const shipNum = (s: ShipmentRow) =>
- isLoose(s) ? looseRef(s.id) : s.num.startsWith("#") ? s.num : plainNum(s.id)
+ isLoose(s) ? looseRef(s) : s.num.startsWith("#") ? s.num : plainNum(s.id)
 const shipOrigin = (s: ShipmentRow, loose = "Manual label") => (isLoose(s) ? loose : platformFromId(s.id))
 
 /** What the CARRIER says. Kept visually distinct from the factory stage, because the whole
@@ -111,12 +124,20 @@ const DELIVERY: Record<string, { label: string; cls: string }> = Object.fromEntr
  * question — "which of these is in what state" — and it is the only one that is about
  * money rather than movement, which the amount column already shows.
  */
-const FILTERS: { key: string; label: string; match: (s: ShipmentRow) => boolean }[] = [
+/**
+ * `alert` MARKS THE TWO THAT ARE A CALL TO ACTION — see the note on TabBarItem.count.
+ *
+ * Eight numbers in one row is eight things competing to be read, and "Delivered 79" is not
+ * news: it is the pile that went fine. What somebody scans this row FOR is the parcel that
+ * has not moved and the one that came back — so those two carry a figure and the rest carry
+ * their name. The count is for what is unresolved, not for everything that can be counted.
+ */
+const FILTERS: { key: string; label: string; alert?: true; match: (s: ShipmentRow) => boolean }[] = [
   { key: "all", label: "All", match: () => true },
   { key: "in_transit", label: "In transit", match: (s) => s.delivery === "in_transit" },
-  { key: "awaiting_pickup", label: "Not collected", match: (s) => s.delivery === "awaiting_pickup" },
+  { key: "awaiting_pickup", label: "Not collected", alert: true, match: (s) => s.delivery === "awaiting_pickup" },
   { key: "delivered", label: "Delivered", match: (s) => s.delivery === "delivered" },
-  { key: "problem", label: "Needs a look", match: (s) => s.delivery === "returned" || s.delivery === "failed" },
+  { key: "problem", label: "Needs a look", alert: true, match: (s) => s.delivery === "returned" || s.delivery === "failed" },
   { key: "unchecked", label: "Not asked yet", match: (s) => !s.delivery },
   { key: "refunded", label: "Refunded", match: (s) => (s.refunded ?? 0) > 0 },
   { key: "test", label: "Test", match: (s) => s.test },
@@ -386,7 +407,10 @@ export function ShipmentsView() {
  return {
  id: f.key,
  label: tl("shipments", f.label),
- count: n,
+              /* Only the two that need acting on. `undefined` rather than 0 — the primitive
+                 hides a zero anyway, but not passing one at all is what says this filter is
+                 not the kind that carries a figure. */
+ count: f.alert ? n : undefined,
  disabled: status !== f.key && n === 0 && f.key !== "all",
             }
           })}
@@ -475,8 +499,12 @@ export function ShipmentsView() {
  receipt number leads, and the marketplace becomes a caption, which is
  the same shape the Customer column beside it already uses. */}
                     <td className="px-5 py-2.5">
+                      {/* THE NUMBER ALONE (owner's call). The caption under it — "Etsy",
+                          "Manual label" — is gone: it repeated on every row of a column that
+                          is already sorted and filtered by platform, and doubled the height of
+                          the busiest cell in the table to say something the id prefix and the
+                          filter both already carry. */}
                       <div className="max-w-[9.5rem] truncate text-sm font-semibold tabular-nums" title={s.id}>{shipNum(s)}</div>
-                      <div className="text-2xs text-muted-foreground">{shipOrigin(s, tl("shipments", "Manual label"))}</div>
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex max-w-[14rem] items-center gap-1.5">
