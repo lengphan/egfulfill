@@ -14,7 +14,7 @@ import { prettyColorName } from "@/lib/color-name"
 import { shipBandKey } from "@/lib/ship-band"
 import { swatchHex } from "@/lib/color-swatch"
 import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
-import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-method"
+import { normalizeMethods, splitMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
 import { cleanSku, EG_SKU } from "@/lib/sku"
@@ -476,6 +476,21 @@ export function ProductEditorDialog({
   // so the margin that matters is Base cost − Product cost.
  const [productCost, setProductCost] = useState("")
  const [basePrice, setBasePrice] = useState("")
+  /**
+   * PRICING OVERRIDES — what this blank charges instead of the platform rate.
+   *
+   * `methodPrices` and `sidePrice` have been honoured by pricing.js for a long time and had
+   * nowhere to be typed: they were settable only through the catalogue import or by editing
+   * the jsonb by hand, which meant "a product can override this" was true and unusable.
+   *
+   * Strings, not numbers, and BLANK IS NOT ZERO. Blank means "follow the platform"; a typed
+   * 0 means the same thing here because pricing takes an override only when it is above zero
+   * (methodAddOn and sideAddOn both test `> 0`) — so the field cannot be used to make
+   * something free, and the placeholder shows the inherited figure rather than 0.00 so the
+   * difference between empty and set is legible.
+   */
+ const [methodOv, setMethodOv] = useState<Record<string, string>>({})
+ const [sideOv, setSideOv] = useState("")
  const [shipping, setShipping] = useState("")
   // Shipping physicals — weight (oz) + box (inches). Feed the label buy and the dim-weight
   // check that warns when a box would be billed on size instead of weight.
@@ -598,6 +613,9 @@ export function ProductEditorDialog({
  setMethod(p?.method ?? "DTG")
  setProductCost(p?.productCost != null ? String(p.productCost) : "")
  setBasePrice(p?.basePrice != null ? String(p.basePrice) : p?.base_price != null ? String(p.base_price) : "")
+ setMethodOv(Object.fromEntries(Object.entries((p?.methodPrices ?? {}) as Record<string, unknown>)
+      .filter(([, v]) => Number(v) > 0).map(([k, v]) => [k.toUpperCase(), String(v)])))
+ setSideOv(Number((p as { sidePrice?: unknown })?.sidePrice) > 0 ? String((p as { sidePrice?: unknown }).sidePrice) : "")
  setShipping(p?.shippingFee != null ? String(p.shippingFee) : p?.shipping_fee != null ? String(p.shipping_fee) : "")
  setWeightOz(p?.weightOz != null ? String(p.weightOz) : "")
  setBoxL(p?.boxL != null ? String(p.boxL) : "")
@@ -1038,6 +1056,15 @@ export function ProductEditorDialog({
  productCost: firstTierNum("cost", productCost),
  basePrice: firstTierNum("price", basePrice),
  shippingFee: firstTierNum("shipping", shipping),
+      /* Undefined rather than {} or 0 when nothing is overridden, so a product that has never
+         had one does not gain an empty object on every save — the same rule colorImages
+         above already follows. */
+ methodPrices: (() => {
+ const out: Record<string, number> = {}
+ for (const [k, v] of Object.entries(methodOv)) { const n = Number(v); if (n > 0) out[k] = n }
+ return Object.keys(out).length ? out : undefined
+      })(),
+ sidePrice: Number(sideOv) > 0 ? Number(sideOv) : undefined,
  weightOz: weightOz.trim() === "" ? undefined : Number(weightOz) || 0,
  boxL: boxL.trim() === "" ? undefined : Number(boxL) || 0,
  boxW: boxW.trim() === "" ? undefined : Number(boxW) || 0,
@@ -2189,6 +2216,60 @@ export function ProductEditorDialog({
               )}
             </div>
           )}
+
+          {/**
+           * ── Pricing overrides ────────────────────────────────────────────────────────
+           *
+           * pricing.js has honoured `methodPrices` and `sidePrice` for a long time and
+           * neither had anywhere to be typed — settable only through the catalogue import or
+           * by editing the jsonb by hand. "A product can override this" was true and
+           * unusable.
+           *
+           * PLACED AFTER PRINT SIDES on purpose: the extra-side rate is the price of the
+           * thing that section just configured, and a method surcharge is the price of the
+           * methods ticked above it. A pricing box far from what it prices is a number
+           * nobody connects to a decision.
+           *
+           * BLANK MEANS FOLLOW THE PLATFORM, and the placeholder shows the figure being
+           * followed — so an empty field reads as inheritance rather than as zero. A typed 0
+           * inherits too, because pricing takes an override only when it is above zero; this
+           * is not the control for making something free.
+           *
+           * Only the methods this product actually offers. A surcharge box for a technique
+           * the blank cannot take is a decision nobody will ever act on.
+           */}
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-medium">{tl("product", "Pricing overrides")}</span>
+              <span className="text-xs text-muted-foreground">{tl("product", "blank follows Settings")}</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {normalizeMethods(splitMethods(method)).map((m) => (
+                <label key={m.key} className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">{m.label}</span>
+                  <Input
+                    value={methodOv[m.key.toUpperCase()] ?? ""}
+                    onChange={(e) => setMethodOv((o) => ({ ...o, [m.key.toUpperCase()]: e.target.value.replace(/[^0-9.]/g, "") }))}
+                    placeholder={`$${(Number(fees?.[`method_${m.key.toLowerCase()}`]) || 0).toFixed(2)}`}
+                    inputMode="decimal"
+                    aria-label={`${m.label} surcharge for this product`}
+                    className="h-8 text-xs tabular-nums"
+                  />
+                </label>
+              ))}
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">{tl("product", "Each additional side")}</span>
+                <Input
+                  value={sideOv}
+                  onChange={(e) => setSideOv(e.target.value.replace(/[^0-9.]/g, ""))}
+                  placeholder={`$${(Number(fees?.method_side) || 0).toFixed(2)}`}
+                  inputMode="decimal"
+                  aria-label={tl("product", "Extra side charge for this product")}
+                  className="h-8 text-xs tabular-nums"
+                />
+              </label>
+            </div>
+          </div>
 
           {/* Colors — chips + suggested */}
           <div className="space-y-2">
