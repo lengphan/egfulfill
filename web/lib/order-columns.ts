@@ -42,6 +42,11 @@ export const ITEMS_MIN_PX = 178
 // Widths are deliberately tight: the table is `table-fixed`, so every pixel spent
 // here is taken from Items — the only flexible column, and the one carrying the
 // photos + product name. Keep the fixed total low or item names truncate to "Hoodie ·…".
+//
+// EVERY NUMBER HERE IS TEXT + 24. TableCell is `px-3`, so 24px are spent before a character
+// is drawn, and a width measured against the string alone is short by exactly that. Two of
+// these were: `date` at 72 clipped a 50px date, and `cost` at 96 clipped the $1,204.50 it
+// names in its own comment, by one pixel. Measure the text, then add 24.
 export const ORDER_COLS: Record<OrderColId, OrderColDef> = {
   // 104px, for the same measured reason as the factory board's `order` track below: an Etsy
   // number is 100px in this face and 76px cut it to "#4153554…". The seller quotes this
@@ -63,12 +68,26 @@ export const ORDER_COLS: Record<OrderColId, OrderColDef> = {
    * nothing anybody recorded. A seller looking at their own queue wants what it costs them,
    * and that lived only on the detail page.
    *
-   * 96px, four more than Total: an estimate reads "$1,204.50" at the widest and the column
-   * is right-aligned, where a truncated figure is unreadable rather than merely short.
+   * 100px: an estimate reads "$1,204.50" at the widest and the column is right-aligned,
+   * where a truncated figure is unreadable rather than merely short. Measured at 73px in
+   * Plus Jakarta Sans — plus the 24px below, which is why 96 was one pixel short of the
+   * exact string it was sized for.
    */
-  cost: { px: 96, id: "cost", label: "Cost", width: "w-[96px]", align: "right" },
+  cost: { px: 100, id: "cost", label: "Cost", width: "w-[100px]", align: "right" },
   total: { px: 88, id: "total", label: "Total", width: "w-[88px]", align: "right" },
-  date: { px: 72, id: "date", label: "Date", width: "w-[72px]", align: "right" },
+  /**
+   * 80px, AND THE REASON IS PADDING — the thing every width here was measured without.
+   *
+   * TableCell is `px-3`, so 24 of a column's pixels are gone before a character is drawn.
+   * At 72 that left 48 for a date measured at 50 in Plus Jakarta Sans, so "Sep 10" ellipsised
+   * to "Sep …" on a column whose entire job is six characters. Vietnamese is worse: "10 thg 9"
+   * is 55, so it clipped by seven and the seller's own locale was the one that could not read
+   * its own dates.
+   *
+   * It read as the item title crowding the date out — the title IS the flexible column, so
+   * it looks like the culprit. It is not: this is `table-fixed`, and 72 was never 72.
+   */
+  date: { px: 80, id: "date", label: "Date", width: "w-[80px]", align: "right" },
 }
 
 export const DEFAULT_ORDER_COLS: OrderColId[] = ["order", "store", "customer", "items", "status", "tracking", "cost", "total", "date"]
