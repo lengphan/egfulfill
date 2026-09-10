@@ -1105,7 +1105,17 @@ export default function OrderDetailPage() {
                       <div className="flex justify-between">
                         <dt className="text-muted-foreground">
                           {l.label}
-                          {l.note && <span className="opacity-70"> · {l.note}</span>}
+                          {/* THE SAME SUFFIX THE QUOTE PRINTS. A design fee names its item's
+                              NUMBER here, exactly as it does before the charge — see the note
+                              on the quote's row for why a product title cannot go beside a
+                              $2.00 figure. Every other line keeps its note, which is the
+                              reason somebody typed and the whole point of the row. */}
+                          {l.part === "design" && l.lineId
+                            ? (() => {
+ const n = items.findIndex((x) => x.line_id === l.lineId)
+ return n >= 0 ? <span className="opacity-70"> · Item {n + 1}</span> : null
+                              })()
+                            : l.note && <span className="opacity-70"> · {l.note}</span>}
                           {/* On the row, not in a total at the bottom: "which part did I send
                               back" is the question, and a lone Refunded line cannot answer it. */}
                           {refundByPart.onLine.has(i) && (

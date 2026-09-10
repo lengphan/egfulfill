@@ -267,7 +267,27 @@ export async function orderCharges(orderId) {
     const amt = money(r.delta);
     if (amt <= 0) continue;
     chargedBy.design += amt;
-    lines.push({ part: 'design', label: PART_LABELS.design, amount: amt, note: r.note, at: r.created_at });
+    /**
+     * WHICH LINE, so the summary reads the same before the charge and after it.
+     *
+     * Before, a design fee prints "· Item 1" — the item's NUMBER, because a marketplace
+     * product name is a keyword list that wraps a $2.00 row onto five lines and buries the
+     * money. After, the same fee printed its raw ledger NOTE, so one summary read
+     * "Design service · Item 1" and the other "Design service · Design work · OTTO CAP®
+     * OTTO FLEX® Fitted 6 Panel Low Profile Dad Hat · #1", and a seller had to work out that
+     * these were one charge. Two documents, one event, two shapes.
+     *
+     * The line was recoverable all along: the ref is `design-<order>-<line>`, minted for
+     * idempotency, and the query above already selects it. Stripping the known prefix is
+     * EXACT — the order id is a literal we hold, so a hyphen inside it cannot be mistaken
+     * for the separator, which splitting on '-' would get wrong on every FF- order.
+     *
+     * The note still ships. The wallet reads these same rows with no order around them, and
+     * there the product name is the only thing identifying a $2.00 line.
+     */
+    const dPrefix = `design-${id}-`;
+    const lineId = String(r.ref || '').startsWith(dPrefix) ? String(r.ref).slice(dPrefix.length) : null;
+    lines.push({ part: 'design', label: PART_LABELS.design, amount: amt, note: r.note, at: r.created_at, lineId });
   }
   // Each adjustment is its OWN line, never a merged total: the reason is the point of the
   // row, and two adjustments summed into one line lose both of them.

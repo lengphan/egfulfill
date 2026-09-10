@@ -5276,7 +5276,11 @@ export type OrderChargePart = {
   key: string; label: string; charged: number; refunded: number; refundable: number
 }
 export type OrderCharges = {
-  lines: { part: string; label: string; amount: number; note?: string | null; at: string }[]
+  /** `lineId` is set on design fees — the order_items line the fee was charged for, so the
+   *  summary can name the ITEM NUMBER after the charge exactly as the quote does before it.
+   *  `note` still ships for the wallet, which reads these rows with no order around them. */
+  lines: { part: string; label: string; amount: number; note?: string | null; at: string
+           lineId?: string | null }[]
   parts: OrderChargePart[]
   refunds: { amount: number; part: string | null; note?: string | null; at: string; by?: string | null }[]
   charged: number; refunded: number; refundable: number
