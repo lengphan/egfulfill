@@ -636,10 +636,9 @@ export async function forgetPushDevice(token: string) {
  * them rather than adding a fourth endpoint that would say the same thing and then have to
  * be kept in step with all three.
  *
- * WHAT THIS CANNOT SAY, and must not pretend to: whether a token has EXPIRED. None of the
- * three routes selects `token_expires_at`, so "reconnect needed" is not derivable here.
- * `last_sync_at` is real and is what gets shown; a Shopify token that quietly expired shows
- * as a stale sync, which is true, rather than as a red banner this cannot actually justify.
+ * `token_expires_at` is a TIMESTAMP, never the token — the three routes select the expiry
+ * and nothing else from the credential columns, which is what lets a phone say "reconnect"
+ * without ever holding a bearer secret for someone's shop.
  *
  * A failed platform resolves to an empty list rather than rejecting the whole call: one
  * channel being down must not blank the other two.
@@ -651,6 +650,10 @@ export type StoreConnection = {
   shop_name: string | null
   last_sync_at: string | null
   created_at: string
+  /** When the OAuth token dies. A shop whose token has expired keeps its row and keeps its
+   *  orders — it just stops syncing — so this is the difference between "quiet" and "broken",
+   *  and without it the two are indistinguishable from a stale last_sync_at. */
+  token_expires_at?: string | null
 }
 
 export async function getConnections(): Promise<StoreConnection[]> {

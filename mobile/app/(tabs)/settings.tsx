@@ -177,13 +177,7 @@ export default function Settings() {
           )}
       </View>
 
-      {/* STORES. The prototype drew "Token expired 3 Sep · Reconnect" here, and this screen
-          deliberately does not: none of the three connection routes returns token_expires_at,
-          so an expiry banner would be a claim nothing on this device can support. What IS
-          real is when each shop last synced, and a token that quietly died shows up as a
-          sync that stopped — which is the honest form of the same news.
-
-          A channel with no row says so and says where to fix it. OAuth runs through a
+      {/* STORES. A channel with no row says so and says where to fix it. OAuth runs through a
           redirect_uri registered with Etsy, Shopify and TikTok that points at the web
           origin, so Connect genuinely cannot happen on the phone — §4 says explain, never
           hide, so the row names the reason rather than offering a button that would fail. */}
@@ -194,6 +188,10 @@ export default function Settings() {
           const synced = mine
             .map((c) => c.last_sync_at).filter(Boolean)
             .sort().reverse()[0] as string | undefined
+          /* A shop whose token has died keeps its row and keeps its orders — it just stops
+             syncing. That is the one state on this screen worth colouring, because it is
+             the only one a person has to go and fix. */
+          const dead = mine.find((c) => c.token_expires_at && new Date(c.token_expires_at).getTime() < Date.now())
           return (
             <View
               key={st.key}
@@ -204,15 +202,17 @@ export default function Settings() {
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg, flex: 1 }}>{st.label}</Text>
-                <Text style={{ fontSize: 13, fontFamily: F.medium, color: mine.length ? C.fg : C.muted }}>
-                  {conns === null ? "…" : mine.length ? "Connected" : "Not connected"}
+                <Text style={{ fontSize: 13, fontFamily: F.medium, color: dead ? C.alert : mine.length ? C.fg : C.muted }}>
+                  {conns === null ? "…" : dead ? "Reconnect" : mine.length ? "Connected" : "Not connected"}
                 </Text>
               </View>
               {conns !== null && (
                 <Text style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, marginTop: 3 }}>
                   {mine.length
                     ? [mine.map((c) => c.shop_name || c.shop_id).join(", "),
-                       synced ? `synced ${new Date(synced).toLocaleDateString()}` : "never synced"]
+                       dead
+                         ? `token expired ${new Date(dead.token_expires_at as string).toLocaleDateString()} — orders not syncing`
+                         : synced ? `synced ${new Date(synced).toLocaleDateString()}` : "never synced"]
                         .filter(Boolean).join("  ·  ")
                     : "Connect this channel on the web"}
                 </Text>

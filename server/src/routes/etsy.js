@@ -1226,10 +1226,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // The chooser ratchets against whichever is wider, so a shop with 60 days of orders
       // can't be re-connected at "Today" just because nobody recorded a window for it.
     const r = await q(
-      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days,
+      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days, token_expires_at,
                         (select min(o.created_at) from orders o where o.source='etsy' and o.seller_id = pc.connected_by) as oldest_order_at
                  from platform_connections pc where platform='etsy' order by created_at`
-            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days,
+            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at, backfill_days, token_expires_at,
                         (select min(o.created_at) from orders o where o.source='etsy' and o.seller_id = pc.connected_by) as oldest_order_at
                  from platform_connections pc where platform='etsy' and connected_by=$1 order by created_at`,
       staff ? [] : [req.user.sub]);
