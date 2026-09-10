@@ -110,9 +110,26 @@ export async function writePricing(patch) {
 export async function effectiveSeller(user) {
   if (!user || isStaff(user)) return null;
   try {
+/**
+ * BOUND TO THE PERSON, NOT THE ADDRESS.
+ *
+ * These lookups matched on EMAIL alone, so an active membership granted access to whoever
+ * held that address — including an account created long after the invite was accepted. Give
+ * up an address, or have one reassigned, and the next owner of it inherits somebody's orders,
+ * products, stores and wallet without a single deliberate act.
+ *
+ * `accept` has always recorded `user_id`, so the correct identity was sitting in the row
+ * unused. It is preferred now, and email is the fallback ONLY for a row that has no user_id —
+ * memberships activated before that column was written, which would otherwise stop working
+ * the moment this shipped. Checked on the live table first: every active row has a user_id,
+ * so nothing in production depends on the fallback today.
+ */
     const r = await q(
-      "select owner_id from team_members where lower(email)=lower($1) and status='active' limit 1",
-      [String(user.email || '')]);
+      `select owner_id from team_members
+        where status='active'
+          and (user_id = $1 or (coalesce(user_id,'') = '' and lower(email)=lower($2)))
+        order by (user_id = $1) desc limit 1`,
+      [String(user.sub || ''), String(user.email || '')]);
     if (r.rows[0]?.owner_id) return String(r.rows[0].owner_id);
   } catch { /* no team table yet → they are their own owner */ }
   return String(user.sub);

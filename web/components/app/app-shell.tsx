@@ -17,6 +17,7 @@ import { sellerNav, allowedByPerms } from "@/lib/nav"
 import { getMyAccess } from "@/lib/api"
 import { LowBalanceBanner } from "@/components/app/low-balance-banner"
 import { VerifyEmailBanner } from "@/components/app/verify-email-banner"
+import { TeamBanner } from "@/components/app/team-banner"
 import { ChatLauncher } from "@/components/app/chat-launcher"
 
 // The (app) shell is role-aware: sellers see the seller Sidebar; staff who may use a page
@@ -125,6 +126,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               stops an order being submitted from ANYWHERE, so a warning that only appears
               on the wallet page arrives after the refusal it was meant to prevent.
               Renders nothing unless the server says the balance is actually low. */}
+          {/* FIRST OF THE THREE. Whose account this is changes what every other notice on the
+              page MEANS — a low balance is not yours, an unconfirmed address is not the one
+              the orders belong to — so it is read before them or not at all. */}
+          <TeamBanner />
           {/* ABOVE the balance warning: an unconfirmed address BLOCKS the top-up the other
               banner is about to send them off to do, so the two in the wrong order send
               somebody to a wall. */}

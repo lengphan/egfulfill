@@ -370,7 +370,13 @@ export async function resolveSeller(user, q) {
   if (!user) return { id: null, perms: null, member: false };
   if (isStaff(user)) return { id: user.sub, perms: null, member: false };
   try {
-    const r = await q("select owner_id, permissions from team_members where lower(email)=lower($1) and status='active' limit 1", [user.email || '']);
+    /* Bound to the person, not the address — see the note on effectiveSeller. */
+    const r = await q(
+      `select owner_id, permissions from team_members
+        where status='active'
+          and (user_id = $1 or (coalesce(user_id,'') = '' and lower(email)=lower($2)))
+        order by (user_id = $1) desc limit 1`,
+      [String(user.sub || ''), user.email || '']);
     const row = r.rows[0];
     if (row && row.owner_id) return { id: row.owner_id, perms: Array.isArray(row.permissions) ? row.permissions : [], member: true };
   } catch (e) { /* fall through to "not a member" */ }
@@ -409,7 +415,9 @@ export async function resolveEntitlements(user) {
     const r = await q(
       `select u.id as owner_id, u.plan, u.spydeck_addon
          from team_members t join users u on u.id::text = t.owner_id
-        where lower(t.email)=lower($1) and t.status='active' limit 1`, [user.email]);
+        where t.status='active'
+          and (t.user_id = $1 or (coalesce(t.user_id,'') = '' and lower(t.email)=lower($2)))
+        order by (t.user_id = $1) desc limit 1`, [String(user.sub || ''), user.email]);
     const o = r.rows[0];
     if (!o) return own;
     const ownerPlan = o.plan || 'starter';

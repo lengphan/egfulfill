@@ -81,7 +81,9 @@ export function teamRoutes(app, requireAuth) {
         `select t.id, t.owner_id, t.role, t.permissions,
                 coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name
            from team_members t left join users u on u.id::text = t.owner_id
-          where lower(t.email)=lower($1) and t.status='active' limit 1`, [req.user.email || '']);
+          where t.status='active'
+            and (t.user_id = $1 or (coalesce(t.user_id,'') = '' and lower(t.email)=lower($2)))
+          order by (t.user_id = $1) desc limit 1`, [String(req.user.sub || ''), req.user.email || '']);
       if (!r.rows[0]) return { member: false, permissions: null };
       const row = r.rows[0];
       // membershipId lets the member leave the team from their own settings.
