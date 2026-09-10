@@ -564,6 +564,9 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         // rather than being faked, because a parcel with no order genuinely has none.
         ...sh.map((x) => ({
           id: x.id, num: x.id,
+          // The readable label number. Null only for a row written before the column existed
+          // and not yet touched — the view falls back to the id's tail for those.
+          seq: x.seq != null ? Number(x.seq) : null,
           customer: x.to_name || null, state: x.to_state || null,
           // A loose label carries no street — the buy stored only what it shipped to.
           address: [x.to_city, x.to_state, x.to_zip].filter(Boolean).join(', ') || null,
@@ -1328,8 +1331,38 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         && (!o.tracking || String(l.trackingNumber || '') === String(o.tracking)));
       if (!hit) continue;
       // Their pickedAt is the true scan time; fall back to now if they omit it.
-      await q("update orders set label_scanned_at=coalesce($1::timestamptz, now()), scanned_via=coalesce(scanned_via,'partner') where id=$2 and label_scanned_at is null",
-        [hit.pickedAt || null, o.id]).catch(() => {});
+      const upd = await q("update orders set label_scanned_at=coalesce($1::timestamptz, now()), scanned_via=coalesce(scanned_via,'partner') where id=$2 and label_scanned_at is null",
+        [hit.pickedAt || null, o.id]).catch(() => null);
+      /**
+       * RECORD THE PARTNER SCAN, because until now only OUR scans were recorded.
+       *
+       * `order.scan` is audited on the in-house route with `via: 'in-house'`, and this — the
+       * same event, done by byeastside — wrote the timestamp and said nothing. So the audit
+       * log answered "when did this parcel get scanned" for half the parcels and went silent
+       * for the half that went out through a partner, which is exactly the half nobody here
+       * watched happen.
+       *
+       * A DIFFERENT ACTION, not `order.scan` with a flag. "Scanned here" is the wording on
+       * that one and it would be a lie about this; and the two are genuinely different
+       * events to anyone reading the log — one is a person at our bench, the other is a
+       * report from someone else's.
+       *
+       * `null` for the request: nobody here did it. audit() then files it as `system`, which
+       * is the truth — we learned about it from a poll, minutes or hours after the fact, and
+       * their `pickedAt` is carried so the log can say WHEN it happened rather than when we
+       * found out.
+       *
+       * Only when the UPDATE actually changed a row. The statement is guarded on
+       * `label_scanned_at is null`, so a re-poll of an already-scanned order matches nothing
+       * — and auditing regardless would write a fresh scan entry on every tick of a poller
+       * that runs for as long as the order sits there.
+       */
+      if (upd && upd.rowCount) {
+        audit(null, 'dispatch.scan', {
+          entityType: 'order', entityId: String(o.id),
+          after: { via: 'partner', partner: 'byeastside', tracking: o.tracking || null, at: hit.pickedAt || null },
+        });
+      }
       scanned++;
     }
     if (scanned) egBroadcast({ type: 'orders' });
@@ -1370,8 +1403,16 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       const r = await bes(`/customer/pdfs/${encodeURIComponent(o.dispatch_pdf_id)}`, { method: 'DELETE' });
       if (r.status === 409) {
         // They scanned it between our check and this call. Record the scan rather than
-        // pretending it's still cancellable.
-        await q("update orders set label_scanned_at=coalesce(label_scanned_at, now()), scanned_via=coalesce(scanned_via,'partner') where id=$1", [o.id]).catch(() => {});
+        // pretending it's still cancellable — in the log as well as in the column, and the
+        // same event the poller above records. This one has a request behind it (somebody
+        // pressed cancel), but the SCAN still was not theirs, so it is filed the same way.
+        const late = await q("update orders set label_scanned_at=coalesce(label_scanned_at, now()), scanned_via=coalesce(scanned_via,'partner') where id=$1 and label_scanned_at is null", [o.id]).catch(() => null);
+        if (late && late.rowCount) {
+          audit(null, 'dispatch.scan', {
+            entityType: 'order', entityId: String(o.id),
+            after: { via: 'partner', partner: 'byeastside', tracking: o.tracking || null, foundOn: 'cancel' },
+          });
+        }
         results.push({ id: o.id, ok: false, reason: 'already-scanned' });
         continue;
       }

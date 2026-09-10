@@ -55,6 +55,11 @@ const REGISTRY: Record<string, { label: string; verb: string; icon: ActionMeta["
   "order.tracking":      { label: "Tracking added", verb: "added tracking",          icon: Truck },
   "order.manifested":    { label: "Manifested",    verb: "added it to a manifest",   icon: Stack },
   "dispatch.push":       { label: "Sent to byeastside",      verb: "sent it to byeastside",      icon: PaperPlaneTilt },
+  /* THEIR SCAN, NOT OURS — a separate action from `order.scan`, whose wording is "scanned
+     here" and would be a lie about a parcel scanned at somebody else's bench. The two are
+     also different events to a reader: one is a person we can ask, the other is a report
+     that arrived from a poll. The actor is `system` for the same reason. */
+  "dispatch.scan":       { label: "Scanned by byeastside", verb: "was scanned by byeastside", icon: Barcode },
   "dispatch.cancel":     { label: "Cancelled with byeastside", verb: "cancelled it with byeastside", icon: X },
   // Order state
   "item.status":         { label: "Item status changed", verb: "changed an item's status", icon: ArrowRight },
@@ -155,6 +160,11 @@ export function actionDetail(r: AuditRow, resolveLine?: (key: string) => string 
       return str("note")
     case "order.tracking":
       return str("tracking")
+    /* THEIR time, not ours. The poll can run hours after the parcel was picked, so the row
+       carries `at` from byeastside and the tracking it belongs to — without them the entry
+       says a scan happened and leaves you to guess which parcel and when. */
+    case "dispatch.scan":
+      return [str("tracking"), a.at ? new Date(String(a.at)).toLocaleString() : ""].filter(Boolean).join(" · ")
     case "shipping.label_detached":
     case "shipping.label_restored":
       return str("tracking") || String((r.before as Record<string, unknown> | null)?.tracking ?? "")
