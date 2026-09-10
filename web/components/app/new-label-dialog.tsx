@@ -105,9 +105,6 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   /** `unknown` = nobody could check — see lib/address-check.ts. It used to fall to `idle`,
    *  which made a failed check look exactly like an address nobody had typed yet. */
  const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid" | "unknown" | "unreadable"; msg?: string }>({ status: "idle" })
-  /** What was typed before USPS standardised it, so the rewrite is undoable. A correction
-   *  nobody can reverse is a correction nobody trusts. */
- const [preCorrection, setPreCorrection] = useState<string | null>(null)
   /** Every address signature this has already acted on, AND every one it has produced.
    *  Both halves matter — see the loop note below. */
  const corrected = useRef<Set<string>>(new Set())
@@ -126,7 +123,6 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * also removes the redundant call, and these are metered.
    */
  const goodAddr = useRef<Set<string>>(new Set())
- const fromUsps = useRef<Set<string>>(new Set())
  useEffect(() => {
  const complete = addrComplete(to)
  let alive = true
@@ -159,7 +155,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  const sig = [to.street, to.street2, to.city, to.state, to.zip].join("|")
       /* ALREADY ANSWERED. See goodAddr above — the settled verdict for this exact text. */
  if (goodAddr.current.has(sig)) {
- setAddrCheck({ status: "valid", ...(fromUsps.current.has(sig) ? { msg: "corrected" } : {}) })
+ setAddrCheck({ status: "valid" })
  return
       }
  setAddrCheck({ status: "checking" })
@@ -180,6 +176,13 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
              * carried through rather than dropped — a missing unit number is a parcel that
              * reaches the building and not the person. If any piece is missing the address is
              * left exactly as typed and the badge just says validated.
+             *
+             * IT IS NOT ANNOUNCED. This briefly said "USPS format" with an Undo beside it,
+             * and that was a control explaining itself in prose (§4) for a change nobody
+             * needs told about: the corrected text is right there to read, and it is the
+             * address the label prints either way, so there is nothing to weigh up and
+             * nothing to go back to. The badge says what the manual-order form's says —
+             * Validated, or Not validated — and the two surfaces read the same.
              *
              * AND IT CANNOT LOOP — which took two goes to get right, so the reasoning is here.
              *
@@ -207,14 +210,12 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               /* USPS's own output is valid by definition — it is what USPS just told us this
                  address IS — so the rewritten text is marked good without a second lookup. */
  goodAddr.current.add(outSig)
- fromUsps.current.add(outSig)
  const next = [to.name, a.street, a.street2, `${a.city}, ${a.state} ${zip}`]
                 .filter((l) => l && String(l).trim()).join("\n")
  if (next !== pasteText) {
- setPreCorrection(pasteText)
  setPasteText(next)
  setTo({ ...to, street: a.street, street2: a.street2 || "", city: a.city, state: a.state, zip })
- setAddrCheck({ status: "valid", msg: "corrected" })
+ setAddrCheck({ status: "valid" })
  return
               }
             }
@@ -590,7 +591,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 />
                 <div className="pointer-events-none absolute bottom-2 right-2.5">
                   {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> {tl("label", "Checking…")}</span>}
-                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {addrCheck.msg === "corrected" ? tl("label", "USPS format") : tl("label", "Validated")}</span>}
+                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {tl("label", "Validated")}</span>}
                   {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? tl("label", "Couldn't verify") : tl("label", "Not found")}</span>}
                   {/* GREY, NO ICON. Nobody could check — there is nothing to fix, and the
                       label buys against the address as typed either way. */}
@@ -600,19 +601,6 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                       check) because this one is not about the validator at all. */}
                   {addrCheck.status === "unreadable" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {tl("label", "Can’t read this")}</span>}
 
-                  {/* THE WAY BACK. A silent rewrite of somebody's typing is the kind of help
-                      that gets switched off — so the correction is announced and reversible,
-                      and reverting also stops it being re-applied, because the ref already
-                      holds this input's signature. */}
-                  {addrCheck.status === "valid" && addrCheck.msg === "corrected" && preCorrection && (
-                    <button
-                      type="button"
-                      onClick={() => { setPasteText(preCorrection); setPreCorrection(null); setAddrCheck({ status: "valid" }) }}
-                      className="rounded-lg bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    >
-                      {tl("label", "Undo")}
-                    </button>
-                  )}
                 </div>
               </div>
               {/* NO SUBTITLE. It read "Name, street, then City, ST ZIP — the label uses
