@@ -12,7 +12,10 @@ export type Tone = "pos" | "neg" | "mut"
  *
  * A tile is a LABEL and a NUMBER. It carried a caption under the figure as well, and with
  * four tiles to a row that was four sentences restating four headings the reader already
- * knew. `sub`/`tone` are still accepted so the ~200 call sites don't need touching, and
+ * knew. `sub`/`tone` are still accepted and IGNORED so the ~200 call sites don't need
+ * touching — `tone` joined `sub` there on 2026-09-10 when the lead bar went. Kept in the
+ * signature rather than removed because a prop that vanishes is 200 files to edit and 200
+ * chances to get one wrong, for a value nothing reads; and
  * they simply aren't drawn.
  */
 export function StatCard({
@@ -21,7 +24,9 @@ export function StatCard({
   icon: Icon,
   onClick,
   active,
-  tone,
+  /* `tone` is NOT destructured, the same as `sub` above it — both are accepted by the type
+     and read by nothing, and pulling an unused name out of the props is just a lint warning
+     with extra steps. */
 }: {
   label: string
   value: string
@@ -65,7 +70,9 @@ export function StatCard({
           positive — nothing else on the screen carries it, which is the entire reason it
           registers. Lime can never letter anything (1.05:1 on white: invisible), so it is
           used the only way it works — as a solid shape. */}
-      {tone === "pos" && <span className="mt-2.5 block h-[3px] w-9 rounded-full bg-[var(--brand-foreground)]" />}
+      {/* The card variant carried the same lead bar as the rail, so removing one and not the
+          other would have left the mark on half the app's tiles. Both go — see the note at
+          the rail below. */}
     </>
   )
 
@@ -81,7 +88,13 @@ export function StatCard({
       <>
         <span className="block eg-label whitespace-nowrap text-muted-foreground">{label}</span>
         <span className="mt-1 block text-2xl font-semibold leading-none tracking-tight tabular-nums">{value}</span>
-        {tone === "pos" && <span className="absolute bottom-0 left-0 h-[3px] w-8 rounded-full bg-[var(--brand-foreground)]" />}
+        {/* NO LEAD BAR (owner, 2026-09-10). A 32px rule under any `pos` figure, on the
+            shared tile, so it appeared on every console rail in the app — and it marked
+            nothing a reader needed: the figure is already the largest type in the row, and
+            in Shipments it sat under "Refunded", where a bright underline reads like an
+            emphasis on money coming back rather than the neutral tally it is. A rail is
+            four numbers to compare at a glance; one of them wearing a stripe is a claim
+            nobody made. */}
       </>
     )
     if (!onClick) return <div className="relative shrink-0 pb-[7px]">{fig}</div>

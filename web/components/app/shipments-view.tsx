@@ -80,7 +80,7 @@ const looseRef = (id: string) => "LBL-" + id.replace(/^sh_/, "").slice(-8).toUpp
  * an order, so the absence is already stated; printing both is saying it twice, and a row
  * whose headline is "No order ID" cannot be referred to at all.
  */
-const shipNum = (s: ShipmentRow, loose = "Manual label") =>
+const shipNum = (s: ShipmentRow) =>
  isLoose(s) ? looseRef(s.id) : s.num.startsWith("#") ? s.num : plainNum(s.id)
 const shipOrigin = (s: ShipmentRow, loose = "Manual label") => (isLoose(s) ? loose : platformFromId(s.id))
 
@@ -95,9 +95,6 @@ const shipOrigin = (s: ShipmentRow, loose = "Manual label") => (isLoose(s) ? loo
 const DELIVERY: Record<string, { label: string; cls: string }> = Object.fromEntries(
   Object.keys(DELIVERY_TEXT_TONE).map((k) => [k, { label: deliveryWord(k) as string, cls: DELIVERY_TEXT_TONE[k] }]),
 )
-
-const when = (s: string | null) =>
- s ? new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null
 
 /**
  * The status filter, as the questions someone actually arrives with.
@@ -456,7 +453,11 @@ export function ShipmentsView() {
                           <span className="shrink-0 rounded bg-draft/20 px-1.5 py-0.5 text-2xs font-medium text-draft">TEST</span>
                         )}
                       </div>
-                      {s.state && <div className="text-2xs text-muted-foreground">{s.state}</div>}
+                      {/* NO STATE UNDER THE NAME. Two letters on their own answer nothing
+                          anyone opens this page for — you cannot ship to "CA", and the full
+                          address is one click away on the row. It made every row two lines
+                          tall to carry a fragment of a fact. It stays in the CSV export,
+                          where a column of states is something you can actually sort by. */}
                     </td>
                     <td className="px-3 py-2.5">
                       {s.tracking ? (
@@ -528,9 +529,14 @@ export function ShipmentsView() {
                         // facts, and the difference decides whether to chase.
                         <span className="text-xs text-muted-foreground">{tl("shipments", "Not asked yet")}</span>
                       )}
-                      {s.deliveryCheckedAt && (s.refunded ?? 0) === 0 && (
-                        <div className="mt-1 text-2xs text-muted-foreground">checked {when(s.deliveryCheckedAt)}</div>
-                      )}
+                      {/* NO "checked <time>". It is a fact about US — when the poller last
+                          asked the carrier — printed under a fact about the PARCEL, in a
+                          column people scan for whether something has moved. Every row
+                          carrying the same timestamp to the minute (the batch ran at 9:52)
+                          is the giveaway: it varies with our schedule, not with the
+                          shipment, so it cannot inform a decision about one. "Not asked
+                          yet" already covers the only case where our polling is the
+                          reader's problem. */}
                     </td>
                   </tr>
                 )
