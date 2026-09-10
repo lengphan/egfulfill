@@ -36,7 +36,9 @@ export const GRANTS = [
     label: 'Edit an order after approval',
     // Shown in the admin UI. It says what the grant DOES and where it still stops, because
     // an admin turning this on is accepting the consequence and needs to see the edge.
-    note: 'Lets an operator correct a line after Approved, the same reach an admin has — until the blanks are ordered, after which it is locked for everyone.',
+    // The note is a LINE, not a paragraph — an admin reading this row is deciding, not being
+    // taught. What matters is the reach and where it stops; the rest is in the code.
+    note: 'Correct a line after Approved. Locked for everyone once blanks are ordered.',
   },
   {
     key: 'operator.editSurcharges',
@@ -47,7 +49,7 @@ export const GRANTS = [
        unit, so it changes what every seller is quoted on every future order of that method.
        Deliberately narrow: it is the four surcharge fields, not the rest of the settings PUT,
        which still needs admin or warehouse. */
-    note: 'Lets an operator change the DTG, DTF, embroidery and extra-side surcharges. These are added to the base cost per unit, so they change what sellers are quoted from that moment on — existing orders keep the price they were frozen at. Every other number on this page still needs admin or warehouse.',
+    note: 'Change the four print surcharges. New quotes only — priced orders keep their price.',
   },
 ];
 const GRANT_KEYS = new Set(GRANTS.map((g) => g.key));

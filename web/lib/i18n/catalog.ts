@@ -2688,6 +2688,7 @@ const vi: Dict = {
   "teamBanner.’s account.": " — tài khoản của họ.",
   "teamBanner.your team": "nhóm của bạn",
   "teamBanner.Orders, products and stores here are theirs — anything you create belongs to them, and your own account stays separate.": "Đơn hàng, sản phẩm và cửa hàng ở đây là của họ — mọi thứ bạn tạo đều thuộc về họ, còn tài khoản riêng của bạn vẫn tách biệt.",
+  "roleGrants.what a role may do. Audited.": "những gì một vai trò được làm. Có ghi nhật ký.",
   "canvas.every face": "mọi mặt",
   "canvas.Recent files": "Tệp gần đây",
   "canvas.Pick a blank to start designing.": "Chọn một phôi để bắt đầu thiết kế.",

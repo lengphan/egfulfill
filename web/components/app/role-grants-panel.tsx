@@ -66,7 +66,11 @@ export function RoleGrantsPanel() {
       <h2 className="text-sm font-semibold">{tl("roleGrants", "Extra permissions")}</h2>
       <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
         <ShieldWarning size={14} weight="fill" className="mt-0.5 shrink-0" />
-        <span>{tl("roleGrants", "These")} <strong>widen</strong> {tl("roleGrants", "what a role may do, unlike the list above. Every change is recorded in the audit log with who made it.")}</span>
+        {/* One line. It said "These widen what a role may do, unlike the list above. Every
+            change is recorded in the audit log with who made it." — three facts where one
+            does the work: the shield icon beside it and the heading already say what this
+            section is, and audited is the default for anything in Settings. */}
+        <span>{tl("roleGrants", "These")} <strong>widen</strong> {tl("roleGrants", "what a role may do. Audited.")}</span>
       </p>
 
       {!grants ? (
