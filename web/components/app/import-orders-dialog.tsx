@@ -642,6 +642,25 @@ export function ImportOrdersDialog({
               for (const f of faces) {
                 if (!f.artwork) continue
                 await postOrderDesign(orderId, {
+                  /**
+                   * THE LINE ID, which this loop has minted and the machine-file attach two
+                   * dozen lines up already uses — and which this call did not pass.
+                   *
+                   * Measured on a real import: the two design rows were written correctly,
+                   * front and back, and filed under `sku` = the item's NAME, because
+                   * `it.sku || it.name` falls through whenever the sheet names a blank
+                   * rather than a listing SKU (which the template encourages: Blank Product
+                   * is required, Item SKU is not). The lines it had just created carried an
+                   * EMPTY sku and a real line_id, so the placement matched nothing on either
+                   * key and both items read "0 positions" while the artwork sat in the
+                   * database beside them.
+                   *
+                   * It is the mistake the comment on lineIds warns about, in the same file:
+                   * two lines of one SKU are different jobs, so the only handle that can be
+                   * trusted is the one we minted. `sku` stays as the fallback the server
+                   * still accepts for rows written before line_id existed.
+                   */
+                  line_id: lineIds[li],
                   sku: it.sku || it.name,
                   side: f.side || "front",
                   data: f.artwork,
@@ -654,7 +673,11 @@ export function ImportOrdersDialog({
               if (it.templateMachineFile?.data) {
                 await uploadDesignFile({
                   designId: `TPL-${it.templateId || "file"}-${(it.sku || it.name).replace(/[^a-z0-9]+/gi, "-").slice(0, 30)}`,
-                  orderId, sku: it.sku || it.name,
+                  // Same handle as the design rows above and the library attach below it: the
+                  // line we minted. Filed by sku alone, a template's stitch file landed on
+                  // whichever sibling shared the name — or, when the sheet gave a blank and no
+                  // Item SKU, on nothing at all.
+                  orderId, sku: it.sku || it.name, lineId: lineIds[li],
                   name: it.templateMachineFile.name, data: it.templateMachineFile.data,
                 }).catch(() => {})
               }
