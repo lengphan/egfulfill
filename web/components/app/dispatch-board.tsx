@@ -7,7 +7,7 @@ import { ManifestDialog } from "@/components/app/manifest-dialog"
 import { SearchField } from "@/components/app/search-field"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
 import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ArrowUUpLeft, XCircle, Clock, Barcode, CaretDown, type Icon } from "@phosphor-icons/react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
@@ -17,7 +17,7 @@ import { fetchShipmentLabel } from "@/lib/api"
 import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { getOrders, cachedOrders, streamOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
-import { StagedLabelRow, UploadLabelRow, useLabelPullBack, AddLabelButton, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
+import { StagedLabelRow, UploadLabelRow, useLabelPullBack, PageDropZone, isPdf, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
 import {
   DISPATCH_GRID, DISPATCH_HEAD, DISPATCH_COLS, DISPATCH_COL_ORDER, DISPATCH_HIDDEN_DEFAULT,
   dispatchTemplate, type DispatchColId,
@@ -169,6 +169,8 @@ export function DispatchBoard() {
   /* Column layout, persisted per browser. Read in an effect: localStorage does not exist on
      the server, and a first paint that disagrees with the second is a flicker on every load. */
  const [colOrder, setColOrder] = useState<DispatchColId[]>(DISPATCH_COL_ORDER)
+  /** The Add-label file input, clicked by its menu item — see the toolbar. */
+ const pdfInput = useRef<HTMLInputElement>(null)
  const [hiddenCols, setHiddenCols] = useState<DispatchColId[]>(DISPATCH_HIDDEN_DEFAULT)
  useEffect(() => {
     const t = setTimeout(() => {
@@ -905,66 +907,112 @@ export function DispatchBoard() {
             </DropdownMenu>
 
             {/* Dropping a file anywhere on this page is the primary gesture (PageDropZone);
- this is the same thing for a mouse, at the weight it deserves — one control
- among the others rather than a band above them. */}
-            <AddLabelButton onStage={stageFiles} onError={setErr} />
+                this is the same thing for a mouse. It is an INPUT rather than a button now,
+                because the visible control moved into the Actions menu and a menu item cannot
+                wrap a file input — so the item clicks this instead. Same accept, same PDF
+                test, one upload path. */}
+            <input
+              ref={pdfInput}
+              type="file" multiple className="sr-only" accept="application/pdf"
+              onChange={(e) => {
+                const list = Array.from(e.target.files ?? [])
+                e.target.value = ""
+                if (!list.length) return
+                // Caught before anything leaves, so picking a photo by accident answers
+                // instantly. The server checks the bytes too — this one is about the wait.
+                const bad = list.filter((f) => !isPdf(f))
+                const good = list.filter(isPdf)
+                setErr(bad.length ? `${bad.map((f) => f.name).join(", ")} — only PDFs can be pre-scanned, that's what carriers issue.` : null)
+                if (good.length) stageFiles(good)
+              }}
+            />
 
-            {/* SEVEN BUTTONS IN A ROW IS A SEARCH, NOT A TOOLBAR.
-                Label & Slip and the two walk-it-back actions move behind one More menu, so
- the row carries only what a shift actually presses: print, send, scan, finish.
-                The rule: at most a handful of actions in the row, one of them filled, and
- everything occasional behind a menu — including the things that spend most of
- their life disabled, which were taking prime space to do nothing. */}
+            {/**
+             * ONE ACTIONS MENU (owner, 2026-09-10).
+             *
+             * The row carried six controls: Print, Add label PDF, More, Send to byeastside,
+             * Scanned here, Finish All. Three of them were the same KIND of thing — a batch
+             * verb applied to whatever is ticked — sitting loose beside a menu that already
+             * held two more of exactly that kind. So "what can I do with these?" was answered
+             * in two places, and which place depended on how often we guessed you would want
+             * it. Three controls now: print, add, act.
+             *
+             * THE TRIGGER IS THE FILLED ONE. §4 wants one primary per screen — the thing the
+             * screen is FOR — and with every verb behind this menu, this is it. Leaving it as
+             * a plain control would give the toolbar no primary at all, which is the failure
+             * the variants exist to prevent.
+             *
+             * ORDERED AS A SHIFT RUNS, not alphabetically or by how dangerous they are: send
+             * it out, record the scan, finish it. Then the occasional paperwork. Then the two
+             * that walk something back, last and behind a rule, because undo belongs where a
+             * hand does not land by accident.
+             *
+             * THE PARTNER IS NOT NAMED ANY MORE. "Send to byeastside" and "Cancel with
+             * byeastside" told the floor which company handles a pre-scan, on a screen where
+             * the only thing that matters is whether the parcel is scanned there or here.
+             * "Send To Scan" and "Cancel Scan" say the job. §2.9 is about not naming who
+             * supplies us; this is the same instinct one step in.
+             */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="eg-control">
-                {tl("dispatch", "More")} <CaretDown size={12} weight="bold" className="text-muted-foreground" />
+              <DropdownMenuTrigger className="eg-tap inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50">
+                {tl("dispatch", "Actions")} <CaretDown size={12} weight="bold" className="opacity-70" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 p-1">
+              <DropdownMenuContent align="end" className="w-56 p-1">
+                {canSendToPartner && (
+                  <DropdownMenuItem
+                    disabled={(!chosenWithLabel.length && !stagedChosen.length) || busy}
+                    onClick={sendToPartner}
+                    title={stagedChosen.length
+                      ? `Upload ${chosenWithLabel.length ? tl("dispatch", "these labels and ") : ""}${stagedChosen.length} dropped file${stagedChosen.length === 1 ? "" : "s"} to the pre-scan queue`
+                      : tl("dispatch", "Upload these labels to the pre-scan queue — charges the expedite fee per label")}
+                  >
+                    {tl("dispatch", "Send To Scan")}
+                  </DropdownMenuItem>
+                )}
+                {canScanOut && (
+                  <DropdownMenuItem
+                    disabled={!chosen.length || busy}
+                    onClick={markScanned}
+                    title={tl("dispatch", "Record that we scanned these ourselves — starts the buyer's tracking. Doesn't change what production is doing.")}
+                  >
+                    {tl("dispatch", "Scan Here")}
+                  </DropdownMenuItem>
+                )}
+                {canScanOut && (
+                  <DropdownMenuItem
+                    disabled={!chosen.length || busy || !canFinish}
+                    onClick={finishAll}
+                    title={canFinish ? tl("dispatch", "Mark the selected orders Shipped & Fulfilled") : tl("dispatch", "Your role can't ship orders out")}
+                  >
+                    {tl("dispatch", "Finish All")}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem disabled={!chosenWithLabel.length || busy} onClick={labelAndSlip}>
                   {tl("dispatch", "Label & Slip")}
                 </DropdownMenuItem>
+                {/* Never disabled: adding a label is the one action here that does not act on
+                    a selection, so it is available whether anything is ticked or not. */}
+                <DropdownMenuItem onClick={() => pdfInput.current?.click()}
+                  title={tl("dispatch", "Choose label PDFs — or just drop them anywhere on this page")}>
+                  {tl("dispatch", "Add label PDF")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={(!chosen.length && !uploadsChosen.length) || busy} onClick={pullBack}>
+                  {tl("dispatch", "Cancel Scan")}
+                </DropdownMenuItem>
                 {/* Discards any selected file that was dropped but never sent. Only staged
- files — an ORDER has nothing to discard, it is listed because it has an
- unscanned label. */}
+                    files — an ORDER has nothing to discard, it is listed because it has an
+                    unscanned label. */}
                 <DropdownMenuItem
- disabled={!stagedChosen.length || busy}
- onClick={() => { for (const s of stagedChosen) discardStaged(stagedKeyOf(s)) }}
- title={tl("dispatch", "Discard the dropped files that haven't been sent anywhere")}
+                  disabled={!stagedChosen.length || busy}
+                  onClick={() => { for (const s of stagedChosen) discardStaged(stagedKeyOf(s)) }}
+                  title={tl("dispatch", "Discard the dropped files that haven't been sent anywhere")}
                 >
                   {tl("dispatch", "Discard dropped files")}
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={(!chosen.length && !uploadsChosen.length) || busy} onClick={pullBack}>
-                  {tl("dispatch", "Cancel with byeastside")}
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* THE TWO ROUTES kept prominent — this is where the choice is made. Both start
- the buyer's tracking clock; they differ in who does it and what it costs. */}
-            {/* Also the send button for external labels dropped below — a dropped file now
- waits to be sent rather than sending itself, and this is what sends it. Kept
- visible while any file is waiting even if the partner reads as unconfigured,
- so a staged file can never become unsendable. */}
-            {canSendToPartner && (
-              <Button size="sm" variant="outline" disabled={(!chosenWithLabel.length && !stagedChosen.length) || busy} onClick={sendToPartner}
- title={stagedChosen.length
-                  ? `Upload ${chosenWithLabel.length ? tl("dispatch", "these labels and ") : ""}${stagedChosen.length} dropped file${stagedChosen.length === 1 ? "" : "s"} to byeastside's pre-scan queue`
- : tl("dispatch", "Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label")}>
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("dispatch", "Send to byeastside")}
-              </Button>
-            )}
-            {canScanOut && (
-              <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={markScanned}
- title={tl("dispatch", "Record that we scanned these ourselves — starts the buyer's tracking. Doesn't change what production is doing.")}>
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("dispatch", "Scanned here")}
-              </Button>
-            )}
-            {canScanOut && (
-              <Button size="sm" disabled={!chosen.length || busy || !canFinish} onClick={finishAll}
- title={canFinish ? tl("dispatch", "Mark the selected orders Shipped & Fulfilled") : tl("dispatch", "Your role can't ship orders out")}>
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("dispatch", "Finish All")}
-              </Button>
-            )}
           </div>
   )
 

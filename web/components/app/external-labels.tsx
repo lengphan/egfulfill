@@ -39,7 +39,10 @@ import { readLabelPdf, PARSE_NOTE, PARSE_WHY, type LabelParse } from "@/lib/labe
  * wrapped photos on the way through; it was removed rather than left dormant, because a
  * conversion path nobody exercises is one nobody notices breaking.
  */
-const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name)
+/** Exported so the dispatch toolbar can run the same test from its own hidden input — the
+ *  Add-label action lives in a menu there, and a second definition of "is this a PDF" is how
+ *  two entry points to one upload start disagreeing about what they accept. */
+export const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name)
 
 const readAsDataUrl = (file: File) =>
  new Promise<string>((resolve, reject) => {
