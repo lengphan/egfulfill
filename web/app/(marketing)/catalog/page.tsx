@@ -13,8 +13,13 @@ export default async function CatalogPage() {
   // null means the read failed, [] means the catalogue is genuinely empty. Collapsing both
   // into [] is what once had this page reporting an empty catalogue while the API answered.
   let products: Awaited<ReturnType<typeof getPublicProducts>>["products"] | null = null
+  // The extra-item fee travels with the products, from the same read. A failure costs the
+  // postage line inside an open product, never the catalogue.
+  let shipping: { extra: number } | null = null
   try {
-    products = (await getPublicProducts()).products ?? []
+    const r = await getPublicProducts()
+    products = r.products ?? []
+    shipping = r.shipping ? { extra: r.shipping.extra } : null
   } catch {
     products = null
   }
@@ -23,6 +28,7 @@ export default async function CatalogPage() {
   return (
     <PloyProducts
       products={products}
+      shipping={shipping}
       /* The stored PageHead — `title` / `accent` / `sub`, the same three the old design read.
          Falls back only when a field is blank, so an admin's copy always wins. */
       headline={head.title || "What we"}

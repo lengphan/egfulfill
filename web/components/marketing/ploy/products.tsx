@@ -1,152 +1,811 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { motion } from "motion/react"
+import { AnimatePresence, motion } from "motion/react"
 import { HOVER, reveal } from "./motion"
 import { GUTTER, SECTION, TOP } from "./rhythm"
-import type { PublicProduct } from "@/lib/api"
+import { getPublicProduct, type PublicProduct } from "@/lib/api"
 /* THE CANONICAL SPLITTER, not a second one. `normalizeMethods` already splits a combined
-   value ("DTG printing / Embroidery") and de-dupes by normalised key — I had re-derived that
-   here as methods-of.ts, which is exactly the private copy §5 warns about. */
-import { normalizeMethods } from "@/lib/print-method"
-import { sizeRangeLabel } from "@/lib/size-order"
-/* The canonical swatch resolver — the same one the catalogue grid and the app product page
-   read, so one colour name cannot render three ways across the product (§5). */
+   value ("DTG printing / Embroidery") and de-dupes by normalised key. */
+import { normalizeMethods, normTech } from "@/lib/print-method"
+import { bySize, sizeRangeLabel } from "@/lib/size-order"
+/* The canonical swatch resolver — the same one the app's product page reads, so one colour
+   name cannot render three ways across the product (§5). */
 import { swatchChipStyle } from "@/lib/color-swatch"
+/* ONE VOCABULARY FOR A FACE. `left` is "Left sleeve" everywhere in the product — on the
+   import sheet, on the boards and here — and a second spelling on a public page is how two
+   words for one placement start (§5). */
+import { SIDE_LABEL } from "@/lib/order-import"
+import { framingStyle } from "@/lib/product-framing"
+import { ShippingFees } from "@/components/shipping-fees"
 
 /**
- * THE PRODUCTS PAGE — one garment shot large, then every other one shot identically.
+ * THE CATALOGUE, AS ONE PAGE.
  *
- * THE BLANKS ARE OUR OWN PHOTOGRAPHY, and they are not product listings. Each is a garment
- * TYPE with the methods it can take, and it carries no price, no sku and no buy button —
- * because inventing those is exactly the fake-catalogue §4 forbids. The real products, with
- * real prices, come from the API below and link to their own pages.
+ * It used to be a grid of 23 identical squares beside a 190px filter sidebar, and a click
+ * left for /catalog/<slug> — a page built in a DIFFERENT design language (the old bold-kit,
+ * with its violet artwork plate), so choosing a product visibly changed which site you were
+ * on. That is most of what read as "not exciting": not the amount of information, the
+ * uniformity of it.
  *
- * ONE SHOOT, AND THAT IS THE DESIGN. Every blank is framed from the collarbone down, front
- * facing, same distance, same grey trousers, same periwinkle seamless, same light. The
- * uniformity is the point: twelve garments shot twelve ways read as twelve stock photos,
- * and the same twelve shot once read as a catalogue. The generated frames were cropped to a
- * common scale afterwards rather than trusted — the camera distance varied between them.
+ * Three things changed, and they are one idea.
+ *
+ *   EDITORIAL, NOT INVENTORY.  The catalogue is grouped by its own categories, each opened
+ *   by a display word, and the tiles inside a group are packed at TWO scales rather than
+ *   one. A page of equal squares has no focus by construction; a page that varies scale has
+ *   to decide what matters, which is what makes it read as a catalogue rather than a stock
+ *   list.
+ *
+ *   NOWHERE TO GO.  Selecting a product opens a full-width band directly beneath ITS OWN
+ *   ROW — the grid parts, the detail pushes in, and your place in the page is never lost.
+ *   Nothing is fetched to do it: /api/public/products already returns every field the
+ *   detail needs (colours, sizes, sizePrices, methodPrices, sides, sideFee, ship). The one
+ *   exception is the supplier size chart, which is deliberately detail-route-only because
+ *   it costs a supplier call per product — so that, and only that, is read on open.
+ *
+ *   THE PICKS MOVE THE PRICE.  Colour, size, technique and placement are the four things
+ *   that change what a seller pays, and the figure recomputes as they are pressed. This
+ *   mirrors server/src/pricing.js exactly: size sets the base, the method adds its own
+ *   surcharge, and only faces 2..n are charged because the blank's price already buys one.
+ *
+ * WHAT IS STILL DELIBERATELY ABSENT, because we do not have it: ratings, delivery dates,
+ * stock. §4 — an invented figure must not look like a measured one. And no `sku`, no
+ * `blank`, no supplier domain in any src: §2.9 covers URLs, not just fields.
  */
 
+/** How many colourways a CARD shows before it prints a count instead. */
+const CARD_SWATCHES = 6
+/** How many the open panel shows before it folds. Three rows at the panel's width. */
+const PANEL_SWATCHES = 24
+
 /**
- * THE CATEGORIES THE LIVE CATALOGUE ACTUALLY USES, each with a photograph of its own.
- *
- * `key` is matched against `PublicProduct.category` verbatim — these are not labels invented
- * for the page, they are the four values the published products carry. A category with no
- * products simply does not draw, so this list going stale shows as an absence rather than as
- * a tile that filters to nothing.
- *
- * The photographs are ours, shot to one direction (periwinkle seamless, one soft key). They
- * are illustrative of the CATEGORY, not of any product in it — which is why a tile carries a
- * count and never a price.
+ * WHAT WE NEED FROM A CUSTOMER, by technique. Ours, not the supplier's — a manufacturer's
+ * feed describes the garment, not what a print shop needs to receive. `methods: []` means it
+ * applies to every one. Kept to a line each: this is the answer to "what do I send you", not
+ * a prepress manual, and it used to be a full-bleed plate of eight paragraphs under the fold.
  */
-const CATEGORIES: { key: string; img: string }[] = [
-  { key: "Apparel", img: "hoodie" },
-  { key: "Headwear", img: "cap" },
-  { key: "Bags", img: "bag" },
-  { key: "Other", img: "other" },
+const FILE_GUIDES: { label: string; body: string; methods: string[] }[] = [
+  { label: "File type", methods: [], body: "PNG with transparency, or a vector PDF/SVG/AI." },
+  { label: "Resolution", methods: [], body: "300 DPI at the size it will be printed." },
+  { label: "Colour", methods: ["DTG", "DTF", "SUB"], body: "sRGB — we convert for the printer." },
+  { label: "Stitch files", methods: ["EMB"], body: "Send .DST, .PES or .EMB and we run it as-is." },
+  { label: "Small text", methods: ["EMB"], body: "Under 5mm tall tends to close up in stitches." },
+  { label: "Placement", methods: [], body: "Tell us where it goes and how wide." },
 ]
 
-function FilterList({
-  head,
-  options,
-  value,
-  onChange,
-  className = "",
+const usd = (n: number) =>
+  `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/** Every technique this garment is offered in, one per entry. `methods` arrives as ONE
+ *  STRING PER ROW ("DTG printing / Embroidery"), so nothing means anything until it is split. */
+const techniquesOf = (methods: string[]) =>
+  [...new Set(methods.flatMap((m) => m.split("/").map((x) => x.trim()).filter(Boolean)))]
+
+/**
+ * PACK THE TILES INTO ROWS THAT ALWAYS SUM TO 12.
+ *
+ * The editorial rhythm is a cycle — a wide tile with a narrow one, then three equal ones,
+ * then the mirror — but a cycle applied blindly is exactly how a grid ends with one orphan
+ * above four empty cells, which is the defect the owner reads as "the layout seems undone".
+ * So the LAST row of every group is re-spanned to fill the width whatever is left over:
+ * one tile takes 12, two take 6 each, three take 4.
+ *
+ * Rows are explicit rather than implied by wrapping because the open panel has to know which
+ * row it belongs under — a `flex-wrap` grid has no row to ask about.
+ */
+/**
+ * EACH CATEGORY OPENS FOUR ACROSS, THEN RUNS SIX.
+ *
+ * This started much bigger and came down twice, which is worth recording because the
+ * instinct that made it big is the wrong one. Two tiles across the full width, then three:
+ * both read as a LOOKBOOK, and a lookbook is a different object from a catalogue. A
+ * catalogue's job is comparison — how many blanks are there, which is cheapest, which comes
+ * in the colour I want — and comparison needs several products in the eye at once. At
+ * three-up on a full-bleed page a single card was 440px and two of them filled the fold.
+ *
+ * The page carries no max width (that is the site's rhythm, not this page's choice), so a
+ * span is the only thing holding tile size down. Four-then-six lands at roughly 330px and
+ * 215px on a 1440 screen — small enough to scan a row, large enough to read a garment.
+ *
+ * The rhythm is still real: the opening row is half again the size of the run, which is what
+ * gives a group a beginning instead of just a first item.
+ */
+const OPENING = [3, 3, 3, 3]
+const RUN = [2, 2, 2, 2, 2, 2]
+
+type Cell<T> = { item: T; span: number; centre?: boolean }
+
+function packRows<T>(items: T[]): Cell<T>[][] {
+  const rows: Cell<T>[][] = []
+  let i = 0
+  let r = 0
+  while (i < items.length) {
+    const pattern = r === 0 ? OPENING : RUN
+    r += 1
+    const take = Math.min(pattern.length, items.length - i)
+    if (take === pattern.length) {
+      rows.push(pattern.map((span, k) => ({ item: items[i + k], span })))
+    } else {
+      /**
+       * THE TAIL, and the one case that needs saying.
+       *
+       * Re-spanning what is left so the row closes is what keeps a group from ending in the
+       * orphan-above-empty-cells shape. But `12 / take` sends a group of ONE to a full-width
+       * tile — and a category with a single product is not hypothetical, Bags has exactly one
+       * — which would print a 1376×1720 photograph of a duffel bag. That is not emphasis
+       * either; it is the same hole, wearing the product as a hat.
+       *
+       * So the tail is capped at a third of the width, and a lone tile is CENTRED instead of
+       * stretched. A centred tile reads as a decision; a left-aligned one with a void beside
+       * it reads as the layout having run out.
+       */
+      const span = Math.min(4, 12 / take)
+      rows.push(
+        Array.from({ length: take }, (_, k) => ({
+          item: items[i + k],
+          span,
+          centre: take === 1,
+        })),
+      )
+    }
+    i += take
+  }
+  return rows
+}
+
+/**
+ * SCALE VARIES, THE CROP DOES NOT — and that is the whole correction.
+ *
+ * The first cut of this gave the feature tile a LANDSCAPE frame, on the reasoning that a
+ * catalogue needs two shapes. It does, but not this way: every photograph in the catalogue
+ * is a portrait or square product shot, so a 16/11 `object-cover` frame took a band out of
+ * the middle of each one. A cap came out as an abstract close-up of its crown — the tile
+ * meant to be the most important thing on the row was the only one you could not identify.
+ *
+ * So there is ONE ratio and the rhythm comes from SIZE: a row of two, then a row of four.
+ * That reads as editorial for the reason a magazine spread does — the eye is given somewhere
+ * to land — while every garment stays whole, which is the thing a catalogue is FOR.
+ *
+ * Two breakpoints, because a quarter-width tile on a 768px screen is a thumbnail: below lg a
+ * feature runs full width and the rest go two-up. Tailwind needs finished class names, so
+ * these are a lookup rather than a template.
+ */
+const COL: Record<number, string> = {
+  2: "col-span-6 sm:col-span-4 lg:col-span-2",
+  3: "col-span-6 sm:col-span-4 lg:col-span-3",
+  4: "col-span-6 lg:col-span-4",
+  6: "col-span-12 lg:col-span-6",
+  12: "col-span-12",
+}
+/** A lone tail tile, placed in the middle four-of-twelve rather than left against a void. */
+const CENTRED = "col-span-6 sm:col-span-4 lg:col-span-3 lg:col-start-5"
+/** One frame for every tile — portrait, which is the shape the photography already is, and
+ *  only just: 5/6 rather than 4/5, because the extra height was white margin baked into the
+ *  supplier cut-outs rather than any more garment. */
+const RATIO = "aspect-[5/6]"
+
+/* ────────────────────────────────────────────────────────────────────────────
+   THE CARD
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function Card({
+  p,
+  span,
+  centre,
+  open,
+  onOpen,
 }: {
-  head: string
-  options: string[]
-  value: string
-  onChange: (v: string) => void
-  className?: string
+  p: PublicProduct
+  span: number
+  centre?: boolean
+  open: boolean
+  onOpen: () => void
 }) {
+  /** The colourway under the cursor. Hovering a swatch swaps the PHOTO, which is the one
+   *  thing a row of dots cannot say on its own — and it is why the swatches are here at all
+   *  rather than a count. Null is the product's default shot. */
+  const [peek, setPeek] = useState<number | null>(null)
+  const shot = (peek != null && p.colors[peek]?.image) || p.image
+
   return (
-    <div className={className}>
-      <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/40">{head}</p>
-      <ul className="mt-4 flex flex-col gap-2.5">
-        {options.map((o) => (
-          <li key={o}>
-            <button
-              type="button"
-              onClick={() => onChange(o)}
-              aria-pressed={value === o}
-              className={
-                "text-left text-[15px] transition-colors " +
-                (value === o ? "font-semibold text-ploy-ink" : "text-ploy-ink/55 hover:text-ploy-ink")
-              }
+    <motion.div {...reveal(0)} className={centre ? CENTRED : COL[span] ?? COL[3]}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-expanded={open}
+        className="block w-full text-left"
+      >
+        <motion.div
+          whileHover={{ y: -4 }}
+          transition={HOVER}
+          className={
+            "relative overflow-hidden rounded-[26px] bg-ploy-paper ring-2 transition-[box-shadow] " +
+            RATIO +
+            (open ? " ring-ploy-ink" : " ring-transparent")
+          }
+        >
+          {shot ? (
+            <Image
+              src={shot}
+              alt={p.name}
+              fill
+              sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 18vw"
+              className="object-cover"
+              /* The crop set in the product editor — the public surfaces were the last ones
+                 still ignoring it, so a product framed for the app arrived here uncropped. */
+              style={framingStyle(p)}
+            />
+          ) : (
+            /* An honest blank tile, never a placeholder mockup: §4, and the marketing-home
+               note about never reintroducing a fake render. */
+            <div className="grid h-full w-full place-items-center">
+              <span className="text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/35">
+                Photo coming
+              </span>
+            </div>
+          )}
+        </motion.div>
+      </button>
+
+      {/* STACKED, not name-left / price-right. A run tile is a sixth of the page, and a
+          two-column meta row inside it puts the price hard against a truncated name — which
+          is the crooked-column defect §4 describes, one tile at a time. The price keeps its
+          own line and its tabular figures, so the column of them still reads down the row. */}
+      <div className="mt-3">
+        <p className="truncate text-[15px] font-semibold">{p.name}</p>
+        <p className="mt-0.5 text-[13px] text-ploy-ink/55">
+          <span className="tabular-nums text-ploy-ink">
+            {p.priceVaries ? "from " : ""}
+            {usd(p.priceFrom ?? p.price)}
+          </span>
+          <span className="text-ploy-ink/35"> · </span>
+          {sizeRangeLabel(p.sizes)}
+        </p>
+      </div>
+
+      {p.colors.length > 0 && (
+        /* NOT a picker — the card is one button and these are inside it only visually. They
+           set the hovered photo and nothing else, so they are `aria-hidden` and unfocusable;
+           the real choice lives in the panel, where there is something for it to change. */
+        <div className="mt-2.5 flex items-center gap-1.5" onMouseLeave={() => setPeek(null)}>
+          {p.colors.slice(0, CARD_SWATCHES).map((c, i) => (
+            <span
+              key={c.name}
+              title={c.name}
+              aria-hidden
+              onMouseEnter={() => setPeek(i)}
+              className="size-3.5 shrink-0 cursor-pointer rounded-full border border-ploy-ink/15"
+              style={swatchChipStyle(c.name, c.image)}
+            />
+          ))}
+          {p.colors.length > CARD_SWATCHES && (
+            <span className="text-[12px] font-medium tabular-nums text-ploy-ink/45">
+              +{p.colors.length - CARD_SWATCHES}
+            </span>
+          )}
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
+/**
+ * ONE PICK, four call sites — colour aside, every choice in the panel is this button.
+ *
+ * Defined at module scope, not inside Panel: a component declared in a render body is a NEW
+ * TYPE on every render, so React unmounts and remounts the whole row each keystroke — which
+ * is what `react-hooks/static-components` exists to catch (§5).
+ *
+ * SHAPE SAYS KIND (§4). These are choices between options, so they carry a control's radius
+ * and a control's border, and the live one FILLS rather than growing a second shape.
+ */
+function Pick({ on, ...rest }: { on: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      {...rest}
+      className={
+        "rounded-[var(--radius-control)] border px-3.5 py-1.5 text-[14px] font-medium transition-colors " +
+        (on
+          ? "border-ploy-ink bg-ploy-ink text-ploy-ground"
+          : "border-ploy-ink/25 text-ploy-ink/70 hover:border-ploy-ink hover:text-ploy-ink")
+      }
+    />
+  )
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   THE PANEL — the configurator, in place
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function Panel({
+  p,
+  shipping,
+  specs,
+  onClose,
+}: {
+  p: PublicProduct
+  shipping: { extra: number } | null
+  /** undefined = not read yet · [] = read, none published · rows = the chart. */
+  specs: { size: string; spec: string; value: string }[] | undefined
+  onClose: () => void
+}) {
+  const [colorIdx, setColorIdx] = useState<number | null>(null)
+  const [size, setSize] = useState<string | null>(null)
+  const [method, setMethod] = useState<string | null>(null)
+  /** MULTI-SELECT, and the only one here: colour, size and technique are choices BETWEEN
+   *  options; placement is not — a garment can carry a front and a back, which is exactly
+   *  why it has a price. Empty means one print, which the base price already buys. */
+  const [sides, setSides] = useState<string[]>([])
+  const [allColors, setAllColors] = useState(false)
+
+  const methods = techniquesOf(p.methods)
+  const placements = p.sides ?? []
+  const sideFee = Number(p.sideFee ?? 0) || 0
+
+  /** A size with no tier of its own is charged the base — the same rule the server prices by. */
+  const priceOfSize = (s: string | null) =>
+    (s ? p.sizePrices?.find((t) => t.size === s)?.price : undefined) ?? p.price
+  /** ZERO WHEN UNKNOWN, never a guess: a method the table has no entry for adds nothing,
+   *  which is what methodAddOn() does too. */
+  const addOn = (m: string | null) => {
+    if (!m) return 0
+    const key = normTech(m)?.key
+    return (key && p.methodPrices?.[key]) || 0
+  }
+  const sidesAdd = sideFee > 0 ? sideFee * Math.max(0, sides.length - 1) : 0
+  const base = size ? priceOfSize(size) : p.priceFrom ?? p.price
+  const shown = base + addOn(method) + sidesAdd
+
+  const chosen = colorIdx == null ? null : p.colors[colorIdx] ?? null
+  const hero = chosen?.image ?? p.image
+
+  /** The colourways that actually carry a photo — what the arrows step through. Stepping
+   *  onto one without an image would blank the hero mid-browse. */
+  const shots = p.colors.map((c, i) => (c.image ? i : -1)).filter((i) => i >= 0)
+  const at = colorIdx == null ? -1 : shots.indexOf(colorIdx)
+  const step = (d: number) => {
+    if (!shots.length) return
+    setColorIdx(shots[at < 0 ? (d > 0 ? 0 : shots.length - 1) : (at + d + shots.length) % shots.length])
+  }
+
+  /** The techniques in play: the picked one, or all of them while nobody has picked. */
+  const inPlay = method && methods.includes(method) ? [method] : methods
+  const guides = FILE_GUIDES.filter(
+    (g) => g.methods.length === 0 || inPlay.some((m) => g.methods.some((k) => m.toUpperCase().includes(k))),
+  )
+
+  const specNames = [...new Set((specs ?? []).map((x) => x.spec))]
+  const sizeNames = [...new Set((specs ?? []).map((x) => x.size))]
+  const specAt = (z: string, n: string) => (specs ?? []).find((x) => x.size === z && x.spec === n)?.value ?? ""
+
+  return (
+    <div className="col-span-12 mt-2 overflow-hidden rounded-[26px] bg-ploy-paper">
+      {/**
+       * THREE COLUMNS, because two left half the band empty.
+       *
+       * The first cut gave the photograph `1fr` beside a 26rem column of picks. On a
+       * full-bleed band that made the picture ~700px wide and ~875 tall, and the picks ran
+       * out level with its middle — so the bottom-right quarter of an open product was blank
+       * page, which is the exact complaint this rewrite exists to answer. A photo taking
+       * every pixel it is offered is not the same as a photo that needed them.
+       *
+       * So the picture is capped, the picks keep their reading measure, and the prose that
+       * used to sit UNDER the photo — the description, the file guidance, the size chart —
+       * takes the third column instead of pushing the panel further down the page. Below lg
+       * the three stack in that order, which is also the order they are wanted in.
+       */}
+      <div className="relative grid gap-8 p-6 md:gap-10 md:p-10 lg:grid-cols-[minmax(0,19rem)_minmax(0,24rem)_minmax(0,1fr)]">
+        {/* The close belongs to the PANEL, not to a column — it was inside the picks header,
+            which put it in the middle of the band once there were three of them. */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-4 top-4 z-10 grid size-9 place-items-center rounded-full border border-ploy-ink/20 bg-ploy-paper text-ploy-ink/60 transition-colors hover:border-ploy-ink hover:text-ploy-ink"
+        >
+          ✕
+        </button>
+        {/* ── The picture ─────────────────────────────────────────────── */}
+        <div className="min-w-0">
+          {/* THE SAME FRAME AS THE CARDS, and for the same reason.
+              This was 4/3 with `object-contain`, which letterboxed every portrait cut-out —
+              a white garment on its own white background, with two grey rails down the sides
+              where the page ground showed through. It reads as a broken image rather than a
+              wide one. Cover at the card's own ratio crops almost nothing (the photography is
+              already about this shape) and never produces a bar. */}
+          <div className="relative aspect-[4/5] overflow-hidden rounded-[20px] bg-ploy-ground">
+            {hero ? (
+              <Image
+                src={hero}
+                alt={chosen ? `${p.name} — ${chosen.name}` : p.name}
+                fill
+                unoptimized
+                sizes="(max-width:768px) 100vw, 45vw"
+                className="object-cover"
+                style={framingStyle(p)}
+              />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-[13px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/35">
+                Photo coming
+              </div>
+            )}
+            {/* Only when there is somewhere to go: an arrow pair over one photo is a control
+                that lies about having a next. */}
+            {shots.length > 1 &&
+              ([-1, 1] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => step(d)}
+                  aria-label={d < 0 ? "Previous colour" : "Next colour"}
+                  className={
+                    "absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-ploy-ground text-ploy-ink transition-transform hover:scale-105 " +
+                    (d < 0 ? "left-3" : "right-3")
+                  }
+                >
+                  {d < 0 ? "‹" : "›"}
+                </button>
+              ))}
+          </div>
+
+        </div>
+
+        {/* ── The picks ───────────────────────────────────────────────── */}
+        <div className="min-w-0">
+          {(p.brand || p.category) && (
+            <p className="pr-12 text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
+              {[p.brand, p.category].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          <h3 className="mt-1.5 text-[26px] font-semibold leading-tight tracking-[-0.02em]">{p.name}</h3>
+
+          <div className="mt-5 border-y border-ploy-ink/12 py-5">
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              {/* "from" ONLY while no size is chosen. Once one is, this is not a range any
+                  more — it is that size's price, and still hedging it would be a lie. */}
+              {p.priceVaries && !size && (
+                <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-ploy-ink/45">from</span>
+              )}
+              <span className="text-[34px] font-semibold tabular-nums leading-none tracking-tight">
+                {usd(shown)}
+              </span>
+              {size && <span className="text-[13px] font-semibold text-ploy-ink/55">for {size}</span>}
+            </div>
+            {shipping && <ShippingFees first={p.ship} extra={shipping.extra} tone="marketing" className="mt-3" />}
+          </div>
+
+          {p.colors.length > 0 && (
+            <div className="mt-5">
+              <div className="flex items-baseline gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
+                <span>Colour · {p.colors.length}</span>
+                {chosen && (
+                  <span className="truncate text-[13px] normal-case tracking-normal text-ploy-ink">{chosen.name}</span>
+                )}
+              </div>
+              {/* A GRID ON A FIXED TRACK, not a wrapping flex row: 82 swatches in flex-wrap
+                  give every row a different count and a ragged right edge. */}
+              <div className="mt-3 grid grid-cols-[repeat(auto-fill,1.75rem)] gap-2.5">
+                {(allColors ? p.colors : p.colors.slice(0, PANEL_SWATCHES)).map((c, i) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => setColorIdx(i)}
+                    aria-pressed={colorIdx === i}
+                    aria-label={c.name}
+                    title={c.name}
+                    className={
+                      "size-7 rounded-full border transition-shadow " +
+                      (colorIdx === i
+                        ? "border-ploy-ink/25 ring-2 ring-ploy-ink ring-offset-2 ring-offset-ploy-paper"
+                        : "border-ploy-ink/20 hover:ring-2 hover:ring-ploy-ink/20 hover:ring-offset-2 hover:ring-offset-ploy-paper")
+                    }
+                    style={swatchChipStyle(c.name, c.image)}
+                  />
+                ))}
+              </div>
+              {p.colors.length > PANEL_SWATCHES && (
+                <button
+                  type="button"
+                  onClick={() => setAllColors((v) => !v)}
+                  className="mt-3 text-[13px] font-semibold underline underline-offset-4 text-ploy-ink/65 hover:text-ploy-ink"
+                >
+                  {allColors ? "Show fewer" : `Show all ${p.colors.length}`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {p.sizes.length > 0 && (
+            <div className="mt-5">
+              <div className="flex items-baseline gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
+                <span>Size · {p.sizes.length}</span>
+              </div>
+              {/* THE SHARED LADDER, not the stored order. A live row reads
+                  "S, M, XL, 3XL, 4XL, 2XL" — the order sizes happened to be entered — and
+                  printing that raw puts 2XL after 4XL in a row of buttons somebody is
+                  scanning for their own size. `bySize` is the same comparator the range
+                  label above already uses, so the two cannot disagree (§5). */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[...p.sizes].sort(bySize).map((s) => (
+                  <Pick key={s} on={size === s} onClick={() => setSize(size === s ? null : s)}>
+                    {s}
+                    {p.priceVaries && (
+                      <span className={"ml-2 text-[12px] tabular-nums " + (size === s ? "opacity-70" : "opacity-55")}>
+                        {usd(priceOfSize(s))}
+                      </span>
+                    )}
+                  </Pick>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {methods.length > 0 && (
+            <div className="mt-5">
+              <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
+                Technique · {methods.length}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {methods.map((m) => (
+                  <Pick key={m} on={method === m} onClick={() => setMethod(method === m ? null : m)}>
+                    {m}
+                    {addOn(m) > 0 && (
+                      <span className={"ml-2 text-[12px] tabular-nums " + (method === m ? "opacity-70" : "opacity-55")}>
+                        +{usd(addOn(m))}
+                      </span>
+                    )}
+                  </Pick>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {placements.length > 1 && (
+            <div className="mt-5">
+              <div className="flex items-baseline gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
+                <span>Placement · {placements.length}</span>
+                {/* The first face is free, and that belongs on the heading rather than in a
+                    sentence underneath it — §4 forbids prose under a control. */}
+                {sideFee > 0 && (
+                  <span className="normal-case tracking-normal text-ploy-ink/45">
+                    {usd(sideFee)} per extra
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {placements.map((sd) => (
+                  <Pick
+                    key={sd}
+                    on={sides.includes(sd)}
+                    onClick={() => setSides(sides.includes(sd) ? sides.filter((x) => x !== sd) : [...sides, sd])}
+                  >
+                    {SIDE_LABEL[sd] ?? sd}
+                  </Pick>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            <Link
+              href="/signup"
+              className="inline-block rounded-full bg-ploy-ink px-6 py-2.5 text-[15px] font-medium text-ploy-ground"
             >
-              {o}
-            </button>
-          </li>
-        ))}
-      </ul>
+              Start free
+            </Link>
+            <Link
+              href="/pricing"
+              className="inline-block rounded-full border border-ploy-ink/30 px-6 py-2.5 text-[15px] font-medium"
+            >
+              See pricing
+            </Link>
+          </div>
+
+        </div>
+
+        {/* ── The notes: what to send, what it is, how big ─────────────── */}
+        <div className="min-w-0">
+          {guides.length > 0 && (
+            <>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
+                What to send us{inPlay.length === 1 ? ` · ${inPlay[0]}` : ""}
+              </p>
+              <dl className="mt-3 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                {guides.map((g) => (
+                  <div key={g.label}>
+                    <dt className="text-[13px] font-semibold">{g.label}</dt>
+                    <dd className="text-[13px] leading-relaxed text-ploy-ink/55">{g.body}</dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          )}
+          {p.description && (
+            <p className="mt-6 max-w-prose border-t border-ploy-ink/12 pt-5 text-[13px] leading-relaxed text-ploy-ink/55">
+              {p.description}
+            </p>
+          )}
+
+          {/* THE SIZE CHART, where the sizes are — not a full section under a fold that most
+              products cannot fill. Only S&S publishes a measurement feed, so the common case
+              is no chart at all, and a heading over an apology is a section announcing its
+              own emptiness. */}
+          {specNames.length > 0 && (
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full min-w-[22rem] border-collapse text-[13px]">
+                <thead>
+                  <tr className="border-b border-ploy-ink/15 text-left">
+                    <th className="py-2 pr-3 font-semibold">Size</th>
+                    {specNames.map((n) => (
+                      <th key={n} className="py-2 pr-3 font-semibold">{n}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sizeNames.map((z) => (
+                    <tr key={z} className="border-b border-ploy-ink/8">
+                      <td className="py-2 pr-3 font-semibold">{z}</td>
+                      {specNames.map((n) => (
+                        <td key={n} className="py-2 pr-3 tabular-nums text-ploy-ink/65">{specAt(z, n)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+   THE PAGE
+   ──────────────────────────────────────────────────────────────────────────── */
+
 export function PloyProducts({
   products,
+  shipping,
   headline,
   accent,
   lead,
 }: {
   /** null means the read FAILED. [] means the catalogue is genuinely empty. §4 — those are
-   *  different facts and the block below says which. */
+   *  different facts and the page says which. */
   products: PublicProduct[] | null
+  /** The extra-item fee, from the same read as the products. The garment price without the
+   *  postage beside it is the half of the answer that flatters us. */
+  shipping: { extra: number } | null
   headline: string
   accent: string
   lead: string
 }) {
-  const railRef = useRef<HTMLDivElement>(null)
-  /* One card plus its gap, read off the DOM rather than assumed — the tile width changes at
-     md and a hardcoded step would overshoot on one of the two. */
-  const nudgeRail = (dir: 1 | -1) => {
-    const el = railRef.current
-    if (!el) return
-    const card = el.firstElementChild as HTMLElement | null
-    el.scrollBy({ left: dir * ((card?.offsetWidth ?? 240) + 16), behavior: "smooth" })
-  }
-
-  const [cat, setCat] = useState("All")
+  const [q, setQ] = useState("")
   const [method, setMethod] = useState("All")
+  const [openSlug, setOpenSlug] = useState<string | null>(null)
+  /** Size charts already read, by slug. A key present with `[]` means "asked, none
+   *  published" — which is what stops a product without a chart being re-requested. */
+  const [specs, setSpecs] = useState<Record<string, { size: string; spec: string; value: string }[]>>({})
 
-  /* Both lists are DERIVED from what the catalogue actually holds, so neither can offer an
-     option that matches nothing. Methods are split and normalised first — see methods-of.ts. */
-  const categories = useMemo(
-    () => ["All", ...[...new Set((products ?? []).map((p) => p.category).filter((c): c is string => !!c))].sort()],
-    [products],
-  )
+  const all = useMemo(() => products ?? [], [products])
+
   const methodTabs = useMemo(
-    () => ["All", ...normalizeMethods((products ?? []).flatMap((p) => p.methods ?? [])).map((m) => m.label)],
-    [products],
+    () => ["All", ...normalizeMethods(all.flatMap((p) => p.methods ?? [])).map((m) => m.label)],
+    [all],
   )
 
-  const visible = useMemo(
-    () =>
-      (products ?? []).filter(
-        (p) =>
-          (cat === "All" || p.category === cat) &&
-          (method === "All" || normalizeMethods(p.methods ?? []).some((m) => m.label === method)),
-      ),
-    [products, cat, method],
-  )
+  /**
+   * SEARCH ACROSS EVERYTHING A VISITOR MIGHT TYPE — the name, the brand, the category, the
+   * techniques and the COLOUR NAMES. "navy" is a real thing to search a blanks catalogue
+   * for, and a search that only matches the title makes the visitor learn our vocabulary.
+   *
+   * Never the sku or the blank: §2.9 withholds those from every unauthenticated surface,
+   * and a field you can SEARCH is a field you have published.
+   */
+  const visible = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    return all.filter((p) => {
+      if (method !== "All" && !normalizeMethods(p.methods ?? []).some((m) => m.label === method)) return false
+      if (!term) return true
+      const hay = [p.name, p.brand, p.category, ...(p.methods ?? []), ...p.colors.map((c) => c.name)]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+      return hay.includes(term)
+    })
+  }, [all, q, method])
+
+  /** Grouped by the catalogue's OWN categories, in the order they first appear, each opened
+   *  by a display word. A group with nothing in it does not draw. */
+  const groups = useMemo(() => {
+    const by = new Map<string, PublicProduct[]>()
+    for (const p of visible) {
+      const k = p.category || "Other"
+      const list = by.get(k)
+      if (list) list.push(p)
+      else by.set(k, [p])
+    }
+    return [...by.entries()]
+  }, [visible])
+
+  /**
+   * OPENING IS AN EVENT — a click — and never an effect watching a list (§2.8). Nothing here
+   * loads on scroll, on length, or on a page number, so there is no shape for a runaway
+   * loader to take.
+   *
+   * The URL moves with `pushState` so a deep link still resolves and BACK closes the panel
+   * rather than leaving the page — the static /catalog/<slug> route stays exactly as it is
+   * and keeps serving crawlers and anyone who arrives on the link cold.
+   */
+  const open = useCallback((slug: string) => {
+    setOpenSlug(slug)
+    /**
+     * PUSH ONCE, THEN REPLACE.
+     *
+     * Opening a second product while one is already open used to push again, so browsing
+     * six blanks buried /catalog six entries deep and BACK walked you back through them one
+     * at a time. Only the FIRST open is a navigation — after that the panel is a thing on
+     * the page being retargeted, so the entry is replaced and Back always means "close".
+     */
+    const nested = !!window.history.state?.egCatalog
+    const next = { ...(window.history.state ?? {}), egCatalog: slug }
+    if (nested) window.history.replaceState(next, "", `/catalog/${slug}`)
+    else window.history.pushState(next, "", `/catalog/${slug}`)
+  }, [])
+  /** Closing UNDOES the entry rather than adding another, so the history stays the length
+   *  the visitor's own navigation made it. `popstate` is what actually clears the state —
+   *  which is also what makes BACK and this button do exactly the same thing. */
+  const close = useCallback(() => {
+    if (window.history.state?.egCatalog) window.history.back()
+    else setOpenSlug(null)
+  }, [])
+
+  useEffect(() => {
+    const onPop = () => setOpenSlug(null)
+    /* ESCAPE GOES THROUGH close(), not straight to state. It used to call setOpenSlug(null)
+       itself, which shut the panel and left the address bar on a product that was no longer
+       open — and the next Back then appeared to do nothing at all. */
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close() }
+    window.addEventListener("popstate", onPop)
+    window.addEventListener("keydown", onKey)
+    return () => {
+      window.removeEventListener("popstate", onPop)
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [close])
+
+  /**
+   * THE ONE THING THAT IS FETCHED, and why it cannot loop.
+   *
+   * Everything the panel draws is already in the list payload. The supplier size chart is
+   * not, deliberately — it costs a supplier call per product, so /api/public/products omits
+   * it and the detail route adds it. It is read once per slug, on open.
+   *
+   * The condition is `a slug is open AND we have not asked for it yet`, and the fetch's own
+   * result makes that FALSE — including on failure, which writes `[]` so a product with no
+   * chart is never asked for twice. That is the direction §2.8 requires: a fetch must not be
+   * able to re-satisfy the condition that started it.
+   */
+  useEffect(() => {
+    if (!openSlug || specs[openSlug]) return
+    let live = true
+    getPublicProduct(openSlug)
+      .then((r) => { if (live) setSpecs((s) => ({ ...s, [openSlug]: r.product.specs ?? [] })) })
+      .catch(() => { if (live) setSpecs((s) => ({ ...s, [openSlug]: [] })) })
+    return () => { live = false }
+  }, [openSlug, specs])
+
+  const openProduct = openSlug ? all.find((p) => p.slug === openSlug) ?? null : null
 
   return (
     <div className="bg-ploy-ground text-ploy-ink">
-      {/* ── THE OPENER: TYPE ON THE GROUND ────────────────────────────────
-          It was a giant periwinkle card carrying one garment at full height. Two things were
-          wrong with it: the rail directly below shows that same garment among seven others, so
-          the card said nothing the next section did not say better — and every other page here
-          (/pricing, /how-it-works, /integrations) opens with plain type on the page ground, so
-          this was the one page whose opener was a different KIND of thing. Type, then the
-          photography, then the products. */}
+      {/* ── THE MASTHEAD ─────────────────────────────────────────────── */}
       <section className={`${GUTTER} ${TOP}`}>
-        {/* NO OBJECT IN THIS HEADLINE. The chrome sits in the next heading, and the two are on
-            screen together at the top of the page — one object twice in a viewport reads as a
-            repeat rather than as a motif. The opener is type; the rail below is the picture. */}
         <h1 className="ploy-display text-[clamp(2.4rem,6vw,5rem)]">
           <motion.span {...reveal(0)} className="block">{headline}</motion.span>
           <motion.span {...reveal(0.1)} className="block">{accent}</motion.span>
@@ -154,206 +813,121 @@ export function PloyProducts({
         <motion.p {...reveal(0.2)} className="mt-6 max-w-xl text-[17px] leading-relaxed text-ploy-ink/70">
           {lead}
         </motion.p>
-        <motion.div {...reveal(0.3)} className="mt-8 flex flex-wrap items-center gap-3">
-          <motion.div whileHover={{ scale: 1.03 }} transition={HOVER}>
-            <Link href="/signup" className="inline-block rounded-full bg-ploy-ink px-7 py-3 text-[15px] font-medium text-ploy-ground">
-              Start free
-            </Link>
-          </motion.div>
-          <motion.div whileHover={{ scale: 1.03 }} transition={HOVER}>
-            <Link href="/pricing" className="inline-block rounded-full border border-ploy-ink/30 px-7 py-3 text-[15px] font-medium text-ploy-ink">
-              See pricing
-            </Link>
-          </motion.div>
-        </motion.div>
       </section>
 
-      {/* ── THE CATEGORIES ────────────────────────────────────────────────────
-          It was a rail of eight garments under an eyebrow reading "the blanks we keep". Two
-          problems: the eyebrow was a caption nobody needed, and the row was a scroll with no
-          control on it — the last tile was clipped with no way to reach it. These are the
-          catalogue's OWN four categories now, each a button that sets the filter below, with
-          arrows so the row is navigable rather than merely scrollable. */}
+      {/* ── THE BAR: a rule under the live word, never a tray of capsules ──
+          §4 — tabs and filter rows are a rule under the live word, and the search sits on
+          the same line because it filters the same list. The 190px sidebar this replaces
+          cost more page than it saved on a catalogue of two dozen. */}
       <section className={`${GUTTER} ${SECTION}`}>
-        <div className="mb-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => nudgeRail(-1)}
-            aria-label="Previous categories"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-ploy-ink/25 text-ploy-ink/70 transition-colors hover:bg-ploy-paper"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            onClick={() => nudgeRail(1)}
-            aria-label="Next categories"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-ploy-ink text-ploy-ground"
-          >
-            ›
-          </button>
-        </div>
-
-        <div ref={railRef} className="ploy-rail flex gap-3 overflow-x-auto pb-2 md:gap-4">
-          {CATEGORIES.map((c, i) => {
-            const n = (products ?? []).filter((p) => p.category === c.key).length
-            if (products && n === 0) return null
-            const live = cat === c.key
-            return (
-              <motion.button
-                key={c.key}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4 border-b border-ploy-ink/15 pb-3">
+          <label className="flex min-w-[15rem] flex-1 items-center gap-2">
+            <span aria-hidden className="text-[15px] text-ploy-ink/40">⌕</span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search a garment, brand or colour"
+              className="w-full bg-transparent text-[15px] outline-none placeholder:text-ploy-ink/35"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-5">
+            {methodTabs.map((m) => (
+              <button
+                key={m}
                 type="button"
-                {...reveal(0.05 * i)}
-                onClick={() => { setCat(live ? "All" : c.key); document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth", block: "start" }) }}
-                aria-pressed={live}
-                className="w-[210px] shrink-0 text-left md:w-[260px]"
+                onClick={() => setMethod(m)}
+                aria-pressed={method === m}
+                className={
+                  "relative pb-3 -mb-3 text-[14px] transition-colors " +
+                  (method === m
+                    ? "font-semibold text-ploy-ink after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-ploy-ink"
+                    : "text-ploy-ink/50 hover:text-ploy-ink")
+                }
               >
-                <div className={"aspect-[4/5] overflow-hidden rounded-2xl bg-ploy-sky ring-2 transition-all " + (live ? "ring-ploy-ink" : "ring-transparent")}>
-                  <Image
-                    src={`/ploy/blank/${c.img}.webp`}
-                    alt={`${c.key} we print on`}
-                    width={960}
-                    height={1200}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <p className="mt-3 text-[16px] font-semibold">{c.key}</p>
-                <p className="mt-0.5 text-[13px] text-ploy-ink/55">
-                  {products === null ? "—" : `${n} ${n === 1 ? "product" : "products"}`}
-                </p>
-              </motion.button>
-            )
-          })}
+                {m}
+              </button>
+            ))}
+          </div>
+          <span className="ml-auto shrink-0 text-[13px] tabular-nums text-ploy-ink/45">
+            {products === null ? "—" : `${visible.length} of ${all.length}`}
+          </span>
         </div>
       </section>
 
-      {/* ── THE CATALOGUE: A LIST TO FILTER BY, AND THE PRODUCTS ──────────────
-          It was a periwinkle band with a row of tabs across it, and the tabs were built from
-          the raw `methods` entries — which are COMPOUND strings in the live data, so it
-          offered "DTG printing / Embroidery / Appliqué / Laser / DTF printing" as if that
-          were one method, beside a separate tab reading "DTG". See methods-of.ts.
-
-          The filter is a plain list in a column now: no band, no pills, no chrome. It is the
-          shape a catalogue filter has everywhere because it is the one that works — you can
-          see every option at once, the current one is legible, and it costs a click rather
-          than a horizontal scroll. Two lists, ANDed, and a count in the heading so the
-          filter's effect is visible without scrolling the grid. */}
-      <section className={`${GUTTER} ${SECTION}`} id="catalogue">
-        <h2 className="ploy-display text-[clamp(2rem,4.4vw,3.8rem)]">
-          <motion.span {...reveal(0)} className="block">
-            Products{products ? ` (${visible.length})` : ""}
-          </motion.span>
-        </h2>
-
+      {/* ── THE CATALOGUE ────────────────────────────────────────────── */}
+      <section className={`${GUTTER} ${SECTION} pb-4`}>
         {products === null ? (
-          <p className="mt-8 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
+          <p className="max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
             The catalogue could not be loaded just now. This is our end, not yours — the
             products are still there.{" "}
             <Link href="/contact" className="underline underline-offset-4">Tell us</Link> if it stays this way.
           </p>
-        ) : products.length === 0 ? (
-          <p className="mt-8 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
-            Nothing is published to the public catalogue yet. The blanks above are what the
-            factory keeps — <Link href="/signup" className="underline underline-offset-4">start free</Link> and
-            you can order any of them.
+        ) : all.length === 0 ? (
+          <p className="max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
+            Nothing is published to the public catalogue yet.{" "}
+            <Link href="/signup" className="underline underline-offset-4">Start free</Link> and you can
+            order any blank the factory keeps.
+          </p>
+        ) : visible.length === 0 ? (
+          <p className="text-[16px] leading-relaxed text-ploy-ink/70">
+            Nothing matches that.{" "}
+            <button
+              type="button"
+              onClick={() => { setQ(""); setMethod("All") }}
+              className="underline underline-offset-4"
+            >
+              Clear it
+            </button>
+            .
           </p>
         ) : (
-          <div className="mt-10 grid gap-10 md:grid-cols-[190px_1fr] md:gap-12">
-            {/* The list STICKS, so it is still there when you are six rows down — the whole
-                point of a sidebar over a tab strip. `top-24` clears the fixed header. */}
-            <aside className="md:sticky md:top-24 md:self-start">
-              <FilterList
-                head="Category"
-                options={categories}
-                value={cat}
-                onChange={setCat}
-              />
-              <FilterList
-                head="Print method"
-                options={methodTabs}
-                value={method}
-                onChange={setMethod}
-                className="mt-8 border-t border-ploy-ink/10 pt-8"
-              />
-            </aside>
+          groups.map(([cat, list], gi) => (
+            <div key={cat} className={gi === 0 ? "" : "mt-16"}>
+              <div className="mb-6 flex items-baseline gap-3">
+                <h2 className="ploy-display text-[clamp(1.6rem,3.2vw,2.8rem)]">{cat}</h2>
+                <span className="text-[13px] tabular-nums text-ploy-ink/45">{list.length}</span>
+              </div>
 
-            <div>
-              {visible.length === 0 ? (
-                <p className="text-[16px] leading-relaxed text-ploy-ink/70">
-                  Nothing matches that pair yet. <button type="button" onClick={() => { setCat("All"); setMethod("All") }} className="underline underline-offset-4">Clear the filters</button>.
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
-                  {visible.map((p, i) => (
-                    <motion.div key={p.slug} {...reveal(0.03 * Math.min(i, 8))} whileHover={{ y: -4 }} transition={HOVER}>
-                      <Link href={`/catalog/${p.slug}`} className="block">
-                        {/* SQUARE, NOT 4:5. Three tall frames on a wide screen made one product
-                            fill the fold, so scanning the catalogue meant scrolling it. Four
-                            square ones show a row at a glance, which is what a grid is for. */}
-                        <div className="aspect-square overflow-hidden rounded-2xl bg-ploy-paper">
-                          {/* The image is served from OUR url — the public shape resolves the
-                              supplier's address server-side, so it never reaches this markup
-                              (§2.9). No image is an honest blank tile, never a placeholder. */}
-                          {p.image ? (
-                            <Image src={p.image} alt={p.name} width={600} height={600} loading="lazy" className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="h-full w-full" />
-                          )}
-                        </div>
-                        {/* THE COLOURWAYS, DIRECTLY UNDER THE PHOTO (owner's call, 2026-09-09).
-                            The line below already said "10 colours", which is a COUNT — it
-                            tells you how many there are and nothing about which, so a buyer
-                            deciding between two garments had to open both. The swatches are
-                            the same object the app's product page uses (swatchChipStyle),
-                            at the size that reads without becoming a second control: this is
-                            a card, not a picker, so nothing here is clickable and the whole
-                            card stays one link.
-                            EIGHT, then a count. A supplier style carries forty-plus, and a
-                            wall of dots under every tile is the grid's shape gone. */}
-                        {p.colors?.length ? (
-                          <div className="mt-3 flex items-center gap-1.5">
-                            {p.colors.slice(0, 8).map((c) => (
-                              <span
-                                key={c.name}
-                                title={c.name}
-                                aria-hidden
-                                className="size-3.5 shrink-0 rounded-full border border-ploy-ink/15"
-                                style={swatchChipStyle(c.name, c.image)}
-                              />
-                            ))}
-                            {p.colors.length > 8 && (
-                              <span className="text-[12px] font-medium tabular-nums text-ploy-ink/45">+{p.colors.length - 8}</span>
-                            )}
-                          </div>
-                        ) : null}
-                        <p className="mt-3 truncate text-[15px] font-semibold">{p.name}</p>
-                        {/* WHAT YOU NEED TO TELL TWO PRODUCTS APART: how many colourways, what
-                            sizes, and the price. `sizeRangeLabel` is the shared ladder — the
-                            stored order is arbitrary ("S, M, XL, 3XL, 4XL, 2XL" on a live row),
-                            so printing it raw would read as noise.
-
-                            NO SKU, and that is not an omission: a blank's sku maps to supplier
-                            stock, so §2.9 withholds it from every unauthenticated surface. The
-                            public API does not publish it and this page could not show it. */}
-                        {/* THE COUNT WENT WITH THE SWATCHES ARRIVING. "10 colours" above a
-                            row of ten dots is the same fact twice, and the overflow chip
-                            already says how many did not fit. Sizes stay: there is no
-                            swatch for a size range. */}
-                        <p className="mt-1 text-[13px] text-ploy-ink/55">{sizeRangeLabel(p.sizes)}</p>
-                        <p className="mt-0.5 text-[14px] font-medium tabular-nums text-ploy-ink">
-                          {p.priceVaries ? "from " : ""}${Number.isInteger(p.priceFrom ?? p.price) ? (p.priceFrom ?? p.price) : (p.priceFrom ?? p.price).toFixed(2)}
-                        </p>
-                      </Link>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
+              {packRows(list).map((row, ri) => {
+                const openHere = row.some((c) => c.item.slug === openSlug)
+                return (
+                  <div key={ri} className="mb-4 grid grid-cols-12 gap-4 md:mb-6 md:gap-6">
+                    {row.map(({ item, span, centre }) => (
+                      <Card
+                        key={item.slug}
+                        p={item}
+                        span={span}
+                        centre={centre}
+                        open={item.slug === openSlug}
+                        onOpen={() => (item.slug === openSlug ? close() : open(item.slug))}
+                      />
+                    ))}
+                    <AnimatePresence initial={false}>
+                      {openHere && openProduct && (
+                        <motion.div
+                          key={openProduct.slug}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.42, ease: [0.22, 0.68, 0, 1] }}
+                          className="col-span-12 overflow-hidden"
+                        >
+                          <Panel
+                            p={openProduct}
+                            shipping={shipping}
+                            specs={specs[openProduct.slug]}
+                            onClose={close}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )
+              })}
             </div>
-          </div>
+          ))
         )}
       </section>
-
     </div>
   )
 }
