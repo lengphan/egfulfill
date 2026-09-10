@@ -2,9 +2,11 @@ import type { ComponentType } from "react"
 import {
   X, Plus, LinkSimple, CurrencyDollar, ArrowRight, PencilSimple, Printer,
   Barcode, Truck, PaperPlaneTilt, CheckCircle, File, ArrowUUpLeft, Stack,
-  Storefront, ShieldCheck,
+  Storefront, ShieldCheck, PlugsConnected, Plugs, UserSwitch, Trash, Prohibit,
 } from "@phosphor-icons/react"
 import type { AuditRow } from "@/lib/api"
+// The one money formatter (lib/order-format), not a second one here — §5.
+import { usd } from "@/lib/order-format"
 
 /**
  * The ONE place an audit action becomes words + an icon, so every history feed (order page,
@@ -38,6 +40,30 @@ const REGISTRY: Record<string, { label: string; verb: string; icon: ActionMeta["
   "shipping.label_bought":    { label: "Label bought",      verb: "bought a shipping label",            icon: Truck },
   // Buyer-data retention — who changed the policy, and when.
   "pii.retention.configured": { label: "Retention changed", verb: "changed the buyer-data retention policy", icon: ShieldCheck },
+  /* A SHOP CHANGING HANDS, both directions. Connecting is a change of OWNERSHIP as much as
+     a setup step — platform_connections is unique per shop, so a connect moves it off
+     whoever held it — and a disconnect stops the sync with no other visible symptom than
+     orders quietly not arriving. Neither was recorded at all until now. */
+  "etsy.connected":       { label: "Shop connected",    verb: "connected an Etsy shop",     icon: PlugsConnected },
+  "shopify.connected":    { label: "Shop connected",    verb: "connected a Shopify store",  icon: PlugsConnected },
+  "tiktok.connected":     { label: "Shop connected",    verb: "connected a TikTok shop",    icon: PlugsConnected },
+  "etsy.disconnected":    { label: "Shop disconnected", verb: "disconnected an Etsy shop",  icon: Plugs },
+  "shopify.disconnected": { label: "Shop disconnected", verb: "disconnected a Shopify store", icon: Plugs },
+  "tiktok.disconnected":  { label: "Shop disconnected", verb: "disconnected a TikTok shop", icon: Plugs },
+  /* THE DECISION, as distinct from the ledger row it produces. wallet_ledger already says
+     the balance moved; these say who decided it should, which is the half a dispute needs. */
+  "wallet.ledger":    { label: "Balance adjusted", verb: "adjusted a balance",   icon: CurrencyDollar },
+  "topup.confirmed":  { label: "Top-up approved", verb: "approved a top-up",       icon: CurrencyDollar },
+  "topup.rejected":   { label: "Top-up rejected", verb: "rejected a top-up",       icon: Prohibit },
+  "payout.paid":      { label: "Payout sent",     verb: "sent a payout",           icon: CurrencyDollar },
+  "payout.rejected":  { label: "Payout rejected", verb: "rejected a payout request", icon: Prohibit },
+  /* ACCOUNT LIFECYCLE. All three were falling through the humaniser, which turned
+     "user.transferred" into the bare word "transferred" — true, and silent about what moved
+     where. The object builder below reads the recorded before/after for the rest. */
+  "user.transferred": { label: "Account moved",   verb: "moved an account's balance", icon: UserSwitch },
+  "user.deleted":     { label: "Account deleted", verb: "deleted an account",       icon: Trash },
+  "user.created":     { label: "Account created", verb: "created an account",       icon: Plus },
+  "user.updated":     { label: "Account changed", verb: "changed an account",       icon: PencilSimple },
   /* MONEY MOVED ON THIS ORDER. Both fell through to the humaniser — "Fee" and "Refund" —
      which is the right default and the wrong words here: "Fee" reads as one of OUR costs
      rather than something charged to the seller, and a reversal is not the same act as
@@ -94,7 +120,9 @@ export const ACTION_CATEGORIES: ActionCategory[] = [
   // job, one of them unfindable.
   { key: "fulfilment", label: "Fulfilment",  prefixes: ["label.", "shipping.", "dispatch.", "manifest", "consignment."] },
   { key: "design",     label: "Design",      prefixes: ["design"] },
-  { key: "money",      label: "Money",       prefixes: ["wallet.", "billing.", "topup"] },
+  // "payout" was missing, so money going OUT — the largest single act in the ledger —
+  // could not be filtered for while money coming in could.
+  { key: "money",      label: "Money",       prefixes: ["wallet.", "billing.", "topup", "payout"] },
   { key: "users",      label: "Users & team", prefixes: ["user.", "seller.", "team"] },
   { key: "catalog",    label: "Catalog",     prefixes: ["catalog"] },
   { key: "email",      label: "Email",       prefixes: ["broadcast.", "email_branding"] },
@@ -179,6 +207,52 @@ export function actionDetail(r: AuditRow, resolveLine?: (key: string) => string 
       }
       const keys = Object.keys(a).filter((k) => WORD[k] && JSON.stringify(a[k]) !== JSON.stringify(b[k]))
       return keys.map((k) => WORD[k]).join(" · ")
+    }
+    /* A SHOP, BY NAME. The entity id is the platform's own shop id — "88rush3" or a TikTok
+       open_id — which names nothing to a reader. */
+    case "etsy.connected": case "shopify.connected": case "tiktok.connected":
+      return str("shop_name") || str("shop_id")
+    case "etsy.disconnected": case "shopify.disconnected": case "tiktok.disconnected":
+      return String(b.shop_name ?? b.shop_id ?? "")
+    /* MONEY ROWS CARRY THE AMOUNT AND WHOSE IT WAS. Without both, four approvals in a row
+       are four identical lines and the log answers nothing it was opened for. */
+    case "topup.confirmed": case "topup.rejected":
+      return [a.amount_usd != null ? usd(Number(a.amount_usd)) : "", str("seller"), str("ref")]
+        .filter(Boolean).join(" · ")
+    case "payout.paid": case "payout.rejected":
+      return [a.amount_usd != null ? usd(Number(a.amount_usd)) : "", str("seller"), str("rail")]
+        .filter(Boolean).join(" · ")
+    /* WHAT MOVED, AND WHERE TO. "moved an account's balance" alone is the shape this file
+       exists to prevent — the amount and the destination are the whole content. */
+    case "user.transferred": {
+      const amount = a.movedAmount != null ? usd(Number(a.movedAmount)) : ""
+      const n = Number(a.movedOrders) || 0
+      const orders = n ? `${n} order${n === 1 ? "" : "s"}` : ""
+      const left = Number(a.connectionsLeftBehind) || 0
+      return [[amount, orders].filter(Boolean).join(" · "),
+              str("to") ? `→ ${str("to")}` : "",
+              left ? `${left} shop${left === 1 ? "" : "s"} left behind` : ""].filter(Boolean).join(" · ")
+    }
+    /* A HAND-MOVED BALANCE. This is the one money row an admin types themselves, and it read
+       as a bare "Ledger" with the amount and the reason both recorded and neither shown —
+       the reason especially, since an unexplained entry in a money ledger is the thing the
+       route itself refuses to accept without. */
+    case "wallet.ledger":
+      return [a.delta != null ? usd(Number(a.delta)) : "", str("note") || str("type")]
+        .filter(Boolean).join(" · ")
+    case "user.deleted":
+      return String(a.email ?? b.email ?? "")
+    case "user.updated": {
+      /* An account change is several different acts sharing one action name, and the one a
+         reader is looking for is usually the identity change or the lock-out. Both are said
+         in words; anything else falls back to naming the fields that moved. */
+      const parts: string[] = []
+      if (a.email != null && b.email != null && a.email !== b.email) parts.push(`${String(b.email)} → ${String(a.email)}`)
+      if (typeof a.active === "boolean") parts.push(a.active ? "reactivated" : "deactivated")
+      if (a.password === "reset") parts.push("password reset")
+      if (a.role != null) parts.push(`role ${String(a.role)}`)
+      if (a.plan != null) parts.push(`plan ${String(a.plan)}`)
+      return parts.join(" · ")
     }
     default:
       return ""

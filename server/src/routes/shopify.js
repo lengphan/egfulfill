@@ -505,6 +505,11 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
         const conn = (await q(`select * from platform_connections where platform='shopify' and shop_id=$1`, [shop])).rows[0];
         if (conn) backfill = await syncShopifyConnection(conn);
       } catch (e) { backfill = { error: e.message }; }
+      // A CONNECT IS A CHANGE OF HANDS. Nothing recorded it, so "when did this shop start
+      // syncing, and who authorised it" had no answer anywhere — while the disconnect that
+      // ends it was equally silent. Both are in the log now, under Channels.
+      audit(req, 'shopify.connected', { entityType: 'connection', entityId: String(shop),
+        after: { platform: 'shopify', shop_id: String(shop), shop_name: shopName } });
       return { ok: true, shop_id: shop, shop_name: shopName, scopes: t.scope || SCOPES, webhooks, backfill };
     } catch (e) {
       reply.code(400); return { error: e.message };
@@ -605,8 +610,17 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
 
   app.delete('/api/shopify/connections/:shop_id', { preHandler: requireAuth }, async (req) => {
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    // The NAME, read before the row goes. A log entry saying "dev-1" names nothing to the
+    // person reading it a month later; the shop id is the platform's handle, not a label.
+    const was = (await q(
+      `select shop_name from platform_connections where platform='shopify' and shop_id=$1`,
+      [req.params.shop_id]).catch(() => ({ rows: [] }))).rows[0] || {};
     if (staff) await q(`delete from platform_connections where platform='shopify' and shop_id=$1`, [req.params.shop_id]);
     else await q(`delete from platform_connections where platform='shopify' and shop_id=$1 and connected_by=$2`, [req.params.shop_id, req.user.sub]);
+    // Disconnecting STOPS THE SYNC. The orders already here stay, so the only visible
+    // symptom later is that new ones never arrive — which is unanswerable without this row.
+    audit(req, 'shopify.disconnected', { entityType: 'connection', entityId: String(req.params.shop_id),
+      before: { platform: 'shopify', shop_id: String(req.params.shop_id), shop_name: was.shop_name || null } });
     return { ok: true };
   });
 

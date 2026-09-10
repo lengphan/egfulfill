@@ -7,6 +7,7 @@
 // a DEBIT (negative delta) instead of a credit, and paying is gated to admin/warehouse
 // because it moves money OUT.
 import { q } from '../db.js';
+import { audit } from '../audit.js';
 import { canMoveMoney } from '../auth.js';
 import { balanceOf } from './wallet.js';
 import { sendMail, mailConfigured } from '../mailer.js';
@@ -381,6 +382,16 @@ export function payoutsRoutes(app, requireAuth) {
         entityId: String(rec.id),
       });
     }
+    /* MONEY OUT — the largest single act on this screen, and it recorded a ledger row and a
+       notification but nothing in Activity. The ledger says the balance moved; this says WHO
+       decided it moved, on which rail, and against what proof. */
+    audit(req, 'payout.paid', {
+      entityType: 'payout', entityId: String(rec.id),
+      before: { status: 'pending' },
+      after: { seller: rec.seller_email || rec.seller_id, amount_usd: amount,
+               rail: (rec.paid_method && (rec.paid_method.type || rec.paid_method.method)) || null,
+               proof: rec.proof ? 'attached' : null },
+    });
     return rec;
   });
 
@@ -392,6 +403,13 @@ export function payoutsRoutes(app, requireAuth) {
       [req.params.id, req.user.sub]
     );
     if (!r.rows[0]) { reply.code(404); return { error: 'Not found or already processed' }; }
+    /* No ledger movement, so this decision left NO trace anywhere — the one shape that is
+       genuinely invisible without an audit row. */
+    audit(req, 'payout.rejected', {
+      entityType: 'payout', entityId: String(r.rows[0].id),
+      before: { status: 'pending' },
+      after: { seller: r.rows[0].seller_email || r.rows[0].seller_id, amount_usd: r.rows[0].amount_usd },
+    });
     return r.rows[0];
   });
 }

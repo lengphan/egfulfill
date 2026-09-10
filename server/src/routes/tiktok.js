@@ -7,6 +7,7 @@
 import crypto from 'node:crypto';
 import { descriptionHtml } from '../listing-description.js';
 import { q } from '../db.js';
+import { audit } from '../audit.js';
 import { takenByAnother } from '../connections.js';
 import { recordUsage } from '../usage.js';
 import { clampDays, windowStartSec } from '../backfill.js';
@@ -738,6 +739,11 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
            updated_at=now()`,
         [shopId, shopName, d.access_token, d.refresh_token, expires, scopes, req.user.sub, bd]
       );
+      // A CONNECT IS A CHANGE OF HANDS. Nothing recorded it, so "when did this shop start
+      // syncing, and who authorised it" had no answer anywhere — while the disconnect that
+      // ends it was equally silent. Both are in the log now, under Channels.
+      audit(req, 'tiktok.connected', { entityType: 'connection', entityId: String(shopId),
+        after: { platform: 'tiktok', shop_id: String(shopId), shop_name: shopName } });
       return { ok: true, shop_id: shopId, shop_name: shopName, scopes };
     } catch (e) {
       // The client only sees e.message, which hides WHERE it came from (TikTok's token
@@ -751,8 +757,17 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   // Disconnect. Sellers can only remove their own; staff can remove any.
   app.delete('/api/tiktok/connections/:shop_id', { preHandler: requireAuth }, async (req) => {
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    // The NAME, read before the row goes. A log entry saying "dev-1" names nothing to the
+    // person reading it a month later; the shop id is the platform's handle, not a label.
+    const was = (await q(
+      `select shop_name from platform_connections where platform='tiktok' and shop_id=$1`,
+      [req.params.shop_id]).catch(() => ({ rows: [] }))).rows[0] || {};
     if (staff) await q(`delete from platform_connections where platform='tiktok' and shop_id=$1`, [req.params.shop_id]);
     else await q(`delete from platform_connections where platform='tiktok' and shop_id=$1 and connected_by=$2`, [req.params.shop_id, req.user.sub]);
+    // Disconnecting STOPS THE SYNC. The orders already here stay, so the only visible
+    // symptom later is that new ones never arrive — which is unanswerable without this row.
+    audit(req, 'tiktok.disconnected', { entityType: 'connection', entityId: String(req.params.shop_id),
+      before: { platform: 'tiktok', shop_id: String(req.params.shop_id), shop_name: was.shop_name || null } });
     return { ok: true };
   });
 

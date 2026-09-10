@@ -4,6 +4,7 @@
 // an admin/staff confirms, status flips to 'received' and the seller's wallet
 // (polling its own top-ups) credits itself.
 import { q } from '../db.js';
+import { audit } from '../audit.js';
 import { isStaff } from '../auth.js';
 import { sendMail, mailConfigured } from '../mailer.js';
 import { notify } from './notifications.js';
@@ -228,6 +229,15 @@ export function topupsRoutes(app, requireAuth) {
         ).catch(() => {});
       }
     }
+    /* MONEY IN, and until now the only trace was a wallet_ledger row. That records the
+       CREDIT; it does not record the decision, so "who approved this transfer, and against
+       what reference" was unanswerable from Activity. Both halves matter when a top-up is
+       later disputed. */
+    audit(req, 'topup.confirmed', {
+      entityType: 'topup', entityId: String(rec.id),
+      after: { seller: rec.seller_email, amount_usd: rec.amount_usd, vnd: rec.vnd,
+               method: rec.method || null, ref: rec.ref || null },
+    });
     return rec;
   });
 
@@ -287,6 +297,13 @@ export function topupsRoutes(app, requireAuth) {
       [req.params.id, req.user.sub]
     );
     if (!r.rows[0]) { reply.code(404); return { error: 'Not found or already processed' }; }
+    /* A REJECTION IS A DECISION ABOUT SOMEBODY'S MONEY — often against a transfer they have
+       already made — and it left no trace at all: the request simply left the pending list. */
+    audit(req, 'topup.rejected', {
+      entityType: 'topup', entityId: String(r.rows[0].id),
+      before: { status: 'pending' },
+      after: { seller: r.rows[0].seller_email, amount_usd: r.rows[0].amount_usd, ref: r.rows[0].ref || null },
+    });
     return r.rows[0];
   });
 }

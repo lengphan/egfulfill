@@ -442,6 +442,9 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
    */
   app.delete('/api/users/:id', { preHandler: requireAdmin }, async (req, reply) => {
     if (req.params.id === req.user.sub) { reply.code(400); return { error: "You can't delete your own account" }; }
+    // Read the account BEFORE removing it — the audit row has to name who was deleted, and
+    // after the delete the id resolves to nothing.
+    const gone = (await q('select email, role from users where id=$1', [req.params.id])).rows[0] || {};
     let orders = 0;
     let ledger = 0;
     try {
@@ -471,7 +474,10 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
       };
     }
     await q('delete from users where id=$1', [req.params.id]);
-    audit(req, 'user.deleted', { entityType: 'user', entityId: req.params.id });
+    // The ADDRESS, not just the id. The row is gone, so the id resolves to nothing from here
+    // on — an audit entry that names only a dead uuid cannot answer "who was deleted".
+    audit(req, 'user.deleted', { entityType: 'user', entityId: req.params.id,
+      after: { email: gone.email || null, role: gone.role || null } });
     return { ok: true };
   });
 }
