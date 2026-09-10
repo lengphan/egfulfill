@@ -12,6 +12,7 @@
 import { q } from '../db.js';
 import { egSendTo } from '../events.js';
 import { pushToUsers } from './push.js';
+import { CHANNELS, pushableIds, mutedChannels, setMuted } from '../notify-prefs.js';
 
 let _ready = null;
 export function ensureNotifications() {
@@ -84,14 +85,17 @@ export async function notify({ userIds, roles, type, title, body, href, entityId
      * to Expo inside it would put a third party in the path of shipping an order. It swallows
      * internally too; the .catch is belt and braces.
      */
-    pushToUsers(ids, {
+    /* THE PHONE IS OPT-OUT-ABLE, THE RECORD IS NOT. A muted channel drops out here and
+       nowhere else — the row above is already written and the bell has already rung, so
+       turning something off quietens the pocket without erasing the history. */
+    pushableIds(ids, type).then((phoneIds) => phoneIds.length && pushToUsers(phoneIds, {
       title,
       body,
       // The href is the WEB's route. The phone maps it to its own — that mapping is
       // presentation and belongs on the client, so the server keeps sending one canonical
       // address and every front-end resolves it the way its own router works.
       data: { kind: type, href: href || null, entityId: entityId ? String(entityId) : null },
-    }).catch(() => {});
+    })).catch(() => {});
   } catch (e) {
     // Swallow: a missed bell must never break the action that caused it.
   }
@@ -99,6 +103,23 @@ export async function notify({ userIds, roles, type, title, body, href, entityId
 
 export function notificationRoutes(app, requireAuth) {
   ensureNotifications().catch(() => {});
+
+  /* WHICH PUSHES YOU WANT. The channels come from the server rather than being typed into
+     each front-end: a channel added here appears on the phone and the web without either
+     of them shipping, and neither can invent one that nothing emits into. */
+  app.get('/api/notification-prefs', { preHandler: requireAuth }, async (req) => {
+    const muted = await mutedChannels(req.user.sub).catch(() => []);
+    return {
+      channels: CHANNELS.map(({ key, label }) => ({ key, label, on: !muted.includes(key) })),
+    };
+  });
+
+  app.put('/api/notification-prefs', { preHandler: requireAuth }, async (req, reply) => {
+    const { channel, on } = req.body || {};
+    const ok = await setMuted(req.user.sub, String(channel || ''), !on);
+    if (!ok) { reply.code(400); return { error: 'Unknown channel.' }; }
+    return { ok: true };
+  });
 
   // The bell: recent notifications + unread count.
   // The bell reads the top of this list; the notifications PAGE pages through all of

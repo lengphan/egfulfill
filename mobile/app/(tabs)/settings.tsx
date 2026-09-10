@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react"
-import { View, Text, ScrollView, Pressable, Alert, Linking } from "react-native"
+import { View, Text, ScrollView, Pressable, Alert, Linking, Switch } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import { Ionicons } from "@expo/vector-icons"
-import { getMe, clearToken, getConnections, type User, type StoreConnection } from "@/lib/api"
+import { getMe, clearToken, getConnections, getNotifyPrefs, setNotifyPref, type User, type StoreConnection, type NotifyChannel } from "@/lib/api"
 import { enablePush, disablePush, pushState, type PushState } from "@/lib/push"
 import { useFocusEffect } from "expo-router"
 import { TAB_BAR,F,C, R, CARD } from "@/lib/theme"
@@ -62,6 +62,7 @@ export default function Settings() {
      differently for each, because a screen still loading and an account with no shops must
      not look the same. */
   const [conns, setConns] = useState<StoreConnection[] | null>(null)
+  const [chans, setChans] = useState<NotifyChannel[] | null>(null)
 
   const load = useCallback(async () => {
     try { setMe(await getMe()); setErr(null) }
@@ -69,6 +70,7 @@ export default function Settings() {
     /* Its own try: a connections failure must not blank the account block above it, which
        is the more important of the two and answered fine. */
     try { setConns(await getConnections()) } catch { setConns([]) }
+    try { setChans((await getNotifyPrefs()).channels) } catch { setChans([]) }
   }, [])
   /* RELOAD WHEN YOU COME BACK TO IT, not once and never again.
    *
@@ -223,6 +225,14 @@ export default function Settings() {
       </View>
 
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>ALERTS</Text>
+      {/* WHAT EACH SWITCH DOES, and it is narrower than it looks: it stops the PUSH. The
+          notification is still written and the in-app bell still rings, so nothing vanishes
+          from the app — "don't buzz my pocket about this" and "pretend it never happened"
+          are different requests and only the first one has a switch here.
+
+          The channels are the SERVER'S list. The phone holding its own copy is how a screen
+          ends up offering a switch nothing emits into — the prototype asked for "Hold raised"
+          and "Delivered", and neither exists as a notification type, so neither is offered. */}
       <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
         <Line
           label="Notifications"
@@ -271,6 +281,43 @@ export default function Settings() {
       {pushWhy ? (
         <Text style={{ fontSize: 13, color: C.warn, marginTop: 8, paddingHorizontal: 4 }}>{pushWhy}</Text>
       ) : null}
+
+      {chans && chans.length > 0 && (
+        <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
+          {chans.map((c, i) => (
+            <View
+              key={c.key}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 12,
+                paddingHorizontal: 16, paddingVertical: 9,
+                borderBottomWidth: i === chans.length - 1 ? 0 : 1, borderBottomColor: C.border,
+              }}
+            >
+              <Text style={{ fontSize: 15, fontFamily: F.body, color: C.fg, flex: 1 }}>{c.label}</Text>
+              <Switch
+                value={c.on}
+                /* NOT THE OS GREEN. Emerald is a reserved status colour here — it means an
+                   order shipped — and a settings toggle borrowing it puts a stage colour on
+                   a screen that has no stages. Ink is what "on" looks like everywhere else
+                   in this app. */
+                trackColor={{ false: C.border, true: C.ink }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor={C.border}
+                /* Optimistic, and it puts the switch BACK if the server refuses. A toggle
+                   that waits for a round trip feels broken; one that lies about the result
+                   is worse. */
+                onValueChange={(next) => {
+                  setChans((prev) => prev?.map((x) => (x.key === c.key ? { ...x, on: next } : x)) ?? prev)
+                  setNotifyPref(c.key, next).catch(() => {
+                    setChans((prev) => prev?.map((x) => (x.key === c.key ? { ...x, on: !next } : x)) ?? prev)
+                    Alert.alert("Couldn't save that", "The change didn't reach the server.")
+                  })
+                }}
+              />
+            </View>
+          ))}
+        </View>
+      )}
 
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>APP</Text>
       <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>

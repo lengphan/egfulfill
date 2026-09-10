@@ -663,3 +663,28 @@ export async function getConnections(): Promise<StoreConnection[]> {
   )
   return parts.flat()
 }
+
+
+/**
+ * WHICH PUSHES THIS PERSON WANTS.
+ *
+ * The channel list comes FROM the server — the phone does not hold its own copy, because a
+ * switch is only honest if something actually emits into it, and only the server knows which
+ * notification types exist. A channel added there appears here without the app shipping.
+ *
+ * `on` is the plain reading: true means the phone buzzes. A muted channel still writes its
+ * notification row and still rings the in-app bell — turning one off quietens the pocket, it
+ * does not erase the history.
+ */
+export type NotifyChannel = { key: string; label: string; on: boolean }
+
+export function getNotifyPrefs() {
+  return request<{ channels: NotifyChannel[] }>("/api/notification-prefs")
+}
+
+export function setNotifyPref(channel: string, on: boolean) {
+  return request<{ ok: boolean }>("/api/notification-prefs", {
+    method: "PUT",
+    body: JSON.stringify({ channel, on }),
+  })
+}
