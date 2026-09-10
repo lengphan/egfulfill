@@ -27,6 +27,101 @@ import { F,C, R } from "@/lib/theme"
 const usd0 = (n: number) => `$${Math.round(n).toLocaleString()}`
 const vnd0 = (n: number) => `${Math.round(n).toLocaleString()} ₫`
 
+/**
+ * THE AMOUNT, SET WITH A THUMB.
+ *
+ * A grid of preset buttons answers "one of these five" and nothing else — $250 meant typing
+ * on a numeric pad, which on this screen is the step people abandon. A ruler you drag
+ * answers every amount at the same cost, and it lands on the presets on the way past.
+ *
+ * IT IS A ScrollView, not a PanResponder. The feel people mean by "finger meter" is
+ * MOMENTUM — you flick it and it coasts and settles — and that is the platform's scroll
+ * physics, not something worth re-deriving. Snapping falls out of snapToInterval, so the
+ * value can never land between two steps.
+ *
+ * TWO-WAY WITHOUT A LOOP, AND WITHOUT TRUSTING AN EVENT. Typing and the presets also set
+ * the amount, so the ruler must follow them; but the ruler setting the amount must not
+ * re-scroll the ruler. The first version gated onScroll on onScrollBeginDrag having fired,
+ * which is true of a finger and NOT of a wheel or a programmatic scroll — driven under test
+ * the ruler moved 350pt and the field never left blank. A control that reports nothing when
+ * one event is missed is the wrong shape. So onScroll ALWAYS reports, and the follow effect
+ * skips when the incoming value is the one this component last emitted.
+ */
+function AmountScrub({ value, min, max, step, onChange }: {
+  value: number; min: number; max: number; step: number; onChange: (n: number) => void
+}) {
+  const PX = 14                        // one step of money, in points of travel
+  const ref = useRef<ScrollView>(null)
+  /** The last value this ruler produced, so the effect below can tell its own echo from a
+   *  change that came from the field or a preset. */
+  const emitted = useRef<number | null>(null)
+  const [w, setW] = useState(0)
+  const steps = Math.max(1, Math.round((max - min) / step))
+  const offsetFor = (v: number) => ((Math.min(max, Math.max(min, v)) - min) / step) * PX
+
+  /*
+   * Follow the field and the presets; ignore our own echo.
+   *
+   * NOT ANIMATED, and that is the whole correctness of it. A glided scrollTo emits an
+   * onScroll at every frame ALONG THE WAY, and each one reported the value it was passing
+   * through — so tapping $500 wrote 10, then 20, then 30, and the last frame to land before
+   * React settled won. Measured: the preset produced $10. An instant set emits ONE event, at
+   * the destination, which equals what we just recorded as emitted and is therefore skipped.
+   * A preset is a discrete choice; it should land, not travel.
+   */
+  useEffect(() => {
+    if (!w || value === emitted.current) return
+    emitted.current = value
+    ref.current?.scrollTo({ x: offsetFor(value), animated: false })
+  }, [value, w])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    /* A WELL, so it reads as something you operate. Loose ticks on the page ground read as
+       decoration — shape says kind here as everywhere else, and this one is a field. */
+    <View
+      onLayout={(e) => setW(e.nativeEvent.layout.width)}
+      style={{ marginTop: 12, height: 46, borderRadius: R.control, backgroundColor: C.accent, overflow: "hidden" }}
+    >
+      <ScrollView
+        ref={ref}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={PX}
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const n = Math.min(max, Math.max(min, min + Math.round(e.nativeEvent.contentOffset.x / PX) * step))
+          if (n === emitted.current) return
+          emitted.current = n
+          onChange(n)
+        }}
+        /* Half the width of padding at each end, so step zero sits under the centre mark
+           rather than at the left edge. */
+        contentContainerStyle={{ paddingHorizontal: w / 2 }}
+      >
+        {Array.from({ length: steps + 1 }, (_, i) => {
+          const major = i % 5 === 0
+          return (
+            <View key={i} style={{ width: PX, alignItems: "center", justifyContent: "center", height: 46 }}>
+              <View style={{
+                width: major ? 2 : 1, height: major ? 22 : 11, borderRadius: 1,
+                backgroundColor: major ? C.edge : C.muted, opacity: major ? 1 : 0.45,
+              }} />
+            </View>
+          )
+        })}
+      </ScrollView>
+      {/* THE MARK IS FIXED AND THE RULER MOVES — the other way round would mean reading a
+          value off a moving pointer, which is what makes a slider hard to land precisely. */}
+      <View pointerEvents="none" style={{
+        position: "absolute", left: "50%", marginLeft: -1.5, top: 7, bottom: 7,
+        width: 3, borderRadius: 2, backgroundColor: C.ink,
+      }} />
+    </View>
+  )
+}
+
+
 export default function TopUp() {
   const insets = useSafeAreaInsets()
   /**
@@ -355,6 +450,17 @@ export default function TopUp() {
                 {usdAmt > 0 && rate > 0 ? `≈ ${vnd0(vndAmt)}` : "·"}
               </Text>
             </View>
+
+            {/* The ruler is bounded by what the server allows below and a ceiling of ten
+                minimums or the largest preset, whichever is further — a ruler that runs to
+                a number nobody tops up is mostly empty travel. */}
+            <AmountScrub
+              value={usdAmt}
+              min={0}
+              max={Math.max(minUsd * 10, ...(presets.length ? presets : [minUsd]), 500)}
+              step={10}
+              onChange={(n) => { setAmount(String(n)); setErr(null) }}
+            />
 
             {presets.length > 0 && (
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
