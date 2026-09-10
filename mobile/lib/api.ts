@@ -147,6 +147,10 @@ export type Order = {
    *  ("Pending") means a seller submitted and was charged, so it is not a position a
    *  factory order can occupy. See nextStage in lib/orders.ts. */
   factory_order?: boolean | null
+  /** The order's own scratchpad. `held_from` lives here — the stage a hold interrupted, and
+   *  the only stage the gate will let a held order return to. The phone never carried it,
+   *  so a held order resolved its way back to Draft. */
+  meta?: Record<string, unknown> | null
   rush?: boolean
   created_at?: string | null
   ship_by?: string | null

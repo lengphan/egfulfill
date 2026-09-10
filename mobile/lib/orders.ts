@@ -1,7 +1,7 @@
 import type { Order } from "./api"
 import {
   PIPELINE, STAGE_LABEL, normalizeStage, isOpenStage, isException,
-  nextStage as nextStageOn, stageDenialReason, canSetStage, isFactoryOrder,
+  nextStage as nextStageOn, stageDenialReason, canSetStage, isFactoryOrder, heldFromOf,
   isOverdueBy, DEFAULT_OVERDUE_DAYS, plainNum, platformFromId, orderRefLabel, unitsOfItems,
   recordedRevenue,
 } from "@shared/order-rules"
@@ -24,7 +24,7 @@ import {
  * role × stage matrix and fails if they ever answer differently.
  */
 export {
-  PIPELINE, STAGE_LABEL, normalizeStage, isException, stageDenialReason, canSetStage,
+  PIPELINE, STAGE_LABEL, normalizeStage, isException, stageDenialReason, canSetStage, heldFromOf,
   isFactoryOrder, plainNum, recordedRevenue,
 }
 /** The stage as a person reads it. Raw ids ("working", "in_review") were being printed

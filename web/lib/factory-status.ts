@@ -21,7 +21,7 @@
 // thing that only stays harmless while it stays unreachable.
 import { STATUS_TONE } from "@/lib/status-tone"
 import {
-  normalizeStage, isException, isFactoryOrder, nextStage, stageDenialReason, canSetStage,
+  normalizeStage, isException, isFactoryOrder, nextStage, stageDenialReason, canSetStage, heldFromOf,
   isMoneyStage, lineFor, posOf,
 } from "@/shared/order-rules"
 
@@ -41,7 +41,7 @@ import {
  * whole role x stage matrix and fails if they ever disagree.
  */
 export {
-  normalizeStage, isException, isFactoryOrder, nextStage, stageDenialReason, canSetStage,
+  normalizeStage, isException, isFactoryOrder, nextStage, stageDenialReason, canSetStage, heldFromOf,
   isMoneyStage,
 }
 
@@ -219,12 +219,14 @@ export function stagePath(current: string | null | undefined, target: string, is
  * Only true for a genuine SKIP (two or more steps). One step is an ordinary move and
  * doesn't need a confirmation.
  */
-export function canWalk(role: string, current: string | null | undefined, target: string, isFactory?: boolean): boolean {
+export function canWalk(role: string, current: string | null | undefined, target: string, isFactory?: boolean, holdFrom?: string | null): boolean {
   const path = stagePath(current, target, isFactory)
   if (!path || path.length < 2) return false
   let at = normalizeStage(current)
   for (const s of path) {
-    if (stageDenialReason(role, at, s, isFactory) !== null) return false
+    /* `holdFrom` only ever applies to the FIRST step — after it the order is off hold, and
+       carrying it further would let a walk step past the block one stage at a time. */
+    if (stageDenialReason(role, at, s, isFactory, at === "on_hold" ? holdFrom : null) !== null) return false
     at = s
   }
   return true
@@ -238,10 +240,10 @@ export function canWalk(role: string, current: string | null | undefined, target
 // A greyed row is for a move this role may not make; this stage doesn't EXIST for this
 // order, and listing it would put the seller queue's name in the menu of an order that can
 // never belong there. Every other stage still shows with its reason.
-export function stageOptionsFor(role: string, current: string | null | undefined, isFactory?: boolean): FactoryStage[] {
+export function stageOptionsFor(role: string, current: string | null | undefined, isFactory?: boolean, holdFrom?: string | null): FactoryStage[] {
   return ALL_STATUSES
     .filter((s) => !(isFactory && s.id === "in_review"))
-    .filter((s) => canSetStage(role, current, s.id, isFactory))
+    .filter((s) => canSetStage(role, current, s.id, isFactory, holdFrom))
 }
 
 export const TONE_CLASS: Record<FactoryTone, string> = {

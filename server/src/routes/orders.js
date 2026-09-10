@@ -193,7 +193,7 @@ function skipsPipeline(current, target, isFactory = false) {
  * derived from the owner's role). It selects which line the adjacency rules read; see the note
  * on FACTORY_LINE. Defaults false, so a caller that doesn't know is held to the stricter line.
  */
-export function stageDenial(role, current, target, isFactory = false) {
+export function stageDenial(role, current, target, isFactory = false, holdFrom = null) {
   const at = normalizeStage(current), to = normalizeStage(target);
 
   // SKIPPING IS DENIED FOR EVERYONE, admin included. This is not a permission — it is
@@ -231,6 +231,36 @@ export function stageDenial(role, current, target, isFactory = false) {
   }
   if (at === 'refunded' && to !== 'refunded') {
     return 'This order was refunded. That is the end of it.';
+  }
+
+  /**
+   * A HOLD IS A BLOCK ON THE LINE. Every role, admin included.
+   *
+   * It was a LABEL: nothing here refused anything, so a held order could be approved,
+   * printed and shipped by whichever board reached it next — and the person who held it
+   * found out afterwards. A stop that only the person who applied it can see is not a stop.
+   *
+   * THE ONLY WAY OUT IS BACK TO WHERE IT STOPPED. `hold_from` is the stage the hold
+   * interrupted, so returning to it advances nothing — it undoes the stop. Every other
+   * pipeline stage is an ADVANCEMENT past a block somebody put there deliberately, and
+   * that is the thing this exists to refuse. Take the hold off first; then the ladder
+   * applies again as normal, one stage at a time.
+   *
+   * CANCEL AND REFUND STAY OPEN, because a held order is very often one that is about to
+   * be one of those two, and making someone resume production to cancel is backwards.
+   *
+   * An old hold that recorded no `hold_from` falls back to `draft` — matching the menu,
+   * and the one stage that asserts nothing about production having started.
+   *
+   * Mirrors stageDenialReason in web/lib/factory-status.ts.
+   */
+  if (at === 'on_hold' && to !== 'on_hold' && to !== 'cancelled' && to !== 'refunded') {
+    // '' IS Draft here — normalizeStage collapses new/draft/pending onto it — so an
+    // unknown prior stage lands there, and the label has to be spelled out for it.
+    const back = normalizeStage(holdFrom || '');
+    if (to !== back) {
+      return `This order is on hold. Take the hold off first — it goes back to ${STAGE_LABEL[back] || 'Draft'}.`;
+    }
   }
 
   /**
@@ -2333,11 +2363,13 @@ export function ordersRoutes(app, requireAuth) {
      */
     if (isStaff(req.user) && (body.factoryStatus !== undefined || body.status !== undefined)) {
       const want = normalizeStage(String(body.factoryStatus ?? body.status ?? ''));
-      const cur = await q('select factory_status, factory_order from orders where id=$1', [req.params.id])
+      // `meta` comes along for held_from: a hold's only legal exit is back to the stage it
+      // interrupted, and stageDenial can't know that without the row. See the on-hold rule.
+      const cur = await q('select factory_status, factory_order, meta from orders where id=$1', [req.params.id])
         .then((r) => r.rows[0]).catch(() => null);
       const recordingLabel = body.tracking !== undefined && want === 'shipped';
       if (cur && !recordingLabel) {
-        const denial = stageDenial(String(req.user.role || ''), cur.factory_status, want, cur.factory_order === true);
+        const denial = stageDenial(String(req.user.role || ''), cur.factory_status, want, cur.factory_order === true, cur.meta && cur.meta.held_from);
         if (denial) { reply.code(403); return { error: denial }; }
       }
     }
@@ -2762,13 +2794,13 @@ export function ordersRoutes(app, requireAuth) {
     // the same round trip rather than a second query — this runs once per line item, and a
     // batch move walks every line of the order.
     const pre = await q(
-      `select i.factory_status, coalesce(o.factory_order, false) as factory_order
+      `select i.factory_status, coalesce(o.factory_order, false) as factory_order, o.meta
          from order_items i join orders o on o.id = i.order_id
         where i.order_id=$1 and i.${key}=$2 limit 1`, [req.params.id, val]);
     if (!pre.rows[0]) { reply.code(404); return { error: 'item not found' }; }
     // Role gate — see stageDenial. Read the CURRENT stage first: an operator's reach
     // depends on where the item already is, not just where they're sending it.
-    const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status, pre.rows[0].factory_order);
+    const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status, pre.rows[0].factory_order, pre.rows[0].meta && pre.rows[0].meta.held_from);
     if (denial) { reply.code(403); return { error: denial }; }
     // Shipping is an ORDER-level claim even when set per item: a parcel can't go out
     // half-made. Everything before shipped stays per-item and unrestricted.

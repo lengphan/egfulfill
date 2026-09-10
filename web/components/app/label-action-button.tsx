@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { voidLabel, type OrderRow } from "@/lib/api"
 import { useConfirm } from "@/components/app/confirm-dialog"
+import { normalizeStage } from "@/lib/factory-status"
 
 /**
  * The order's label control, with two states so it's obvious at a glance whether a label
@@ -32,6 +33,21 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
  const [busy, setBusy] = useState(false)
  const labelUrl = order.tracking_label_url || ""
  const hasLabel = !!labelUrl
+  /**
+   * A HELD ORDER DOES NOT BUY POSTAGE.
+   *
+   * This control had no stage gate of ANY kind — so an order somebody had stopped still
+   * offered Create label, and pressing it spent money and made a promise to the buyer on
+   * the one order that was flagged as not ready to go out. The stage gate could not catch
+   * it either: buying a label is not a stage change, so nothing in stageDenial sees it.
+   *
+   * DOWNLOAD AND REFUND STAY OPEN, and that is not an oversight. Opening a PDF that already
+   * exists changes nothing, and refunding is the UNDO — a held order is very often one
+   * whose label needs voiding, and making someone lift the hold to void it would mean
+   * releasing the order to the floor in order to stop it going out.
+   */
+ const held = normalizeStage(order.factory_status) === "on_hold"
+ const heldWhy = tl("labelActionButton", "This order is on hold — remove the hold first.")
 
   /*
    * BUYING A SECOND LABEL COSTS AGAIN, and nothing on the way there said so — "Create
@@ -43,6 +59,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
    * damaged stock, a changed address), it just must not happen by accident.
    */
  const createAnother = async () => {
+ if (held) return
  const ok = await confirm({
  title: tl("labelActionButton", "This order already has a label"),
  body: `A label was already bought for this order${order.tracking ? ` (${order.tracking})` : ""}. Creating another buys a SECOND label and charges again — the first stays valid unless you refund it.`,
@@ -72,9 +89,14 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
 
  if (!hasLabel) {
  return (
-      <Button variant="outline" size="sm" onClick={onOpenLabel}>
-        {tl("labelActionButton", "Create label")}
-      </Button>
+      /* The reason rides on a wrapper, not the button: `buttonVariants` sets
+         `disabled:pointer-events-none`, so a disabled button never fires the hover its own
+         title needs. Same pattern as ApproveOrderButton. */
+      <span title={held ? heldWhy : undefined}>
+        <Button variant="outline" size="sm" disabled={held} onClick={onOpenLabel}>
+          {tl("labelActionButton", "Create label")}
+        </Button>
+      </span>
     )
   }
 
@@ -112,7 +134,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
  slip, Cancel order, Approve), so a truck and a plus here were the only marks in
  the row and read as decoration on the one action that spends money. The CARET
  stays: it is not a picture of the action, it is what says there is a menu. */}
-          <DropdownMenuItem onClick={createAnother}>{tl("labelActionButton", "Create another label")}</DropdownMenuItem>
+          <DropdownMenuItem disabled={held} title={held ? heldWhy : undefined} onClick={createAnother}>{tl("labelActionButton", "Create another label")}</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={refund}><span className="text-alert">{tl("labelActionButton", "Refund label")}</span></DropdownMenuItem>
         </DropdownMenuContent>

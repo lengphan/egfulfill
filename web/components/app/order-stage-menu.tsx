@@ -4,7 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { DotsThree } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, canSetStage, stageDenialReason, canWalk, isFactoryOrder } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, canSetStage, stageDenialReason, canWalk, isFactoryOrder, heldFromOf } from "@/lib/factory-status"
 import { updateOrder, type OrderRow } from "@/lib/api"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
@@ -47,7 +47,18 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   // rule below reads it, so the menu offers the same moves the API would accept.
   const fac = isFactoryOrder(order)
   const next = nextStage(stage, fac)
-  const canAdvance = !!next && canSetStage(role, stage, next, fac)
+  /**
+   * A HOLD BLOCKS THIS MENU TOO, and that is the whole point of it being a hold.
+   *
+   * The row menu in the hub and this one are the same set of moves on the same order, so a
+   * hold that stopped one and not the other would just mean opening the order to get past
+   * it. `held` reaches the things the stage gate cannot see — buying a label is not a stage
+   * change — and `holdFrom` feeds the gate itself, which then greys every stage row with
+   * the server's own sentence on it.
+   */
+  const held = normalizeStage(stage) === "on_hold"
+  const holdFrom = held ? heldFromOf(order) : null
+  const canAdvance = !!next && canSetStage(role, stage, next, fac, holdFrom)
   const canShip = !!canFulfill && !stopped && !!onNewLabel
 
   const setOrderStatus = async (to: string) => {
@@ -67,8 +78,8 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   // legally WALK to it (a confirmed catch-up rather than an outright refusal).
   const withReason = (list: typeof FACTORY_STAGES) =>
     list.map((s) => {
-      const deny = stageDenialReason(role, stage, s.id, fac)
-      return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id, fac) }
+      const deny = stageDenialReason(role, stage, s.id, fac, holdFrom)
+      return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id, fac, holdFrom) }
     })
   // Pending is left OUT for a factory order rather than greyed: a disabled row means "you
   // may not", and this is "this order can't be there at all". Every other stage still lists
@@ -79,8 +90,13 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   /** On hold is a STOP, not a stage — it has to be leavable from the same menu that set it.
    *  `resumeTo` is where the order goes back to: what it was doing before, when the order
    *  remembers, else Working, which is what "carry on" means. */
-  const isOnHold = normalizeStage(stage) === "on_hold"
-  const resumeTo = String((order as { meta?: { held_from?: string } } | null)?.meta?.held_from || "") || "working"
+  const isOnHold = held
+  /* `heldFromOf` reads BOTH spellings — see its docblock. The fallback is "" (Draft), not
+     Working: the server refuses every target but this one now, so a guess is a refusal, and
+     Draft is the stage that asserts nothing about production having started. */
+  const resumeTo = normalizeStage(holdFrom || "")
+  /* "" finds nothing in FACTORY_STAGES because Draft is not one — it is the absence of one. */
+  const resumeLabel = FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? tl("orderStageMenu", "Draft")
 
   const onStage = async (s: { id: string; label: string; deny: string | null; walk: boolean }) => {
     if (s.walk) {
@@ -159,12 +175,10 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
                 "catch up" does above, and in the title for anyone who wants it spelled out. */}
             <DropdownMenuItem
               onClick={() => setOrderStatus(resumeTo)}
-              title={`Puts this back to ${FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? tl("orderStageMenu", "Working")} — where it was when it was held`}
+              title={`Puts this back to ${resumeLabel} — where it was when it was held`}
             >
-              {tl("orderStageMenu", "Clear hold")}
-              <span className="ml-auto text-2xs text-muted-foreground">
-                {FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? tl("orderStageMenu", "Working")}
-              </span>
+              {tl("orderStageMenu", "Remove Hold")}
+              <span className="ml-auto text-2xs text-muted-foreground">{resumeLabel}</span>
             </DropdownMenuItem>
           </>
         )}

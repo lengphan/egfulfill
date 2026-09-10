@@ -9,7 +9,7 @@ import {
 } from "@/lib/api"
 import {
   normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines, PIPELINE,
-  STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder, recordedRevenue,
+  STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder, recordedRevenue, heldFromOf,
 } from "@/lib/orders"
 import { F,C, R, CARD_INK, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
@@ -211,12 +211,15 @@ export default function OrderDetail() {
    * web (stageDenialReason is a port of it), so a control that is dead here is dead there.
    */
   const isFactory = isFactoryOrder(o)
-  const denial = o && to ? stageDenialReason(role, stage, to, isFactory) : null
+  /* A HOLD BLOCKS THE LINE, and the phone is a board like any other. `held_from` is the one
+     target the gate still allows — pass it, or the phone refuses the hold's own release. */
+  const heldFrom = heldFromOf(o)
+  const denial = o && to ? stageDenialReason(role, stage, to, isFactory, heldFrom) : null
   /* Asked SEPARATELY, because Confirm shipment is not the next rung on the ladder — it is a
      camera, an upload and a post to the order's activity BEFORE the stage write. An
      operator can never set `shipped`, so leaving this ungated meant photographing a parcel
      and uploading it every time only to be refused at the last step. */
-  const shipDenial = o ? stageDenialReason(role, stage, "shipped", isFactory) : null
+  const shipDenial = o ? stageDenialReason(role, stage, "shipped", isFactory, heldFrom) : null
   const items = o?.items ?? []
   const late = o ? isOverdue(o) : false
   /**

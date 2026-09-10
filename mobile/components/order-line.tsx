@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, setItemStatus, getEmbPreview, type OrderItem, type OrderDesign } from "@/lib/api"
 import {
   designsFor, lineArt, lineListing, lineTitle, lineFacts, nextLineStage, normalizeStage,
-  STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork, stageDenialReason, isFactoryOrder,
+  STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork, stageDenialReason, isFactoryOrder, heldFromOf,
 } from "@/lib/orders"
 import { F,C, R } from "@/lib/theme"
 import { ImagePeek } from "@/components/order-row"
@@ -102,7 +102,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
   const to = nextLineStage(item, order)
   /* Same rules as the web (a port of stageDenialReason), so a line control that is dead on
      the phone is dead on the board too — and the reason is the same sentence. */
-  const denial = to ? stageDenialReason(role ?? "", stage, to, isFactoryOrder(order)) : null
+  const denial = to ? stageDenialReason(role ?? "", stage, to, isFactoryOrder(order), heldFromOf(order)) : null
   // A line with no print method is an undecorated blank. It needs no artwork, so it must
   // not be flagged as missing one — that would deadlock every plain-garment order.
   const needsArt = !!String(item.print_type || "").trim() && !mine.some((d) => isArtwork(d.kind))

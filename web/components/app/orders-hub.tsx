@@ -68,7 +68,7 @@ function minPxFor(cols: FactoryColId[]): number {
 }
 import { useIsNarrow } from "@/lib/use-narrow"
 import { ColumnsMenu } from "@/components/app/columns-menu"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress, resolvedOrderStage } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress, resolvedOrderStage, heldFromOf } from "@/lib/factory-status"
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
@@ -819,10 +819,15 @@ export function OrdersHub() {
       // never clobbers source/note/etc.
  const prev = normalizeStage(o.factory_status ?? orderStage(o.items ?? []))
  let metaPatch: Record<string, unknown> | undefined
+ /* `held_from` — THE SERVER'S SPELLING, which is the only one that survives.
+         This wrote `hold_from` while orders.js wrote `held_from` on the same field, so a
+         hold applied from a board and a hold applied from here left DIFFERENT keys, and
+         whichever side read the other's rows found nothing and resumed to a guess. The
+         legacy key is still read below, because rows written by the old client have it. */
  if (to === "on_hold" && prev && prev !== "on_hold") {
- metaPatch = { ...(o.meta ?? {}), hold_from: prev }
-      } else if (prev === "on_hold" && to !== "on_hold" && o.meta && "hold_from" in o.meta) {
- const m = { ...o.meta }; delete m.hold_from; metaPatch = m
+ metaPatch = { ...(o.meta ?? {}), held_from: prev }
+      } else if (prev === "on_hold" && to !== "on_hold" && o.meta && ("held_from" in o.meta || "hold_from" in o.meta)) {
+ const m = { ...o.meta }; delete m.held_from; delete m.hold_from; metaPatch = m
       }
       /* THE ROWS MOVE OPTIMISTICALLY; THE MOVE ITSELF IS ONE REQUEST.
          This looped a call PER LINE and then patched the order — so a line that failed
@@ -2033,6 +2038,9 @@ export function OrdersHub() {
                * that greyed out its own way forward would be a dead end.
                */
  const held = normalizeStage(stage) === "on_hold"
+ /* The stage the hold interrupted — the ONE target the gate still allows, so it has to
+    reach stageDenialReason or "Remove Hold" would be refused along with everything else. */
+ const holdFromMeta = held ? heldFromOf(o) : null
  const allShipped = items.length > 0 && items.every((it) => normalizeStage(it.factory_status) === "shipped")
  const units = items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
   // The one line the narrow card shows a picture of. A queue row is recognised by its
@@ -2453,12 +2461,12 @@ export function OrdersHub() {
  const fac = isFactoryOrder(o)
  const withReason = (list: typeof FACTORY_STAGES) =>
  list.map((s) => {
- const deny = stageDenialReason(role, stage, s.id, fac)
+ const deny = stageDenialReason(role, stage, s.id, fac, holdFromMeta)
                           // A skip this role could legally WALK isn't refused outright — it
                           // becomes a catch-up, behind a confirmation. Every other refusal
                           // stands: canWalk requires each intermediate hop to be permitted,
                           // so an operator can't reach Shipped by calling it a catch-up.
- return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id, fac) }
+ return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id, fac, holdFromMeta) }
                         })
                       // The ONE exception to "list everything, disable what's refused": a
                       // factory order doesn't get Pending at all. Disabled means "you may
@@ -2508,7 +2516,7 @@ export function OrdersHub() {
                        * first and the permission second.
                        */
  const next = nextStage(stage, fac)
- const canAdvance = !!next && canSetStage(role, stage, next, fac)
+ const canAdvance = !!next && canSetStage(role, stage, next, fac, holdFromMeta)
                       /**
                        * WAITING TO GO INTO PRODUCTION — which is Draft for the factory's
                        * own order and Pending for a seller's, because those are the two
@@ -2613,7 +2621,7 @@ export function OrdersHub() {
                             // On hold remembers the stage it interrupted (meta.hold_from), so
                             // it offers a one-click "Back to <that stage>" — clear how to come
                             // off hold. Without a stored prior (an old hold), fall back to ⋯.
- const holdFrom = norm === "on_hold" ? (o.meta?.hold_from as string | undefined) : undefined
+ const holdFrom = norm === "on_hold" ? heldFromOf(o) : undefined
  const backLabel = holdFrom != null ? (stageMeta(holdFrom)?.label || "Draft") : null
  return (
                               <span className="inline-flex shrink-0 items-center gap-1.5">
@@ -2711,7 +2719,11 @@ export function OrdersHub() {
  never the row's primary. Named with its destination, since
  in a list of stages "next" is the only one that doesn't say
  where it goes. */}
-                              {canAdvance && next && (
+                              {/* A HELD ORDER DOES NOT ADVANCE. The hold is the decision;
+                                  a stage button that ignores it makes the hold advisory. It
+                                  is DISABLED rather than removed, because a hold lifts — see
+                                  `held` above. */}
+                              {canAdvance && next && !held && (
                                 <DropdownMenuItem onClick={() => advanceOrder(o, next)}>
                                   {tl("ui", "Move to")} {stageMeta(next)?.label ?? next}
                                 </DropdownMenuItem>
@@ -2725,7 +2737,18 @@ export function OrdersHub() {
                                   Dropped the `primary !== "ship"` guard with it: that was
  only there to avoid showing the item twice, and there is
  no longer a primary to collide with. */}
-                              {canShip && <DropdownMenuItem onClick={() => openFulfill(o)}>{tl("ui", "Create new label")}</DropdownMenuItem>}
+                              {/* NO LABEL WHILE IT IS HELD. Buying postage is the action a
+                                  hold most needs to stop: the parcel is the thing somebody
+                                  parked, and a label is money spent and a promise made to a
+                                  buyer. Disabled with the reason, so it reads as "not yet"
+                                  rather than as a missing feature. */}
+                              {canShip && (
+                                <DropdownMenuItem
+                                  disabled={held}
+                                  title={held ? tl("ui", "This order is on hold — remove the hold first.") : undefined}
+                                  onClick={() => { if (!held) openFulfill(o) }}
+                                >{tl("ui", "Create new label")}</DropdownMenuItem>
+                              )}
                               {label && <DropdownMenuItem onClick={() => openLabel(label)}>{tl("ui", "Reopen label")}</DropdownMenuItem>}
                               {/* TikTok orders can be shipped on TIKTOK'S label, which lives
  only in Seller Center — so it's fetched on demand, not a
@@ -2823,7 +2846,7 @@ export function OrdersHub() {
                                        * missing prior can't fake progress.
                                        */
  const onHoldNow = s.id === "on_hold" && normalizeStage(stage) === "on_hold"
- const holdFrom = (o.meta?.hold_from as string | undefined) ?? ""
+ const holdFrom = heldFromOf(o)
  return (
                                         <DropdownMenuItem
  key={s.id}
@@ -2836,7 +2859,7 @@ export function OrdersHub() {
  if (!s.deny) setOrderStatus(o, s.id)
                                           }}
                                         >
-                                          {onHoldNow ? tl("ui", "Clear hold") : tl("stage", s.label)}
+                                          {onHoldNow ? tl("ui", "Remove Hold") : tl("stage", s.label)}
                                         </DropdownMenuItem>
                                       )
                                     })}
@@ -3208,7 +3231,9 @@ export function OrdersHub() {
                           {(() => {
  const fac = isFactoryOrder(o)
  const to = nextStage(it.factory_status, fac)
- if (to !== "working" || !canSetStage(role, it.factory_status, to, fac)) return null
+ /* The item route reads the ORDER's held_from, so this has to as well — otherwise a
+    held line offers a Start button the server answers with a refusal. */
+ if (to !== "working" || !canSetStage(role, it.factory_status, to, fac, heldFromOf(o))) return null
  return (
                               <Button
  size="sm" variant="outline" className="h-8 shrink-0"
@@ -3241,7 +3266,7 @@ export function OrdersHub() {
                             // Pending is absent from a factory order's options for the same
                             // reason it's absent from its ⋯ menu — the stage isn't on that
                             // order's line at all (see FACTORY_LINE).
- const opts = stageOptionsFor(role, it.factory_status, isFactoryOrder(o))
+ const opts = stageOptionsFor(role, it.factory_status, isFactoryOrder(o), heldFromOf(o))
  const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
                             /**
                              * CANCEL AND REFUND ARE NOT OFFERED PER LINE — they are order

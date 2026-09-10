@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
-import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB, canSetStage, isFactoryOrder } from "@/lib/orders"
+import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB, canSetStage, isFactoryOrder, heldFromOf } from "@/lib/orders"
 import { TAB_BAR,F,C, R, CARD_INK } from "@/lib/theme"
 import { OrderRow } from "@/components/order-row"
 
@@ -194,7 +194,7 @@ export default function Orders() {
    */
   const canMove = useCallback((o: Order) => {
     const to = nextStage(o)
-    return !!to && canSetStage(role, o.factory_status, to, isFactoryOrder(o))
+    return !!to && canSetStage(role, o.factory_status, to, isFactoryOrder(o), heldFromOf(o))
   }, [role])
   const chosen = useMemo(() => rows.filter((o) => picked.includes(o.id)), [rows, picked])
   // Only the ones that can actually move. A selection of shipped orders — or of orders this

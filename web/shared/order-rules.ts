@@ -131,8 +131,31 @@ const LABEL_OF = (id: string) => (id === "" ? "Draft" : STAGE_LABEL[id] ?? id)
  * this exists so a UI can grey an option and say why, instead of silently dropping it from
  * the menu and leaving the rule unlearnable.
  */
+/**
+ * WHERE A HOLD CAME FROM, and the one place that spelling is decided.
+ *
+ * The server writes `meta.held_from`; the web hub used to write `hold_from` on the same
+ * field. Two writers, two keys, one column — so a hold applied on a board and a hold
+ * applied in the hub left different rows, and each side read the other's as "no prior
+ * stage" and resumed to a guess. `held_from` wins because it is what the API writes and
+ * therefore what is already in the database; the legacy key is still READ so rows the old
+ * client wrote resume correctly instead of silently landing in Draft.
+ */
+export function heldFromOf(order: unknown): string {
+  /* `unknown`, and narrowed here: the three front-ends pass three different order types
+     (the web's OrderRow, mobile's Order, and props narrowed to a field or two), and a
+     structural signature would just be a weak type every one of them fails against. The
+     check below is the validation either way. */
+  const m = (order as { meta?: unknown } | null | undefined)?.meta
+  if (!m || typeof m !== "object") return ""
+  const v = (m as Record<string, unknown>).held_from ?? (m as Record<string, unknown>).hold_from
+  return typeof v === "string" ? v : ""
+}
+
 export function stageDenialReason(
   role: string, current: string | null | undefined, target: string, isFactory?: boolean,
+  /** `meta.held_from` — the stage the hold interrupted. See the on-hold rule below. */
+  holdFrom?: string | null,
 ): string | null {
   const at = normalizeStage(current)
   const to = normalizeStage(target)
@@ -168,6 +191,32 @@ export function stageDenialReason(
   }
   if (at === "refunded" && to !== "refunded") {
     return "This order was refunded. That is the end of it."
+  }
+
+  /**
+   * A HOLD IS A BLOCK ON THE LINE — every role, admin included.
+   *
+   * It was only a LABEL. Nothing refused anything, so a held order could be approved,
+   * printed and shipped by whichever board reached it next, and the person who stopped it
+   * found out afterwards. A stop only its author can see is not a stop.
+   *
+   * THE ONLY WAY OUT IS BACK TO WHERE IT STOPPED. Returning to `held_from` advances
+   * nothing — it undoes the stop. Every other pipeline stage is an advancement past a
+   * block somebody put there on purpose, which is the whole thing this refuses. Take the
+   * hold off, and the ladder applies again as normal.
+   *
+   * Cancel and refund stay open: a held order is very often about to become one of the
+   * two, and making someone resume production in order to cancel is backwards.
+   *
+   * Mirrors stageDenial in server/src/routes/orders.js.
+   */
+  if (at === "on_hold" && to !== "on_hold" && to !== "cancelled" && to !== "refunded") {
+    /* "" IS Draft (normalizeStage collapses new/draft/pending onto it), so an unknown
+       prior stage lands there — the one stage that asserts nothing about production. */
+    const back = normalizeStage(holdFrom || "")
+    if (to !== back) {
+      return `This order is on hold. Take the hold off first — it goes back to ${LABEL_OF(back)}.`
+    }
   }
 
   /**
@@ -236,7 +285,8 @@ export function stageDenialReason(
 
 export const canSetStage = (
   role: string, current: string | null | undefined, target: string, isFactory?: boolean,
-): boolean => stageDenialReason(role, current, target, isFactory) === null
+  holdFrom?: string | null,
+): boolean => stageDenialReason(role, current, target, isFactory, holdFrom) === null
 
 /**
  * Cancelled and Refunded — the two stages that MOVE MONEY.
