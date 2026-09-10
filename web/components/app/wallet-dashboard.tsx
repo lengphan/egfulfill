@@ -387,46 +387,60 @@ function txMeta(type: string, delta: number): { label: string; tone: string } {
  const t = String(type || "").toLowerCase()
  const EM = "bg-shipped/12 text-shipped", MUT = "bg-muted text-muted-foreground", AM = "bg-hold/15 text-hold"
  if (t === "order-charge-in") return { label: "Revenue", tone: EM }
- if (t === "order-charge-out" || t === "charge") return { label: "Order charge", tone: MUT }
+ if (t === "order-charge-out" || t === "charge") return { label: "Order", tone: MUT }
  if (t === "topup") return { label: "Deposit", tone: EM }
  if (t.startsWith("order-refund")) return { label: "Refund", tone: EM }
- if (t === "blanks-cost") return { label: "Product cost", tone: AM }
+ if (t === "blanks-cost") return { label: "Blanks", tone: AM }
  if (t === "label-cost") return { label: "Postage", tone: AM }
  if (t === "design-partner-cost") return { label: "Design", tone: AM }
- if (t === "expedite-cost") return { label: "Dispatch fee", tone: AM }
+ if (t === "expedite-cost") return { label: "Dispatch", tone: AM }
  if (t === "sample-cost") return { label: "Sample", tone: AM }
- if (t === "sample-cost-credit") return { label: "Sample refund", tone: EM }
-  // AI, both directions and told apart. Without these three, every generation row in the
-  // history fell through to a bare "Debit"/"Credit" — the row that says what a press cost,
-  // labelled as nothing in particular.
- if (t === "aigen-cost") return { label: "AI generation", tone: AM }
- if (t === "aigen-in") return { label: "AI billed on", tone: EM }
- if (t === "aigen-out") return { label: "AI generation", tone: MUT }
- if (t.startsWith("aigen-refund")) return { label: "AI refund", tone: EM }
+ if (t === "sample-cost-credit") return { label: "Refund", tone: EM }
+  // AI, both directions. They no longer name the direction — the amount's sign and colour
+  // already carry it, and repeating it in the category was what made these three words long.
+ if (t === "aigen-cost") return { label: "AI", tone: AM }
+ if (t === "aigen-in") return { label: "AI", tone: EM }
+ if (t === "aigen-out") return { label: "AI", tone: MUT }
+ if (t.startsWith("aigen-refund")) return { label: "Refund", tone: EM }
  if (t === "withdrawal") return { label: "Payout", tone: MUT }
  if (t === "manual-income") return { label: "Income", tone: EM }
  if (t === "manual-expense") return { label: "Expense", tone: AM }
  if (t === "adjust") return { label: "Adjustment", tone: MUT }
-  /**
-   * THE TWO CHARGES AN ORDER RAISES BESIDE PRODUCTION, which fell through to "Debit".
-   *
-   * A statement line that says only "Debit −$2.00" is the row a seller writes in to ask
-   * about, and the answer is already in the ledger: `design-work` is the fee for digitising
-   * artwork, `order-fee` is a price adjustment somebody charged with a reason attached. Both
-   * directions, because the factory reads the same table from the other side — its credit is
-   * the seller's debit and calling both "Debit" was how one row managed to be wrong twice.
-   */
- if (t === "design-work-out") return { label: "Design fee", tone: MUT }
- if (t === "design-work-in") return { label: "Design fee", tone: EM }
- if (t === "order-fee-out") return { label: "Price adjustment", tone: MUT }
- if (t === "order-fee-in") return { label: "Price adjustment", tone: EM }
- if (t === "expedite-out") return { label: "Expedited shipping", tone: MUT }
- if (t === "expedite-in") return { label: "Expedited shipping", tone: EM }
- if (t === "express-ship-out") return { label: "Express shipping", tone: MUT }
- if (t === "express-ship-in") return { label: "Express shipping", tone: EM }
- if (t === "emb-file" || t === "design-file") return { label: "Design file", tone: MUT }
+ if (t === "design-work-out") return { label: "Design", tone: MUT }
+ if (t === "design-work-in") return { label: "Design", tone: EM }
+ if (t === "order-fee-out") return { label: "Adjustment", tone: MUT }
+ if (t === "order-fee-in") return { label: "Adjustment", tone: EM }
+ if (t === "expedite-out") return { label: "Shipping", tone: MUT }
+ if (t === "expedite-in") return { label: "Shipping", tone: EM }
+ if (t === "express-ship-out") return { label: "Shipping", tone: MUT }
+ if (t === "express-ship-in") return { label: "Shipping", tone: EM }
+ if (t === "emb-file" || t === "design-file") return { label: "Design", tone: MUT }
  return { label: delta >= 0 ? "Credit" : "Debit", tone: MUT }
 }
+
+/**
+ * EVERY CATEGORY THIS COLUMN CAN PRINT, as literals the i18n scanner can see.
+ *
+ * The chip renders `tl("wallet", meta.label)` — a VARIABLE — and check-i18n reads literal
+ * tl() call sites, so it has never once looked at this map. That is why the gate reported
+ * 100% while the column printed "Hoàn tiền" beside "Design fee": the handful of labels that
+ * happened to match a key written elsewhere were translated, and the rest silently fell back
+ * to English. A dynamic key is invisible to a coverage gate, so the keys are listed here
+ * where the gate can count them.
+ *
+ * Referenced by TX_LABELS below so the list cannot rot into a comment nobody runs.
+ */
+function txLabelKeys(tl: (ns: string, s: string) => string) {
+ return {
+    Revenue: tl("wallet", "Revenue"), Order: tl("wallet", "Order"), Deposit: tl("wallet", "Deposit"),
+    Refund: tl("wallet", "Refund"), Blanks: tl("wallet", "Blanks"), Postage: tl("wallet", "Postage"),
+    Design: tl("wallet", "Design"), Dispatch: tl("wallet", "Dispatch"), Sample: tl("wallet", "Sample"),
+    AI: tl("wallet", "AI"), Payout: tl("wallet", "Payout"), Income: tl("wallet", "Income"),
+    Expense: tl("wallet", "Expense"), Adjustment: tl("wallet", "Adjustment"),
+    Shipping: tl("wallet", "Shipping"), Credit: tl("wallet", "Credit"), Debit: tl("wallet", "Debit"),
+  } as Record<string, string>
+}
+
 type Row = {
  id: string
   /** Sort key for merging non-ledger entries (rejected top-ups) into the history. */
@@ -589,6 +603,7 @@ function mapLedger(balance: number, ledger: LedgerRow[], fmtDate: (s?: string | 
 export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: boolean } = {}) {
   const fmtDate = useDateFormat()
   const tl = useLabelT()
+  const TX_LABELS = txLabelKeys(tl)
   const inShell = useActionNode() !== null
  const [view, setView] = useState<View | null>(null)
   // Distinguishes "couldn't read the wallet" from "this wallet is empty". Without it the
@@ -1023,12 +1038,19 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                       Capped and truncated, with the full text on hover and in the row's own
  dialog, so the table keeps a shape a column of numbers can be read down. */}
                   <TableCell className="max-w-[26rem] font-medium">
-                    <div className="truncate" title={t.desc}>{t.desc}</div>
-                    {(t.ref || (t.method && t.method !== "—")) && (
-                      <div className="mt-0.5 truncate text-xs font-normal text-muted-foreground"
- title={[t.refFull || t.ref, t.method && t.method !== "—" ? t.method : null].filter(Boolean).join(" · ")}>
-                        {[t.ref, t.method && t.method !== "—" ? t.method : null].filter(Boolean).join(" · ")}
-                      </div>
+                    <div className="truncate" title={[t.desc, t.refFull || t.ref].filter(Boolean).join(" · ")}>{t.desc}</div>
+                    {/* THE REF IS GONE FROM THE PAGE. "refund-FF-1uxwlv…ndzg-fee-4-fee" is an
+                        idempotency key: it exists so a retry cannot double-charge, and it is
+                        addressed to the ledger, not to a person. Printed under every row it
+                        took a second line each time to say nothing anybody could act on —
+                        §4's rule that a mark is recognised, never read, and that an
+                        identifier belongs where it is used.
+
+                        It stays in the row's `title` and in the detail dialog, so support can
+                        still trace a payment without it occupying the table. The method
+                        keeps its line, because "ACH" or "VietQR" IS readable. */}
+                    {t.method && t.method !== "—" && (
+                      <div className="mt-0.5 truncate text-xs font-normal text-muted-foreground">{t.method}</div>
                     )}
                   </TableCell>
                   <TableCell>
@@ -1041,7 +1063,10 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                     <span className="grid grid-cols-[8.5rem_auto] items-center gap-1.5">
                       <span className="flex min-w-0 items-center gap-1.5">
                         <Badge className={t.tone + " truncate"} variant="secondary">
-                          {tl("wallet", t.label)}
+                          {/* Through TX_LABELS, whose keys are literals the i18n gate can
+                              count — see txLabelKeys. A bare tl(ns, variable) is invisible
+                              to it, which is how half this column stayed English. */}
+                          {TX_LABELS[t.label] ?? tl("wallet", t.label)}
                         </Badge>
                         {t.isTest && (
                           <Badge variant="secondary" className="bg-muted text-muted-foreground">{tl("wallet", "Test")}</Badge>
