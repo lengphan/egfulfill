@@ -2314,6 +2314,12 @@ function UsersPanel() {
  const [emFor, setEmFor] = useState<AdminUser | null>(null)
  const [emValue, setEmValue] = useState("")
  const [emErr, setEmErr] = useState<string | null>(null)
+  /* Changing the address does NOT unlock the account — they are separate switches, and an
+     admin who locked someone out for a reason should not have it undone by fixing a typo.
+     But "they sign in with this from now on" is what an admin reads a rename to MEAN, so on
+     a deactivated account the dialog says the truth and offers the other half in the same
+     press rather than sending them back to the menu to discover it. */
+ const [emReactivate, setEmReactivate] = useState(true)
   // Manual balance movement. A reason is required: an unexplained entry in a money
   // ledger is worse than no entry, because nobody can tell later whether it was right.
  const [adjFor, setAdjFor] = useState<AdminUser | null>(null)
@@ -2463,7 +2469,8 @@ function UsersPanel() {
  if (addr === emFor.email.toLowerCase()) { setEmFor(null); return }
  setBusy(emFor.id); setEmErr(null)
  try {
- const r = await updateUserAdmin(emFor.id, { email: addr })
+ const alsoOn = emFor.active === false && emReactivate
+ const r = await updateUserAdmin(emFor.id, alsoOn ? { email: addr, active: true } : { email: addr })
  if (r?.error) throw new Error(r.error)
  setEmFor(null); setEmValue(""); loadUsers()
     } catch (e) { setEmErr(e instanceof Error ? e.message : "Couldn't change that email.") }
@@ -2809,7 +2816,7 @@ function UsersPanel() {
                           </DropdownMenuItem>
                         )}
                         {isAdminCaller && (
-                          <DropdownMenuItem onClick={() => { setEmFor(u); setEmValue(u.email); setEmErr(null) }}>
+                          <DropdownMenuItem onClick={() => { setEmFor(u); setEmValue(u.email); setEmErr(null); setEmReactivate(true) }}>
                             {tl("settings", "Change email…")}
                           </DropdownMenuItem>
                         )}
@@ -2925,9 +2932,22 @@ function UsersPanel() {
               <Input value={emValue} onChange={(e) => { setEmValue(e.target.value); setEmErr(null) }}
  type="email" inputMode="email" autoComplete="off" className="h-9" autoFocus />
             </label>
-            <p className="text-sm text-muted-foreground">
-              {tl("settings", "They sign in with this from now on. Their orders, balance, connected shops and team stay exactly as they are.")}
-            </p>
+            {emFor?.active === false ? (
+              <>
+                <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
+                  <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+                  {tl("settings", "This account is deactivated. A new email alone won't let them sign in — they'd be turned away at the new address too.")}
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={emReactivate} onCheckedChange={(v) => setEmReactivate(v === true)} />
+                  {tl("settings", "Let them sign in again as well")}
+                </label>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {tl("settings", "They sign in with this from now on. Their orders, balance, connected shops and team stay exactly as they are.")}
+              </p>
+            )}
             {emErr && <p className="text-sm text-destructive">{emErr}</p>}
           </div>
           <DialogFooter>

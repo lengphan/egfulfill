@@ -1632,6 +1632,8 @@ const vi: Dict = {
   "settings.Let them sign in again?": "Cho phép họ đăng nhập lại?",
   "settings.gets access back immediately. Everything on the account is exactly as they left it.": "sẽ được truy cập lại ngay. Mọi thứ trong tài khoản vẫn nguyên như lúc họ rời đi.",
   "settings.Change email": "Đổi email",
+  "settings.This account is deactivated. A new email alone won't let them sign in — they'd be turned away at the new address too.": "Tài khoản này đang bị vô hiệu hoá. Chỉ đổi email thì họ vẫn không đăng nhập được — địa chỉ mới cũng sẽ bị từ chối.",
+  "settings.Let them sign in again as well": "Cho phép họ đăng nhập lại luôn",
   "settings.Change email…": "Đổi email…",
   "settings.New email": "Email mới",
   "settings.They sign in with this from now on. Their orders, balance, connected shops and team stay exactly as they are.": "Từ giờ họ đăng nhập bằng email này. Đơn hàng, số dư, cửa hàng đã kết nối và nhóm của họ vẫn giữ nguyên.",
