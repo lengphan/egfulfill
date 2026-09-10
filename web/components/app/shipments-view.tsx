@@ -356,7 +356,8 @@ export function ShipmentsView() {
           onChange={setQ}
           onClear={() => setQ("")}
           width="md"
-          placeholder={tl("shipments", "Tracking, order, customer or carrier…")}
+          placeholder={tl("shipments", "Search shipments")}
+          hotkey
         />
         <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows || rows.length === 0}>
           <DownloadSimple size={14} weight="bold" /> {tl("shipments", "Export CSV")}

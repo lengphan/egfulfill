@@ -853,7 +853,8 @@ export function DispatchBoard() {
       value={q}
       onChange={setQ}
       width="sm"
-      placeholder={tl("dispatch", "Search order, customer or tracking…")}
+      placeholder={tl("dispatch", "Search the queue")}
+          hotkey
     />
   )
   const headActions = (
@@ -1079,7 +1080,8 @@ export function DispatchBoard() {
               value={q}
               onChange={setQ}
               width="sm"
-              placeholder={tl("dispatch", "Search order, customer or tracking…")}
+              placeholder={tl("dispatch", "Search the queue")}
+          hotkey
             />
           )}
           {/* TWO ROWS, THE WAY /orders DOES IT — filters on their own line, then search and
@@ -1178,10 +1180,10 @@ export function DispatchBoard() {
             which already filters to label and dispatch actions. A board for work waiting
             to be done should not also be the archive of work that is finished.
             See the commit for the one thing this does lose. */}
-          /* ONE COLUMN PER FACT — the same nine the external-label list uses, so the two
- cards read as one screen (see dispatch-grid.ts). Channel, units, address and
- status used to share a single wrapping line under the order number, which made
- the address the thing that moved every row's status somewhere different. */
+          {/* ONE COLUMN PER FACT — the same nine the external-label list uses, so the two
+              cards read as one screen (see dispatch-grid.ts). Channel, units, address and
+              status used to share a single wrapping line under the order number, which made
+              the address the thing that moved every row&apos;s status somewhere different. */}
           <div className="overflow-x-auto">
             <div className={DISPATCH_GRID + " " + DISPATCH_HEAD} style={gridStyle}>
               <span />

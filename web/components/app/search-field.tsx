@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { MagnifyingGlass, X } from "@phosphor-icons/react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -44,6 +45,7 @@ export function SearchField({
   /** `grow` fills the toolbar · `md` and `sm` cap it. No pixel widths. */
   width = "grow",
   className,
+  hotkey,
 }: {
   value: string
   onChange: (v: string) => void
@@ -55,8 +57,40 @@ export function SearchField({
   autoFocus?: boolean
   width?: "grow" | "md" | "sm"
   className?: string
+  /**
+   * PRESS `/` TO SEARCH — off unless a board asks for it, because two fields both claiming
+   * the key would fight and the last one mounted would win.
+   *
+   * It is the oldest shortcut on the web (Gmail, GitHub, YouTube, Reddit) and it is the one
+   * that fits here: ⌘K is already the topbar's global overlay, and a second thing on the
+   * same chord would be a coin toss. This one scopes to the list you are looking at.
+   */
+  hotkey?: boolean
 }) {
   const cap = width === "sm" ? "max-w-xs" : width === "md" ? "max-w-md" : ""
+  const ref = useRef<HTMLInputElement>(null)
+
+  /**
+   * The listener is on the DOCUMENT and ignores anything typed into a field.
+   *
+   * Without that guard `/` becomes unusable: a URL in a note, a size like "S/M", a fraction
+   * in a price — every one of them would yank focus out of whatever the person was actually
+   * typing into. contentEditable counts too; the chat composer is one.
+   */
+  useEffect(() => {
+    if (!hotkey) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      const tag = t?.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) return
+      e.preventDefault()
+      ref.current?.focus()
+      ref.current?.select()
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [hotkey])
   return (
     /*
      * A FLOOR, NOT JUST A CEILING — and this was found by looking rather than by reasoning.
@@ -79,6 +113,7 @@ export function SearchField({
         className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
       />
       <Input
+        ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
@@ -106,7 +141,8 @@ export function SearchField({
          * used: the tint is there to advertise an empty control, and once there is text in it
          * the text does that job.
          */
-        className={cn("h-9 bg-muted/70 pl-8 focus:bg-background", onClear && value ? "pr-8" : undefined)}
+        className={cn("h-9 bg-muted/70 pl-8 focus:bg-background",
+          onClear && value ? "pr-8" : hotkey ? "pr-9" : undefined)}
       />
       {onClear && value ? (
         <button
@@ -117,6 +153,25 @@ export function SearchField({
         >
           <X size={14} />
         </button>
+      ) : hotkey ? (
+        /**
+         * THE KEY, SHOWN — the half that makes a shortcut worth having.
+         *
+         * A hotkey nobody can see is a hotkey nobody uses, which is why every product that
+         * ships one puts it in the field: GitHub's `/`, Linear's and Shopify's ⌘K. It also
+         * does the job the placeholder was failing at — it says "this is interactive" without
+         * spending width on a sentence.
+         *
+         * `pointer-events-none`, or the badge eats the click that should focus the field. It
+         * disappears the moment there is text, where the clear button takes the same spot:
+         * one control at a time in one place, and the reminder is only useful while empty.
+         */
+        <kbd
+          aria-hidden
+          className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 text-2xs font-medium text-muted-foreground sm:block"
+        >
+          /
+        </kbd>
       ) : null}
     </div>
   )
