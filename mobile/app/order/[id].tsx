@@ -48,14 +48,29 @@ function trackingLink(carrier?: string | null, code?: string | null) {
   return make ? make(code) : null
 }
 
+/*
+ * A HEADING WITH ITS RULE UNDER IT, not a heading AND a rule with a hole between them.
+ *
+ * This drew 28pt above and 12pt below, and every group it introduced then opened with the
+ * shared SECTION token — another 20pt margin, a top border, and 20pt of padding. So the
+ * gap between a title and its own content was 52pt with a hairline stranded in the middle
+ * of it, and the label and the rule were two separators doing one job. The rule belongs to
+ * the heading; groups under one use SECTION_FLUSH and bring no second edge.
+ */
 function Section({ title, right }: { title: string; right?: string }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: 28, marginBottom: 12 }}>
+    <View style={{
+      flexDirection: "row", alignItems: "baseline", justifyContent: "space-between",
+      marginTop: 22, paddingBottom: 7, borderBottomWidth: 1, borderBottomColor: C.border,
+    }}>
       <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.fg, letterSpacing: 1.4 }}>{title}</Text>
       {right ? <Text style={{ fontSize: 12, color: C.muted, fontFamily: F.medium }}>{right}</Text> : null}
     </View>
   )
 }
+
+/** What a group looks like when a Section heading has already drawn the edge above it. */
+const SECTION_FLUSH = { paddingTop: 10 } as const
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -298,7 +313,7 @@ export default function OrderDetail() {
           {staff && (
             stage === "working" ? (
               shipDenial ? (
-                <View style={{ ...SECTION }}>
+                <View style={{ ...SECTION_FLUSH }}>
                   <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>Not yours to ship</Text>
                   <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>{shipDenial}</Text>
                 </View>
@@ -309,7 +324,7 @@ export default function OrderDetail() {
               /* NEVER HIDE, EXPLAIN — the web's rule, and the reason the phone can be
                  learned from. A control that silently vanishes leaves the rule unlearnable;
                  the stage and whose call it is are both named. */
-              <View style={{ ...SECTION }}>
+              <View style={{ ...SECTION_FLUSH }}>
                 <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
                   {stageAction(to)}
                 </Text>
@@ -367,7 +382,7 @@ export default function OrderDetail() {
             */}
           <Section title="DELIVER TO" />
           <View style={{
-            ...SECTION,
+            ...SECTION_FLUSH,
           }}>
             {addressLines(o).length > 0 ? (
               <>
@@ -407,7 +422,7 @@ export default function OrderDetail() {
           {/* ── TRACKING ───────────────────────────────────────────────────────── */}
           <Section title="SHIPPING" />
           <View style={{
-            ...SECTION,
+            ...SECTION_FLUSH,
           }}>
             {code ? (
               <>
@@ -513,7 +528,7 @@ export default function OrderDetail() {
 
           <Section title="DETAILS" />
           <View style={{
-            ...SECTION, paddingBottom: 2,
+            ...SECTION_FLUSH, paddingBottom: 2,
           }}>
             {o.status ? <Row label="Status" value={String(o.status)} /> : null}
             {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
@@ -539,7 +554,7 @@ export default function OrderDetail() {
 
           <Section title="ACTIVITY" />
           <View style={{
-            ...SECTION, paddingBottom: 4,
+            ...SECTION_FLUSH, paddingBottom: 4,
           }}>
             {activity === null
               ? <ActivityIndicator style={{ marginVertical: 16 }} color={C.primary} />

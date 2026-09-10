@@ -241,30 +241,30 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
         )}
       </View>
 
-      <Text numberOfLines={2} style={{ fontSize: 16.5, fontFamily: F.medium, color: C.fg, marginTop: 5, letterSpacing: -0.2 }}>
+      <Text numberOfLines={2} style={{ fontSize: 15, fontFamily: F.medium, color: C.fg, marginTop: 3, letterSpacing: -0.2 }}>
         {lineTitle(item)}
       </Text>
 
-      {/* THE BLANK COMES BEFORE THE VARIANTS, because it is what they are variants OF. The
-          marketplace title above is a keyword list on an Etsy order and names nothing the
-          floor picks; the blank is the garment. */}
-      {item.blank ? (
-        <Text numberOfLines={1} style={{ fontSize: 14.5, fontFamily: F.semi, color: C.fg, marginTop: 6 }}>
-          {item.blank}
-        </Text>
-      ) : null}
-
-      {facts.length > 0 && (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7, marginTop: 5 }}>
+      {/* ONE META LINE, not four stacked ones.
+          The blank still comes FIRST and still reads heavier than what follows, because it
+          is what the variants are variants OF — the marketplace title above is a keyword
+          list on an Etsy order and names nothing the floor picks. What changed is that it
+          shares a line with them instead of owning one: five stacked rows per item is what
+          made this page scroll like a document. */}
+      {(item.blank || facts.length > 0) && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 }}>
+          {item.blank ? (
+            <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.semi, color: C.fg }}>{item.blank}</Text>
+          ) : null}
           {facts.map((f, i) => {
             const method = i === facts.length - 1 && !!String(item.print_type || "").trim()
             return (
-              <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-                {i > 0 && <Text style={{ fontSize: 13, color: C.muted, opacity: 0.6 }}>·</Text>}
+              <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                {(i > 0 || item.blank) && <Text style={{ fontSize: 12, color: C.muted, opacity: 0.6 }}>·</Text>}
                 <Text style={{
-                  fontSize: 13.5,
-                  fontFamily: method ? F.semi : F.medium,
-                  color: method ? C.primary : C.fg,
+                  fontSize: 12.5,
+                  fontFamily: method ? F.semi : F.body,
+                  color: method ? C.primary : C.muted,
                   letterSpacing: method ? 0.3 : 0,
                 }}>{f}</Text>
               </View>
@@ -277,7 +277,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
           is — and it carries a print-method suffix the blank does not, so it is deliberately
           not the same string as the line above. */}
       {item.sku ? (
-        <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, marginTop: 4 }}>
+        <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: F.body, color: C.muted, opacity: 0.8, marginTop: 3 }}>
           {item.sku}
         </Text>
       ) : null}
@@ -347,7 +347,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
       ) : (
         /* Says WHICH it is: nothing to print versus nothing uploaded. An empty list that
            reads the same either way is how a missing file reaches the machine. */
-        <Text style={{ fontSize: 13.5, fontFamily: F.body, color: needsArt ? C.warn : C.muted, marginTop: 12 }}>
+        <Text style={{ fontSize: 12.5, fontFamily: F.body, color: needsArt ? C.warn : C.muted, marginTop: 10 }}>
           {needsArt ? "No artwork on this line yet." : "No file needed — plain blank."}
         </Text>
       )}
