@@ -1155,20 +1155,40 @@ export default function OrderDetailPage() {
                     {(charges?.lines ?? []).map((l, i) => (
                       reversedLines.marked.has(i) ? null : (
                       <Fragment key={`${l.part}-${i}`}>
-                      <div className="flex justify-between">
-                        <dt className="text-muted-foreground">
+                      {/* `items-baseline`, so the FIGURE sits on the label's first line even
+                          when a note wraps underneath it — the amounts down this column have
+                          to share one axis, and centring a two-line row against a one-line one
+                          is what knocked them out of it. */}
+                      <div className="flex items-baseline justify-between gap-3">
+                        <dt className="min-w-0 text-muted-foreground">
                           {l.label}
                           {/* THE SAME SUFFIX THE QUOTE PRINTS. A design fee names its item's
                               NUMBER here, exactly as it does before the charge — see the note
                               on the quote's row for why a product title cannot go beside a
-                              $2.00 figure. Every other line keeps its note, which is the
-                              reason somebody typed and the whole point of the row. */}
+                              $2.00 figure. */}
                           {l.part === "design" && l.lineId
                             ? (() => {
  const n = items.findIndex((x) => x.line_id === l.lineId)
  return n >= 0 ? <span className="opacity-70"> · Item {n + 1}</span> : null
                               })()
-                            : l.note && <span className="opacity-70"> · {l.note}</span>}
+                            : null}
+                          {/**
+                            * THE NOTE GOES UNDERNEATH (owner, 2026-09-10).
+                            *
+                            * "Price adjustment · Method DTG → Embroidery · Item 1" on one line
+                            * is a 50-character label in a 380px column: it wrapped to three
+                            * lines and dragged the amount down with it, so a column of figures
+                            * that should read straight down stepped sideways at every
+                            * adjustment.
+                            *
+                            * Its own line, a step smaller, under the thing it explains. The
+                            * label stays the size of every other label so the rows still scan
+                            * as a list, and the note reads as what it is — the reason, not
+                            * another charge.
+                            */}
+                          {l.part !== "design" && l.note && (
+                            <div className="text-2xs leading-snug opacity-70">{l.note}</div>
+                          )}
                           {/* On the row, not in a total at the bottom: "which part did I send
                               back" is the question, and a lone Refunded line cannot answer it. */}
                           {refundByPart.onLine.has(i) && (
@@ -1178,7 +1198,10 @@ export default function OrderDetailPage() {
                         {/* A deduction reads as one: same minus and same green as the quote,
                             so the row a seller checks looks identical either side of the
                             charge. */}
-                        <dd className="flex items-center gap-2">
+                        {/* `shrink-0`: the label can now be two lines and wants the width, and
+                            a flex child yields it from wherever it can — which was the figure,
+                            wrapping "$5.00" onto its own line at the narrowest column. */}
+                        <dd className="flex shrink-0 items-center gap-2">
                           <span className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
                             {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
                           </span>
