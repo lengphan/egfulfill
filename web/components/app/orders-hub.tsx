@@ -2014,6 +2014,25 @@ export function OrdersHub() {
               /** Cancelled and refunded are terminal — nothing on this row can move. Named
                * once so the menu and the per-item control agree about it. */
  const closed = ["cancelled", "refunded"].includes(normalizeStage(stage))
+              /**
+               * ON HOLD IS A STOP, NOT AN END (owner, 2026-09-10: "when an order is hold, grey
+               * out all action buttons").
+               *
+               * A held order is one somebody deliberately parked — a query with the buyer, a
+               * blank that has not arrived, a payment being chased — and moving it on from a
+               * row menu walks straight past whatever that reason was. The hold IS the
+               * decision, and a stage button that ignores it makes the hold advisory.
+               *
+               * DISABLED, NOT HIDDEN, and that is the difference from `closed` above.
+               * Cancelled and refunded are terminal — those rows are removed, because
+               * "disabled is for you may not; this is there is nothing here". A hold lifts:
+               * the moves are real, they are just not available while it stands, and hiding
+               * them would say the order can never move again.
+               *
+               * Opening the order is untouched — that is where the hold is lifted, and a menu
+               * that greyed out its own way forward would be a dead end.
+               */
+ const held = normalizeStage(stage) === "on_hold"
  const allShipped = items.length > 0 && items.every((it) => normalizeStage(it.factory_status) === "shipped")
  const units = items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
   // The one line the narrow card shows a picture of. A queue row is recognised by its
@@ -2951,7 +2970,18 @@ export function OrdersHub() {
                             // case is ~34px shorter and 136 would put the empty band back on the
                             // other side. This is the size of the PRINT card; the listing tucks
                             // behind it and adds PEEK, not another full tile.
- size={canDesign && stage === "" ? 104 : 88}
+                            // 120 = the identity block's MEASURED height with the picker open
+                            // (title, the blank/colour/size/method strip and its hint), so the
+                            // picture spans it exactly. 104 left a 16px band under the thumb —
+                            // measured in the browser, not estimated: 104 against a 120px
+                            // column. The note above about 136 still holds and is why this is
+                            // 120 rather than back to 136; the column lost height when the
+                            // three meta lines became one, it did not lose all of it.
+                            //
+                            // The picker-less case keeps 88 deliberately. Those rows are a
+                            // title and a chip strip, and sizing them to the tall case is what
+                            // would put the band back on the other side.
+ size={canDesign && stage === "" ? 120 : 88}
  onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
                             /**
                              * A DROP LANDS ON THIS LINE, AND ONLY THIS LINE.
