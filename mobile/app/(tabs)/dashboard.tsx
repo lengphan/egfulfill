@@ -332,7 +332,12 @@ function Funnel({ counts, loading, awaitingScan }: {
 }) {
   const total = LADDER.reduce((n, s) => n + (counts[s.stage] ?? 0), 0)
   return (
-    <View style={{ ...CARD, marginHorizontal: S.xl, padding: S.lg }}>
+    /* ON NIGHT, so it is a lifted PANEL rather than a white card cut out of the dark. A
+       white card here read as the old app showing through a hole in the new one. */
+    <View style={{
+      marginHorizontal: S.xl, padding: S.lg, borderRadius: R.card,
+      backgroundColor: "rgba(255,255,255,0.06)",
+    }}>
       <View style={{ flexDirection: "row", height: 14, gap: 2 }}>
         {LADDER.map((s) => {
           const n = counts[s.stage] ?? 0
@@ -362,15 +367,15 @@ function Funnel({ counts, loading, awaitingScan }: {
             style={({ pressed }) => ({
               flexDirection: "row", alignItems: "center", gap: S.md,
               paddingVertical: 9,
-              borderTopWidth: i === 0 ? 0 : 1, borderTopColor: C.border,
-              backgroundColor: pressed ? C.accent : "transparent",
+              borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "rgba(255,255,255,0.10)",
+              backgroundColor: pressed ? "rgba(255,255,255,0.08)" : "transparent",
             })}
           >
             <View style={{ width: 10, height: 10, borderRadius: R.badge / 2, backgroundColor: s.fill }} />
-            <Text style={{ flex: 1, fontSize: 14.5, fontFamily: F.medium, color: C.fg }}>{s.label}</Text>
+            <Text style={{ flex: 1, fontSize: 14.5, fontFamily: F.medium, color: C.onNight }}>{s.label}</Text>
             <Text style={{
               fontSize: 15, fontFamily: F.semi, fontVariant: ["tabular-nums"],
-              color: (counts[s.stage] ?? 0) === 0 ? C.muted : C.fg,
+              color: C.onNight, opacity: (counts[s.stage] ?? 0) === 0 ? 0.4 : 1,
             }}>
               {loading ? "—" : counts[s.stage] ?? 0}
             </Text>
@@ -388,15 +393,15 @@ function Funnel({ counts, loading, awaitingScan }: {
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", gap: S.md,
             paddingVertical: 9, marginTop: 2,
-            borderTopWidth: 1, borderTopColor: C.edge,
-            backgroundColor: pressed ? C.accent : "transparent",
+            borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.22)",
+            backgroundColor: pressed ? "rgba(255,255,255,0.08)" : "transparent",
           })}
         >
-          <Ionicons name="scan-outline" size={14} color={C.muted} style={{ width: 10 }} />
-          <Text style={{ flex: 1, fontSize: 14.5, fontFamily: F.medium, color: C.fg }}>Awaiting scan</Text>
+          <Ionicons name="scan-outline" size={14} color={C.onNight} style={{ width: 10, opacity: 0.6 }} />
+          <Text style={{ flex: 1, fontSize: 14.5, fontFamily: F.medium, color: C.onNight }}>Awaiting scan</Text>
           <Text style={{
             fontSize: 15, fontFamily: F.semi, fontVariant: ["tabular-nums"],
-            color: awaitingScan === 0 ? C.muted : C.fg,
+            color: C.onNight, opacity: awaitingScan === 0 ? 0.4 : 1,
           }}>
             {loading ? "—" : awaitingScan}
           </Text>
@@ -456,6 +461,69 @@ function Column({ height, today, letter, loading, reduced, delay, dark }: {
  * The card IS the action. An earlier draft put a circular button on the corner, which is
  * one more thing to explain when the whole card is already pressable.
  */
+/**
+ * A FIGURE THAT ARRIVES.
+ *
+ * The app had no motion in it at all — not a count, not a press, not a transition — and
+ * "not smooth" was a literal description rather than a mood. A number that counts up is the
+ * cheapest honest motion there is: it says the value was fetched rather than always sat
+ * there, and it draws the eye to the one thing on a tile worth reading.
+ *
+ * Reduced motion gets the final value immediately. Not a slower count — no count. The
+ * setting is asking for no movement, not for gentler movement.
+ */
+function useCountUp(to: number, reduced: boolean) {
+  const [n, setN] = useState(reduced ? to : 0)
+  useEffect(() => {
+    if (reduced) { setN(to); return }
+    const from = 0, ms = 650, t0 = Date.now()
+    let raf = 0
+    const tick = () => {
+      const p = Math.min(1, (Date.now() - t0) / ms)
+      // Ease out — a linear count reads like a slot machine rather than a value settling.
+      setN(Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3))))
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [to, reduced])
+  return n
+}
+
+/**
+ * A TILE — a figure, a word, and a colour that is the tile rather than a dot on it.
+ *
+ * Rows were the whole app: label left, value right, hairline, repeat, on six screens. A row
+ * is for reading a list; a tile is for recognising one thing at a glance, which is what a
+ * home screen is for. The colour is a large FILL and never type, which is the one thing the
+ * house rules are strict about and the reason `brand` and `acid` are safe to use this way.
+ */
+function Tile({ n, label, bg, fg, prefix, reduced, onPress }: {
+  n: number; label: string; bg: string; fg: string; prefix?: string
+  reduced: boolean; onPress: () => void
+}) {
+  const shown = useCountUp(n, reduced)
+  const scale = useRef(new Animated.Value(1)).current
+  const spring = (to: number) =>
+    Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 40, bounciness: 6 }).start()
+  return (
+    <Animated.View style={{ flex: 1, transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => !reduced && spring(0.96)}
+        onPressOut={() => !reduced && spring(1)}
+        style={{ borderRadius: R.card, backgroundColor: bg, padding: 16, minHeight: 108, justifyContent: "space-between" }}
+      >
+        <Text style={{ fontSize: 34, fontFamily: F.bold, color: fg, letterSpacing: -1.2 }}>
+          {prefix ?? ""}{shown.toLocaleString()}
+        </Text>
+        <Text style={{ fontSize: 13, fontFamily: F.medium, color: fg, opacity: 0.72 }}>{label}</Text>
+      </Pressable>
+    </Animated.View>
+  )
+}
+
+
 function PhotoCard({ art, title, note, thumbs, onPress, height }: {
   art: number; title: string; note?: string | null
   thumbs?: string[]; onPress: () => void
@@ -512,9 +580,9 @@ function CardHead({ label, action, onPress }: { label: string; action: string; o
       flexDirection: "row", alignItems: "baseline", justifyContent: "space-between",
       marginHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm,
     }}>
-      <Text style={{ fontSize: 15.5, fontFamily: F.displaySemi, color: C.fg, letterSpacing: -0.2 }}>{label}</Text>
+      <Text style={{ fontSize: 15.5, fontFamily: F.displaySemi, color: C.onNight, letterSpacing: -0.2 }}>{label}</Text>
       <Pressable onPress={onPress} hitSlop={8}>
-        <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: C.muted }}>{action}</Text>
+        <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: C.onNight, opacity: 0.55 }}>{action}</Text>
       </Pressable>
     </View>
   )
@@ -686,7 +754,7 @@ export default function Dashboard() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: C.bg }}
+      style={{ flex: 1, backgroundColor: C.night }}
       contentContainerStyle={{ paddingTop: insets.top + S.lg, paddingBottom: insets.bottom + TAB_BAR.clearance + S.lg }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
     >
@@ -695,10 +763,10 @@ export default function Dashboard() {
           screen it belongs to — it is where the app reports on itself. */}
       <View style={{ paddingHorizontal: S.xl, flexDirection: "row", alignItems: "flex-start", gap: S.md }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: 13, color: C.muted }}>
+          <Text style={{ fontSize: 13, color: C.onNight, opacity: 0.55 }}>
             {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
           </Text>
-          <Text style={{ marginTop: 2, fontSize: 30, fontFamily: F.display, letterSpacing: -0.5, color: C.fg }}>Dashboard</Text>
+          <Text style={{ marginTop: 2, fontSize: 32, fontFamily: F.display, letterSpacing: -0.8, color: C.onNight }}>Dashboard</Text>
         </View>
         {/* A BORDERED CONTROL, NOT A LOOSE GLYPH. It shipped as a bare 22pt outline in muted
             ink against a big display heading, and the first person to look for Settings did
@@ -717,12 +785,12 @@ export default function Dashboard() {
           style={({ pressed }) => ({
             width: 40, height: 40, marginTop: 2,
             alignItems: "center", justifyContent: "center",
-            borderRadius: R.control,
-            borderWidth: 1, borderColor: C.border,
-            backgroundColor: pressed ? C.accent : C.card,
+            borderRadius: R.pill,
+            borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
+            backgroundColor: pressed ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)",
           })}
         >
-          <Ionicons name="chatbubble-ellipses-outline" size={20} color={C.fg} />
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color={C.onNight} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -732,12 +800,12 @@ export default function Dashboard() {
           style={({ pressed }) => ({
             width: 40, height: 40, marginTop: 2,
             alignItems: "center", justifyContent: "center",
-            borderRadius: R.control,
-            borderWidth: 1, borderColor: C.border,
-            backgroundColor: pressed ? C.accent : C.card,
+            borderRadius: R.pill,
+            borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
+            backgroundColor: pressed ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)",
           })}
         >
-          <Ionicons name="settings-outline" size={20} color={C.fg} />
+          <Ionicons name="settings-outline" size={20} color={C.onNight} />
         </Pressable>
       </View>
 
@@ -761,23 +829,32 @@ export default function Dashboard() {
         onPress={() => router.push("/(tabs)/orders")}
       />
 
-      <CardHead label="In production" action="View all" onPress={() => router.push("/(tabs)/orders")} />
-      <PhotoCard
-        height={132}
-        art={require("../../assets/card-hill.webp")}
-        title={loading ? "Counting…" : `${stageCounts.working ?? 0} being made`}
-        note={loading ? null : awaitingScan ? `${awaitingScan} waiting to be scanned.` : null}
-        onPress={() => router.push("/(tabs)/orders")}
-      />
+      {/* FOUR TILES, NOT FOURTEEN ROWS.
+          Everything under here used to be label-left / value-right rows — the same shape as
+          Wallet, Settings and Details, on all six screens. A row is for reading a list; a
+          tile is for recognising one thing at a glance, which is the only thing a home
+          screen is for. The colour is the tile, not a dot on it. */}
+      <View style={{ flexDirection: "row", gap: 10, marginHorizontal: S.xl, marginTop: S.xl }}>
+        <Tile n={needsYou} label="Need you" bg={C.pop} fg={C.onPop} reduced={reduced}
+              onPress={() => router.push("/(tabs)/orders")} />
+        <Tile n={stageCounts.working ?? 0} label="Being made" bg={C.lit} fg={C.onLit} reduced={reduced}
+              onPress={() => router.push("/(tabs)/orders")} />
+      </View>
+      <View style={{ flexDirection: "row", gap: 10, marginHorizontal: S.xl, marginTop: 10 }}>
+        <Tile n={awaitingScan ?? 0} label="To scan" bg={C.acid} fg={C.onAcid} reduced={reduced}
+              onPress={() => router.push("/(tabs)/scan")} />
+        <Tile n={open.length} label="Open orders" bg={C.brand} fg={C.onBrand} reduced={reduced}
+              onPress={() => router.push("/(tabs)/orders")} />
+      </View>
 
-      <Text style={SECTION_LABEL}>WHERE THE WORK IS</Text>
+      <Text style={[SECTION_LABEL, { color: C.onNight, opacity: 0.55 }]}>WHERE THE WORK IS</Text>
       <Funnel counts={stageCounts} loading={loading} awaitingScan={awaitingScan} />
 
       {/* THE SEVEN-DAY CHART KEPT ITS JOB, not its address. It was inside the ink block; it
           is on the page now, which is the only reason Trend learned a light ground. */}
       <View style={{ marginHorizontal: S.xl }}>
-        <Text style={[SECTION_LABEL, { marginHorizontal: 0 }]}>ARRIVING</Text>
-        <Trend days={days} loading={loading} reduced={reduced} dark={false} />
+        <Text style={[SECTION_LABEL, { marginHorizontal: 0, color: C.onNight, opacity: 0.55 }]}>ARRIVING</Text>
+        <Trend days={days} loading={loading} reduced={reduced} />
       </View>
 
       {/* Say WHICH state this is: a failed fetch and an empty queue must never look alike. */}

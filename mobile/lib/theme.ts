@@ -132,6 +132,24 @@ export const C = {
    * the two are distinguishable because they never share a surface: `lit` is only ever on
    * the block, `pop` only ever on the page.
    */
+  /**
+   * THE MARKETING KIT'S ACID, converted once — web/app/globals.css [data-skin] ACID.
+   * Chosen rather than invented for the same reason `pop` was: a phone picking its own
+   * bright colour is how the two halves of one product end up with different identities.
+   * It is a FILL and never type: 1.1:1 on white, which is why the kit forbids it there too.
+   */
+  acid: "#D4F897",
+  onAcid: "#121212",
+  /**
+   * THE NIGHT GROUND — the dashboard only, and deliberately not `bg`.
+   *
+   * The rest of the app is Workshop: a tinted page with white cards, chroma 0, no shadow.
+   * That is right for a queue you read for an hour and wrong for the screen you open forty
+   * times a day for four seconds, which is the one screen allowed to be an object rather
+   * than a document. Darker than `ink` so an ink block still separates from it.
+   */
+  night: "#141518",
+  onNight: "#F5F6F7",
   pop: "#F472DC",
   onPop: "#101010",
 
