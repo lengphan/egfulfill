@@ -1929,6 +1929,92 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
              products: stale.map((r) => ({ id: r.id, name: (r.data || {}).name || r.id })) };
   });
 
+  /**
+   * PUT THE SUPPLIER'S PRICE BACK ON PRODUCTS ADOPTED BEFORE THE MAPPING CARRIED IT.
+   *
+   * The adopt path in web/lib/supplier-catalog.ts sets productCost from the supplier's own
+   * price, and does so correctly — two products adopted after 2026-09-07 carry it. Everything
+   * adopted before that came in with the name, the images, the sizes and the description and
+   * NO cost, because that version of the mapping did not copy one. Nothing ever went back for
+   * them, so they sat Active, offered in the blank picker, and refused at the pricer.
+   *
+   * Nothing is re-fetched. The prices are already ours — otto_products, ss_products and
+   * sanmar_styles are populated and were populated at the time; only the copy was missing.
+   *
+   * min(price) PER STYLE, which is not a guess: it is what the working path produced.
+   * Measured against the two products that DID adopt correctly — SS-11252 stored 4.76 against
+   * a style whose rows run 4.76, and SS-9182 stored 7.72 against 7.72–8.39. Both are the
+   * minimum, so a backfill that takes the minimum writes what a correct adoption would have.
+   *
+   * A WIDE RANGE IS REPORTED, NOT RESOLVED. A style whose rows span 8.55–17.25 has one cost
+   * here and several in reality, and the honest per-size answer is sizePrices, which this
+   * does not invent. Those rows come back flagged so somebody can look.
+   *
+   * BASE_PRICE IS NEVER TOUCHED, and that is what makes this safe to run over all of them:
+   * it is rung 3 of the cost ladder and productCost is rung 4, so a product already carrying
+   * a hand-typed base price does not move by a cent. Only the products with nothing gain a
+   * price — which is the whole point.
+   *
+   * `sku` is likewise untouched. An older adoption left the supplier's code there; moving it
+   * is a rename of the thing order lines resolve against, and it is not this job.
+   */
+  app.post('/api/catalog/backfill-supplier-costs', { preHandler: requireStaff }, async (req, reply) => {
+    if (req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
+    const dryRun = (req.body || {}).dryRun === true;
+    // A local parse: catalog.js has `money` but no `num`, and a stored cost is free text —
+    // an empty string or "n/a" must read as absent, not as 0.
+    const asNum = (v) => { const n = Number(v); return v == null || v === '' || !isFinite(n) ? null : n; };
+    const rows = (await q(
+      `select id, supplier_sku, base_price, data from catalog_products
+        where id ~ '^(OTTO|SS|SANMAR)-'`)).rows;
+
+    const SOURCES = {
+      OTTO:   { sql: 'select min(price) as p, max(price) as m, min(sku) as sku from otto_products where style = $1' },
+      SS:     { sql: 'select min(price) as p, max(price) as m, min(sku) as sku from ss_products where style_id::text = $1' },
+      SANMAR: { sql: 'select min(price_min) as p, max(coalesce(price_max, price_min)) as m, null::text as sku from sanmar_styles where style = $1' },
+    };
+
+    const changed = [];
+    const skipped = [];
+    for (const row of rows) {
+      const d = row.data || {};
+      const have = asNum(d.productCost ?? d.product_cost);
+      if (have != null && have > 0) { skipped.push({ id: row.id, why: 'already has a cost' }); continue; }
+      const m = /^(OTTO|SS|SANMAR)-(.+)$/.exec(String(row.id));
+      if (!m) { skipped.push({ id: row.id, why: 'not a supplier id' }); continue; }
+      const src = SOURCES[m[1]];
+      const hit = await q(src.sql, [m[2]]).then((r) => r.rows[0]).catch(() => null);
+      const price = hit ? asNum(hit.p) : null;
+      if (price == null || !(price > 0)) { skipped.push({ id: row.id, why: 'no supplier price on file' }); continue; }
+      const max = hit ? asNum(hit.m) : null;
+      const entry = {
+        id: row.id, name: d.name || row.id, productCost: money(price),
+        // The row still prices from its own base when it has one — say so, so a list of 21
+        // changes is not read as 21 price movements.
+        pricesFromBase: (asNum(row.base_price) ?? 0) > 0,
+        spread: max != null && max > price ? { from: money(price), to: money(max) } : null,
+        supplierSku: row.supplier_sku || (hit && hit.sku) || null,
+      };
+      changed.push(entry);
+      if (!dryRun) {
+        await q(
+          `update catalog_products
+              set data = coalesce(data, '{}'::jsonb) || jsonb_build_object('productCost', $2::numeric),
+                  supplier_sku = coalesce(nullif(supplier_sku, ''), $3),
+                  updated_at = now()
+            where id = $1`,
+          [row.id, entry.productCost, entry.supplierSku]);
+      }
+    }
+    if (!dryRun && changed.length) {
+      audit(req, 'catalog.supplier_costs_backfilled', {
+        entityType: 'catalog', entityId: 'supplier-costs',
+        after: { count: changed.length, products: changed.slice(0, 30) },
+      });
+    }
+    return { ok: true, dryRun, updated: changed.length, changed, skipped };
+  });
+
   app.post('/api/catalog/selection', { preHandler: requireStaff }, async (req, reply) => {
     const b = req.body || {};
     const ids = Array.isArray(b.ids) ? b.ids.map(String).filter(Boolean) : [];
