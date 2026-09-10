@@ -38,6 +38,17 @@ export const GRANTS = [
     // an admin turning this on is accepting the consequence and needs to see the edge.
     note: 'Lets an operator correct a line after Approved, the same reach an admin has — until the blanks are ordered, after which it is locked for everyone.',
   },
+  {
+    key: 'operator.editSurcharges',
+    role: 'operator',
+    label: 'Edit print surcharges',
+    /* The note says where it STOPS, because an admin turning this on is accepting the
+       consequence. A surcharge is not a factory preference — it is added to the base cost per
+       unit, so it changes what every seller is quoted on every future order of that method.
+       Deliberately narrow: it is the four surcharge fields, not the rest of the settings PUT,
+       which still needs admin or warehouse. */
+    note: 'Lets an operator change the DTG, DTF, embroidery and extra-side surcharges. These are added to the base cost per unit, so they change what sellers are quoted from that moment on — existing orders keep the price they were frozen at. Every other number on this page still needs admin or warehouse.',
+  },
 ];
 const GRANT_KEYS = new Set(GRANTS.map((g) => g.key));
 

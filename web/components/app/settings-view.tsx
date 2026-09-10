@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { SectionCard } from "@/components/app/section-card"
 import { PermissionsMatrix } from "@/components/app/permissions-matrix"
 import { RoleGrantsPanel } from "@/components/app/role-grants-panel"
+import { isGrantOn, GRANT_OPERATOR_EDIT_SURCHARGES } from "@/lib/role-grants"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -2075,7 +2076,11 @@ function PlatformPanel() {
  belongs here too, and "Print method surcharge" would have read as the wrong home
  for it. */}
       <Fold title={tl("settings", "Surcharge")}>
-        <ReadOnlyFor on={isOperator}>
+        {/* THE ONE CARD AN OPERATOR CAN BE GRANTED. Everything else on this page stays
+            admin-or-warehouse whatever the switch says, and the SERVER is what enforces that
+            — a granted operator's PUT is narrowed to these four keys in factory_settings.js.
+            This only decides whether the fields are drawn live or as a disabled fieldset. */}
+        <ReadOnlyFor on={isOperator && !isGrantOn(GRANT_OPERATOR_EDIT_SURCHARGES)}>
 
         <p className="mb-3 text-xs text-muted-foreground">{tl("settings", "Added to the base cost per unit. A product can override this for its own methods.")}</p>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">

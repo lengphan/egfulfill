@@ -15,6 +15,10 @@ import { getRoleGrants, type RoleGrantDef, type RoleGrants } from "@/lib/api"
 
 /** The one grant key the app reads by name today. Keeps the string out of call sites. */
 export const GRANT_OPERATOR_EDIT_AFTER_APPROVAL = "operator.editAfterApproval"
+/** Lets an operator edit the four print surcharges in Settings › Platform. The SERVER is the
+ *  gate (factory_settings.js narrows a granted operator to those four keys); this only draws
+ *  the fields as editable instead of a disabled fieldset. */
+export const GRANT_OPERATOR_EDIT_SURCHARGES = "operator.editSurcharges"
 
 let ACTIVE: RoleGrants = {}
 let REGISTRY: RoleGrantDef[] = []

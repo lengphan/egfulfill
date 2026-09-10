@@ -5,6 +5,7 @@
 
 import { q } from '../db.js';
 import { audit } from '../audit.js';
+import { isGrantEnabled } from './role_grants.js';
 import { readPricing, writePricing, quoteFor, AI_PRICING_KEY } from '../ai-pricing.js';
 
 // Per-category flat shipping and per-method surcharges. Admin-editable so pricing policy
@@ -583,12 +584,38 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
     return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), return_address: retAddr, product_types: types, thread_palette: threads, parcel_sizes: parcels };
   });
 
+  /**
+   * THE SURCHARGES AN OPERATOR MAY EDIT, when the grant is on — and nothing else on this page.
+   *
+   * A surcharge is added to the base cost per unit, so it changes what every seller is quoted
+   * on every future order of that method. That is why it is a GRANT (closed registry, audited,
+   * an admin can revoke it) rather than a widened role check: `operator.editSurcharges` is a
+   * decision somebody made and can unmake, and the note beside the switch says what it costs.
+   *
+   * The four fields the Surcharge card shows, exactly. The other twenty-odd numbers in KEYS —
+   * design fees, payout rates, markup, shipping — stay admin-or-warehouse, so a granted
+   * operator posting the whole form still cannot move them.
+   */
+  const OPERATOR_SURCHARGE_KEYS = new Set(['method_dtg', 'method_dtf', 'method_emb', 'method_side']);
+
   app.put('/api/factory/settings', { preHandler: requireAdmin }, async (req, reply) => {
     const role = req.user && req.user.role;
-    if (role !== 'admin' && role !== 'warehouse') { reply.code(403); return { error: 'Warehouse or admin only' }; }
+    /* An operator gets in ONLY with the grant, and only to write the four keys above; the
+       loops below narrow to them. Everyone else is unchanged: admin and warehouse write
+       everything, and an operator without the grant is refused at the door as before. */
+    const grantedOperator = role === 'operator' && await isGrantEnabled('operator.editSurcharges');
+    if (role !== 'admin' && role !== 'warehouse' && !grantedOperator) { reply.code(403); return { error: 'Warehouse or admin only' }; }
     await ensure();
     const b = req.body || {};
+    /* AUDITED, because a price change with no author is a number nobody can explain later.
+       Only the granted path — an admin editing settings is already the expected case, and
+       this is the one that widened. */
+    if (grantedOperator) {
+      const changed = Object.fromEntries(Object.entries(b).filter(([k]) => OPERATOR_SURCHARGE_KEYS.has(k)));
+      if (Object.keys(changed).length) audit(req, 'settings.surcharges', { after: changed });
+    }
     for (const k of KEYS) {
+      if (grantedOperator && !OPERATOR_SURCHARGE_KEYS.has(k)) continue;
       if (b[k] == null || b[k] === '') continue;
       const n = Number(b[k]);
       if (!isFinite(n) || n < 0) continue;
@@ -596,12 +623,13 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       await q('insert into settings (key,value,updated_at) values ($1, to_jsonb($2::numeric), now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [k, n]).catch(() => {});
     }
     // Supplier-ordering defaults — stored as JSON strings, not coerced to numbers.
-    for (const k of TEXT_KEYS) {
+    // Never an operator's: the grant is the four surcharge numbers and nothing else.
+    for (const k of grantedOperator ? [] : TEXT_KEYS) {
       if (b[k] === undefined) continue;
       const v = String(b[k] ?? '').trim();
       await q('insert into settings (key,value,updated_at) values ($1, to_jsonb($2::text), now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [k, v]).catch(() => {});
     }
-    if (b.ship_from && typeof b.ship_from === 'object') {
+    if (!grantedOperator && b.ship_from && typeof b.ship_from === 'object') {
       const addr = {};
       for (const f of SHIP_FROM_FIELDS) addr[f] = String(b.ship_from[f] ?? '').trim();
       addr.country = addr.country || 'US';
@@ -642,7 +670,7 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       }
       await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [PARCEL_SIZES_KEY, JSON.stringify(sizes)]);
     }
-    if (b.return_address && typeof b.return_address === 'object') {
+    if (!grantedOperator && b.return_address && typeof b.return_address === 'object') {
       const ret = {};
       for (const f of SHIP_FROM_FIELDS) ret[f] = String(b.return_address[f] ?? '').trim();
       ret.country = ret.country || 'US';
@@ -651,7 +679,7 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       // the providers then fall back to the sender, which is the pre-existing behaviour.
       await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [RETURN_ADDRESS_KEY, JSON.stringify(ret)]);
     }
-    if (Array.isArray(b.product_types)) {
+    if (!grantedOperator && Array.isArray(b.product_types)) {
       // Normalised on the way in: a blank name would create an unselectable type, and
       // duplicates would make the product dropdown ambiguous.
       const seen = new Set();
