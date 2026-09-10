@@ -3447,6 +3447,9 @@ export type FactorySettings = {
   product_types?: ProductType[]
   /** The factory's own cone stock. Empty = fall back to the built-in starter palette. */
   thread_palette?: ThreadColor[]
+  /** Boxes and mailers the floor stocks, set once for everyone. Empty = just the built-in
+   *  three; the list is a fact about the warehouse, not a per-user preference. */
+  parcel_sizes?: { label: string; length: number; width: number; height: number; tareOz?: number }[]
 }
 
 /** One cone on the shelf: code (what you pull), name (what you call it), hex (what it looks like). */

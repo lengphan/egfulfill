@@ -213,6 +213,20 @@ export function shippingBandOf(typeOrName) {
 // were previously bought with whatever `from` the client happened to send, which meant no
 // address at all; this is the single place the floor sets it once.
 export const SHIP_FROM_KEY = 'ship_from';
+/**
+ * THE BOXES AND MAILERS THE FLOOR ACTUALLY HAS.
+ *
+ * PLATFORM-LEVEL, like the ship-from address above it, and for the same reason: there is one
+ * warehouse, and a box either sits on its shelf or it does not. This lived in localStorage
+ * keyed per user — so a size the admin added existed only in the admin's own browser, on the
+ * one machine they added it on, and the packer buying the label never saw it. Three people
+ * could hold three different lists of what the building stocks.
+ *
+ * One jsonb array under one key, the same shape ship_from and site_content use, rather than
+ * a table: it is a short list read on every label and written rarely, and a table would be a
+ * migration for no read this cannot already do.
+ */
+export const PARCEL_SIZES_KEY = 'parcel_sizes';
 // Where returns go. Separate row so it can be set, cleared and read independently of the
 // sender address — they are two different buildings under two different names.
 export const RETURN_ADDRESS_KEY = 'return_address';
@@ -308,6 +322,20 @@ export function normalizeThreadPalette(input) {
 }
 
 const SHIP_FROM_FIELDS = ['name', 'company', 'street', 'street2', 'city', 'state', 'zip', 'country', 'phone', 'email'];
+
+/**
+ * Stock sizes, admin-set. `[]` means nothing configured, and the CALLER decides what to fall
+ * back to — the label dialog ships three defaults so a fresh install is usable, and that is a
+ * front-end fact rather than something to bake into storage where it would be indistinguishable
+ * from a deliberate choice.
+ */
+export async function readParcelSizes() {
+  try {
+    const r = await q('select value from settings where key=$1', [PARCEL_SIZES_KEY]);
+    const v = r.rows[0] && r.rows[0].value;
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
 
 export async function readShipFrom() {
   try {
@@ -551,8 +579,8 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
 
   app.get('/api/factory/settings', { preHandler: requireStaff }, async () => {
     await ensure();
-    const [nums, shipFrom, retAddr, types, threads] = await Promise.all([readAll(), readShipFrom(), readReturnAddress(), readProductTypes(), readThreadPalette()]);
-    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), return_address: retAddr, product_types: types, thread_palette: threads };
+    const [nums, shipFrom, retAddr, types, threads, parcels] = await Promise.all([readAll(), readShipFrom(), readReturnAddress(), readProductTypes(), readThreadPalette(), readParcelSizes()]);
+    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), return_address: retAddr, product_types: types, thread_palette: threads, parcel_sizes: parcels };
   });
 
   app.put('/api/factory/settings', { preHandler: requireAdmin }, async (req, reply) => {
@@ -582,6 +610,37 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       // Defaults ON: the name above is then a fallback, not what every buyer sees.
       addr.blind = b.ship_from.blind !== false;
       await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [SHIP_FROM_KEY, JSON.stringify(addr)]);
+    }
+    if (Array.isArray(b.parcel_sizes)) {
+      /**
+       * VALIDATED ON THE WAY IN, because these numbers are quoted to a carrier.
+       *
+       * A zero or negative dimension is a rate request that either errors or — worse —
+       * returns a price for a parcel that does not exist, and the difference arrives as a
+       * carrier adjustment days later. A blank label is allowed: `sizeLabel` on the client
+       * builds "13 × 10 × 1 in" from the numbers, so a size nobody named is still readable.
+       *
+       * De-duplicated by DIMENSIONS, not by name — the same box entered twice under two
+       * names is one box, and two rows for it make the dropdown ambiguous about which to
+       * pick when they are identical.
+       */
+      const seen = new Set();
+      const sizes = [];
+      for (const raw of b.parcel_sizes) {
+        if (!raw || typeof raw !== 'object') continue;
+        const L = Number(raw.length), W = Number(raw.width), H = Number(raw.height);
+        if (![L, W, H].every((n) => isFinite(n) && n > 0)) continue;
+        const key = [L, W, H].join('x');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const tare = Number(raw.tareOz);
+        sizes.push({
+          label: String(raw.label ?? '').trim(),
+          length: L, width: W, height: H,
+          ...(isFinite(tare) && tare > 0 ? { tareOz: tare } : {}),
+        });
+      }
+      await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [PARCEL_SIZES_KEY, JSON.stringify(sizes)]);
     }
     if (b.return_address && typeof b.return_address === 'object') {
       const ret = {};
@@ -624,6 +683,6 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       }
     }
     const shipFrom = await readShipFrom();
-    return { ok: true, ...(await readAll()), ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: await readProductTypes(), thread_palette: await readThreadPalette() };
+    return { ok: true, ...(await readAll()), ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: await readProductTypes(), thread_palette: await readThreadPalette(), parcel_sizes: await readParcelSizes() };
   });
 }

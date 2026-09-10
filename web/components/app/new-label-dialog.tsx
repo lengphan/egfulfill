@@ -11,12 +11,26 @@ import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
-import { STOCK_SIZES, DEFAULT_SIZE, customSizes, addCustomSize, sizeKey, sizeLabel, type ParcelSize } from "@/lib/parcel-sizes"
+import { STOCK_SIZES, DEFAULT_SIZE, allSizes, setSharedSizes, addCustomSize, sizeKey, sizeLabel, type ParcelSize } from "@/lib/parcel-sizes"
 import { parcelFromOrder, parcelBasisNote } from "@/lib/parcel-from-order"
 import { validateAddress, buyUspsLabel, getShippingRates, getFactorySettings, setFactorySettings, getCatalogProducts, fetchShipmentLabel, type ShipAddress, type UspsLabelResult, type ShippingRate, type OrderItem } from "@/lib/api"
 
 const BLANK: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
-const DEFAULT_CARRIERS = ["usps", "ups"]
+/**
+ * NO DEFAULT CARRIER FILTER — empty means EVERY carrier, which is what the setting has always
+ * claimed and what the client did not do.
+ *
+ * This was `["usps", "ups"]`, applied whenever `enabled_carriers` is unset — and it is unset
+ * in production, checked. So the rate list was quietly capped at two carriers no matter what
+ * the Shippo account offered: connect FedEx or DHL and their rates arrived from the server
+ * and were dropped here, on a page that gives no hint it is filtering. "Why are these so few
+ * package rates" was this line, not the account.
+ *
+ * A hidden allow-list is the wrong default for a rate picker in any case. The point of rate
+ * shopping is seeing what is actually available; a filter belongs there when somebody has
+ * chosen it, which is exactly what `enabled_carriers` is for.
+ */
+const DEFAULT_CARRIERS: string[] = []
 const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
 const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.zip)
 const FROM_STORE = "eg_ship_from"
@@ -56,8 +70,15 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * other, and a person who weighs the full parcel can leave this at 0. */
  const [tareOz, setTareOz] = useState(0)
  const [sizes, setSizes] = useState<ParcelSize[]>(STOCK_SIZES)
+  /**
+   * THE WAREHOUSE'S LIST, not this browser's — filled by the settings call on open below,
+   * which already runs and already has the answer. A second fetch for one field would be two
+   * requests for one page load.
+   *
+   * The stock three show immediately so the dropdown is never empty while it is in flight.
+   */
  useEffect(() => {
- const t = setTimeout(() => setSizes([...STOCK_SIZES, ...customSizes()]), 0)
+ const t = setTimeout(() => setSizes(allSizes()), 0)
  return () => clearTimeout(t)
   }, [])
 
@@ -91,6 +112,8 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  const ec = String(s?.enabled_carriers || "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean)
  setCarriers(ec.length ? ec : DEFAULT_CARRIERS)
  setHiddenServices(String(s?.hidden_services || "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean))
+ setSharedSizes(s?.parcel_sizes ?? [])
+ setSizes(allSizes())
       }).catch(() => {})
  if (order?.to && order.to.street) {
  const a = { ...BLANK, ...order.to }
@@ -408,7 +431,12 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  const r = await getShippingRates({ to, from, parcel: { weightOz, length: pkg.length, width: pkg.width, height: pkg.height }, extra: (svc.signature || svc.insurance) ? { signature: svc.signature, insurance: svc.insurance } : undefined })
  if (r.error) { setErr(r.error); setRates([]); return }
       // Only the carriers this warehouse offers (admin-set; defaults to USPS + UPS), cheapest first.
- const filtered = (r.rates || []).filter((rt) => carriers.some((c) => (rt.carrier || "").toLowerCase().includes(c)))
+      /* No configured carriers = no filtering at all. Relying on the fallback chain below to
+         "happen to" show everything when the allow-list matches nothing is termination by
+         luck; an empty list means unrestricted, so say it. */
+ const filtered = carriers.length
+        ? (r.rates || []).filter((rt) => carriers.some((c) => (rt.carrier || "").toLowerCase().includes(c)))
+        : (r.rates || [])
       // Then drop the services it doesn't ship — Ground Saver and the like. Applied AFTER
       // the carrier filter and never as a fallback: if hiding leaves nothing, that is the
       // honest answer for this parcel, and quietly showing a service the floor refuses to
@@ -480,28 +508,29 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
           One column meant the rates — the thing you came to choose — sat below the fold
  under the parcel fields, so buying a label always began with a scroll. */}
       {/**
-       * A CENTRED WINDOW, ONE COLUMN, 576px.
+       * TWO COLUMNS AT 768px — form left, rates right.
        *
-       * It has been three shapes in two days and the reasoning is worth keeping, because each
-       * step was a real objection:
+       * It has been four shapes in two days, and each move answered the previous complaint,
+       * so the record is worth keeping rather than re-deriving:
        *
-       *   1024px, two columns  too wide — and the width was the symptom. Rates are the RESULT
-       *                        of this form, not a sibling of it, so the right half was empty
-       *                        on arrival and the window opened as half a screen of white
-       *                        beside one button.
-       *   right-hand panel     fixed the column problem and introduced a form factor nobody
-       *                        asked for: a full-height sheet reads as a different surface
-       *                        from every other dialog in the app.
-       *   this                 a pop-up like the rest, narrow, in the order the job happens —
-       *                        who it goes to, what the parcel is, what it costs.
+       *   1024px, two columns  too wide, and the right half was empty on arrival.
+       *   right-hand panel     fixed the columns, introduced a form factor nobody asked for.
+       *   576px, one column    a pop-up like the rest — but with several carriers connected
+       *                        the rate list is long, so Buy sat below a scroll and the
+       *                        window was tall enough to need one.
+       *   this                 two columns, a quarter narrower than the first attempt.
        *
-       * 576px is chosen, not split. The old note argued a rate row needs ~480px because it is
-       * "carrier + service + transit + price"; the markup stacks them — carrier · service on
-       * one line, ETA beneath, price on the right — so a row fits comfortably here and reads
-       * better narrow, with the price nearer the name it belongs to. The long-list worry was
-       * always answered by the list's own scroller, never by a second column.
+       * 768 rather than 1024 because the thing that forced the extra width is gone: the
+       * two-line format helper under the address box was deleted when the parser stopped
+       * needing to be told what shape to expect. That leaves ~360px a side, and a rate row
+       * stacks — carrier · service, ETA beneath, price on the right — so it fits without
+       * truncating the service name.
+       *
+       * The second column earns its place now in a way it did not at the start: with UPS and
+       * USPS both connected there are enough rates that they want their own scroll, and
+       * putting them beside the form is what keeps Buy on screen while you read them.
        */}
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : tl("label", "New label")}</DialogTitle></DialogHeader>
 
         {result ? (
@@ -568,9 +597,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
           </div>
         ) : (
           <>
-            {/* ONE COLUMN, in the order the job happens: who it goes to, what the parcel is,
-                what it costs. The two-track grid is gone with the second column. */}
-            <div className="grid gap-y-3 py-1">
+            {/* Form left, rates right. `items-start` so the rates column does not stretch to the
+                form's height and leave its heading floating in the middle of nothing. */}
+            <div className="grid items-start gap-x-6 gap-y-3 py-1 md:grid-cols-2">
               {/* `md:col-span-1` went with the second column — a span in a one-track grid
                   is a leftover that reads as though a layout is still there. */}
               <div className="space-y-3">
@@ -708,14 +737,12 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 </label>
               </div>
 
-              </div>{/* /form */}
+              </div>{/* /left column */}
 
-              {/* ── RATES, UNDER the form — the result of it, in reading order.
-                  Kept in its own block with its own scroller: the list can be twenty services
-                  long, and the Buy button below it must stay reachable without the panel
-                  growing. A hairline above, because this is the answer and everything over it
-                  was the question. */}
-              <div className="space-y-3 border-t border-border pt-4">
+              {/* ── RATES, in their own column with their own scroll. With several carriers
+                  connected this list runs long, and beside the form is what keeps the Buy
+                  button on screen while you read down it. */}
+              <div className="space-y-3">
               <div className="eg-label text-muted-foreground">{tl("label", "Rates")}</div>
               <Button variant="outline" className="w-full" onClick={getRates} disabled={ratesLoading || !addrComplete(to) || !addrComplete(from)}>
                 {ratesLoading ? <><CircleNotch size={14} className="animate-spin" /> {tl("label", "Getting rates…")}</> : rates ? tl("label", "Refresh rates") : <><Truck size={14} weight="bold" /> {tl("label", "Get rates")}</>}

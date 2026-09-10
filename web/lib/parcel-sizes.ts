@@ -44,7 +44,48 @@ export const DEFAULT_SIZE = STOCK_SIZES[0]
 const KEY = "eg_parcel_sizes"
 const storeKey = () => `${KEY}:${getUser()?.id ?? "anon"}`
 
-/** Sizes this person added themselves. Never throws — a blocked store just means none. */
+/**
+ * THE SHARED LIST — what the building actually stocks, set once in Settings › Platform.
+ *
+ * Sizes used to live ONLY in localStorage, keyed per user. So a box the admin added existed
+ * in the admin's own browser, on the one machine they added it on, and the packer buying the
+ * label never saw it: three people, three different ideas of what is on the shelf. A parcel
+ * size is a fact about the warehouse, not a preference, and it belongs where the ship-from
+ * address already is.
+ *
+ * Held in a module-level cache rather than fetched per render — every label dialog and the
+ * rate calculator ask for it, and it changes about once a quarter. `loadSharedSizes()` is
+ * called by the surfaces that need it; until it answers, the stock three are what shows, so
+ * a slow settings call never leaves the dropdown empty.
+ */
+let shared: ParcelSize[] = []
+export function sharedSizes(): ParcelSize[] { return shared }
+export function setSharedSizes(list: ParcelSize[]) {
+  shared = (Array.isArray(list) ? list : []).filter((s) => s && s.length > 0 && s.width > 0 && s.height > 0)
+}
+
+/**
+ * Every size on offer, in the order the dropdown shows them: the stock three, then whatever
+ * the warehouse added, then anything still stranded in this browser's localStorage.
+ *
+ * DE-DUPLICATED BY DIMENSIONS across all three sources. The migration below copies local
+ * sizes up to the server, and until an admin saves, the same box would otherwise appear
+ * twice — once from each side.
+ */
+export function allSizes(): ParcelSize[] {
+  const out: ParcelSize[] = []
+  const seen = new Set<string>()
+  for (const s of [...STOCK_SIZES, ...shared, ...customSizes()]) {
+    const k = sizeKey(s)
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(s)
+  }
+  return out
+}
+
+/** Sizes this person added themselves, in this browser. Kept only so nothing anyone typed is
+ *  lost on the way to the shared list — see `allSizes`. Never throws. */
 export function customSizes(): ParcelSize[] {
   if (typeof window === "undefined") return []
   try {
