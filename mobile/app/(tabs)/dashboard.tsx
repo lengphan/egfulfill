@@ -5,7 +5,7 @@ import {
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
-import { getOrders, assetUrl, type Order } from "@/lib/api"
+import { getOrders, getMe, assetUrl, type Order, type User } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { isOpen, isOverdue, normalizeStage, platformOf, numOf, lineListing } from "@/lib/orders"
 import { TAB_BAR, F, C, R, S, CARD } from "@/lib/theme"
@@ -524,9 +524,12 @@ function Tile({ n, label, bg, fg, prefix, reduced, onPress }: {
 }
 
 
-function PhotoCard({ art, title, note, thumbs, onPress, height }: {
+function PhotoCard({ art, title, note, thumbs, onPress, height, top }: {
   art: number; title: string; note?: string | null
   thumbs?: string[]; onPress: () => void
+  /** Space above it. The card lost its section heading, so it now owns the gap the heading
+   *  used to provide. */
+  top?: number
   /* AN EXPLICIT HEIGHT, not an aspectRatio. aspectRatio on an <Image> resolved against the
      file's own dimensions rather than the given width, and a 4:3 crop drew 555pt tall on a
      414pt screen — one card filling the whole home screen. A card's height is a layout
@@ -537,7 +540,7 @@ function PhotoCard({ art, title, note, thumbs, onPress, height }: {
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        marginHorizontal: S.xl, borderRadius: 26, overflow: "hidden",
+        marginHorizontal: S.xl, marginTop: top ?? 0, borderRadius: 26, overflow: "hidden",
         opacity: pressed ? 0.92 : 1, backgroundColor: C.accent,
       })}
     >
@@ -652,6 +655,15 @@ export default function Dashboard() {
    */
   useFocusEffect(useCallback(() => { load() }, [load]))
 
+  /* One shot, on mount, for the name in the greeting. Empty deps on purpose: an effect
+     whose condition its own result could re-satisfy is the shape that took a machine down
+     (CLAUDE.md 2.8), and this one has no condition at all. */
+  const [me, setMe] = useState<User | null>(null)
+  useEffect(() => { getMe().then(setMe).catch(() => {}) }, [])
+
+  const hour = new Date().getHours()
+  const hello = `Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}${me?.name ? `, ${String(me.name).split(" ")[0]}` : ""}`
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true); await load(); setRefreshing(false)
   }, [load])
@@ -731,11 +743,35 @@ export default function Dashboard() {
   const needsNote = useMemo(() => {
     const lateN = open.filter(isOverdue).length
     const rushN = open.filter((o) => o.rush && !isOverdue(o)).length
-    if (lateN && rushN) return `${lateN} overdue and ${rushN} marked rush.`
-    if (lateN) return `${lateN} overdue.`
-    if (rushN) return `${rushN} marked rush.`
+    /* Written as a sentence, not a tally. "3 overdue." under "3 orders need you" repeats a
+       number and then abbreviates its way out of a verb. */
+    const all = lateN + rushN
+    const many = (n: number) => (n === all && all > 1 ? "All" : String(n))
+    if (lateN && rushN) return `${lateN} are overdue and ${rushN} is marked rush.`
+    if (lateN) return lateN === 1 ? "It is overdue." : `${many(lateN)} of them are overdue.`
+    if (rushN) return rushN === 1 ? "It is marked rush." : `${many(rushN)} of them are marked rush.`
     return null
   }, [open])
+
+  const shipped = useMemo(
+    () => rows.filter((o) => normalizeStage(o.factory_status) === "shipped").length,
+    [rows],
+  )
+
+  /* What is on the floor right now, as pictures. Capped at eight: this is a glance, and a
+     strip you scroll for a minute is a list wearing a different coat. */
+  const inWorks = useMemo(
+    () => open
+      .filter((o) => normalizeStage(o.factory_status) === "working")
+      .map((o) => {
+        const it = (o.items ?? [])[0]
+        const uri = it ? assetUrl(it.img_ref || it.img) : null
+        return uri ? { id: String(o.id), num: numOf(o), uri } : null
+      })
+      .filter(Boolean)
+      .slice(0, 8) as { id: string; num: string; uri: string }[],
+    [open],
+  )
 
   const urgent = useMemo(() => {
     const late = open.filter(isOverdue)
@@ -743,14 +779,9 @@ export default function Dashboard() {
     return [...late, ...rush].slice(0, 12)
   }, [open])
 
-  /* The strip survives as three faces on the card — enough to recognise what is waiting,
-     which is all the strip was ever doing at twelve. */
-  const urgentThumbs = useMemo(
-    () => urgent
-      .map((o) => { const it = (o.items ?? [])[0]; return it ? assetUrl(it.img_ref || it.img) : null })
-      .filter(Boolean).slice(0, 3) as string[],
-    [urgent],
-  )
+  /* The hero card carried three faces for a while. They came off when "In the works" grew
+     its own strip below: two rows of the same thumbnails on one screen is the padding this
+     pass exists to remove, and on a photograph they read as stickers. */
 
   return (
     <ScrollView
@@ -766,7 +797,11 @@ export default function Dashboard() {
           <Text style={{ fontSize: 13, color: C.onNight, opacity: 0.55 }}>
             {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
           </Text>
-          <Text style={{ marginTop: 2, fontSize: 32, fontFamily: F.display, letterSpacing: -0.8, color: C.onNight }}>Dashboard</Text>
+          {/* A GREETING, NOT A LABEL. "Dashboard" is the word on the tab directly below it,
+            and printing it twice tells a person nothing they did not already know. */}
+        <Text style={{ marginTop: 2, fontSize: 32, fontFamily: F.display, letterSpacing: -0.8, color: C.onNight }}>
+          {hello}
+        </Text>
         </View>
         {/* A BORDERED CONTROL, NOT A LOOSE GLYPH. It shipped as a bare 22pt outline in muted
             ink against a big display heading, and the first person to look for Settings did
@@ -819,13 +854,12 @@ export default function Dashboard() {
           is a report rather than a home screen. The two questions a morning actually asks
           are "is anything waiting on me" and "how much is being made", so each gets a card,
           and everything that block also carried is still on this screen, further down. */}
-      <CardHead label="Needs you" action="View all" onPress={() => router.push("/(tabs)/orders")} />
       <PhotoCard
         height={228}
         art={require("../../assets/card-sky.webp")}
         title={loading ? "Counting…" : needsYou === 0 ? "Nothing needs you" : `${needsYou} ${needsYou === 1 ? "order needs" : "orders need"} you`}
         note={loading ? null : needsYou === 0 ? "Everything open is on time." : needsNote}
-        thumbs={urgentThumbs}
+        top={S.xl}
         onPress={() => router.push("/(tabs)/orders")}
       />
 
@@ -834,28 +868,51 @@ export default function Dashboard() {
           Wallet, Settings and Details, on all six screens. A row is for reading a list; a
           tile is for recognising one thing at a glance, which is the only thing a home
           screen is for. The colour is the tile, not a dot on it. */}
+      {/* THE CARD OWNS "needs you", so the tiles are VOLUMES and none of them repeats it.
+          Three sayings of one number — a heading, a headline and a tile — was most of what
+          made this screen read as padded. */}
       <View style={{ flexDirection: "row", gap: 10, marginHorizontal: S.xl, marginTop: S.xl }}>
-        <Tile n={needsYou} label="Need you" bg={C.pop} fg={C.onPop} reduced={reduced}
+        <Tile n={open.length} label="Open" bg={C.brand} fg={C.onBrand} reduced={reduced}
               onPress={() => router.push("/(tabs)/orders")} />
-        <Tile n={stageCounts.working ?? 0} label="Being made" bg={C.lit} fg={C.onLit} reduced={reduced}
-              onPress={() => router.push("/(tabs)/orders")} />
+        <Tile n={stageCounts.working ?? 0} label="In production" bg={C.lit} fg={C.onLit} reduced={reduced}
+              onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Working" } })} />
       </View>
       <View style={{ flexDirection: "row", gap: 10, marginHorizontal: S.xl, marginTop: 10 }}>
-        <Tile n={awaitingScan ?? 0} label="To scan" bg={C.acid} fg={C.onAcid} reduced={reduced}
+        <Tile n={awaitingScan ?? 0} label="Ready to scan" bg={C.acid} fg={C.onAcid} reduced={reduced}
               onPress={() => router.push("/(tabs)/scan")} />
-        <Tile n={open.length} label="Open orders" bg={C.brand} fg={C.onBrand} reduced={reduced}
-              onPress={() => router.push("/(tabs)/orders")} />
+        <Tile n={shipped} label="On the way" bg={C.pop} fg={C.onPop} reduced={reduced}
+              onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Shipped" } })} />
       </View>
 
-      <Text style={[SECTION_LABEL, { color: C.onNight, opacity: 0.55 }]}>WHERE THE WORK IS</Text>
-      <Funnel counts={stageCounts} loading={loading} awaitingScan={awaitingScan} />
-
-      {/* THE SEVEN-DAY CHART KEPT ITS JOB, not its address. It was inside the ink block; it
-          is on the page now, which is the only reason Trend learned a light ground. */}
-      <View style={{ marginHorizontal: S.xl }}>
-        <Text style={[SECTION_LABEL, { marginHorizontal: 0, color: C.onNight, opacity: 0.55 }]}>ARRIVING</Text>
-        <Trend days={days} loading={loading} reduced={reduced} />
-      </View>
+      {/* WHAT IS BEING MADE, as pictures.
+          Two grey blocks stood here — a stage funnel and a seven-day bar chart — and both
+          were lists of numbers on a screen whose whole point is not being one. The funnel
+          said what the Orders screen's own lens tabs already say, one tap away. The chart
+          counted orders CREATED per day, which is a report, and it was labelled ARRIVING,
+          which is not even what it counted. */}
+      {inWorks.length > 0 && (
+        <>
+          <CardHead label="In the works" action="View all"
+                    onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Working" } })} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 10, paddingHorizontal: S.xl }}
+          >
+            {inWorks.map((w) => (
+              <Pressable key={w.id} onPress={() => router.push(`/order/${encodeURIComponent(w.id)}`)}
+                         style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
+                <Image source={{ uri: w.uri }}
+                       style={{ width: 132, height: 132, borderRadius: R.card, backgroundColor: "rgba(255,255,255,0.08)" }}
+                       resizeMode="cover" />
+                <Text numberOfLines={1} style={{ width: 132, marginTop: 7, fontSize: 12.5, fontFamily: F.medium, color: C.onNight, opacity: 0.75 }}>
+                  {w.num}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </>
+      )}
 
       {/* Say WHICH state this is: a failed fetch and an empty queue must never look alike. */}
       {err ? (
