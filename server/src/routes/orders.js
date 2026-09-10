@@ -15,10 +15,10 @@ import { supportReplyEmail } from '../emails.js';
 import { audit } from '../audit.js';
 import { isGrantEnabled } from './role_grants.js';
 import { designNoFor, designLabel, ensureDesignIds } from '../design-id.js';
-import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName, priceLines, computeTotals, feeSettings } from '../pricing.js';
+import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName, priceLines, computeTotals, feeSettings, methodAddOnsFor, matchProduct } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll } from './factory_settings.js';
-import { orderCharges, refundOrder } from './order_refunds.js';
+import { orderCharges, refundOrder, chargeOrderFee } from './order_refunds.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
 import { reserveForOrder, releaseForOrder, consumeForOrder, restoreForOrder } from '../reserve.js';
@@ -3041,6 +3041,15 @@ export function ordersRoutes(app, requireAuth) {
     let where = `order_id=$${n++}`; vals.push(req.params.id);
     if (lineId) { where += ` and line_id=$${n++}`; vals.push(lineId); }
     else { where += ` and sku=$${n++}`; vals.push(sku); }
+    /* THE LINE AS IT STANDS, read before the write. The method surcharge below is a
+       DIFFERENCE, so the old value has to be captured while it is still the old value.
+       Its OWN placeholders: `where` above is numbered from wherever the SET list ended, so
+       reusing it here with a short parameter list would ask for $5 and be handed $1. */
+    const wasRow = (await q(
+      `select print_type, qty, name, sku, blank from order_items
+        where order_id=$1 and ${lineId ? 'line_id' : 'sku'}=$2 limit 1`,
+      [req.params.id, lineId || sku]
+    ).catch(() => ({ rows: [] }))).rows[0];
     const r = await q(`update order_items set ${sets.join(',')} where ${where}`, vals);
     if (!r.rowCount) { reply.code(404); return { error: 'item not found' }; }
     audit(req, 'item.setup', {
@@ -3049,8 +3058,79 @@ export function ordersRoutes(app, requireAuth) {
       // make. Absent on every ordinary edit, so its presence is the whole signal.
       after: { line_id: lineId, sku, ...b, ...(grantedOperator ? { grant: 'operator.editAfterApproval' } : null) },
     });
+    /**
+     * A METHOD CHANGE AFTER THE MONEY MOVED IS A PRICE CHANGE (owner, 2026-09-10: "operator
+     * was trying to change the type upon customer request but it didn't change in price at
+     * all").
+     *
+     * The quote is FROZEN at submit — deliberately, so a seller's total cannot drift under
+     * them — and this route wrote `print_type` straight through it. So DTG → Embroidery moved
+     * the job onto a dearer machine and charged nobody, every time.
+     *
+     * THE DIFFERENCE, NOT A RE-QUOTE. Re-running the whole quote would also pick up a blank
+     * cost or a shipping band that has moved since submit, and silently rebill a seller for
+     * things nobody touched. Only the surcharge that actually changed is priced: the new
+     * method's add-on minus the old one, times the quantity.
+     *
+     * THROUGH chargeOrderFee, the same function the Price adjustment panel calls — so it
+     * takes the same lock, writes the same `order-fee` ledger shape, appears in the Summary
+     * as an adjustment, shows in History, and can be reversed by the same ↩ control. A second
+     * mechanism for the same money is a second set of edge cases.
+     *
+     * ONLY AFTER A CHARGE. Before submit nothing has been quoted, so changing the method just
+     * changes what the seller will be asked to confirm — that is the whole point of a draft.
+     *
+     * BEST-EFFORT, and last. The line is already saved; a wallet that cannot be reached must
+     * not undo a correction the floor has made, and the refusal is reported rather than
+     * swallowed so somebody can charge it by hand.
+     */
+    let priced = null;
+    if (wasRow && b.printType !== undefined && String(wasRow.print_type || '') !== String(b.printType || '')) {
+      try {
+        if (await chargedAmount(req.params.id) > 0) {
+          const fees = await feeSettings();
+          const idx = await catalogIndex();
+          const row = matchProduct(idx, { blank: wasRow.blank, sku: wasRow.sku, name: wasRow.name });
+          const from = String(wasRow.print_type || '');
+          const to = String(b.printType || '');
+          const adds = methodAddOnsFor(row, fees, [from, to]);
+          const keyOf = (t) => Object.keys(methodAddOnsFor(row, fees, [t]))[0];
+          const delta = ((adds[keyOf(to)] ?? 0) - (adds[keyOf(from)] ?? 0)) * Math.max(1, Number(wasRow.qty) || 1);
+          if (Math.abs(delta) >= 0.005) {
+            /* CONDENSED, and it is what the seller reads on their statement: what changed,
+               from what to what, on which item. */
+            const what = `Method ${from || '—'} → ${to || '—'} · ${wasRow.name || wasRow.sku || 'item'}`;
+            /**
+             * ONLY THE CHARGE IS AUTOMATIC. A method that got DEARER is unambiguous — the job
+             * costs more, the seller owes the difference, and chargeOrderFee is the same path
+             * the Price adjustment panel uses.
+             *
+             * A method that got CHEAPER is not, and it is not being guessed at. A refund on
+             * this platform comes off a NAMED part, and the fee part's refundable amount is
+             * what was actually charged as a fee — so a downgrade on an order that never had
+             * an adjustment would refund nothing and report success. Which part a method
+             * downgrade should come off is a decision about money, not something to infer at
+             * the tail of a PATCH.
+             *
+             * So it is recorded, surfaced on the response and audited with the figure — and
+             * left for a person to put through the Price adjustment card, which can already
+             * do it in one press. Saying "£5 is owed back" is honest; quietly refunding the
+             * wrong part is not.
+             */
+            priced = delta > 0
+              ? await chargeOrderFee({ orderId: req.params.id, amount: delta, note: what, by: req.user && req.user.sub })
+              : { owedBack: Math.abs(delta), note: what,
+                  error: `This method is $${(Math.abs(delta)).toFixed(2)} cheaper — refund it from the Price adjustment card; it has not been returned automatically.` };
+            audit(req, 'order.fee', {
+              entityType: 'order', entityId: req.params.id,
+              after: { note: what, amount: delta, line_id: lineId, sku, auto: 'method-change' },
+            });
+          }
+        }
+      } catch (e) { priced = { error: e.message }; }
+    }
     egBroadcast({ type: 'orders' });
-    return { ok: true };
+    return { ok: true, ...(priced ? { priced } : null) };
   });
 
   /**
