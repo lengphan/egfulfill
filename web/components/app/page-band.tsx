@@ -375,7 +375,10 @@ export function PageBand({
     <div
       ref={band}
       className={
-        "relative isolate flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-xl bg-sidebar px-5 py-5 text-sidebar-foreground " +
+        "relative isolate flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-xl px-5 py-5 " +
+        /* The pale liquid-glass figure turns the band into a light surface, so the type has to
+           invert with it — white on that material measures as invisible, not merely weak. */
+        (figure === "video" ? "bg-[#dfe3f2] text-[#171826] " : "bg-sidebar text-sidebar-foreground ") +
         /* THE BAND STAYS SHORT (owner's call, 2026-09-09) — the height is not the knob. The
            padding is: the cluster occupies the right of the band, so the type needs the other
            58% reserved or a long Vietnamese name runs into an object. Mobile hides the
@@ -385,7 +388,7 @@ export function PageBand({
     >
       <div className="min-w-0">
         <h1 className="font-title text-2xl font-semibold leading-tight tracking-tight">{title}</h1>
-        {sub && <p className="text-sm text-sidebar-foreground/60">{sub}</p>}
+        {sub && <p className={"text-sm " + (figure === "video" ? "text-[#171826]/70" : "text-sidebar-foreground/60")}>{sub}</p>}
       </div>
       {children}
 

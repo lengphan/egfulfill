@@ -26,8 +26,8 @@ import { useEffect, useRef } from "react"
  * still we were already shipping.
  */
 export function BandVideo({
-  src = "/ploy/obj/chrome-flow.mp4",
-  poster = "/ploy/obj/chrome-silver.webp",
+  src = "/ploy/obj/peri-flow.mp4",
+  poster = "/ploy/obj/peri-still.webp",
 }: { src?: string; poster?: string }) {
   const host = useRef<HTMLDivElement>(null)
   const vid = useRef<HTMLVideoElement>(null)

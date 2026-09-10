@@ -2144,7 +2144,7 @@ td[align="right"] {
    simply where the tubes start. */
 .eg-bandvid-frame {
   position: absolute;
-  inset: 0 0 0 38%;
+  inset: 0;
   overflow: hidden;
   pointer-events: none;
   z-index: -10;
