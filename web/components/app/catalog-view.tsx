@@ -14,6 +14,7 @@ import {
 } from "@/lib/api"
 import { CatalogPrint } from "@/components/app/catalog-print"
 import { ProductThumb } from "@/components/app/product-thumb"
+import { ImageLightbox } from "@/components/app/image-lightbox"
 import { SupplierStylesPicker } from "@/components/app/supplier-styles-picker"
 import { CatalogExportHistory } from "@/components/app/catalog-export-history"
 import { PartnerSheets } from "@/components/app/partner-sheets"
@@ -71,7 +72,7 @@ function marginOf(raw: string, cost: number): { amount: number; pct: number } | 
  * exactly what `react-hooks/static-components` exists to catch.
  */
 function CatalogCard({
-  p, id, image, checked, disabled, draftValue, onDraft, onSave, onToggle, label,
+  p, id, image, checked, disabled, draftValue, onDraft, onSave, onToggle, onZoom,
 }: {
   p: CatalogProduct
   id: string
@@ -82,8 +83,19 @@ function CatalogCard({
   onDraft: (v: string) => void
   onSave: () => void
   onToggle: (include: boolean) => void
-  label: (s: string) => string
+  onZoom: () => void
 }) {
+  /**
+   * THE HOOK, NOT A `label` PROP.
+   *
+   * This took its strings through a `label(s)` callback passed down from the parent, and the
+   * result was that every one of them was INVISIBLE to tools/check-i18n.mjs — the gate scans
+   * for the literal two-argument call, so ten strings reported as fully covered while none
+   * of them had Vietnamese. A gate you have routed around is worse than no gate, because it
+   * still says PASS. (It scans comments too, so this one deliberately does not spell the
+   * call out — writing the example created a tenth phantom key.)
+   */
+  const tl = useLabelT()
   const cost = costOf(p)
   const m = marginOf(draftValue, cost)
   const colours = colorsOf(p).length
@@ -101,9 +113,32 @@ function CatalogCard({
             tile lets the garment sit with no visible box around it — the edge is already the
             card's border. The printed sheet keeps its grey precisely because those wells
             have none. Same photographs, two surfaces, and the plate is load-bearing on one. */}
-        <Link href={`/products/${encodeURIComponent(id)}`} className="block">
-          <ProductThumb src={image} alt={p.name || id} className="aspect-square w-full rounded-none border-0" />
-        </Link>
+        {/**
+          * THE PICTURE ZOOMS; IT DOES NOT NAVIGATE (owner's call).
+          *
+          * It was a link to the product page, which is the wrong answer to the only question
+          * anyone asks it here: "which garment is that". Leaving the catalogue to find out
+          * loses the whole set you were choosing between, and coming back is a fresh load
+          * and a lost scroll position — for a look at a photograph.
+          *
+          * So it opens the SHARED lightbox. Not a new one: image-lightbox.tsx exists because
+          * six surfaces had each grown their own and no two agreed on whether Escape closed
+          * them (§4 — a rule with nothing to import regresses at the speed new files are
+          * created). The product page is still one click away on the name, where a link is
+          * what a name is.
+          */}
+        <button
+          type="button"
+          onClick={() => onZoom()}
+          aria-label={`${tl("catalog", "Enlarge the photo of")} ${p.name || id}`}
+          className="block w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+        >
+          {/* ProductThumb hardcodes `size-24`, so `w-full` widened the tile and left it 96px
+              TALL — a 270px card with a 96px band of photograph in it, which is why the
+              garment read as small. The height override has to be important because both
+              rules are the same Tailwind utility group and source order decides otherwise. */}
+          <ProductThumb src={image} alt={p.name || id} className="!h-auto !w-full aspect-[4/5] rounded-none border-0 p-3" />
+        </button>
         {/* THE TICK IS THE STATE, and it sits on the picture because the picture is what you
             are deciding about. Not dimming an unticked card: fading is the language of
             "unavailable", and these are the ones you are here to pick. */}
@@ -111,7 +146,7 @@ function CatalogCard({
           type="checkbox"
           checked={checked}
           disabled={disabled}
-          aria-label={`${checked ? label("Remove") : label("Add")} ${p.name || id} ${checked ? label("from the catalogue") : label("to the catalogue")}`}
+          aria-label={`${checked ? tl("catalog", "Remove") : tl("catalog", "Add")} ${p.name || id} ${checked ? tl("catalog", "from the catalogue") : tl("catalog", "to the catalogue")}`}
           onChange={(e) => onToggle(e.target.checked)}
           className="absolute left-2.5 top-2.5 size-5 cursor-pointer accent-foreground"
         />
@@ -124,7 +159,7 @@ function CatalogCard({
         <div className="mt-0.5 truncate text-2xs text-muted-foreground">
           <span className="tabular-nums">{p.sku || id}</span>
           {(colours > 0 || sizes.length > 0) && (
-            <> · {colours} {colours === 1 ? label("colour") : label("colours")} · {sizes.length} {sizes.length === 1 ? label("size") : label("sizes")}</>
+            <> · {colours} {colours === 1 ? tl("catalog", "colour") : tl("catalog", "colours")} · {sizes.length} {sizes.length === 1 ? tl("catalog", "size") : tl("catalog", "sizes")}</>
           )}
         </div>
       </div>
@@ -150,7 +185,7 @@ function CatalogCard({
         */}
       <div className="mt-auto border-t border-border">
         <div className="flex items-center gap-2 px-2.5 py-1.5">
-          <span className="shrink-0 text-2xs uppercase tracking-wide text-muted-foreground">{label("Catalogue")}</span>
+          <span className="shrink-0 text-2xs uppercase tracking-wide text-muted-foreground">{tl("catalog", "Catalogue")}</span>
           <Input
             value={draftValue}
             onChange={(e) => onDraft(e.target.value.replace(/[^\d.]/g, ""))}
@@ -161,7 +196,7 @@ function CatalogCard({
                genuinely empty and cannot be read as one priced at zero. */
             placeholder="0.00"
             inputMode="decimal"
-            aria-label={`${label("Catalogue price for")} ${p.name || id}`}
+            aria-label={`${tl("catalog", "Catalogue price for")} ${p.name || id}`}
             className="ml-auto h-7 w-20 px-2 text-right text-sm tabular-nums"
           />
         </div>
@@ -170,11 +205,11 @@ function CatalogCard({
             {/* Labelled as what it is, and not editable here. The two prices side by side is
                 the point — it is how someone sees they are different things rather than
                 finding out later. */}
-            <span className="block truncate text-2xs uppercase tracking-wide text-muted-foreground">{label("Seller pays")}</span>
+            <span className="block truncate text-2xs uppercase tracking-wide text-muted-foreground">{tl("catalog", "Seller pays")}</span>
             <span className="block text-sm tabular-nums text-muted-foreground">{money(cost)}</span>
           </div>
           <div className="min-w-0 flex-1 px-2.5 py-1.5">
-            <span className="block truncate text-2xs uppercase tracking-wide text-muted-foreground">{label("Margin")}</span>
+            <span className="block truncate text-2xs uppercase tracking-wide text-muted-foreground">{tl("catalog", "Margin")}</span>
             {/* NEGATIVE IS THE ONE THAT NEEDS A COLOUR. A catalogue price under what the
                 seller pays us loses money on every sale, and it is entirely possible to
                 type — the two figures are separate fields and nothing else compares them. */}
@@ -210,6 +245,7 @@ function LookbookSheet({
   /** Cover only: the products it leads with. */
   coverImages?: string[]
 }) {
+  const tl = useLabelT()
   const cover = n === "cover"
   return (
     <div className="w-[168px] shrink-0">
@@ -249,7 +285,7 @@ function LookbookSheet({
         )}
       </div>
       <div className="mt-1 truncate text-2xs text-muted-foreground">
-        {cover ? "Cover" : <><span className="tabular-nums">{n}</span> · {name} — <span className="tabular-nums">{price}</span></>}
+        {cover ? tl("catalog", "Cover") : <><span className="tabular-nums">{n}</span> · {name} — <span className="tabular-nums">{price}</span></>}
       </div>
     </div>
   )
@@ -281,6 +317,9 @@ export function CatalogView() {
  const [pct, setPct] = useState("60")
  const [draft, setDraft] = useState<Record<string, string>>({})
  const [printOpen, setPrintOpen] = useState(false)
+  /** The photograph being looked at, if any. Carries the NAME too: a picture on its own,
+   *  full screen, has nothing left on it saying which product it is. */
+ const [zoom, setZoom] = useState<{ src: string; name: string } | null>(null)
   // Which saved catalogue to reopen. Separate from printOpen because the two show
   // different documents — one live, one as it was sent.
  const [reopenId, setReopenId] = useState<string | null>(null)
@@ -537,7 +576,7 @@ export function CatalogView() {
                   onDraft={(v) => setDraft((d) => ({ ...d, [id]: v }))}
                   onSave={() => void savePrice(id)}
                   onToggle={(include) => void toggleOne(id, include)}
-                  label={(t) => tl("catalog", t)}
+                  onZoom={() => setZoom({ src: imageOf(p), name: p.name || id })}
                 />
               )
             })}
@@ -589,6 +628,7 @@ export function CatalogView() {
       )}
         </TabsContent>
       </Tabs>
+      <ImageLightbox src={zoom?.src ?? null} label={zoom?.name ?? null} onClose={() => setZoom(null)} />
       {printOpen && <CatalogPrint onClose={() => setPrintOpen(false)} />}
       {reopenId && <CatalogPrint exportId={reopenId} onClose={() => setReopenId(null)} />}
     </SectionCard>
