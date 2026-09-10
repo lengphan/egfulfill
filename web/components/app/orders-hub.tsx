@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { Package, Plus, UploadSimple, CircleNotch, Printer, Warning, ArrowSquareOut, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, BookmarkSimple } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
+import { TabBar } from "@/components/app/tab-bar"
 import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -1779,39 +1780,47 @@ export function OrdersHub() {
  own and reads left-to-right, rather than stacking into a narrow column hugging
  the right edge. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-5 py-2">
-          <div className="flex shrink-0 flex-wrap items-center gap-1">
-            {STATUS_PILLS.map((p) => {
-              // A hidden pill still renders while it's the ACTIVE filter. Hiding the thing
-              // that's narrowing the list leaves a board that's plainly filtered with nothing
-              // on screen saying so — the exact trap the empty-state sentence exists to avoid.
- if (p.value && hiddenPills.includes(p.value) && query.status !== p.value) return null
- const on = query.status === p.value
- return (
-                <button
- key={p.value}
-                  // Clicking the LIT pill clears it. A tab strip you can enter but not leave
-                  // except by finding "All" is the same trap as a dropdown with no "any" row.
- onClick={() => setQuery({ ...query, status: on ? "" : p.value })}
- aria-pressed={on}
- title={on && p.value ? `Showing ${p.label} only — click to clear` : undefined}
- className={"eg-tap h-8 rounded-md px-2.5 text-sm font-medium transition-colors " + (on ? "eg-selected" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
-                >
-                  {tl("stage", p.label)}
-                  {/* A COUNT, so you know whether it's worth going in. Only on the two pills
- where the number is the point — a badge on every pill is a row of
- numbers nobody reads, and "Overdue 0" is as useful as "Overdue 12". */}
-                  {(p.value === "overdue" || p.value === "rush") && (
-                    <span className={"ml-1.5 rounded-lg px-1.5 py-0.5 text-xs font-semibold tabular-nums " + (
- on ? "bg-primary-foreground/20"
- : p.value === "overdue" && stats.overdue ? "bg-destructive/10 text-destructive"
- : "bg-muted text-muted-foreground"
-                    )}>
-                      {p.value === "overdue" ? stats.overdue : rushCount}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
+          <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-1">
+            {/**
+             * THE SHARED FILTER BAR (owner, 2026-09-10) — the last board still hand-rolling
+             * its own.
+             *
+             * These were outlined lozenges with a filled active state, one tab away from
+             * Dispatch and Shipments, which are a rule under the live word. §4 says a filter
+             * row IS that rule and names tab-bar.tsx as it; three treatments for one job is
+             * why switching board felt like switching product.
+             *
+             * The count logic does not change and did not need to: this row already put a
+             * number only on Overdue and Rush — "a badge on every pill is a row of numbers
+             * nobody reads" — which is the rule the other two boards were converted TO. The
+             * bar hides a zero on top of that, so "Overdue 0" stops taking space to say
+             * nothing.
+             *
+             * OVERDUE KEEPS ITS RED. `alert` carries the destructive tint through the
+             * primitive rather than losing it to a uniform grey — late is a different fact
+             * from busy, and §4 reserves status colour for exactly that.
+             *
+             * CLICKING THE LIT ONE STILL CLEARS IT. A tab strip you can enter but not leave
+             * except by finding "All" is the same trap as a dropdown with no "any" row, so
+             * the toggle lives in onChange: TabBar fires even when the active tab is clicked.
+             *
+             * A HIDDEN PILL STILL RENDERS WHILE IT IS ACTIVE. Hiding the thing narrowing the
+             * list leaves a board plainly filtered with nothing on screen saying so.
+             */}
+            <TabBar
+              size="sm" spacing="none" className="border-b-0"
+              ariaLabel={tl("orders", "Filter by stage")}
+              value={query.status || ""}
+              onChange={(v: string) => setQuery({ ...query, status: query.status === v ? "" : v })}
+              items={STATUS_PILLS
+                .filter((p) => !(p.value && hiddenPills.includes(p.value) && query.status !== p.value))
+                .map((p) => ({
+                  id: p.value || "",
+                  label: tl("stage", p.label),
+                  count: p.value === "overdue" ? stats.overdue : p.value === "rush" ? rushCount : undefined,
+                  alert: p.value === "overdue" || undefined,
+                }))}
+            />
 
             {/* "+" — which stages get a pill, per browser. All ten at once was a wall of
  tabs; the ones a given floor never filters by shouldn't cost row space, but

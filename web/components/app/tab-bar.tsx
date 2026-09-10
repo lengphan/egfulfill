@@ -63,6 +63,20 @@ export type TabBarItem<T extends string> = {
    * independently, which is the sign it belongs in the primitive rather than in a caller.
    */
   disabled?: boolean
+  /**
+   * THIS COUNT IS A PROBLEM, NOT A TALLY — the only tint a count gets.
+   *
+   * Counts already only appear where the number is unresolved work, so most of them are
+   * neutral by construction. "Overdue" is the case that outranks that: late is not the same
+   * kind of fact as busy, and it was carrying `text-destructive` before this bar existed.
+   * Dropping the colour to make the rows match would have been uniformity bought with
+   * meaning, which §4 forbids in as many words — status colours are reserved and carry
+   * meaning on the floor.
+   *
+   * ONE flag, not a palette. If a second tone ever seems necessary, the question to ask is
+   * whether that filter is really a problem or just a big number.
+   */
+  alert?: boolean
 }
 
 export function TabBar<T extends string>({
@@ -203,7 +217,9 @@ export function TabBar<T extends string>({
             {t.count != null && t.count > 0 && (
               <span className={cn(
                 "ml-0.5 rounded-lg px-1.5 py-0.5 text-2xs font-semibold tabular-nums",
-                on ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+                on ? "bg-foreground text-background"
+                  : t.alert ? "bg-destructive/10 text-destructive"
+                  : "bg-muted text-muted-foreground",
               )}>
                 {t.count}
               </span>
