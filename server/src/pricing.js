@@ -29,6 +29,15 @@ import { tierFor as volumeTierFor, normalizeTiers, periodKey, previousPeriod, un
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
 const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+/**
+ * EVERY FACE THAT CAN CARRY A PRICE — the same eight ALL_SIDES declares in
+ * web/lib/variant-resolve.ts, and in the same order, because that order decides which face is
+ * the INCLUDED one when a line prints several. A ninth added there needs one here; the two
+ * lists are checked against each other by tools/check-faces.mjs.
+ */
+export const PRICED_SIDES = ['front', 'back', 'left', 'right', 'sleeve', 'hood', 'inside', 'wrap'];
+const SIDE_KEYS = PRICED_SIDES.map((s) => `side_${s}`);
+
 // The per-band shipping and per-method surcharge keys, so a settings change is a pricing
 // change without a deploy. Defaults come from factory_settings so the admin screen and
 // the billing path can't disagree about what "unset" means.
@@ -37,8 +46,21 @@ const FEE_KEYS = [
   'ship_cap', 'ship_heavy', 'ship_garment',
   'method_dtg', 'method_dtf', 'method_emb', 'method_apl', 'method_lsr',
   'method_scr', 'method_sub', 'method_vnl',
-  // Per ADDITIONAL printed face — see sideAddOn.
+  // Per ADDITIONAL printed face — the FLAT rate, and now the fallback for any face with no
+  // rate of its own. See sideAddOn.
   'method_side',
+  /**
+   * PER FACE, because a sleeve is not a back.
+   *
+   * sideAddOn charged one rate for every additional face, and its own note said why: faces
+   * reached pricing as a COUNT, aggregated long before it, so charging them apart would mean
+   * threading the names through. They are threaded now.
+   *
+   * UNSET FALLS BACK TO method_side, which is what makes this safe to ship: a floor that has
+   * never opened the new grid prices exactly as it did yesterday, and no existing order moves
+   * by a cent. A face only costs its own rate once somebody sets one.
+   */
+  ...SIDE_KEYS,
   'base_markup',
 ];
 export async function feeSettings() {
@@ -336,22 +358,53 @@ function costPartsOf(row, item, fees) {
  * from a sleeve would mean threading the face names through priceLines and unitCostOf, and
  * a per-face grid in the editor. Worth doing if it is asked for; not something to fake.
  */
-function sideAddOn(sides, fees, d) {
-  const own = d ? num(d.sidePrice) : null;
-  const rate = (own != null && own > 0 ? own : num(fees && fees.method_side)) || 0;
-  const extra = Math.max(0, (Number(sides) || 0) - 1);
-  return rate > 0 && extra > 0 ? rate * extra : 0;
+function sideAddOn(faces, fees, d) {
+  /**
+   * ONE FACE IS INCLUDED, the rest are charged — and WHICH one is included has to be
+   * deterministic or the same line prices two ways.
+   *
+   * PRICED_SIDES order decides it, so the front is the free one wherever a line has a front,
+   * and a back-only line is charged nothing extra exactly as it was before. The alternative —
+   * "the first one recorded" — is order_designs insertion order, which is when somebody
+   * happened to upload, not a fact about the garment. That is the same bug the shipping rate
+   * had when it took lines[0].
+   *
+   * A per-product `sidePrice` still overrides everything, and a MAP overrides per face — the
+   * number stays valid and means "every face", which is what every product carries today.
+   */
+  const list = (Array.isArray(faces) ? faces : []).map((f) => String(f || '').toLowerCase()).filter(Boolean);
+  const uniq = [...new Set(list)];
+  if (uniq.length < 2) return 0;
+  const ordered = uniq.slice().sort((a, b) => {
+    const ia = PRICED_SIDES.indexOf(a); const ib = PRICED_SIDES.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  const own = d ? d.sidePrice : null;
+  const ownFlat = num(own);
+  const ownMap = own && typeof own === 'object' ? own : null;
+  const flat = (ownFlat != null && ownFlat > 0 ? ownFlat : num(fees && fees.method_side)) || 0;
+  let total = 0;
+  // ordered[0] is included in the base — charge everything after it.
+  for (const face of ordered.slice(1)) {
+    const perProduct = ownMap ? num(ownMap[face]) : null;
+    const perPlatform = num(fees && fees[`side_${face}`]);
+    const rate = (perProduct != null && perProduct > 0) ? perProduct
+      : (perPlatform != null && perPlatform > 0) ? perPlatform
+      : flat;
+    if (rate > 0) total += rate;
+  }
+  return total;
 }
 
 // Per-unit cost = the size's base price (else the product's base) + the print method's
 // add-on. Mirrors productUnitPrice in eg-design-tools.js, which is what the boards show
 // the seller — if these two disagree, the quote lies about the price on screen.
-function unitCostOf(row, item, fees, sides = 1) {
+function unitCostOf(row, item, fees, faces = ['front']) {
   // The method surcharge sits ON TOP of the base cost, never inside it — so changing
   // the markup never silently changes what embroidery adds. The per-side charge sits on
   // top of both, for the same reason.
   const { base, method } = costPartsOf(row, item, fees);
-  return base == null ? null : base + method + sideAddOn(sides, fees, (row && row.data) || null);
+  return base == null ? null : base + method + sideAddOn(faces, fees, (row && row.data) || null);
 }
 
 /**
@@ -665,12 +718,18 @@ export async function quoteSpec({ blank, sku, size, printType }) {
  * @param fees    feeSettings()
  * @param sidesOf how many faces a line prints; defaults to one
  */
-export function priceLines(items, idx, fees, sidesOf = () => 1) {
+export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
   const lines = [];
   const unpriced = [];
   for (const it of items) {
     const qty = Math.max(1, parseInt(it.qty, 10) || 1);
-    const sides = sidesOf(it);
+    /* NAMES now, not a count — a sleeve and a back can cost differently. Tolerates a caller
+       still handing back a number (an older embedder, or a test): it becomes that many
+       unnamed faces, which prices exactly as the flat rate did. */
+    const raw = sidesOf(it);
+    const faces = Array.isArray(raw) ? raw
+      : Array.from({ length: Math.max(1, Number(raw) || 1) }, (_, i) => (i === 0 ? 'front' : `face-${i}`));
+    const sides = faces.length;
     // A frozen cost wins: once charged, an order's price is history and must not move
     // when someone edits the catalog — which is also what stops artwork added to a second
     // side AFTER submit from silently re-pricing an order that has already been paid for.
@@ -706,7 +765,7 @@ export function priceLines(items, idx, fees, sidesOf = () => 1) {
                         blank: it.blank || null, reason: named ? 'unknown-blank' : 'no-blank' });
         continue;
       }
-      if (cost == null) cost = unitCostOf(row, it, fees, sides);
+      if (cost == null) cost = unitCostOf(row, it, fees, faces);
       if (ship == null) ship = shipFeeOf(row, it.size, fees);
       extra = extraFeeOf(row, fees);
       if (cost == null) { unpriced.push({ id: it.id, line_id: it.line_id, sku: it.sku || '(no sku)', name: it.name || '', blank: it.blank || null, reason: 'no-cost' }); continue; }
@@ -731,7 +790,9 @@ export function priceLines(items, idx, fees, sidesOf = () => 1) {
                     reported the platform figure while unitCostOf charged the override — the
                     breakdown and the charge disagreeing about the same line, which is the one
                     thing a breakdown must never do. */
-                 sides, sideFee: money(sideAddOn(sides, fees, (srow && srow.data) || null)),
+                 /* The COUNT stays on the line for every reader that has one, and the NAMES
+                    ride beside it so a breakdown can say which face cost what. */
+                 sides, faces, sideFee: money(sideAddOn(faces, fees, (srow && srow.data) || null)),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   return { lines, unpriced };
@@ -779,12 +840,22 @@ export async function quoteOrder(orderId) {
      * a deployment that has not run the side migration yet answers nothing, and a missing
      * count must charge for ONE side, never for none and never for more.
      */
-    q(`select coalesce('L:' || line_id, 'S:' || sku) as key, count(distinct coalesce(side,'front'))::int as sides
+    /* THE NAMES, not the count. This aggregated to count(distinct side) and that number was
+       everything pricing ever knew about the faces — which is exactly why a back and a sleeve
+       could not be charged apart. array_agg keeps them, and the count is derived from the
+       array on the other side, so the two can never disagree. */
+    q(`select coalesce('L:' || line_id, 'S:' || sku) as key,
+              array_agg(distinct lower(coalesce(side,'front'))) as faces
           from order_designs where order_id=$1 group by 1`, [orderId])
       .then((r) => r.rows).catch(() => []),
   ]);
-  const sidesByKey = new Map(sideRows.map((r) => [r.key, r.sides]));
-  const sidesOf = (it) => sidesByKey.get(it.line_id ? `L:${it.line_id}` : `S:${it.sku}`) ?? 1;
+  const sidesByKey = new Map(sideRows.map((r) => [r.key, Array.isArray(r.faces) ? r.faces : []]));
+  /* A line with no artwork prices as ONE face, which is what "there is no count" meant before
+     and must keep meaning: a missing row charges for one side, never none and never more. */
+  const sidesOf = (it) => {
+    const hit = sidesByKey.get(it.line_id ? `L:${it.line_id}` : `S:${it.sku}`);
+    return hit && hit.length ? hit : ['front'];
+  };
   const { lines, unpriced } = priceLines(items, idx, fees, sidesOf);
   const volume = await volumeRateFor(orderId);
   /* BEST-OF, never the sum — see effectiveDiscountPct. A frozen (already charged) order
