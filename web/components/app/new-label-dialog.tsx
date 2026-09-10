@@ -111,6 +111,22 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   /** Every address signature this has already acted on, AND every one it has produced.
    *  Both halves matter — see the loop note below. */
  const corrected = useRef<Set<string>>(new Set())
+  /**
+   * ADDRESSES USPS HAS ALREADY PASSED, and the ones it produced by standardising.
+   *
+   * A CORRECTION GUARANTEES A SECOND LOOKUP — rewriting the box changes the fields this
+   * effect watches — and the badge showed whatever that second call said. So a perfectly
+   * good address, standardised to "792 EL RANCHO DR / LIVERMORE, CA 94551-8125" by USPS
+   * itself, came back reading "Not validated" the moment the follow-up call hiccuped: the
+   * screen contradicted the thing it had just done, and the grey badge means "nobody could
+   * check", which was a lie about an address USPS had checked a second earlier.
+   *
+   * Validation is a fact about a STRING, not about a request. Once USPS has passed one, the
+   * answer holds for that exact text, so this short-circuits instead of asking again — which
+   * also removes the redundant call, and these are metered.
+   */
+ const goodAddr = useRef<Set<string>>(new Set())
+ const fromUsps = useRef<Set<string>>(new Set())
  useEffect(() => {
  const complete = addrComplete(to)
  let alive = true
@@ -140,8 +156,13 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
           : { status: "idle" })
  return
       }
- setAddrCheck({ status: "checking" })
  const sig = [to.street, to.street2, to.city, to.state, to.zip].join("|")
+      /* ALREADY ANSWERED. See goodAddr above — the settled verdict for this exact text. */
+ if (goodAddr.current.has(sig)) {
+ setAddrCheck({ status: "valid", ...(fromUsps.current.has(sig) ? { msg: "corrected" } : {}) })
+ return
+      }
+ setAddrCheck({ status: "checking" })
  validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
         .then((v) => {
  if (!alive) return
@@ -177,10 +198,16 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  const a = v.address
  const sigOf = (x: { street?: string; street2?: string; city?: string; state?: string; zip?: string }) =>
               [x.street, x.street2, x.city, x.state, x.zip].join("|")
+ goodAddr.current.add(sig)
  if (a && a.street && a.city && a.state && a.zip && !corrected.current.has(sig)) {
  corrected.current.add(sig)
  const zip = a.zip4 ? `${a.zip}-${a.zip4}` : a.zip
- corrected.current.add(sigOf({ ...a, zip }))
+ const outSig = sigOf({ ...a, zip })
+ corrected.current.add(outSig)
+              /* USPS's own output is valid by definition — it is what USPS just told us this
+                 address IS — so the rewritten text is marked good without a second lookup. */
+ goodAddr.current.add(outSig)
+ fromUsps.current.add(outSig)
  const next = [to.name, a.street, a.street2, `${a.city}, ${a.state} ${zip}`]
                 .filter((l) => l && String(l).trim()).join("\n")
  if (next !== pasteText) {

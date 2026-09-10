@@ -8,6 +8,7 @@ import { SearchField } from "@/components/app/search-field"
 import { ShipmentDetailDialog } from "@/components/app/shipment-detail-dialog"
 import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
+import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { deliveryWord, DELIVERY_TEXT_TONE } from "@/lib/delivery-status"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Badge } from "@/components/ui/badge"
@@ -150,6 +151,9 @@ export function ShipmentsView() {
   const tl = useLabelT()
  const [rows, setRows] = useState<ShipmentRow[] | null>(null)
  const [spend, setSpend] = useState(0)
+  /** Inside ConsoleShell the page header owns the search and the actions; standalone there is
+   *  no header to portal into, so they stay in this card. Same test Dispatch makes. */
+ const inShell = useActionNode() !== null
  const [refunded, setRefunded] = useState(0)
  const [testSpend, setTestSpend] = useState(0)
   // All-time totals off the ledger, kept apart from `rows` on purpose: the list is capped
@@ -300,38 +304,31 @@ export function ShipmentsView() {
       />
     </StatGrid>
 
-    <SectionCard
- title={tl("shipments", "Shipments")}
- actions={
-        <div className="flex items-center gap-3">
-          {busy && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
-          <span className="text-xs text-muted-foreground">
-            {/* Says which number it is. "12 shown" under an active filter, next to a total
- of 200, otherwise reads as the whole list having shrunk. */}
-            {err ? tl("shipments", "count unknown") : status === "all" ? `${counts.total} shown` : `${shown.length} of ${counts.total}`}
-            {/* Only surfaced when non-zero. A row of zeroes reads as a dashboard; these are
- here to be acted on, and "0 need attention" is noise. */}
-            {counts.stuck > 0 && ` · ${counts.stuck} not collected`}
-            {counts.problem > 0 && ` · ${counts.problem} need attention`}
-          </span>
-          {/* The money was crammed in here as a parenthetical beside the row count, which is
- how a figure someone checks daily ended up smaller than the search placeholder.
-              It has its own tiles above the table now. */}
-          <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows || rows.length === 0}>
-            <DownloadSimple size={14} weight="bold" /> {tl("shipments", "Export CSV")}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setRateCheckOpen(true)}>
-            {tl("shipments", "Rate check")}
-          </Button>
-          {canVoid && (
-            <Button size="sm" onClick={() => setNewLabelOpen(true)}>
-              <Plus size={14} weight="bold" /> {tl("shipments", "New label")}
-            </Button>
-          )}
-        </div>
-      }
-    >
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+    {/**
+     * THE SAME CHROME ON BOTH TABS (owner, 2026-09-10: "these many search box positions").
+     *
+     * Dispatch and Shipments live under one shell, one row of tabs apart — and everything
+     * above their tables moved when you switched. Dispatch put its search and its actions in
+     * the PAGE HEADER through ActionsPortal; Shipments hand-rolled its own, with the actions
+     * in a card header and the search on a row inside the card. So the search box jumped
+     * about 150px and the buttons moved to a different surface, for two views of the same
+     * parcels.
+     *
+     * Nobody was careless — ActionsPortal existed and there was simply nothing making the
+     * second caller use it, which is §4's "a rule with no component is a wish" playing out
+     * one file over. The primitive was already there; this is the second caller.
+     *
+     * So: search + page actions in the header on both, and the card below carries ONLY the
+     * filters, which are genuinely different per tab and are the one thing that should
+     * change when you switch. Nothing above the table moves.
+     *
+     * The card's title goes with it — the live tab already says "Shipments", and the count
+     * moves down beside the filters it describes, which is where "124 shown · 18 not
+     * collected" was always answering a question about.
+     */}
+    {inShell && (
+      <ActionsPortal>
+        {/* Search first, then the actions — the same order Dispatch reads in. */}
         <SearchField
           value={q}
           onChange={setQ}
@@ -339,6 +336,26 @@ export function ShipmentsView() {
           width="md"
           placeholder={tl("shipments", "Tracking, order, customer or carrier…")}
         />
+        <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows || rows.length === 0}>
+          <DownloadSimple size={14} weight="bold" /> {tl("shipments", "Export CSV")}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setRateCheckOpen(true)}>
+          {tl("shipments", "Rate check")}
+        </Button>
+        {canVoid && (
+          <Button size="sm" onClick={() => setNewLabelOpen(true)}>
+            <Plus size={14} weight="bold" /> {tl("shipments", "New label")}
+          </Button>
+        )}
+      </ActionsPortal>
+    )}
+
+    <SectionCard>
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+        {/* THE COUNT SITS WITH THE FILTERS, because it is a statement about them: "124 shown"
+            means nothing without knowing what is filtering it, and up in a card header it was
+            a number floating beside a title. `ml-auto` puts it at the far end of the pill row
+            so it reads as the row's total rather than as another pill. */}
         {/* Each pill carries its own count, so the answer to "is anything stuck?" is on
  screen before you click anything. A pill with nothing behind it is disabled
  rather than hidden — a filter that appears and disappears as data changes is a
@@ -366,6 +383,16 @@ export function ShipmentsView() {
           })}
         </div>
         {q && <Button size="sm" variant="ghost" onClick={() => setQ("")}>{tl("shipments", "Clear")}</Button>}
+        <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+          {busy && <CircleNotch size={14} className="animate-spin" />}
+          {/* Says which number it is. "12 shown" under an active filter, next to a total of
+              200, otherwise reads as the whole list having shrunk. */}
+          {err ? tl("shipments", "count unknown") : status === "all" ? `${counts.total} shown` : `${shown.length} of ${counts.total}`}
+          {/* Only surfaced when non-zero. A row of zeroes reads as a dashboard; these are here
+              to be acted on, and "0 need attention" is noise. */}
+          {counts.stuck > 0 && ` · ${counts.stuck} not collected`}
+          {counts.problem > 0 && ` · ${counts.problem} need attention`}
+        </span>
       </div>
 
       {err && (
