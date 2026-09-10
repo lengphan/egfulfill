@@ -5,10 +5,19 @@ import { router } from "expo-router"
 import Constants from "expo-constants"
 import * as Updates from "expo-updates"
 import { Ionicons } from "@expo/vector-icons"
-import { getMe, clearToken, type User } from "@/lib/api"
+import { getMe, clearToken, getConnections, type User, type StoreConnection } from "@/lib/api"
 import { enablePush, disablePush, pushState, type PushState } from "@/lib/push"
 import { useFocusEffect } from "expo-router"
 import { TAB_BAR,F,C, R, CARD } from "@/lib/theme"
+
+/** The channels the product supports, in the order the web lists them. A channel with no
+ *  connection still gets a row: "we don't do TikTok" and "you haven't connected TikTok" are
+ *  different sentences, and a missing row says neither. */
+const STORES = [
+  { key: "etsy", label: "Etsy" },
+  { key: "shopify", label: "Shopify" },
+  { key: "tiktok", label: "TikTok Shop" },
+] as const
 
 /**
  * SETTINGS — deliberately short.
@@ -49,10 +58,17 @@ export default function Settings() {
   const [pushWhy, setPushWhy] = useState<string | null>(null)
   const [upd, setUpd] = useState<"idle" | "checking" | "fetching" | "current">("idle")
   const [updWhy, setUpdWhy] = useState<string | null>(null)
+  /* null means "not asked yet" and [] means "asked, none connected" — the row reads
+     differently for each, because a screen still loading and an account with no shops must
+     not look the same. */
+  const [conns, setConns] = useState<StoreConnection[] | null>(null)
 
   const load = useCallback(async () => {
     try { setMe(await getMe()); setErr(null) }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load your account.") }
+    /* Its own try: a connections failure must not blank the account block above it, which
+       is the more important of the two and answered fine. */
+    try { setConns(await getConnections()) } catch { setConns([]) }
   }, [])
   /* RELOAD WHEN YOU COME BACK TO IT, not once and never again.
    *
@@ -159,6 +175,51 @@ export default function Settings() {
               ) : null}
             </>
           )}
+      </View>
+
+      {/* STORES. The prototype drew "Token expired 3 Sep · Reconnect" here, and this screen
+          deliberately does not: none of the three connection routes returns token_expires_at,
+          so an expiry banner would be a claim nothing on this device can support. What IS
+          real is when each shop last synced, and a token that quietly died shows up as a
+          sync that stopped — which is the honest form of the same news.
+
+          A channel with no row says so and says where to fix it. OAuth runs through a
+          redirect_uri registered with Etsy, Shopify and TikTok that points at the web
+          origin, so Connect genuinely cannot happen on the phone — §4 says explain, never
+          hide, so the row names the reason rather than offering a button that would fail. */}
+      <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>STORES</Text>
+      <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
+        {STORES.map((st, i) => {
+          const mine = conns?.filter((c) => c.platform === st.key) ?? []
+          const synced = mine
+            .map((c) => c.last_sync_at).filter(Boolean)
+            .sort().reverse()[0] as string | undefined
+          return (
+            <View
+              key={st.key}
+              style={{
+                paddingHorizontal: 16, paddingVertical: 13,
+                borderBottomWidth: i === STORES.length - 1 ? 0 : 1, borderBottomColor: C.border,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg, flex: 1 }}>{st.label}</Text>
+                <Text style={{ fontSize: 13, fontFamily: F.medium, color: mine.length ? C.fg : C.muted }}>
+                  {conns === null ? "…" : mine.length ? "Connected" : "Not connected"}
+                </Text>
+              </View>
+              {conns !== null && (
+                <Text style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, marginTop: 3 }}>
+                  {mine.length
+                    ? [mine.map((c) => c.shop_name || c.shop_id).join(", "),
+                       synced ? `synced ${new Date(synced).toLocaleDateString()}` : "never synced"]
+                        .filter(Boolean).join("  ·  ")
+                    : "Connect this channel on the web"}
+                </Text>
+              )}
+            </View>
+          )
+        })}
       </View>
 
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>ALERTS</Text>

@@ -626,3 +626,37 @@ export async function forgetPushDevice(token: string) {
     body: JSON.stringify({ token }),
   })
 }
+
+
+/**
+ * THE SHOPS THIS ACCOUNT HAS CONNECTED.
+ *
+ * Three routes, not one. `/api/{etsy,shopify,tiktok}/connections` already exist and already
+ * return the same columns — they are what the web's own store settings read — so this asks
+ * them rather than adding a fourth endpoint that would say the same thing and then have to
+ * be kept in step with all three.
+ *
+ * WHAT THIS CANNOT SAY, and must not pretend to: whether a token has EXPIRED. None of the
+ * three routes selects `token_expires_at`, so "reconnect needed" is not derivable here.
+ * `last_sync_at` is real and is what gets shown; a Shopify token that quietly expired shows
+ * as a stale sync, which is true, rather than as a red banner this cannot actually justify.
+ *
+ * A failed platform resolves to an empty list rather than rejecting the whole call: one
+ * channel being down must not blank the other two.
+ */
+export type StoreConnection = {
+  id: number | string
+  platform: string
+  shop_id: string
+  shop_name: string | null
+  last_sync_at: string | null
+  created_at: string
+}
+
+export async function getConnections(): Promise<StoreConnection[]> {
+  const parts = await Promise.all(
+    ["etsy", "shopify", "tiktok"].map((p) =>
+      request<StoreConnection[]>(`/api/${p}/connections`).catch(() => [] as StoreConnection[])),
+  )
+  return parts.flat()
+}
