@@ -51,6 +51,7 @@ import {
  getVietqrRate,
  setVietqrRate,
  deleteUserAdmin,
+ transferAccount,
  adjustBalance,
  type ShipFromAddress,
  type ProductType,
@@ -2293,6 +2294,22 @@ function UsersPanel() {
   // asked, so it belongs in the dialog — it used to be swallowed by a bare `catch`, which
   // closed the dialog and reloaded the list, i.e. looked exactly like a successful delete.
  const [rmErr, setRmErr] = useState<string | null>(null)
+
+  /* MOVING AN ACCOUNT'S BALANCE (and optionally its orders) TO ANOTHER ACCOUNT — the
+     "I want a fresh account but my money is in the old one" case. mvRef is minted when the
+     dialog OPENS, not per press: the server keys its duplicate check on it, so a double
+     click is one move while opening the dialog again tomorrow is a new one. */
+ const [mvFor, setMvFor] = useState<AdminUser | null>(null)
+ const [mvTo, setMvTo] = useState("")
+ const [mvOrders, setMvOrders] = useState(false)
+ const [mvRef, setMvRef] = useState("")
+ const [mvErr, setMvErr] = useState<string | null>(null)
+ const [mvDone, setMvDone] = useState<null | { movedAmount?: number; movedOrders?: number; to?: string
+ connections?: { platform: string; shop_name?: string | null; shop_id: string }[] }>(null)
+  /* Changing the address IN PLACE — nothing moves, so nothing can be stranded. */
+ const [emFor, setEmFor] = useState<AdminUser | null>(null)
+ const [emValue, setEmValue] = useState("")
+ const [emErr, setEmErr] = useState<string | null>(null)
   // Manual balance movement. A reason is required: an unexplained entry in a money
   // ledger is worse than no entry, because nobody can tell later whether it was right.
  const [adjFor, setAdjFor] = useState<AdminUser | null>(null)
@@ -2390,6 +2407,37 @@ function UsersPanel() {
       // closing would make the admin re-find the row to be told the same thing again.
  setRmErr(e instanceof Error ? e.message : "Couldn't delete that account.")
     } finally { setBusy(null) }
+  }
+
+  const runTransfer = async () => {
+ if (!mvFor) return
+ const to = mvTo.trim()
+ if (!to) { setMvErr("Enter the destination account's email."); return }
+ if (to.toLowerCase() === mvFor.email.toLowerCase()) { setMvErr("That's the same account."); return }
+ setBusy(mvFor.id); setMvErr(null)
+ try {
+ const r = await transferAccount(mvFor.id, { toEmail: to, balance: true, orders: mvOrders, ref: mvRef })
+ if (r?.error) throw new Error(r.error)
+      // The result STAYS ON SCREEN rather than closing, because it carries the half of the
+      // job the admin still has to do — which shops must be reconnected on the new account.
+ setMvDone({ movedAmount: r.movedAmount, movedOrders: r.movedOrders, to: r.to, connections: r.connections })
+ loadUsers()
+    } catch (e) { setMvErr(e instanceof Error ? e.message : "Couldn't move that account.") }
+ finally { setBusy(null) }
+  }
+
+  const saveEmail = async () => {
+ if (!emFor) return
+ const addr = emValue.trim().toLowerCase()
+ if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) { setEmErr("Enter a real email address — it's how they sign in and reset their password."); return }
+ if (addr === emFor.email.toLowerCase()) { setEmFor(null); return }
+ setBusy(emFor.id); setEmErr(null)
+ try {
+ const r = await updateUserAdmin(emFor.id, { email: addr })
+ if (r?.error) throw new Error(r.error)
+ setEmFor(null); setEmValue(""); loadUsers()
+    } catch (e) { setEmErr(e instanceof Error ? e.message : "Couldn't change that email.") }
+ finally { setBusy(null) }
   }
 
   /** Deactivate from inside the delete dialog — the action the refusal names, so it has to
@@ -2724,6 +2772,21 @@ function UsersPanel() {
                             {tl("settings", "Adjust balance…")}
                           </DropdownMenuItem>
                         )}
+                        {isAdminCaller && (
+                          <DropdownMenuItem onClick={() => { setEmFor(u); setEmValue(u.email); setEmErr(null) }}>
+                            {tl("settings", "Change email…")}
+                          </DropdownMenuItem>
+                        )}
+                        {isAdminCaller && (
+                          /* Minting the ref HERE is what makes a retry idempotent — see the
+                             state block. Opening the dialog is the event, not pressing Move. */
+                          <DropdownMenuItem onClick={() => {
+                            setMvFor(u); setMvTo(""); setMvOrders(false); setMvErr(null); setMvDone(null)
+                            setMvRef(`acct-move:${u.id}:${Date.now()}`)
+                          }}>
+                            {tl("settings", "Move balance to another account…")}
+                          </DropdownMenuItem>
+                        )}
                         {u.active === false ? (
                           <DropdownMenuItem onClick={() => setActive(u, true)}>{tl("settings", "Reactivate account")}</DropdownMenuItem>
                         ) : (
@@ -2810,6 +2873,101 @@ function UsersPanel() {
             <Button size="sm" onClick={() => applyAdjust(1)} disabled={busy === adjFor?.id}>
               {busy === adjFor?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Top up")}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CHANGE THE ADDRESS — the option other platforms reach for first, and the only one
+          here that moves nothing. The account id is untouched, so orders, wallet, shop
+          connections, team and audit all stay exactly where they are. */}
+      <Dialog open={!!emFor} onOpenChange={(v) => { if (!v) { setEmFor(null); setEmErr(null) } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>{tl("settings", "Change email")}</DialogTitle></DialogHeader>
+          <div className="space-y-3 px-1">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">{tl("settings", "New email")}</span>
+              <Input value={emValue} onChange={(e) => { setEmValue(e.target.value); setEmErr(null) }}
+ type="email" inputMode="email" autoComplete="off" className="h-9" autoFocus />
+            </label>
+            <p className="text-sm text-muted-foreground">
+              {tl("settings", "They sign in with this from now on. Their orders, balance, connected shops and team stay exactly as they are.")}
+            </p>
+            {emErr && <p className="text-sm text-destructive">{emErr}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setEmFor(null)} disabled={busy === emFor?.id}>{tl("settings", "Cancel")}</Button>
+            <Button size="sm" onClick={saveEmail} disabled={busy === emFor?.id}>
+              {busy === emFor?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Change email")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MOVE THE BALANCE (and optionally the orders) TO ANOTHER ACCOUNT. */}
+      <Dialog open={!!mvFor} onOpenChange={(v) => { if (!v) { setMvFor(null); setMvErr(null); setMvDone(null) } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{mvDone ? tl("settings", "Moved") : tl("settings", "Move to another account")}</DialogTitle></DialogHeader>
+          {mvDone ? (
+            <div className="space-y-3 px-1">
+              <p className="text-sm">
+                {usd2(mvDone.movedAmount ?? 0)}
+                {mvDone.movedOrders ? ` · ${mvDone.movedOrders} ${mvDone.movedOrders === 1 ? "order" : "orders"}` : ""}
+                {" → "}
+                <span className="font-medium">{mvDone.to}</span>
+              </p>
+              {/* THE HALF WE CANNOT DO. A shop is handed over by the SELLER at the
+                  marketplace's own consent screen; reconnecting there moves it, because
+                  platform_connections is unique per shop and the connect updates its owner.
+                  Until they do, the old account still syncs and new orders land on it. */}
+              {(mvDone.connections?.length ?? 0) > 0 ? (
+                <div className="rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
+                  <div className="flex items-start gap-2">
+                    <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+                    <div>
+                      <div className="font-medium">
+                        {tl("settings", "Still connected to the old account — the seller has to reconnect these on the new one:")}
+                      </div>
+                      <ul className="mt-1 space-y-0.5">
+                        {mvDone.connections!.map((c) => (
+                          <li key={`${c.platform}-${c.shop_id}`}>{c.platform} · {c.shop_name || c.shop_id}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">{tl("settings", "No connected shops were left behind.")}</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3 px-1">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{mvFor?.email}</span> · {usd2(mvFor?.balance ?? 0)}
+                {(mvFor?.orders_total ?? 0) > 0 ? ` · ${mvFor?.orders_total} ${mvFor?.orders_total === 1 ? "order" : "orders"}` : ""}
+              </p>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">{tl("settings", "Destination account email")}</span>
+                <Input value={mvTo} onChange={(e) => { setMvTo(e.target.value); setMvErr(null) }}
+ type="email" inputMode="email" autoComplete="off" placeholder="new@seller.com" className="h-9" autoFocus />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={mvOrders} onCheckedChange={(v) => setMvOrders(v === true)} />
+                {tl("settings", "Move their orders too")}
+              </label>
+              {mvErr && <p className="text-sm text-destructive">{mvErr}</p>}
+            </div>
+          )}
+          <DialogFooter>
+            {mvDone ? (
+              <Button size="sm" onClick={() => { setMvFor(null); setMvDone(null) }}>{tl("settings", "Done")}</Button>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setMvFor(null)} disabled={busy === mvFor?.id}>{tl("settings", "Cancel")}</Button>
+                <Button size="sm" onClick={runTransfer} disabled={busy === mvFor?.id}>
+                  {busy === mvFor?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Move")}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

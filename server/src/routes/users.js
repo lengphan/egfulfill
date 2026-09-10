@@ -1,6 +1,7 @@
 // User management API — ADMIN ONLY. Backs the "Users" admin screen so you
 // add/promote/reset/delete accounts from the app instead of editing the DB.
-import { q } from '../db.js';
+import { q, withLock } from '../db.js';
+import { moveFunds } from './wallet.js';
 import { hashPassword, passwordProblem, isStaff, canManageUsers } from '../auth.js';
 import { audit } from '../audit.js';
 import { readAll } from './factory_settings.js';
@@ -175,11 +176,14 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   });
 
   app.patch('/api/users/:id', { preHandler: requireUserManager }, async (req, reply) => {
-    const { role, password, name, active, plan, spydeck_addon, order_limit } = req.body || {};
+    const { role, password, name, active, plan, spydeck_addon, order_limit, email } = req.body || {};
     const isAdminCaller = req.user.role === 'admin';
     if (!isAdminCaller) {
       // Warehouse: no privilege changes, and hands off admin accounts entirely.
       if (role != null || plan != null || spydeck_addon != null) { reply.code(403); return { error: 'Only an admin can change roles or plans' }; }
+      // The address IS the identity — it signs in, it receives the password reset, and it is
+      // what every marketplace and payment record names. Changing it is an admin act.
+      if (email != null) { reply.code(403); return { error: 'Only an admin can change an account\'s email' }; }
       const target = await q('select role from users where id=$1', [req.params.id]).then((r) => r.rows[0]);
       if (target && target.role === 'admin') { reply.code(403); return { error: 'Only an admin can change an admin account' }; }
     }
@@ -191,6 +195,28 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     if (typeof spydeck_addon === 'boolean') { sets.push(`spydeck_addon=$${n++}`); vals.push(spydeck_addon); }
     if (role) { if (!ROLES.includes(role)) { reply.code(400); return { error: 'Invalid role' }; } sets.push(`role=$${n++}`); vals.push(role); }
     if (name != null) { sets.push(`name=$${n++}`); vals.push(name); }
+    /**
+     * CHANGING THE ADDRESS, rather than moving everything out of the account.
+     *
+     * This is the move most platforms reach for first, and it was the one thing the admin
+     * screen could not do — so "this should be under a different login" had no answer short
+     * of transferring every order and the balance one at a time. Changing the address keeps
+     * the account id, which means orders, wallet, connections, team and audit all stay
+     * exactly where they are. Nothing moves, so nothing can be stranded.
+     *
+     * Same shape check signup enforces, for the same reason it enforces it: an identifier
+     * with no '@' lands in the email column and login routes it to the USERNAME column, so
+     * the account becomes unreachable from both directions at once.
+     */
+    if (email != null) {
+      const addr = String(email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) {
+        reply.code(400); return { error: "Enter a real email address — it's how they sign in and reset their password." };
+      }
+      const taken = await q('select 1 from users where lower(email)=$1 and id<>$2', [addr, req.params.id]);
+      if (taken.rowCount) { reply.code(409); return { error: 'Another account already uses that email.' }; }
+      sets.push(`email=$${n++}`); vals.push(addr);
+    }
     if (typeof active === 'boolean') {
       if (!active && req.params.id === req.user.sub) { reply.code(400); return { error: "You can't deactivate your own account" }; }
       sets.push(`active=$${n++}`); vals.push(active);
@@ -212,6 +238,9 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
       sets.push(`order_limit=$${n++}`); vals.push(lim);
     }
     if (!sets.length) return { ok: true };
+    const prevEmail = email != null
+      ? await q('select email from users where id=$1', [req.params.id]).then((r) => r.rows[0]?.email || null)
+      : null;
     vals.push(req.params.id);
     await q(`update users set ${sets.join(',')} where id=$${n}`, vals);
     // Account changes are exactly what you want a trail of after the fact — especially a
@@ -219,7 +248,11 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     // password is never recorded, only that one was set.
     audit(req, 'user.updated', {
       entityType: 'user', entityId: req.params.id,
-      after: { role, name, active, plan, spydeck_addon, password: password ? 'reset' : undefined },
+      // The OLD address is carried too. For every other field here the new value is enough,
+      // but an identity change that records only what it became cannot be read backwards —
+      // and "who was this account before" is the whole question afterwards.
+      before: email != null ? { email: prevEmail } : undefined,
+      after: { role, name, active, plan, spydeck_addon, email: email != null ? String(email).trim().toLowerCase() : undefined, password: password ? 'reset' : undefined },
     });
     return { ok: true };
   });
@@ -272,6 +305,115 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     audit(req, 'capacity.limits_suggested', { entityType: 'settings', entityId: 'order_limits',
       after: { cap, reserved, distributable, sellers: assignments.length } });
     return { ok: true, applied: assignments.length, cap, reserved, distributable, assignments };
+  });
+
+  /**
+   * MOVE AN ACCOUNT'S BALANCE AND ORDERS TO ANOTHER ACCOUNT.
+   *
+   * The case this is for: a seller wants a fresh account and wants what they already paid
+   * for to come with them. Before this the only routes were an admin deducting on one side
+   * and topping up on the other — two independent writes, so a crash between them lost or
+   * doubled real money — or nothing at all for the orders.
+   *
+   * WHY THIS IS SAFE ALONGSIDE A MARKETPLACE, which is the part worth stating because it is
+   * the part that looks dangerous and is not. Verified in the three sync modules, not assumed:
+   *
+   *   platform_connections is `unique (platform, shop_id)` and every connect does
+   *   `connected_by = excluded.connected_by` on conflict (etsy.js, shopify.js, tiktok.js).
+   *   So a shop is connected to exactly ONE account at a time, and reconnecting it to the new
+   *   account MOVES it. Two accounts can never sync the same shop, and there is no race to
+   *   decide who owns an incoming order.
+   *
+   *   None of the three syncs list seller_id in their `on conflict (id) do update set`. A
+   *   re-sync therefore rewrites total, customer and address but NEVER ownership. So orders
+   *   moved by this route stay moved, even when the old connection pulls the same receipts
+   *   again — and equally, orders left behind are never dragged across by the new one.
+   *
+   * The one thing that does NOT follow automatically is the connection itself: the seller has
+   * to reconnect each shop on the new account. That is a consent screen at the marketplace,
+   * which is exactly where it belongs and not something we may do on their behalf. The
+   * response therefore NAMES the shops still attached to the old account, because "you must
+   * reconnect these three" is the half of this job the admin cannot see from anywhere else.
+   *
+   * UNDER withLock ON THE SOURCE, because "move what is left" reads the balance and then
+   * spends it, and two of those landing together both read the same figure — the exact
+   * read-then-write shape db.js documents that lock for.
+   */
+  app.post('/api/users/:id/transfer', { preHandler: requireAdmin }, async (req, reply) => {
+    const from = String(req.params.id);
+    const b = req.body || {};
+    if (from === req.user.sub) { reply.code(400); return { error: "You can't transfer out of your own account" }; }
+
+    const src = (await q('select id, email, role from users where id=$1', [from])).rows[0];
+    if (!src) { reply.code(404); return { error: 'That account no longer exists.' }; }
+
+    let dst = null;
+    if (b.toAccount) dst = (await q('select id, email, role, active from users where id=$1', [String(b.toAccount)])).rows[0] || null;
+    else if (b.toEmail) dst = (await q('select id, email, role, active from users where lower(email)=lower($1)', [String(b.toEmail)])).rows[0] || null;
+    if (!dst) { reply.code(404); return { error: "No account with that email — the destination has to exist and be signed up already." }; }
+    if (dst.id === from) { reply.code(400); return { error: 'Source and destination are the same account.' }; }
+    if (dst.active === false) { reply.code(400); return { error: 'That destination account is deactivated. Reactivate it first, or pick another.' }; }
+
+    // A ref supplied by the CLIENT is what makes a retry idempotent without making a second,
+    // deliberate transfer impossible: the dialog mints one when it opens, so pressing the
+    // button twice is one move and opening it again tomorrow is a new one. moveFunds keys
+    // its duplicate check on it.
+    const ref = (b.ref != null && b.ref !== '') ? String(b.ref) : `acct-move:${from}:${dst.id}:${Date.now()}`;
+    const wantOrders = b.orders === true;
+    const wantBalance = b.balance !== false && b.balance !== 0;
+
+    let movedAmount = 0;
+    let movedOrders = 0;
+    let fromBalance = null;
+    let toBalance = null;
+    try {
+      await withLock(`wallet:${from}`, async () => {
+        if (wantBalance) {
+          const bal = (await q('select coalesce(sum(delta),0)::float as n from wallet_ledger where account=$1', [from])).rows[0].n;
+          // A NUMBER means "move this much"; `true` means "move whatever is left". Never more
+          // than is there — the overdraft guard would throw anyway, but refusing the whole
+          // transfer because a stale figure was a cent high is not what was asked for.
+          const want = typeof b.balance === 'number' ? Math.abs(b.balance) : bal;
+          movedAmount = Math.round(Math.min(want, bal) * 100) / 100;
+          if (movedAmount > 0) {
+            const r = await moveFunds({
+              from, to: dst.id, amount: movedAmount, type: 'account-move', ref,
+              note: b.note || `Moved from ${src.email} to ${dst.email}`, by: req.user.sub });
+            fromBalance = r.fromBalance; toBalance = r.toBalance;
+          }
+        }
+        if (wantOrders) {
+          // factory_order is derived from the OWNER'S ROLE and recomputed at every boot
+          // (orders.js). Setting it here rather than leaving it means the row does not
+          // silently reclassify at the next restart — the same reason POST /api/orders
+          // writes it at creation instead of waiting for the sweep.
+          const isFactory = dst.role !== 'seller';
+          const r = await q(
+            'update orders set seller_id=$2, factory_order=$3, updated_at=now() where seller_id=$1',
+            [from, dst.id, isFactory]);
+          movedOrders = r.rowCount;
+        }
+      });
+    } catch (e) {
+      if (e.code === 'INSUFFICIENT_FUNDS') { reply.code(400); return { error: e.message }; }
+      req.log.error({ err: e.message, from, to: dst.id }, 'account transfer failed');
+      reply.code(500);
+      return { error: `The transfer did not complete: ${e.message}` };
+    }
+
+    // WHAT THE ADMIN STILL HAS TO DO. A connection cannot be handed over from here — it needs
+    // the seller's consent at the marketplace — so the shops still pointing at the old account
+    // are named rather than left to be discovered when orders stop arriving.
+    const connections = (await q(
+      `select platform, shop_name, shop_id from platform_connections where connected_by=$1
+        order by platform`, [from]).catch(() => ({ rows: [] }))).rows;
+
+    audit(req, 'user.transferred', {
+      entityType: 'user', entityId: from,
+      before: { account: src.email, balance: fromBalance != null ? fromBalance + movedAmount : null },
+      after: { to: dst.email, movedAmount, movedOrders, ref, connectionsLeftBehind: connections.length },
+    });
+    return { ok: true, movedAmount, movedOrders, fromBalance, toBalance, to: dst.email, connections };
   });
 
   /**

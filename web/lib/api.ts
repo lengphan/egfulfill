@@ -788,7 +788,20 @@ export function suggestOrderLimits() {
                assignments?: { id: string; label: string; avgDaily: number; limit: number }[] }>(
     `/api/users/suggest-order-limits`, { method: "POST" })
 }
-export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean; plan?: string; spydeck_addon?: boolean; order_limit?: number | null }) {
+/** Move an account's remaining balance and/or its orders to another account, in one
+ *  server-side action so a crash can't land one half. `balance: true` means "whatever is
+ *  left"; a number moves that much. `ref` makes a retry idempotent — mint it once when the
+ *  dialog opens, not per press. `connections` comes back naming the shops still attached to
+ *  the OLD account: those need the seller to reconnect them, which we can't do for them. */
+export function transferAccount(id: string, body: {
+  toEmail?: string; toAccount?: string; balance?: boolean | number; orders?: boolean; ref?: string; note?: string
+}) {
+  return api<{ ok?: boolean; error?: string; movedAmount?: number; movedOrders?: number
+               fromBalance?: number | null; toBalance?: number | null; to?: string
+               connections?: { platform: string; shop_name?: string | null; shop_id: string }[] }>(
+    `/api/users/${encodeURIComponent(id)}/transfer`, { method: "POST", body: JSON.stringify(body) })
+}
+export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean; plan?: string; spydeck_addon?: boolean; order_limit?: number | null; email?: string }) {
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) })
 }
 
