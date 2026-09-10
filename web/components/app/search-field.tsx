@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { MagnifyingGlass, X } from "@phosphor-icons/react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -69,6 +69,10 @@ export function SearchField({
 }) {
   const cap = width === "sm" ? "max-w-xs" : width === "md" ? "max-w-md" : ""
   const ref = useRef<HTMLInputElement>(null)
+  /** The badge is a way IN. Once the caret is in the field it is answering a question nobody
+   *  is asking any more — and `/` typed while focused goes into the query, so a key hint
+   *  sitting beside the caret is actively misleading. */
+  const [focused, setFocused] = useState(false)
 
   /**
    * The listener is on the DOCUMENT and ignores anything typed into a field.
@@ -141,8 +145,10 @@ export function SearchField({
          * used: the tint is there to advertise an empty control, and once there is text in it
          * the text does that job.
          */
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         className={cn("h-9 bg-muted/70 pl-8 focus:bg-background",
-          onClear && value ? "pr-8" : hotkey ? "pr-9" : undefined)}
+          onClear && value ? "pr-8" : hotkey && !focused ? "pr-9" : undefined)}
       />
       {onClear && value ? (
         <button
@@ -153,7 +159,7 @@ export function SearchField({
         >
           <X size={14} />
         </button>
-      ) : hotkey ? (
+      ) : hotkey && !focused ? (
         /**
          * THE KEY, SHOWN — the half that makes a shortcut worth having.
          *
