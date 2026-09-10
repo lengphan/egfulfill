@@ -318,8 +318,27 @@ function costPartsOf(row, item, fees) {
  * 0 or 1 adds nothing, which is also what a line with no artwork yet must cost: a seller
  * who has not placed a design has not asked for a second print.
  */
-function sideAddOn(sides, fees) {
-  const rate = num(fees && fees.method_side) || 0;
+/**
+ * A PRODUCT MAY SET ITS OWN RATE, exactly as it may for a print method.
+ *
+ * `method_side` is one platform number for every blank, and a second print is not the same
+ * job on a cap as it is on a hoodie — a back panel and a crown are different setups on
+ * different machines. `methodPrices` already lets a product override what its METHOD costs;
+ * this is the same escape hatch for its extra faces, and it was the only half missing.
+ *
+ * Same precedence and the same test as methodAddOn: the product's figure when it is a real
+ * number above zero, else the platform's. A stored 0 therefore falls through rather than
+ * meaning "free" — deliberate, because `methodPrices` behaves that way and one of the two
+ * reading zero differently is worse than neither supporting it.
+ *
+ * ONE RATE PER PRODUCT, not one per face. `sides` reaches here as a COUNT — order_designs is
+ * aggregated to `count(distinct side)` long before pricing — so charging a back differently
+ * from a sleeve would mean threading the face names through priceLines and unitCostOf, and
+ * a per-face grid in the editor. Worth doing if it is asked for; not something to fake.
+ */
+function sideAddOn(sides, fees, d) {
+  const own = d ? num(d.sidePrice) : null;
+  const rate = (own != null && own > 0 ? own : num(fees && fees.method_side)) || 0;
   const extra = Math.max(0, (Number(sides) || 0) - 1);
   return rate > 0 && extra > 0 ? rate * extra : 0;
 }
@@ -332,7 +351,7 @@ function unitCostOf(row, item, fees, sides = 1) {
   // the markup never silently changes what embroidery adds. The per-side charge sits on
   // top of both, for the same reason.
   const { base, method } = costPartsOf(row, item, fees);
-  return base == null ? null : base + method + sideAddOn(sides, fees);
+  return base == null ? null : base + method + sideAddOn(sides, fees, (row && row.data) || null);
 }
 
 /**
@@ -708,7 +727,11 @@ export function priceLines(items, idx, fees, sidesOf = () => 1) {
                  // What the line is PRINTED on, and what the extra faces added. Shown as its
                  // own number for the same reason methodFee is: a blank quoting more than
                  // its base cost has to be able to say which surcharge did it.
-                 sides, sideFee: money(sideAddOn(sides, fees)),
+                 /* THE PRODUCT'S OWN RATE HERE TOO. Computed without `srow.data` this
+                    reported the platform figure while unitCostOf charged the override — the
+                    breakdown and the charge disagreeing about the same line, which is the one
+                    thing a breakdown must never do. */
+                 sides, sideFee: money(sideAddOn(sides, fees, (srow && srow.data) || null)),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   return { lines, unpriced };
