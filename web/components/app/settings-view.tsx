@@ -3809,6 +3809,10 @@ export function SettingsView() {
  const [isAdmin, setIsAdmin] = useState(false)
  const [canPlatform, setCanPlatform] = useState(false)
  const [isSeller, setIsSeller] = useState(false)
+  /** Read at render, not stored: the role is already in the session and this only decides
+   *  which tabs are drawn. The SERVER is the boundary that refuses — hiding a tab is the
+   *  §4 hide-only rule, never the gate. */
+ const isOperator = (getUser()?.role || "") === "operator"
   // API keys are for integrating AGAINST the platform — a seller wiring up their own
   // systems, or an admin. Floor roles have nothing to integrate.
  const [canUseKeys, setCanUseKeys] = useState(false)
@@ -3929,11 +3933,16 @@ export function SettingsView() {
         {isAdmin && <TabsTrigger value="users"><TabLabel>{tl("settings", "Users")}</TabLabel></TabsTrigger>}
         {/* Supplier ordering defaults — these decide how a purchase order PAYS and ships,
             so they follow the money boundary rather than canPlatform alone. Warehouse lost
-            it on 2026-08-24; the floor receives stock, it does not decide the terms. */}
-        {canPlatform && canSeeMoney() && <TabsTrigger value="suppliers"><TabLabel>{tl("settings", "Suppliers")}</TabLabel></TabsTrigger>}
+            it on 2026-08-24; the floor receives stock, it does not decide the terms.
+            AND OPERATORS TOO (owner, 2026-09-10). An operator runs the job in front of them;
+            who supplies the blank, on what payment terms, is not part of that job — and §2.9
+            treats who supplies us as commercial information kept to the people who need it.
+            Same reasoning the warehouse exclusion already records, one role over. */}
+        {canPlatform && canSeeMoney() && !isOperator && <TabsTrigger value="suppliers"><TabLabel>{tl("settings", "Suppliers")}</TabLabel></TabsTrigger>}
         {/* Integration usage carries an estimated $ per platform — a cost surface, so it
-            takes the same boundary as Suppliers above rather than canPlatform's. */}
-        {canPlatform && canSeeMoney() && <TabsTrigger value="usage"><TabLabel>{tl("settings", "Usage")}</TabLabel></TabsTrigger>}
+            takes the same boundary as Suppliers above rather than canPlatform's, operators
+            included: what our API traffic costs us is not a number the floor acts on. */}
+        {canPlatform && canSeeMoney() && !isOperator && <TabsTrigger value="usage"><TabLabel>{tl("settings", "Usage")}</TabLabel></TabsTrigger>}
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
         {isAdmin && <TabsTrigger value="branding"><TabLabel>{tl("settings", "Branding")}</TabLabel></TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity"><TabLabel>{tl("settings", "Activity")}</TabLabel></TabsTrigger>}
@@ -3994,7 +4003,10 @@ export function SettingsView() {
           </div>
         </TabsContent>
       )}
-      {canPlatform && (
+      {/* THE PANEL TAKES THE TRIGGER'S CONDITION, not a looser one. Gated on canPlatform
+          alone, an operator who never sees the tab still renders its content by arriving at
+          ?tab=suppliers — a hidden control with a reachable body is not hidden. */}
+      {canPlatform && canSeeMoney() && !isOperator && (
         <TabsContent value="suppliers">
           <SectionCard
  title={tl("settings", "Supplier ordering")}
@@ -4008,7 +4020,7 @@ export function SettingsView() {
           <UsersPanel />
         </TabsContent>
       )}
-      {canPlatform && (
+      {canPlatform && canSeeMoney() && !isOperator && (
         <TabsContent value="usage">
           <UsagePanel isAdmin={isAdmin} />
         </TabsContent>
