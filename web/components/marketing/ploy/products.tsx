@@ -639,6 +639,7 @@ function Panel({
 export function PloyProducts({
   products,
   shipping,
+  initialSlug = null,
   headline,
   accent,
   lead,
@@ -649,13 +650,23 @@ export function PloyProducts({
   /** The extra-item fee, from the same read as the products. The garment price without the
    *  postage beside it is the half of the answer that flatters us. */
   shipping: { extra: number } | null
+  /**
+   * A PRODUCT TO OPEN ON ARRIVAL — how /catalog/<slug> is served.
+   *
+   * That route used to render a whole second page in the old bold-kit, so a link shared
+   * from this grid landed somebody on a different-looking site. It renders THIS page now,
+   * with the product already open, which means one design and one set of behaviour however
+   * you got here. The panel is in the first render rather than opened by an effect, so a
+   * crawler and a cold visitor both receive the product in the HTML.
+   */
+  initialSlug?: string | null
   headline: string
   accent: string
   lead: string
 }) {
   const [q, setQ] = useState("")
   const [method, setMethod] = useState("All")
-  const [openSlug, setOpenSlug] = useState<string | null>(null)
+  const [openSlug, setOpenSlug] = useState<string | null>(initialSlug)
   /** Size charts already read, by slug. A key present with `[]` means "asked, none
    *  published" — which is what stops a product without a chart being re-requested. */
   const [specs, setSpecs] = useState<Record<string, { size: string; spec: string; value: string }[]>>({})
@@ -729,8 +740,31 @@ export function PloyProducts({
    *  the visitor's own navigation made it. `popstate` is what actually clears the state —
    *  which is also what makes BACK and this button do exactly the same thing. */
   const close = useCallback(() => {
-    if (window.history.state?.egCatalog) window.history.back()
-    else setOpenSlug(null)
+    if (window.history.state?.egCatalog) { window.history.back(); return }
+    /* Arrived ON the product — /catalog/<slug> straight from a link or a search result —
+       so there is no entry of ours to pop, and Back belongs to wherever they came from.
+       The address has to come back to /catalog by itself or it would keep naming a product
+       that is no longer open, which is the bug Escape used to have. */
+    setOpenSlug(null)
+    window.history.replaceState({}, "", "/catalog")
+  }, [])
+
+  /**
+   * A COLD ARRIVAL LANDS ON THE MASTHEAD, not on the product it asked for.
+   *
+   * The panel is in the markup from the first render, but it can be several rows down, so
+   * without this /catalog/<slug> opens at the top of the catalogue and the visitor has to
+   * find the thing they clicked. Once, on mount, and never in response to a state change —
+   * this reads the DOM and scrolls, it does not fetch, so there is nothing here that could
+   * re-trigger itself (§2.8).
+   */
+  useEffect(() => {
+    if (!initialSlug) return
+    const t = setTimeout(() => {
+      document.getElementById(`p-${initialSlug}`)?.scrollIntoView({ block: "start" })
+    }, 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -859,7 +893,11 @@ export function PloyProducts({
               {packRows(list).map((row, ri) => {
                 const openHere = row.some((c) => c.item.slug === openSlug)
                 return (
-                  <div key={ri} className="mb-4 grid grid-cols-12 gap-4 md:mb-6 md:gap-6">
+                  <div
+                    key={ri}
+                    id={row.map(({ item }) => item.slug).includes(openSlug ?? "") ? `p-${openSlug}` : undefined}
+                    className="mb-4 grid scroll-mt-24 grid-cols-12 gap-4 md:mb-6 md:gap-6"
+                  >
                     {row.map(({ item }) => (
                       <Card
                         key={item.slug}
