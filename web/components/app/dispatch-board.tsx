@@ -1068,7 +1068,9 @@ export function DispatchBoard() {
          * A line break says it — the top row decides the list, the row under it narrows it —
          * which is what Mercury does with its status tabs above a separate filter bar.
          */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 pb-2 pt-3">
+        {/* Back to even padding. The asymmetric pb-2/pt-3 was there to tuck the filter row
+            up under the view switcher above it; with one row it just reads as off-centre. */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
           {/* SEARCH SITS WITH THE ACTIONS, NOT UNDER THE FILTERS.
               Splitting the strip in two put the filters on row one and pushed search onto row
               two, so the thing you reach for most moved DOWN every time a filter row grew.
@@ -1092,11 +1094,13 @@ export function DispatchBoard() {
           {(
             <TabBar
               spacing="none"
-              /* `basis-full` is what actually breaks the line: the wrapper is a wrap-flex, so
-                 without it the filters sit beside the view switcher again the moment there is
-                 room, and the hierarchy comes and goes with the window width. A level is not
-                 a level if it only holds on narrow screens. */
-              className={"basis-full border-b-0" + (inShell ? " order-2" : "")}
+              /* NO `basis-full` ANY MORE. It was added to force a line break between the view
+                 switcher and these filters, back when "To scan / History" sat above them and
+                 the two levels needed separating. History is gone, so there is one level —
+                 and the forced break was leaving a band of empty card between the filters and
+                 the table, with Columns and Select all stranded far right on a row of their
+                 own. One level, one row; it still wraps on its own when there is no room. */
+              className={"border-b-0" + (inShell ? " order-2" : "")}
               size="sm"
               ariaLabel={tl("dispatch", "Filter the queue")}
               value={qFilter}
