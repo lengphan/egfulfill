@@ -52,7 +52,22 @@ for (const f of files) {
   const src = fs.readFileSync(f, 'utf8')
   const rel = path.relative(WEB_DIR, f)
   const add = (key) => { if (!used.has(key)) used.set(key, new Set()); used.get(key).add(rel) }
-  for (const m of src.matchAll(/\btl\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"\s*\)/g)) {
+  /**
+   * EVERY NAME THE TRANSLATOR IS GIVEN, not just `tl`.
+   *
+   * This matched the literal identifier `tl`, and six files bind useLabelT() to something
+   * else — dashboard-view calls it `cl`, the nav components call it `nl`. Twenty-three call
+   * sites were therefore never counted, and the gate reported 100% while "Best sellers" and
+   * "Revenue" rendered in English on a Vietnamese dashboard. A coverage gate that cannot see
+   * a call site is worse than no gate: it answers the question with a number.
+   *
+   * The names are read from the file rather than listed here, so the next alias is counted
+   * without anybody remembering to add it.
+   */
+  const names = new Set(['tl'])
+  for (const m of src.matchAll(/\b(?:const|let)\s+(\w+)\s*=\s*useLabelT\(\)/g)) names.add(m[1])
+  const callSite = new RegExp(String.raw`\b(?:${[...names].join('|')})\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"\s*\)`, 'g')
+  for (const m of src.matchAll(callSite)) {
     add(JSON.parse(`"${m[1]}"`) + '.' + JSON.parse(`"${m[2]}"`))
   }
   for (const m of src.matchAll(/\bt\(\s*"((?:[^"\\]|\\.)*)"/g)) {

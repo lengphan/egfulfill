@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getOrders, getWallet, type OrderRow } from "@/lib/api"
+import { getOrders, getWallet, type OrderRow, getBestSellers, type BestSeller } from "@/lib/api"
 import { DashboardTicker } from "@/components/app/dashboard-ticker"
 import { PageBand } from "@/components/app/page-band"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
@@ -28,7 +28,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
 import { resolvedOrderStage } from "@/lib/factory-status"
-import { dailyRevenue, barsOf, topProducts, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
+import { dailyRevenue, barsOf, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
 
 const DAY = 864e5
 // What each range means as a number of DAILY bars.
@@ -184,7 +184,24 @@ export function DashboardView() {
      still a shortlist rather than a report. An account with fewer simply shows fewer —
      nothing is padded to fill the row, because a placeholder tile beside a real product is
      the invented-data problem §4 forbids. */
-  const blanks = useMemo(() => topProducts(orders ?? [], 8), [orders])
+  /**
+   * WHAT SELLS ACROSS THE FLOOR. One request, not derived from `orders` — the reader's own
+   * orders cannot answer "what should I be making" on a first day, which is the whole reason
+   * this row exists.
+   *
+   * Empty on failure rather than a spinner or an error: the row is guidance, and a dashboard
+   * that reports its own plumbing where a product should be is worse than one that shows
+   * three sections instead of four. `blanks`/topProducts are gone with it — nothing else read
+   * them.
+   */
+  const [bestSellers, setBestSellers] = useState<BestSeller[]>([])
+  useEffect(() => {
+    let live = true
+    const t = setTimeout(() => {
+      getBestSellers(8).then((r) => { if (live) setBestSellers(r ?? []) }).catch(() => { if (live) setBestSellers([]) })
+    }, 0)
+    return () => { live = false; clearTimeout(t) }
+  }, [])
 
  /* WHAT IS WAITING ON THE SELLER, and only then what is recent.
   *
@@ -295,15 +312,28 @@ export function DashboardView() {
         </div>
       )}
 
-      {blanks.length > 0 && (
+      {/**
+        * BEST SELLERS — what sells across the whole floor, not what this reader has sold.
+        *
+        * This was the seller's OWN top products, which is a true fact and an empty one for
+        * most accounts: one tile beside three cells of nothing, and no row at all on a first
+        * day. The section answers "what should I be making", and their own history cannot
+        * answer that before they have one.
+        *
+        * NO FIGURES. The old tile carried "6 units · $0" because those were the reader's own
+        * numbers. These are everyone's, so the row publishes the ORDER and nothing else: a
+        * rank is merchandising, an absolute count is our volume. The server withholds both,
+        * so there is nothing here to print even by accident.
+        */}
+      {bestSellers.length > 0 && (
         <div>
-          <p className="eg-label mb-2 text-muted-foreground">{cl("kpi", "What is selling")}</p>
+          <p className="eg-label mb-2 text-muted-foreground">{cl("kpi", "Best sellers")}</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {blanks.map((b) => (
+            {bestSellers.map((b) => (
               <button
- key={b.name}
+ key={b.id}
  type="button"
- onClick={() => router.push(`/products?q=${encodeURIComponent(b.name)}`)}
+ onClick={() => router.push(`/products?q=${encodeURIComponent(b.name || "")}`)}
                 className="eg-tap overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-primary/40"
               >
                 {/* A WHITE BED, because we do not control what arrives here.
@@ -317,12 +347,15 @@ export function DashboardView() {
                     photograph that has a scene reading as its own rectangle, which is the
                     honest rendering of both. Contain stays: the tile answers "which blank
                     is this", so it shows the whole garment. */}
-                <Thumb src={b.img} alt={b.name} fit="contain" className="aspect-[4/3] w-full bg-white" />
+                <Thumb src={b.img} alt={b.name || ""} fit="contain" className="aspect-[4/3] w-full bg-white" />
                 <div className="border-t border-border px-3 py-2.5">
                   <div className="truncate text-sm font-medium leading-tight">{b.name}</div>
-                  <div className="mt-1 text-2xs tabular-nums text-muted-foreground">
-                    {b.units === 1 ? t("dash.oneUnit") : t("dash.nUnits", { n: b.units })} · {usd(b.revenue)}
-                  </div>
+                  {/* The TYPE, where the units and revenue used to be. It is a fact about the
+                      product rather than about anybody's trading, so it survives the move to a
+                      floor-wide row — and it keeps the tile two lines tall, which is what stops
+                      the grid from re-flowing between a product that has one and one that
+                      does not. */}
+                  <div className="mt-1 truncate text-2xs text-muted-foreground">{b.type || "\u00a0"}</div>
                 </div>
               </button>
             ))}

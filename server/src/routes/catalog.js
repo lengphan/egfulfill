@@ -2015,6 +2015,63 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return { ok: true, dryRun, updated: changed.length, changed, skipped };
   });
 
+  /**
+   * WHAT IS SELLING ACROSS THE FLOOR — the seller dashboard's Best sellers row.
+   *
+   * That row used to be the reader's OWN top products, which is a real fact and an empty one
+   * for most accounts: a seller who has shipped one style sees one tile beside three cells of
+   * nothing, and a seller on their first day sees no row at all. The section exists to answer
+   * "what should I be making", and their own history cannot answer that on day one.
+   *
+   * ORDERED, NOT COUNTED. It ranks by units and publishes neither the units nor the revenue.
+   * A rank is merchandising; an absolute figure is our volume, and a seller reading "1,240
+   * units" across a few visits knows the size of the floor. §2.9's reasoning about the
+   * supplier applies to us as well — the ordering is the useful half and the only half that
+   * has to leave the building.
+   *
+   * Through slimImages + sellerSafe, the same pipeline /api/catalog_products already uses, so
+   * this inherits the supplier stripping rather than restating it. A projection written fresh
+   * here is exactly how the cost and the supplier sku come back.
+   *
+   * Cancelled and refunded orders are excluded: they are not sales, and a big order somebody
+   * reversed would otherwise sit at the top of a list of what sells.
+   */
+  app.get('/api/catalog/best-sellers', { preHandler: requireAuth }, async (req) => {
+    const limit = Math.max(1, Math.min(24, parseInt((req.query || {}).limit, 10) || 8));
+    /* The blank cell is a COMPOSITE — "EG-18000 - Unisex Heavy Blend™ Crewneck Sweatshirt" —
+       so the sku is matched against the whole value AND against the half before the dash,
+       which is the shape the import template writes and the picker stores. supplier_sku is
+       matched for the same reason matchProduct reads it: an older line names the supplier's
+       own code. */
+    const top = await q(
+      `select p.data, p.status, sum(i.qty)::int as units
+         from order_items i
+         join orders o on o.id = i.order_id
+         join catalog_products p on (
+              lower(nullif(p.sku,'')) = lower(nullif(i.blank,''))
+           or lower(nullif(p.supplier_sku,'')) = lower(nullif(i.blank,''))
+           or lower(nullif(p.sku,'')) = lower(split_part(i.blank, ' - ', 1))
+           or lower(coalesce(p.data->>'name','')) = lower(nullif(i.name,''))
+         )
+        where lower(coalesce(o.status,'')) not in ('cancelled','refunded')
+          and coalesce(o.label_only, false) = false
+        group by p.id, p.data, p.status
+        order by units desc, p.id
+        limit $1`, [limit]
+    ).then((r) => r.rows).catch(() => []);
+
+    const staff = isStaff(req.user);
+    // Same visibility gate as the catalogue read: a product a seller may not see does not
+    // become visible by having sold well.
+    const rows = top
+      .filter((row) => row.data && (staff || sellerVisible(row.status ?? row.data.status)))
+      .map((row) => row.data);
+    const light = await Promise.all(rows.map(slimImages));
+    return (staff ? light : light.map(sellerSafe)).map((p) => ({
+      id: p.id, name: p.name, img: p.img ?? null, type: p.type ?? null,
+    }));
+  });
+
   app.post('/api/catalog/selection', { preHandler: requireStaff }, async (req, reply) => {
     const b = req.body || {};
     const ids = Array.isArray(b.ids) ? b.ids.map(String).filter(Boolean) : [];

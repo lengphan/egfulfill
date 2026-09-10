@@ -1276,6 +1276,10 @@ export type CatalogProduct = {
   boxH?: number | string | null
   // Print-method surcharge, e.g. { DTG: 3, EMB: 5 } — EMB stitches cost more than ink.
   methodPrices?: Record<string, number>
+  /** What ONE EXTRA printed face costs on this blank, overriding the platform's
+   *  `method_side`. Above zero or absent — a stored 0 falls through to the platform rate,
+   *  because sideAddOn in server/src/pricing.js takes an override only when it is `> 0`. */
+  sidePrice?: number
   // This product's own extra-item shipping, overriding the platform's ship_extra.
   additionalItemShipping?: number | null
   description?: string
@@ -1538,6 +1542,10 @@ export type PublicProduct = {
    * known" rather than "no surcharge".
    */
   methodPrices?: Record<string, number>
+  /** What ONE EXTRA printed face costs on this blank, overriding the platform's
+   *  `method_side`. Above zero or absent — a stored 0 falls through to the platform rate,
+   *  because sideAddOn in server/src/pricing.js takes an override only when it is `> 0`. */
+  sidePrice?: number
   /**
    * THE FACES THIS BLANK PRINTS ON — resolved server-side from the product's own `sides`,
    * else its category's (mirrors sidesOf in lib/variant-resolve.ts). Keys, not labels:
@@ -1601,6 +1609,13 @@ export function getPublicProduct(slug: string) {
   return api<{ product: PublicProduct }>(`/api/public/products/${encodeURIComponent(slug)}`, PUBLIC_CACHE)
 }
 
+/** What sells best across the whole floor — the seller dashboard's Best sellers row.
+ *  Ordered by units and carrying NO figures: a rank is merchandising, an absolute count is
+ *  our volume. Seller-safe through the same projection the catalogue read uses. */
+export type BestSeller = { id: string; name?: string | null; img?: string | null; type?: string | null }
+export function getBestSellers(limit = 8) {
+  return api<BestSeller[]>(`/api/catalog/best-sellers?limit=${encodeURIComponent(String(limit))}`)
+}
 export function getCatalogProducts() {
   return cachedList("catalog_products", 120_000, () => api<CatalogProduct[]>(`/api/catalog_products`))
 }
