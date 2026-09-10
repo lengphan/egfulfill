@@ -300,14 +300,27 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
   const [editing, setEditing] = useState<string | null>(null)
   /** The cell the fill handle belongs to — the one with focus. Kept in state rather than read
    *  from document.activeElement because the handle has to RENDER, and a ref does not. */
-  const [fillFrom, setFillFrom] = useState<{ r: number; c: number } | null>(null)
-  /** The row the pointer is currently over mid-drag. null when no drag is running. Drives both
-   *  the preview and, on release, the range that gets written. */
-  const [fillTo, setFillTo] = useState<number | null>(null)
+  /**
+   * The cell the fill handle belongs to — now a ROW and a COLUMN RANGE, because a sheet fills
+   * several columns at once and typing the same address across four of them is the case this
+   * whole gesture exists for. `c0`/`c1` are inclusive and unordered until read: shift-click
+   * can extend leftward.
+   */
+  const [fillFrom, setFillFrom] = useState<{ r: number; c0: number; c1: number } | null>(null)
+  /** The selected columns as an inclusive [lo, hi], or null. */
+  const fillCols = fillFrom ? [Math.min(fillFrom.c0, fillFrom.c1), Math.max(fillFrom.c0, fillFrom.c1)] as const : null
+  /** The CELL the pointer is over mid-drag — row and column, because the dot now drags in
+   *  both axes. null when no drag is running. Drives the preview; the release writes it. */
+  const [fillTo, setFillTo] = useState<{ r: number; c: number } | null>(null)
   /** Did this focus come from a pointer? A ref, not state — it is read inside the same
    *  gesture that sets it, and a re-render between mousedown and click would be a bug of its
    *  own. See the cell's onMouseDown / onClick. */
   const pointerSel = useRef(false)
+  /** Was Shift held on the mousedown that is about to move focus? A ref for the same reason
+   *  pointerSel is one: it is written and read inside a single gesture, and a re-render
+   *  between mousedown and focus would be a bug of its own. Shift+click extends the fill
+   *  selection sideways — the "select a few columns, then drag" case. */
+  const shiftRef = useRef(false)
   /** Which whole row is selected, by index. Cleared the moment a cell takes focus — a
    *  sheet cannot have both a live cell and a live row without the next keypress being
    *  ambiguous about which one it means. */
@@ -610,64 +623,104 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * product may not offer. A fill that skipped that would leave "Navy" on forty rows that no
    * longer have a Navy — the exact state that clear exists to prevent.
    */
-  const fillDown = useCallback((fromRow: number, toRow: number, c: number) => {
-    const lo = Math.min(fromRow, toRow)
-    const hi = Math.max(fromRow, toRow)
-    if (hi <= lo) return
+  /**
+   * THE FILL — a rectangle from the anchor to wherever the dot was dragged, in either axis.
+   *
+   * Down repeats the row; sideways repeats the column; both at once fills the rectangle. That
+   * is what a sheet does, and it is the same gesture either way, so it is one function rather
+   * than a fillDown and a fillRight that would drift apart.
+   *
+   * The anchor is a ROW and a COLUMN RANGE. Dragging a four-column selection down writes each
+   * column its own value. Dragging one cell sideways writes that value across. A wide anchor
+   * dragged wider TILES — target column c takes the anchor column (c - lo) mod width — which
+   * is the only rule that answers every combination without a special case.
+   *
+   * ONE UNDO for the whole drag: it writes through writeRows directly rather than calling
+   * setCell per cell, which tags each write `cell:<r>:<c>` and would leave a forty-row fill as
+   * forty entries to walk back through.
+   *
+   * It repeats rather than extrapolating a series. Guessing which was meant is how "S, M"
+   * becomes "S, M, L, XL" on rows that wanted three smalls.
+   */
+  const fillRange = useCallback((from: { r: number; c0: number; c1: number }, toR: number, toC: number) => {
+    const cLo = Math.min(from.c0, from.c1)
+    const cHi = Math.max(from.c0, from.c1)
+    const rLo = Math.min(from.r, toR)
+    const rHi = Math.max(from.r, toR)
+    const tLo = Math.min(cLo, toC)
+    const tHi = Math.max(cHi, toC)
+    if (rHi === rLo && tHi === cHi && tLo === cLo) return
+    const width = cHi - cLo + 1
     writeRows((prev) => {
-      const v = prev[fromRow]?.[c] ?? ""
+      const src = prev[from.r]
+      if (!src) return prev
       const next = prev.map((row) => row.slice())
-      for (let r = lo; r <= hi; r++) {
-        if (r === fromRow || !next[r]) continue
-        const had = next[r][c]
-        next[r][c] = v
-        if (c === IDX.blank && had !== v) {
+      for (let r = rLo; r <= rHi; r++) {
+        if (!next[r]) continue
+        const cols: number[] = []
+        for (let c = tLo; c <= tHi; c++) {
+          // The anchor itself is never rewritten — it is what everything else is copied FROM.
+          if (r === from.r && c >= cLo && c <= cHi) continue
+          cols.push(c)
+        }
+        if (!cols.length) continue
+        /* THE BLANK'S CASCADE RUNS FIRST, whatever order the columns come in. It clears
+           colour, size, method and side (setCell does the same on a single edit, because
+           those name options the new product may not offer) — so doing it up front means
+           every other column in the range then writes over a cleared cell instead of having
+           its freshly-written value wiped a moment later. */
+        if (cols.includes(IDX.blank) && next[r][IDX.blank] !== src[cLo + ((IDX.blank - tLo) % width + width) % width]) {
           next[r][IDX.item_color] = ""
           next[r][IDX.item_size] = ""
           next[r][IDX.print_type] = ""
           next[r][IDX.print_side] = ""
         }
+        for (const c of cols) next[r][c] = src[cLo + (((c - tLo) % width) + width) % width] ?? ""
       }
       return next
-    }, `fill:${fromRow}:${c}:${Date.now()}`)
+    }, `fill:${from.r}:${cLo}-${cHi}:${Date.now()}`)
   }, [writeRows])
 
   /**
-   * THE DRAG. Pointer events on the WINDOW, not on the handle: a fill runs down the sheet and
-   * the pointer leaves the 8px square immediately, so a handler bound to the handle would stop
+   * THE DRAG. Pointer events on the WINDOW, not on the handle: a fill runs across the sheet
+   * and the pointer leaves the 9px dot immediately, so a handler bound to the dot would stop
    * hearing about it on the first pixel.
    *
-   * The row under the pointer is read from the DOM rather than computed from a row height —
-   * rows here are not a fixed height (a wrapped product name makes one taller), so arithmetic
-   * off the start position drifts further from the truth the further you drag.
+   * The cell under the pointer is READ from the DOM rather than computed from a row height —
+   * rows here are not a fixed height (a wrapped product name makes one taller) and columns are
+   * not a fixed width, so arithmetic off the start position drifts further from the truth the
+   * further you drag.
    */
-  const startFill = useCallback((r: number, c: number) => (e: React.PointerEvent) => {
+  const startFill = useCallback((from: { r: number; c0: number; c1: number }) => (e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setFillTo(r)
-    const rowUnder = (y: number): number | null => {
-      const el = document.elementFromPoint(e.clientX, y) as HTMLElement | null
+    const cHi = Math.max(from.c0, from.c1)
+    setFillTo({ r: from.r, c: cHi })
+    const cellUnder = (x: number, y: number): { r: number; c: number } | null => {
+      const el = document.elementFromPoint(x, y) as HTMLElement | null
       const cell = el?.closest<HTMLElement>("[data-cell]")
       const rc = cell?.dataset.cell?.split("-")
-      const n = rc ? Number(rc[0]) : NaN
-      return Number.isFinite(n) ? n : null
+      if (!rc || rc.length < 2) return null
+      const r = Number(rc[0]); const c = Number(rc[1])
+      return Number.isFinite(r) && Number.isFinite(c) ? { r, c } : null
     }
     const move = (ev: PointerEvent) => {
-      const n = rowUnder(ev.clientY)
-      // DOWNWARD ONLY. A sheet fills up as well, but the handle sits at the bottom-right and
-      // an upward drag from it reads as a mis-grab far more often than as an intention.
-      if (n != null && n >= r) setFillTo(n)
+      const n = cellUnder(ev.clientX, ev.clientY)
+      // FORWARD ONLY. A sheet fills up and left as well, but the dot sits at the bottom-right
+      // and a backward drag from it reads as a mis-grab far more often than as an intention.
+      if (n && n.r >= from.r && n.c >= cHi) setFillTo(n)
     }
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move)
       window.removeEventListener("pointerup", up)
-      const n = rowUnder(ev.clientY)
+      const n = cellUnder(ev.clientX, ev.clientY)
       setFillTo(null)
-      if (n != null && n > r) fillDown(r, n, c)
+      if (n && n.r >= from.r && n.c >= cHi && (n.r > from.r || n.c > cHi)) fillRange(from, n.r, n.c)
     }
     window.addEventListener("pointermove", move)
     window.addEventListener("pointerup", up)
-  }, [fillDown])
+  }, [fillRange])
+
 
 
   const setCell = useCallback((r: number, c: number, v: string) => {
@@ -1093,7 +1146,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                              it. `pointerSel` is set on mousedown and read after, which is the
                              only point at which the browser's own selection reflects what was
                              actually dragged. */
-                          onMouseDown={() => { pointerSel.current = true }}
+                          onMouseDown={(e) => { pointerSel.current = true; shiftRef.current = e.shiftKey }}
                           onFocus={(e) => {
                             setSel(null)
                             /* Skip the select-all when focus came from a POINTER: the click
@@ -1105,7 +1158,9 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                                before release — would otherwise leave the flag set, and the
                                next KEYBOARD focus would silently skip its select-all. Read
                                once, cleared once, in the same handler. */
-                            setFillFrom({ r, c })
+                            /* Focus resets the selection to THIS cell. Shift-click extends it
+                               sideways — see the cell's onMouseDown. */
+                            setFillFrom((cur) => (shiftRef.current && cur && cur.r === r ? { ...cur, c1: c } : { r, c0: c, c1: c }))
                             const byPointer = pointerSel.current
                             pointerSel.current = false
                             if (editing !== `${r}-${c}` && !byPointer) e.currentTarget.select()
@@ -1180,22 +1235,23 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                           * own accent while the drag runs, so what is highlighted is exactly
                           * what is about to change — the row you started from is not.
                           */}
-                        {fillFrom && fillTo != null && c === fillFrom.c && r > fillFrom.r && r <= fillTo && (
+                        {fillFrom && fillTo && fillCols && !(r === fillFrom.r && c >= fillCols[0] && c <= fillCols[1])
+                          && r >= fillFrom.r && r <= fillTo.r && c >= fillCols[0] && c <= Math.max(fillCols[1], fillTo.c) && (
                           <span
                             aria-hidden
                             className={`pointer-events-none absolute inset-0 z-10 border-x border-dashed border-muted-foreground/70 bg-foreground/5${
-                              r === fillFrom.r + 1 ? " border-t" : ""}${r === fillTo ? " border-b" : ""}`}
+                              r === fillFrom.r ? " border-t" : ""}${r === fillTo.r ? " border-b" : ""}`}
                           />
                         )}
                         {/* THE GRIP. Eight pixels in the cell's bottom-right corner, shown on
                             the focused cell and on hover. `touch-none` because a pointer drag
                             on a touch screen would otherwise scroll the sheet instead. */}
-                        {fillFrom?.r === r && fillFrom?.c === c && editing !== `${r}-${c}` && (
+                        {fillFrom?.r === r && fillCols?.[1] === c && editing !== `${r}-${c}` && (
                           <span
                             role="presentation"
                             aria-hidden
-                            onPointerDown={startFill(r, c)}
-                            title={tl("grid", "Drag down to copy this value")}
+                            onPointerDown={startFill(fillFrom)}
+                            title={tl("grid", "Drag to copy — down, across, or both")}
                             className="absolute -bottom-[4px] -right-[4px] z-20 size-[9px] cursor-crosshair touch-none rounded-full bg-brand ring-2 ring-background"
                           />
                         )}
