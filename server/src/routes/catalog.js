@@ -1883,6 +1883,52 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * to charge for it are different decisions, and bundling them means one careless call
    * does both.
    */
+  /**
+   * CAN THIS PRODUCT BE PRICED AT ALL? — one rule, read by the save gate and the sweep below.
+   *
+   * `sellerBaseCostOf` is the pricer's own answer, not a second opinion: it walks the same
+   * four-step ladder priceLines walks (the size's own base cost, the size's supplier cost
+   * plus markup, the product's base cost, the product's supplier cost plus markup) and
+   * returns null when none of them answers. A copy of that ladder here is how a product
+   * passes this check and then prices at nothing on the order — §5.
+   *
+   * `> 0`, not merely non-null. A product carrying a literal 0 is the case that started
+   * this: it resolves, it quotes $0.00, and an order line reads "Not priced" while the
+   * catalogue card shows a confident price of zero.
+   */
+  const pricedOk = (row, fees) => {
+    const base = sellerBaseCostOf(row, fees);
+    return base != null && base > 0;
+  };
+
+  /**
+   * PUT EVERY UNPRICED PRODUCT BACK TO INACTIVE.
+   *
+   * An Active product with no cost is worse than a missing one: it is offered, chosen, put
+   * on an order, and only refuses at the pricer — the last step before somebody is charged.
+   * The seller has done everything asked of them by then.
+   *
+   * Inactive rather than deleted, because the product is real and only its price is missing.
+   * It stays in the Products list, where a cost can be typed and the row reactivated.
+   */
+  app.post('/api/catalog/deactivate-unpriced', { preHandler: requireStaff }, async (req, reply) => {
+    if (req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
+    const fees = await feeSettings();
+    const rows = (await q("select id, data, base_price from catalog_products where lower(coalesce(status,'active')) = 'active'")).rows;
+    const stale = rows.filter((r) => !pricedOk(r, fees));
+    if (!stale.length) return { ok: true, deactivated: 0, products: [] };
+    const ids = stale.map((r) => r.id);
+    // in_catalog goes too. A product that cannot be priced has no business on the lookbook
+    // either, and leaving it there would put the same hole one screen further out.
+    await q("update catalog_products set status='Inactive', in_catalog=false, updated_at=now() where id = any($1::text[])", [ids]);
+    audit(req, 'catalog.deactivated_unpriced', {
+      entityType: 'catalog', entityId: 'unpriced',
+      after: { count: ids.length, products: stale.slice(0, 25).map((r) => ({ id: r.id, name: (r.data || {}).name || r.id })) },
+    });
+    return { ok: true, deactivated: ids.length,
+             products: stale.map((r) => ({ id: r.id, name: (r.data || {}).name || r.id })) };
+  });
+
   app.post('/api/catalog/selection', { preHandler: requireStaff }, async (req, reply) => {
     const b = req.body || {};
     const ids = Array.isArray(b.ids) ? b.ids.map(String).filter(Boolean) : [];
@@ -2051,6 +2097,31 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
   });
 
   app.post('/api/catalog_products', { preHandler: requireStaff }, async (req, reply) => {
+    /**
+     * A PRODUCT WITH NO PRICE MAY NOT BE ACTIVE — the gate, applied at the only door.
+     *
+     * `p.status || 'Active'` made Active the default for anything that did not say
+     * otherwise, so a supplier import or a hand-added row went live carrying no cost. It is
+     * then offered in the blank picker, chosen, imported onto a line, and refuses at the
+     * pricer — the last step before a charge, and the one place the seller cannot act.
+     *
+     * It DOWNGRADES rather than refusing the save. This is a bulk write of the whole
+     * catalogue; rejecting all of it because one row lacks a cost would lose the other
+     * edits, and the product itself is fine — only its price is missing. The held rows come
+     * back in the response so the screen can name them instead of leaving someone to notice
+     * that a switch did not stay where they put it.
+     */
+    const gateFees = await feeSettings().catch(() => ({}));
+    const heldInactive = [];
+    const statusFor = (p) => {
+      const want = p.status || 'Active';
+      if (String(want).toLowerCase() !== 'active') return want;
+      // The same shape the pricer reads: it walks `row.data`, which for a save IS the payload.
+      if (pricedOk({ data: p, base_price: p.basePrice ?? p.base_price }, gateFees)) return want;
+      heldInactive.push({ id: p.id, name: p.name || p.id });
+      return 'Inactive';
+    };
+
     const products = await Promise.all((Array.isArray(req.body) ? req.body : []).map(fattenImages));
     // An empty list used to mean "delete every product", which is never what a full-list
     // sync intends — it's what a caller sends when it has nothing to send. The client
@@ -2116,7 +2187,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         [
           id, p.name || '', p.sku || null, p.supplierSku || p.supplier_sku || null,
           p.type || null, p.method || null,
-          p.status || 'Active', Number(p.basePrice ?? p.base_price ?? 0) || 0,
+          statusFor(p), Number(p.basePrice ?? p.base_price ?? 0) || 0,
           Number(p.price ?? 0) || 0, p.mainColor || p.main_color || null, p
         ]
       );
@@ -2282,6 +2353,8 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     if (sourced) {
       audit(req, 'sourcing.auto_added', { entityType: 'manual_supplier', entityId: 'auto', after: { rows: sourced } });
     }
-    return { ok: true, count: keep.length, priceChanges: priceChanges.length, tracked, sourced };
+    // WHICH ROWS THE GATE HELD BACK. A switch that does not stay where somebody put it has
+    // to say so, or the only symptom is a product quietly missing from the picker later.
+    return { ok: true, count: keep.length, priceChanges: priceChanges.length, tracked, sourced, heldInactive };
   });
 }
