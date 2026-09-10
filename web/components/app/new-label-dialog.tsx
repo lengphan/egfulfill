@@ -105,6 +105,12 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   /** `unknown` = nobody could check — see lib/address-check.ts. It used to fall to `idle`,
    *  which made a failed check look exactly like an address nobody had typed yet. */
  const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid" | "unknown" | "unreadable"; msg?: string }>({ status: "idle" })
+  /** What was typed before USPS standardised it, so the rewrite is undoable. A correction
+   *  nobody can reverse is a correction nobody trusts. */
+ const [preCorrection, setPreCorrection] = useState<string | null>(null)
+  /** Every address signature this has already acted on, AND every one it has produced.
+   *  Both halves matter — see the loop note below. */
+ const corrected = useRef<Set<string>>(new Set())
  useEffect(() => {
  const complete = addrComplete(to)
  let alive = true
@@ -135,10 +141,58 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  return
       }
  setAddrCheck({ status: "checking" })
+ const sig = [to.street, to.street2, to.city, to.state, to.zip].join("|")
  validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
         .then((v) => {
  if (!alive) return
- if (v && v.ok) { setAddrCheck({ status: "valid" }); return }
+ if (v && v.ok) {
+            /**
+             * WRITE USPS'S OWN VERSION BACK INTO THE BOX.
+             *
+             * The Addresses API does not just say yes — it returns the STANDARDISED address:
+             * the state as a two-letter code, the city as USPS spells it, and ZIP+4. That is
+             * the form the label is printed in either way, so showing anything else means the
+             * screen and the parcel disagree, and "California" stays on screen looking like
+             * something we accepted rather than something we rewrote.
+             *
+             * INTEGRITY FIRST. Applied only when USPS returned every part, and street2 is
+             * carried through rather than dropped — a missing unit number is a parcel that
+             * reaches the building and not the person. If any piece is missing the address is
+             * left exactly as typed and the badge just says validated.
+             *
+             * AND IT CANNOT LOOP — which took two goes to get right, so the reasoning is here.
+             *
+             * This effect writes the text that feeds the parse that feeds this effect: exactly
+             * the shape CLAUDE.md §2.8 is about, and the one bug class that reaches past the
+             * browser. A single "have I corrected this input" ref is NOT enough, because
+             * correcting changes the input — the next pass sees a new signature, the guard
+             * passes again, and only the text comparison further down happens to stop it. That
+             * is termination by luck: it holds while USPS returns exactly what we composed, and
+             * fails the moment it reformats its own output differently.
+             *
+             * So the ref remembers every signature acted on AND every one produced. A
+             * correction can therefore never be applied to its own result, whatever comes back,
+             * and the loop is closed by construction rather than by a value comparison.
+             */
+ const a = v.address
+ const sigOf = (x: { street?: string; street2?: string; city?: string; state?: string; zip?: string }) =>
+              [x.street, x.street2, x.city, x.state, x.zip].join("|")
+ if (a && a.street && a.city && a.state && a.zip && !corrected.current.has(sig)) {
+ corrected.current.add(sig)
+ const zip = a.zip4 ? `${a.zip}-${a.zip4}` : a.zip
+ corrected.current.add(sigOf({ ...a, zip }))
+ const next = [to.name, a.street, a.street2, `${a.city}, ${a.state} ${zip}`]
+                .filter((l) => l && String(l).trim()).join("\n")
+ if (next !== pasteText) {
+ setPreCorrection(pasteText)
+ setPasteText(next)
+ setTo({ ...to, street: a.street, street2: a.street2 || "", city: a.city, state: a.state, zip })
+ setAddrCheck({ status: "valid", msg: "corrected" })
+ return
+              }
+            }
+ setAddrCheck({ status: "valid" }); return
+          }
           /* An availability error is not a verdict on the address — grey, not amber. */
  setAddrCheck(cannotCheck(v?.error)
             ? { status: "unknown", msg: friendlyValidationError(v?.error) }
@@ -397,24 +451,32 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
       {/* Two columns: what you are sending on the left, what it costs on the right.
           One column meant the rates — the thing you came to choose — sat below the fold
  under the parcel fields, so buying a label always began with a scroll. */}
-      {/* sm:max-w-3xl, NOT max-w-3xl. DialogContent's own class list ends with
-          `sm:max-w-md`, and tailwind-merge keeps a bare utility and a `sm:` one side by
- side — they are different variants, so nothing is dropped. Above 640px the
- responsive rule then wins on source order and the window was capped at 448px,
- three-quarters narrower than asked for. Worse, `md:grid-cols-2` keys off the
-          VIEWPORT, so on any normal screen the two columns still split — a 448px popup
- divided into two ~190px tracks, which is why every field sat alone on its own
- line and the Buy button was pushed off the bottom. Matching the modifier is what
- actually raises the cap.
-
-          3xl (768px) was still not enough for two real columns. Split in half it left
-          ~360px a side: the ship-to helper wrapped to four lines, the parcel fields each
- took their own row, and the rates column — the wider half by nature, since a rate
- row is carrier + service + transit + price — sat empty beside a tall stack. The
- result read as one long form with a blank margin. 5xl gives each side ~480px,
- which is where the helper text settles onto two lines and a rate row fits without
- truncating the service name. */}
-      <DialogContent className="sm:max-w-5xl">
+      {/**
+       * A SIDE PANEL, NOT A 1024px MODAL (owner, 2026-09-10).
+       *
+       * It was two columns — the form left, rates right — sized so a rate row would not
+       * truncate. Two things were wrong with that, and the width was only the symptom.
+       *
+       * THE RIGHT COLUMN IS EMPTY ON ARRIVAL. Rates are the RESULT of the form, not a
+       * sibling of it, so the window opened as half a screen of white beside one button and
+       * asked you to look right at something that could not exist until you had finished
+       * looking left. Every other tool that does this job — Pirate Ship, ShipStation,
+       * Shopify's own buy-label flow — is one column with the rates underneath, for that
+       * reason.
+       *
+       * AND THE WIDTH ARGUMENT DID NOT HOLD. The old note reasoned that "a rate row is
+       * carrier + service + transit + price" and needed ~480px. The markup stacks them —
+       * carrier · service on one line, ETA beneath, price on the right — so a row fits
+       * comfortably in 400 and reads BETTER narrow, because the price sits nearer the name
+       * it belongs to. The other reason, a long list pushing Buy off screen, was already
+       * solved by the list's own max-h scroller and had nothing to do with columns.
+       *
+       * Right-hand rather than centred because this is work done against a list: the
+       * shipments table stays visible, the panel is tall instead of wide, and full height is
+       * where a long rate list actually wants to live. It also leaves the toolbar and the
+       * filter row completely alone, which a centred 1024px window does not.
+       */}
+      <DialogContent side="right" className="sm:max-w-lg">
         <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : tl("label", "New label")}</DialogTitle></DialogHeader>
 
         {result ? (
@@ -481,7 +543,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
           </div>
         ) : (
           <>
-            <div className="grid gap-x-5 gap-y-3 py-1 md:grid-cols-2">
+            {/* ONE COLUMN, in the order the job happens: who it goes to, what the parcel is,
+                what it costs. The two-track grid is gone with the second column. */}
+            <div className="grid gap-y-3 py-1">
               <div className="space-y-3 md:col-span-1">
               <div className="eg-label text-muted-foreground">{tl("label", "Ship to")}</div>
               {/* Live validation status sits INSIDE the box, bottom-right; extra bottom padding
@@ -500,7 +564,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 />
                 <div className="pointer-events-none absolute bottom-2 right-2.5">
                   {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> {tl("label", "Checking…")}</span>}
-                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {tl("label", "Validated")}</span>}
+                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {addrCheck.msg === "corrected" ? tl("label", "USPS format") : tl("label", "Validated")}</span>}
                   {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? tl("label", "Couldn't verify") : tl("label", "Not found")}</span>}
                   {/* GREY, NO ICON. Nobody could check — there is nothing to fix, and the
                       label buys against the address as typed either way. */}
@@ -509,9 +573,30 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                       the person can fix it. Distinct from `unknown` (grey — nobody could
                       check) because this one is not about the validator at all. */}
                   {addrCheck.status === "unreadable" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {tl("label", "Can’t read this")}</span>}
+
+                  {/* THE WAY BACK. A silent rewrite of somebody's typing is the kind of help
+                      that gets switched off — so the correction is announced and reversible,
+                      and reverting also stops it being re-applied, because the ref already
+                      holds this input's signature. */}
+                  {addrCheck.status === "valid" && addrCheck.msg === "corrected" && preCorrection && (
+                    <button
+                      type="button"
+                      onClick={() => { setPasteText(preCorrection); setPreCorrection(null); setAddrCheck({ status: "valid" }) }}
+                      className="rounded-lg bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    >
+                      {tl("label", "Undo")}
+                    </button>
+                  )}
                 </div>
               </div>
-              <p className="text-2xs text-muted-foreground">{tl("label", "Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).")}</p>
+              {/* NO SUBTITLE. It read "Name, street, then City, ST ZIP — the label uses
+                  exactly this. Ship-from is your saved warehouse address (Settings ›
+                  Platform)." — two lines of prose under a control, which §4 calls a defect,
+                  and both halves are now answered by the thing itself: the parser takes the
+                  shapes people actually paste rather than demanding one, an address it cannot
+                  read says so in amber and names the missing part, and a missing warehouse
+                  address is already a refusal on the Get rates button that names Settings ›
+                  Platform. A format instruction is only needed while the format is strict. */}
 
               <div className="pt-1 eg-label text-muted-foreground">{tl("label", "Parcel")}</div>
 
@@ -609,13 +694,14 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 </label>
               </div>
 
-              </div>{/* /left column */}
+              </div>{/* /form */}
 
-              {/* ── RATES, beside the form rather than under it ─────────────────
-                  This is what the window is for; it was the one thing you had to scroll
- to reach. Its own column, its own scroll, so a long list of services
- never pushes the Buy button off screen. */}
-              <div className="space-y-3 md:col-span-1">
+              {/* ── RATES, UNDER the form — the result of it, in reading order.
+                  Kept in its own block with its own scroller: the list can be twenty services
+                  long, and the Buy button below it must stay reachable without the panel
+                  growing. A hairline above, because this is the answer and everything over it
+                  was the question. */}
+              <div className="space-y-3 border-t border-border pt-4">
               <div className="eg-label text-muted-foreground">{tl("label", "Rates")}</div>
               <Button variant="outline" className="w-full" onClick={getRates} disabled={ratesLoading || !addrComplete(to) || !addrComplete(from)}>
                 {ratesLoading ? <><CircleNotch size={14} className="animate-spin" /> {tl("label", "Getting rates…")}</> : rates ? tl("label", "Refresh rates") : <><Truck size={14} weight="bold" /> {tl("label", "Get rates")}</>}
