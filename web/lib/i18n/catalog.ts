@@ -2665,6 +2665,7 @@ const vi: Dict = {
   "dispatch.Upload these labels to the pre-scan queue — charges the expedite fee per label": "Tải nhãn lên hàng chờ quét trước — tính phí xử lý nhanh cho mỗi nhãn",
   "orders.Filter by stage": "Lọc theo giai đoạn",
   "orderSearch.No orders yet.": "Chưa có đơn hàng nào.",
+  "orderedVariant.Blank not linked to a product": "Phôi chưa liên kết với sản phẩm",
   "canvas.every face": "mọi mặt",
   "canvas.Recent files": "Tệp gần đây",
   "canvas.Pick a blank to start designing.": "Chọn một phôi để bắt đầu thiết kế.",

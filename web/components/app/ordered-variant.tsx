@@ -123,10 +123,33 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
    * the name when the blank matches no catalog product, because saying nothing there would
    * hide that the line has a blank at all.
    */
-  if (blankSku || blank) ids.push(
-    <span key="b" title={blank || undefined}>
+  /**
+   * ALWAYS OUR SKU, NEVER THE SUPPLIER'S (owner, 2026-09-10: "blank SKU should always be our
+   * SKU since the supplier SKU should just be for factory, suitable for ordering blanks").
+   *
+   * This was `blankSku || blank`, and the fallback is what printed
+   * "10-271-016-SM-S-M-016-WHITE" on a cap whose catalogue SKU is EG-1007. That string is
+   * Otto's variant code with our size and colour appended — a code that means nothing on our
+   * side of the wire, is not what stock is keyed on once a product resolves, and is a
+   * supplier's part number on a surface a SELLER can see.
+   *
+   * When it does not resolve, the honest line is that the line is not linked to a catalogue
+   * product — which is the thing somebody has to fix, and the reason its stock, its price and
+   * its searchability are all wrong at the same time. Printing the raw code instead made a
+   * broken link look like a working field.
+   *
+   * The raw value is NOT put in the tooltip either. This component renders on the seller's
+   * own order list, and a hover is still a surface.
+   */
+  if (blankSku) ids.push(
+    <span key="b">
       <span className="font-medium text-foreground/70">{tl("orderedVariant", "Blank SKU:")}</span>{" "}
-      <span className="tabular-nums">{blankSku || blank}</span>
+      <span className="tabular-nums">{blankSku}</span>
+    </span>
+  )
+  else if (blank) ids.push(
+    <span key="b" className="text-hold">
+      {tl("orderedVariant", "Blank not linked to a product")}
     </span>
   )
   // PRESENT WHENEVER IT IS PRESENT AT ALL — including x1. An absent count and a count of
