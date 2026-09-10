@@ -6,6 +6,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, getMe, assetUrl, type Order, type User } from "@/lib/api"
+import { useCountUp, usePressScale } from "@/lib/motion"
 import { router, useFocusEffect } from "expo-router"
 import { isOpen, isOverdue, normalizeStage, platformOf, numOf, lineListing } from "@/lib/orders"
 import { TAB_BAR, F, C, R, S, CARD } from "@/lib/theme"
@@ -462,35 +463,6 @@ function Column({ height, today, letter, loading, reduced, delay, dark }: {
  * one more thing to explain when the whole card is already pressable.
  */
 /**
- * A FIGURE THAT ARRIVES.
- *
- * The app had no motion in it at all — not a count, not a press, not a transition — and
- * "not smooth" was a literal description rather than a mood. A number that counts up is the
- * cheapest honest motion there is: it says the value was fetched rather than always sat
- * there, and it draws the eye to the one thing on a tile worth reading.
- *
- * Reduced motion gets the final value immediately. Not a slower count — no count. The
- * setting is asking for no movement, not for gentler movement.
- */
-function useCountUp(to: number, reduced: boolean) {
-  const [n, setN] = useState(reduced ? to : 0)
-  useEffect(() => {
-    if (reduced) { setN(to); return }
-    const from = 0, ms = 650, t0 = Date.now()
-    let raf = 0
-    const tick = () => {
-      const p = Math.min(1, (Date.now() - t0) / ms)
-      // Ease out — a linear count reads like a slot machine rather than a value settling.
-      setN(Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3))))
-      if (p < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [to, reduced])
-  return n
-}
-
-/**
  * A TILE — a figure, a word, and a colour that is the tile rather than a dot on it.
  *
  * Rows were the whole app: label left, value right, hairline, repeat, on six screens. A row
@@ -503,19 +475,17 @@ function Tile({ n, label, bg, fg, prefix, reduced, onPress }: {
   reduced: boolean; onPress: () => void
 }) {
   const shown = useCountUp(n, reduced)
-  const scale = useRef(new Animated.Value(1)).current
-  const spring = (to: number) =>
-    Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 40, bounciness: 6 }).start()
+  const press = usePressScale(reduced)
   return (
-    <Animated.View style={{ flex: 1, transform: [{ scale }] }}>
+    <Animated.View style={{ flex: 1, transform: [{ scale: press.scale }] }}>
       <Pressable
         onPress={onPress}
-        onPressIn={() => !reduced && spring(0.96)}
-        onPressOut={() => !reduced && spring(1)}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
         style={{ borderRadius: R.card, backgroundColor: bg, padding: 16, minHeight: 108, justifyContent: "space-between" }}
       >
         <Text style={{ fontSize: 34, fontFamily: F.bold, color: fg, letterSpacing: -1.2 }}>
-          {prefix ?? ""}{shown.toLocaleString()}
+          {prefix ?? ""}{Math.round(shown).toLocaleString()}
         </Text>
         <Text style={{ fontSize: 13, fontFamily: F.medium, color: fg, opacity: 0.72 }}>{label}</Text>
       </Pressable>
