@@ -831,7 +831,7 @@ function CustomerFileThumb({ src }: { src: string }) {
 
 export function DesignCanvasDialog({
  open, onOpenChange, orderId, orderLabel, item, initialDesign, initialPos, onSaved, catalog,
- siblings, designs, onSendToDesigner, filesLocked, sideFee,
+ siblings, designs, onSendToDesigner, filesLocked, sideFee, sideFees,
 }: {
  open: boolean
  onOpenChange: (v: boolean) => void
@@ -850,6 +850,11 @@ export function DesignCanvasDialog({
    * side pills so the cost is known BEFORE a second face is committed to, not discovered on
    * the Summary afterwards. null/0 ⇒ extra sides are free and nothing is said. */
  sideFee?: number | null
+  /** Per-FACE rates, when the platform prices them apart — `side_<face>` from settings. A
+   *  face with no entry costs `sideFee`, the flat rate, which is what every face cost
+   *  before these existed. A map rather than a resolved number so the rail and the quote
+   *  read the same figures from the same place. */
+  sideFees?: Record<string, number> | null
   /** Every design on the order, keyed as the server keys them (line first, sku as fallback).
    *  Only used to count how many lines "use on every line" would OVERWRITE before it does. */
  designs?: Record<string, { data?: string } | undefined> | null
@@ -2725,14 +2730,19 @@ export function DesignCanvasDialog({
                 /* The surcharge is per ADDITIONAL face: shown on one that already costs, and
                    on an empty one that WOULD — which is only true once something else is
                    printed. Nothing at all when the rate is 0. */
- const charges = !!sideFee && sideFee > 0 && (art ? costingFaces[k] : anyFaceHasArt)
+                /* THIS face's rate, not the flat one. Telling a seller "+$2.00" on a sleeve
+                   that actually adds $5.00 is worse than telling them nothing: they are
+                   quoted a price, add the artwork, and meet a different figure on the
+                   summary. */
+ const rate = (sideFees && Number(sideFees[k]) > 0 ? Number(sideFees[k]) : Number(sideFee)) || 0
+ const charges = rate > 0 && (art ? costingFaces[k] : anyFaceHasArt)
  return (
                   <FaceTile
  key={f.side} url={f.url} label={f.side || "front"}
                     /* One artwork per face is this window's model, so: a list of one. */
  layers={art ? [{ src: art.data, pos: art.pos }] : []}
  active={i === side} onSelect={() => goToSide(i)}
- extra={charges ? `+${sideFee.toLocaleString("en-US", { style: "currency", currency: "USD" })}` : null}
+ extra={charges ? `+${rate.toLocaleString("en-US", { style: "currency", currency: "USD" })}` : null}
                   />
                 )
               })}

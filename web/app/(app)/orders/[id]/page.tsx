@@ -2469,6 +2469,14 @@ export default function OrderDetailPage() {
  anyone commits to one. From the quote, which is the same settings the charge
  reads — a number typed here would be a second opinion about the price. */
  sideFee={quote?.fees?.method_side ?? null}
+                /* THE PER-FACE RATES, straight off the same quote the summary is built from.
+                   Built here rather than inside the canvas so there is one reader of
+                   `fees` — a second copy is how the rail and the price come to disagree. */
+                sideFees={ALL_SIDES.reduce<Record<string, number>>((m, f) => {
+                  const v = Number((quote?.fees as Record<string, unknown> | undefined)?.[`side_${f}`])
+                  if (v > 0) m[f] = v
+                  return m
+                }, {})}
  catalog={catalog}
         />
       )}

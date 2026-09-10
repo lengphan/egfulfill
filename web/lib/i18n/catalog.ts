@@ -1712,6 +1712,7 @@ const vi: Dict = {
   "settings.Surcharge": "Phụ phí",
   "settings.Sides": "Mặt in",
   "settings.Each additional side": "Mỗi mặt thêm",
+  "settings.One face is included in the base. Set a face to charge it its own rate instead of the figure above; leave it blank to use that figure.": "Một mặt đã tính trong giá gốc. Đặt giá cho một mặt để tính riêng thay cho mức phía trên; để trống thì dùng mức đó.",
   "settings.Each additional item": "Mỗi sản phẩm thêm",
   "settings.Quick amounts": "Mức nhanh",
   "settings.Bulk amounts": "Mức nạp lớn",

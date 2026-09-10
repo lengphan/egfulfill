@@ -885,7 +885,11 @@ function ReadOnlyFor({ on, children }: { on: boolean; children: React.ReactNode 
     </>
   )
 }
-function MoneyField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function MoneyField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void
+  /** What the box costs while it is EMPTY, shown greyed. A blank money field reads as zero,
+   *  which for the per-face rates is the opposite of the truth — empty means "the flat rate",
+   *  and that figure is the only thing that says so. */
+  placeholder?: string }) {
   // Translated HERE rather than at ~30 call sites. The value stays a number and the $ stays
   // a $ — only the caption moves.
  const tl = useLabelT()
@@ -894,7 +898,7 @@ function MoneyField({ label, value, onChange }: { label: string; value: string; 
       <span className="text-sm font-medium">{tl("settings", label)}</span>
       <div className="relative">
         <CurrencyDollar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input value={value} onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" inputMode="decimal" className="h-9 pl-7" />
+        <Input value={value} onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={placeholder ?? "0.00"} inputMode="decimal" className="h-9 pl-7" />
       </div>
     </label>
   )
@@ -2090,13 +2094,39 @@ function PlatformPanel() {
           <MoneyField label={tl("settings", "Appliqué")} value={bands.method_apl ?? ""} onChange={(v) => setBand("method_apl", v)} />
           <MoneyField label={tl("settings", "Laser")} value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />
         </div>
-        {/* Per EXTRA face, not per face. Its own row under a rule, because it multiplies by
- something different from everything above it — sides, not units of technique. */}
-        <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
-          <MoneyField
+        {/**
+          * PER EXTRA FACE — and now per WHICH face, because a sleeve is not a back.
+          *
+          * The flat rate stays and leads, because it is what every face costs until somebody
+          * says otherwise: leave the grid empty and the floor prices exactly as it did before
+          * this existed. That is also what the placeholders say — each face shows the flat
+          * figure greyed, so an empty box reads as "this rate" rather than as "nothing".
+          *
+          * ONE FACE IS ALWAYS INCLUDED in the base, so these are what the SECOND and
+          * subsequent faces add. The line under the heading says so, because a grid of eight
+          * prices invites the reading that a one-sided print costs the front rate.
+          */}
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <MoneyField
  label={tl("settings", "Each additional side")}
  value={bands.method_side ?? ""} onChange={(v) => setBand("method_side", v)}
-          />
+            />
+          </div>
+          <p className="mb-2 mt-4 text-xs text-muted-foreground">
+            {tl("settings", "One face is included in the base. Set a face to charge it its own rate instead of the figure above; leave it blank to use that figure.")}
+          </p>
+          <div className="grid gap-4 sm:grid-cols-4 lg:grid-cols-8">
+            {ALL_SIDES.map((face) => (
+              <MoneyField
+ key={face}
+ label={tl("sides", face)}
+ value={bands[`side_${face}`] ?? ""}
+ placeholder={Number(bands.method_side) > 0 ? `$${Number(bands.method_side).toFixed(2)}` : undefined}
+ onChange={(v) => setBand(`side_${face}`, v)}
+              />
+            ))}
+          </div>
         </div>
         </ReadOnlyFor>
       </Fold>
