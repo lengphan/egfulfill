@@ -28,6 +28,7 @@ import { startShopifyConnect } from "@/lib/shopify-oauth"
 import { startTikTokConnect } from "@/lib/tiktok-oauth"
 import { getUser } from "@/lib/auth"
 import { EmptyState } from "@/components/app/empty-state"
+import { EtsyAddressRecovery } from "@/components/app/etsy-address-recovery"
 
 function useFmtDate() {
   const fmtDate = useDateFormat()
@@ -531,6 +532,11 @@ export function StoresManager() {
           </div>
         )}
       </div>
+
+      {/* Etsy redacts buyer addresses from the API outside Commercial Access — this fills
+          the gap from the seller's own CSV export instead of an aggregator's OAuth connection.
+          Shown only once a shop is actually connected: no Etsy orders yet, nothing to fill. */}
+      {connected.some((c) => c.platform === "etsy") && <EtsyAddressRecovery />}
 
       {/* Available channels */}
       <div>
