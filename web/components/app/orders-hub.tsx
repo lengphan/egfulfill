@@ -233,56 +233,6 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
 // stock here (purple), short (amber → send to a PO), or untracked/unknown (grey)? Hovering
 // breaks it down per line and shows any PO a short blank is already on. Module-scope (not
 // defined inside the row render) to satisfy react-hooks/static-components.
-function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
- order: OrderRow
- items: OrderItem[]
- catalog: CatalogProduct[]
- stock: Record<string, number>
- canPO: boolean
- sending: boolean
- onSend: (o: OrderRow) => void
-}) {
-  const tl = useLabelT()
- const { state, why } = orderStock(items, catalog, stock)
-  // Same solid-tinted pill as the Label/Scan/Design chips beside it (readiness-dots.tsx):
-  // purple = ready/in-stock, amber = needs action/out, grey = unknown. The colour IS the
-  // status, and it recomputes every render — so picking a blank on a line flips it live. The
-  // per-line NUMBERS live in the expanded detail, not here, to keep the row a clean pill.
-  // The literal same strings the three chips beside it use — imported, not re-typed, so a
-  // tone can never drift between the fourth pill and the other three.
-  /* In stock is FINISHED, so it fades; short or unknown stays dark, because it is the thing
- still to resolve. Same three tones the strip beside it uses, imported not re-chosen. */
- const stockState = state === "in" ? "done" as const : state === "out" ? "todo" as const : "doing" as const
- const tone = CHIP_TONE[stockState]
-  // Always "Stock" — it used to say "In stock" / "No stock" / "Stock", which broke the one
-  // rule the three chips beside it keep (see readiness-dots.tsx): a chip whose text changes
-  // row to row can't be compared down a column, and it was the widest thing in the cell for
-  // a word the colour already carries. The state is in the tone and the hover.
- const label = "Stock"
- const clickable = state === "out" && canPO
- const title = state === "in" ? "Blank stock is on hand for every line"
- : state === "out" ? (canPO ? "Short on blank stock — click to add to a draft purchase order. Open the order for the per-line breakdown." : "Short on blank stock — open the order for the per-line breakdown")
-    // GREY NOW SAYS WHICH LINK IS MISSING. It used to read "not tracked, or no blank picked
-    // yet — open the order to check", which is three guesses and an errand: the chip knows
-    // exactly which of the three it is, and saying so is the difference between a dead pill
-    // and one telling you what to fix.
- : (why || "Blank stock not tracked yet — open the order to check")
- return (
-    <button
- type="button"
- disabled={!clickable || sending}
- onClick={clickable ? () => onSend(order) : undefined}
- title={title}
-      // MATCHES THE THREE CHIPS BESIDE IT, exactly — text-2xs and px-1.5, not text-xs and
-      // px-2 (see the Tag in readiness-dots.tsx). Sitting in the same row a size larger and
-      // a notch wider, "Stock" read as a different KIND of thing from Label/Scan/Design
-      // when it is the fourth of the same set.
- className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1 py-0.5 text-xs transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
-    >
-      {sending ? tl("orders", "Sending…") : label}
-    </button>
-  )
-}
 
 // USPS mail classes offered for a direct label buy (Labels 3.0 values).
 const MAIL_CLASSES: { id: string; label: string }[] = [
@@ -642,6 +592,17 @@ export function OrdersHub() {
   // order is skipped, so a second click never double-counts. Stays a DRAFT — placing an
   // order with a supplier is a separate, deliberately-gated step, and no cost books until
   // a PO is marked received.
+  /**
+   * NO CALLER RIGHT NOW — kept deliberately, not left behind by accident.
+   *
+   * Its only entry point was the Stock chip removed from the row above. Deleting fifty lines
+   * of purchasing logic because a pill went would be answering "take this off the list" with
+   * "and throw away the ability to order the stock", which is not what was asked. Short lines
+   * still reach a draft PO on their own — auto-replenish parks them in the saved-for-later
+   * cart at Approved — so nothing is stranded meanwhile; this is the ONE-CLICK route from an
+   * order, and it wants a new home (the expanded row, or Inventory) or a decision to drop it.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
  const sendToPO = async (o: OrderRow) => {
  const { shortLines } = orderStock(o.items ?? [], catalog, stock)
  if (!shortLines.length || !canPO) return
@@ -2086,7 +2047,7 @@ export function OrdersHub() {
  was made somewhere else, and the row can finally say so instead of
  looking like a mistake. Hidden without a tracking number, because
  then there is no parcel to have a status. */}
-                      {isStaff && <DeliveryBadge order={o} onRefreshed={load} />}
+                      {isStaff && <DeliveryBadge order={o} />}
                       {p.mixed && (
                         <span className="flex items-center gap-1.5" title={`${p.started} of ${p.total} lines started — this order shows the least-advanced one`}>
                           <span className="block h-1 w-10 overflow-hidden rounded-full bg-muted">
@@ -2255,12 +2216,22 @@ export function OrdersHub() {
                     ) : <span className="text-xs text-muted-foreground">—</span>}
                   </div>
                 ),
- ready: (
-                  <div className="flex flex-wrap items-center gap-1">
-                    <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} />
-                    <StockChip order={o} items={items} catalog={catalog} stock={stock} canPO={canPO} sending={poBusy === o.id} onSend={sendToPO} />
-                  </div>
-                ),
+                /**
+                 * NO STOCK CHIP (owner, 2026-09-10: "we already see the stock/inventory per
+                 * item already").
+                 *
+                 * It sat as a fourth chip beside Label / Scan / Design, and it was the only
+                 * one of the four not about THIS ORDER'S readiness — the other three say
+                 * whether the artwork, the label and the scan are done, while stock is a fact
+                 * about the warehouse that one blank shares with every other order needing it.
+                 * So it read as a fourth step in a three-step strip.
+                 *
+                 * And the figure it stood for is on screen anyway: the expanded row carries
+                 * the per-line breakdown and Inventory carries the stock itself. A pill whose
+                 * whole content is a colour, standing in for a number two clicks away, is the
+                 * chrome §4 asks to spend sparingly.
+                 */
+ ready: <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} />,
  action: null, // rendered inline below, pinned last
               }
  return (

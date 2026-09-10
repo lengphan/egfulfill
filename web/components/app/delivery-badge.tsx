@@ -1,9 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
-import { useState } from "react"
-import { ArrowClockwise, CircleNotch } from "@phosphor-icons/react"
-import { refreshTracking, type OrderRow } from "@/lib/api"
+import { type OrderRow } from "@/lib/api"
 import { deliveryWord, DELIVERY_PILL_TONE } from "@/lib/delivery-status"
 
 /**
@@ -17,13 +14,10 @@ import { deliveryWord, DELIVERY_PILL_TONE } from "@/lib/delivery-status"
  * on the stage menu, deliberately, not something a poll does at 3am.
  */
 
-export function DeliveryBadge({ order, onRefreshed, className }: {
+export function DeliveryBadge({ order, className }: {
   order: OrderRow
-  onRefreshed?: () => void
   className?: string
 }) {
-  const tl = useLabelT()
-  const [busy, setBusy] = useState(false)
   // Only meaningful once it's left us — before that, the pipeline stage is the answer.
   if (!order.tracking) return null
 
@@ -37,35 +31,31 @@ export function DeliveryBadge({ order, onRefreshed, className }: {
    * arrives on its own now, because the staff orders read sweeps stale parcels the same way
    * the Shipments list already did (refreshStaleTracking, server/src/routes/orders.js).
    *
-   * So an unanswered parcel shows the refresh control alone — the way to ask, and nothing
-   * claimed. The five states it can come back as are in lib/delivery-status.ts.
+   * So an unanswered parcel shows NOTHING, which is the honest amount.
+   *
+   * ── NO REFRESH BUTTON EITHER (owner, 2026-09-10) ─────────────────────────────────────
+   *
+   * It sat beside the word on every shipped row: a ⟳ per parcel, in a column people scan
+   * DOWN. That is a control repeated once per row to do a job nothing asks a person to do —
+   * and it is a job that already happens by itself. `refreshStaleTracking` sweeps twelve
+   * parcels on every read of this list, oldest-checked first, skipping the final states, on
+   * a six-hour window. It is exported specifically so the ORDERS list drives it, which is
+   * this list. The button was asking somebody to do the poller's work by hand.
+   *
+   * The trade, stated: a specific parcel you care about right now might be up to six hours
+   * behind, and there is no longer a way to demand an answer for that one. If that turns
+   * out to matter, the fix is to prioritise the sweep, not to put a button on every row.
    */
   const word = deliveryWord(order.delivery_status)
-
-  const check = async () => {
-    setBusy(true)
-    try { await refreshTracking(order.id); onRefreshed?.() } catch { /* leave the old state */ }
-    finally { setBusy(false) }
-  }
+  if (!word) return null
 
   return (
-    <span className={"inline-flex items-center gap-1.5 " + (className ?? "")}>
-      {word ? (
-        <span title={order.delivery_detail ?? undefined}
-              className={"rounded px-1.5 py-0.5 text-2xs font-medium "
-                + (DELIVERY_PILL_TONE[order.delivery_status ?? ""] ?? "bg-muted text-muted-foreground")}>
-          {word}
-        </span>
-      ) : null}
-      <button
-        onClick={(e) => { e.stopPropagation(); check() }}
-        disabled={busy}
-        title={tl("deliveryBadge", "Ask the carrier where this is now")}
-        className="eg-tap text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-        aria-label={tl("deliveryBadge", "Refresh carrier status")}
-      >
-        {busy ? <CircleNotch size={12} className="animate-spin" /> : <ArrowClockwise size={12} weight="bold" />}
-      </button>
+    <span className={"inline-flex items-center " + (className ?? "")}>
+      <span title={order.delivery_detail ?? undefined}
+            className={"rounded px-1.5 py-0.5 text-2xs font-medium "
+              + (DELIVERY_PILL_TONE[order.delivery_status ?? ""] ?? "bg-muted text-muted-foreground")}>
+        {word}
+      </span>
     </span>
   )
 }

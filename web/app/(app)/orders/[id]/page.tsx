@@ -1257,7 +1257,7 @@ export default function OrderDetailPage() {
               {/* And beside it, for staff only, the carrier's own word about the parcel —
  a second status from a party we don't control, which changes nothing here
  by design. See lib/delivery-status.ts. */}
-              {isStaff && <DeliveryBadge order={order} onRefreshed={reloadAll} />}
+              {isStaff && <DeliveryBadge order={order} />}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
               {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
