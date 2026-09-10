@@ -139,6 +139,43 @@ export const storeOf = (o: OrderRow) => {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+/**
+ * THE SELLER LINE, INCLUDING WHEN THE ACCOUNT BEHIND IT NO LONGER WORKS.
+ *
+ * Both staff surfaces did `(o.seller_name || "").trim()` and rendered the ` · name` suffix
+ * only when that came back non-empty — so a deactivated seller read EXACTLY like a live one,
+ * and an order whose account had been deleted read like an order with no seller at all. The
+ * board could not answer "why is this shop not replying" from the screen where it is asked,
+ * which is the §4 rule about an unreadable thing never looking like an absent one.
+ *
+ * FOUR STATES, and the two blank-looking ones are the point:
+ *   factory_order          "EG" — ours, and the staff account that keyed it in is not news.
+ *   no seller_id           the account row is GONE. Only possible for an order orphaned
+ *                          before users.js started refusing to delete an owner, since that
+ *                          delete is now blocked outright — but those rows are still out
+ *                          there and must say what they are.
+ *   seller_active === false  deactivated: still their order, still their name, annotated.
+ *   no seller_name         the READER is a seller, whose own copy has the name stripped by
+ *                          stripStaffOnly and who would only be reading themselves back.
+ *                          seller_id survives that stripping, which is what separates this
+ *                          case from the deleted one above — they are indistinguishable on
+ *                          the name alone, and getting that backwards would print
+ *                          "(deleted account)" on every order a seller owns.
+ *
+ * The annotation words are passed IN rather than looked up here: this module is pure and is
+ * imported during the prerender, and the two call sites already hold a translator.
+ */
+export const sellerLabelOf = (
+  o: Pick<OrderRow, "factory_order" | "seller_id" | "seller_name" | "seller_active">,
+  labels?: { deactivated?: string; deleted?: string },
+) => {
+  if (o.factory_order) return "EG"
+  if (!o.seller_id) return `(${labels?.deleted ?? "deleted account"})`
+  const name = (o.seller_name || "").trim()
+  if (!name) return ""
+  return o.seller_active === false ? `${name} (${labels?.deactivated ?? "deactivated"})` : name
+}
+
 export const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
 
 /**

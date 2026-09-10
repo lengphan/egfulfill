@@ -2359,10 +2359,21 @@ export type OrderRow = {
    *  orders would only ever see themselves. Distinct from created_by_name (who uploaded it)
    *  and from `store` (which storefront it came from — one seller can run three). */
   seller_name?: string | null
+  /** The owning account's id. NOT staff-only — a seller's own copy keeps it, which is what
+   *  lets sellerLabelOf() tell "the name was withheld from this reader" (id present) from
+   *  "the account no longer exists" (id absent) without a second field. Absent also when the
+   *  order is factory-owned. */
+  seller_id?: string | null
   /** The seller ACCOUNT's email — staff only, stripped for a seller like seller_name. A
    *  display name can be shared or blank; this is the thing that identifies the login the
    *  order belongs to, which is what a manual order gets asked about. */
   seller_email?: string | null
+  /** Whether that account can still sign in. Staff only, stripped alongside the name — a
+   *  fact about an account leaks the same thing one step removed. `false` means deactivated:
+   *  the order is still theirs and the name still reads, annotated. Absent means either the
+   *  reader is a seller (who never gets it) or the account row is gone — `seller_id` is what
+   *  tells those apart, and sellerLabelOf() in lib/order-format.ts owns that reading. */
+  seller_active?: boolean | null
   tracking?: string | null
   /**
    * THE MARKETPLACE'S OWN SHIP-BY DATE — a promise, not an inference.

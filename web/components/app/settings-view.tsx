@@ -2288,6 +2288,11 @@ function UsersPanel() {
  const [pwErr, setPwErr] = useState<string | null>(null)
  const [pwDone, setPwDone] = useState(false)
  const [removing, setRemoving] = useState<AdminUser | null>(null)
+  // The server REFUSES to delete an account that owns orders or wallet entries, because the
+  // delete would strand them with no owner. That refusal is the answer to what was just
+  // asked, so it belongs in the dialog — it used to be swallowed by a bare `catch`, which
+  // closed the dialog and reloaded the list, i.e. looked exactly like a successful delete.
+ const [rmErr, setRmErr] = useState<string | null>(null)
   // Manual balance movement. A reason is required: an unexplained entry in a money
   // ledger is worse than no entry, because nobody can tell later whether it was right.
  const [adjFor, setAdjFor] = useState<AdminUser | null>(null)
@@ -2375,12 +2380,29 @@ function UsersPanel() {
 
  const removeUser = async () => {
  if (!removing) return
- setBusy(removing.id)
+ setBusy(removing.id); setRmErr(null)
  try {
  const r = await deleteUserAdmin(removing.id)
  if (r?.error) throw new Error(r.error)
  setRemoving(null); loadUsers()
-    } catch { loadUsers(); setRemoving(null) } finally { setBusy(null) }
+    } catch (e) {
+      // The dialog STAYS OPEN on a refusal. Deactivate is one control away inside it, and
+      // closing would make the admin re-find the row to be told the same thing again.
+ setRmErr(e instanceof Error ? e.message : "Couldn't delete that account.")
+    } finally { setBusy(null) }
+  }
+
+  /** Deactivate from inside the delete dialog — the action the refusal names, so it has to
+   *  be reachable without dismissing the refusal and hunting for the row's own switch. */
+ const deactivateFromDialog = async () => {
+ if (!removing) return
+ setBusy(removing.id)
+ try {
+ const r = await updateUserAdmin(removing.id, { active: false })
+ if (r?.error) throw new Error(r.error)
+ setRemoving(null); setRmErr(null); loadUsers()
+    } catch (e) { setRmErr(e instanceof Error ? e.message : "Couldn't deactivate that account.") }
+ finally { setBusy(null) }
   }
 
  const addUser = async () => {
@@ -2792,23 +2814,40 @@ function UsersPanel() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!removing} onOpenChange={(v) => { if (!v) setRemoving(null) }}>
+      <Dialog open={!!removing} onOpenChange={(v) => { if (!v) { setRemoving(null); setRmErr(null) } }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>{tl("settings", "Delete this account?")}</DialogTitle></DialogHeader>
           <div className="space-y-3 px-1">
             <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{removing?.email}</span> {tl("settings", "will be removed permanently. This cannot be undone.")}
             </p>
-            <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
-              <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
-              {tl("settings", "If they simply left, deactivate instead — that blocks sign-in but keeps their orders attached to a real account.")}
-            </div>
+            {rmErr ? (
+              /* THE REFUSAL, carrying its reason — it is the answer, not a caption. It
+                 replaces the advisory below rather than stacking on it: once the server has
+                 said this account cannot be deleted, "if they simply left…" is no longer
+                 advice, it is the only remaining route, and it is the button beside it. */
+              <div className="flex items-start gap-2 rounded-lg border border-alert/30 bg-alert/12 p-2.5 text-xs text-alert">
+                <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+                <span>{rmErr}</span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
+                <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+                {tl("settings", "If they simply left, deactivate instead — that blocks sign-in but keeps their orders attached to a real account.")}
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setRemoving(null)}>{tl("settings", "Cancel")}</Button>
-            <Button size="sm" variant="destructive" onClick={removeUser} disabled={busy === removing?.id}>
-              {busy === removing?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Delete permanently")}
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setRemoving(null); setRmErr(null) }}>{tl("settings", "Cancel")}</Button>
+            {rmErr ? (
+              <Button size="sm" onClick={deactivateFromDialog} disabled={busy === removing?.id}>
+                {busy === removing?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Deactivate instead")}
+              </Button>
+            ) : (
+              <Button size="sm" variant="destructive" onClick={removeUser} disabled={busy === removing?.id}>
+                {busy === removing?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Delete permanently")}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

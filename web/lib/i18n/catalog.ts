@@ -1390,6 +1390,8 @@ const vi: Dict = {
   // renders; these are the hub's own words.
   "orders.position": "vị trí in",
   "orders.positions": "vị trí in",
+  "orders.deactivated": "đã vô hiệu hoá",
+  "orders.deleted account": "tài khoản đã xoá",
   "sides.front": "Mặt trước",
   "sides.back": "Mặt sau",
   "sides.left": "Bên trái",
@@ -1613,6 +1615,7 @@ const vi: Dict = {
   "settings.Reason (recorded in the ledger)": "Lý do (được ghi vào sổ cái)",
   "settings.Deactivate (blocks sign-in)": "Vô hiệu hoá (chặn đăng nhập)",
   "settings.Deactivated": "Đã vô hiệu hoá",
+  "settings.Deactivate instead": "Vô hiệu hoá thay vì xoá",
   "settings.Reactivate account": "Kích hoạt lại tài khoản",
   "settings.Delete this account?": "Xoá tài khoản này?",
   "settings.Delete permanently": "Xoá vĩnh viễn",

@@ -70,7 +70,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf, sellerLabelOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
@@ -2165,7 +2165,7 @@ export function OrdersHub() {
                  */
  store: (() => {
  const platform = platformOf(o)
- const seller = o.factory_order ? "EG" : (o.seller_name || "").trim()
+ const seller = sellerLabelOf(o, { deactivated: tl("orders", "deactivated"), deleted: tl("orders", "deleted account") })
  return (
                     <div className="min-w-0" title={[o.store || platform, seller && `Seller: ${seller}`, o.created_at && fmtDate(o.created_at)].filter(Boolean).join(" · ")}>
                       <div className="truncate text-sm font-medium">{o.store || platform}</div>

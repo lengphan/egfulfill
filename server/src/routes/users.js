@@ -274,8 +274,60 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     return { ok: true, applied: assignments.length, cap, reserved, distributable, assignments };
   });
 
+  /**
+   * A HARD DELETE IS FOR AN ACCOUNT THAT NEVER TRADED — and nothing enforced that.
+   *
+   * Measured end to end against a real database before this guard existed: a seller with one
+   * live order and a $500 wallet balance was deleted, and BOTH survived, unreachable.
+   *
+   *   orders.seller_id       `on delete set null` — the row stays, the owner goes. Every
+   *                          seller-facing list is `where seller_id = $1`, so the order is
+   *                          invisible to all of them forever, and the staff board renders
+   *                          the seller line by simply not printing it. Not "deleted" —
+   *                          ABSENT, which is the one thing §4 says a UI may never do.
+   *   wallet_ledger.account  a bare `text` column with NO foreign key at all, so the money
+   *                          is not even nulled. $500 still sums into every account-wide
+   *                          total while belonging to nobody.
+   *
+   * And it does not come back. Re-registering the same address mints a NEW uuid, and the
+   * wallet is keyed by uuid — correctly, since an email can change hands — so the balance
+   * and the orders stay stranded on an id no login will ever hold again.
+   *
+   * So the row may only go when there is nothing to orphan. For everyone else the answer is
+   * `active = false`, which the schema has carried all along: it blocks sign-in, keeps the
+   * history attached to a real name, and the boards now read that name back annotated
+   * "(deactivated)" rather than silently dropping it.
+   */
   app.delete('/api/users/:id', { preHandler: requireAdmin }, async (req, reply) => {
     if (req.params.id === req.user.sub) { reply.code(400); return { error: "You can't delete your own account" }; }
+    let orders = 0;
+    let ledger = 0;
+    try {
+      orders = (await q('select count(*)::int as n from orders where seller_id=$1', [req.params.id])).rows[0].n;
+      // wallet_ledger is created at wallet.js ROUTE LOAD, not in schema.sql, so a DB that has
+      // genuinely never registered that module has no such table and no entries to strand.
+      // to_regclass asks that question directly — the alternative, catching the error, cannot
+      // tell "no table" from "the count failed", and one of those must not permit a delete.
+      const has = (await q("select to_regclass('public.wallet_ledger') is not null as ok")).rows[0].ok;
+      if (has) ledger = (await q('select count(*)::int as n from wallet_ledger where account=$1', [req.params.id])).rows[0].n;
+    } catch (e) {
+      // FAIL CLOSED. An unreadable history is not an empty one, and this is the branch that
+      // decides whether money can be orphaned.
+      req.log.warn({ err: e.message, user: req.params.id }, 'could not check account history before delete');
+      reply.code(503);
+      return { error: "Couldn't check this account's orders and wallet, so nothing was deleted. Try again." };
+    }
+    if (orders || ledger) {
+      const held = [
+        orders ? `${orders} order${orders === 1 ? '' : 's'}` : null,
+        ledger ? `${ledger} wallet ${ledger === 1 ? 'entry' : 'entries'}` : null,
+      ].filter(Boolean).join(' and ');
+      reply.code(409);
+      return {
+        error: `This account has ${held}, which deleting it would leave with no owner. Deactivate it instead — that blocks sign-in and keeps the history attached to a real name.`,
+        orders, ledger, deactivateInstead: true,
+      };
+    }
     await q('delete from users where id=$1', [req.params.id]);
     audit(req, 'user.deleted', { entityType: 'user', entityId: req.params.id });
     return { ok: true };

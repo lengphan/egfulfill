@@ -1503,11 +1503,29 @@ export function ordersRoutes(app, requireAuth) {
     return rows;
   }
 
+  /**
+   * IS THE OWNING ACCOUNT STILL USABLE — one definition, read by both routes below.
+   *
+   * A deactivated seller (`active = false`) still owns every order they placed, and the
+   * board had no way to say so: the name rendered exactly as a live seller's, so "why is
+   * this shop not answering" was unanswerable from the screen it is asked on. Shipped as
+   * the raw flag rather than as a decorated name, because the annotation is a rendering
+   * decision and belongs with the other rendering decisions in lib/order-format.ts — two
+   * surfaces reading one boolean, not two surfaces each inventing a suffix.
+   *
+   * NULL means the account row is gone. Deleting one that owns orders is refused outright
+   * now (see users.js), so this can only be an orphan from before that guard — which is
+   * precisely the case the seller line must not render as blank.
+   */
+  const sellerActive = `(select su.active from users su where su.id = o.seller_id) as seller_active`;
+
   function stripStaffOnly(row) {
     if (!row) return row;
     // seller_name goes too: it is only ever the reader's own name, and shipping a field
     // that names an account is not something to do by accident on a seller-facing route.
-    const { internal_note, seller_name, seller_email, ...rest } = row;   // eslint-disable-line no-unused-vars
+    // seller_active rides with it: it is a fact ABOUT that account, so it leaks the same
+    // thing one step removed.
+    const { internal_note, seller_name, seller_email, seller_active, ...rest } = row;   // eslint-disable-line no-unused-vars
     return rest;
   }
 
@@ -1564,7 +1582,7 @@ export function ordersRoutes(app, requireAuth) {
      */
     const sellerEmail = `(select su.email from users su where su.id = o.seller_id) as seller_email`;
     const r = await q(
-      `select o.*, ${placedPO}, ${sellerName}, ${sellerEmail}, ${agg} from orders o left join order_items i on i.order_id = o.id
+      `select o.*, ${placedPO}, ${sellerName}, ${sellerEmail}, ${sellerActive}, ${agg} from orders o left join order_items i on i.order_id = o.id
         where o.id = $1 group by o.id`, [req.params.id]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'Order not found' }; }
@@ -1819,7 +1837,7 @@ export function ordersRoutes(app, requireAuth) {
       const sellerName = `(select coalesce(nullif(su.name,''), su.email) from users su where su.id = o.seller_id) as seller_name`;
       const pg = page(0);
       const r = await q(
-        `select o.*, ${machineFile}, ${designBoard}, ${sellerName}, ${agg} from orders o ${join}
+        `select o.*, ${machineFile}, ${designBoard}, ${sellerName}, ${sellerActive}, ${agg} from orders o ${join}
          -- A LABEL IS NOT AN ORDER. Buying a standalone label (re-ship, sample, someone
          -- else's parcel) mints an FF-* row purely so the label has somewhere to live —
          -- it has no lines, nothing to make, and nothing to dispatch, but it was landing

@@ -3,7 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import { Fragment, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
-import { numOf, platformOf, shipAddressOf } from "@/lib/order-format"
+import { numOf, platformOf, shipAddressOf, sellerLabelOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
@@ -2075,7 +2075,7 @@ export default function OrderDetailPage() {
                 <div className="text-muted-foreground">
                   {platformOf(order)}
                   {(() => {
- const seller = order.factory_order ? "EG" : (order.seller_name || "").trim()
+ const seller = sellerLabelOf(order, { deactivated: tl("orders", "deactivated"), deleted: tl("orders", "deleted account") })
  return seller ? ` · ${seller}` : ""
                   })()}
                 </div>
