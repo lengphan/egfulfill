@@ -184,6 +184,15 @@ export default function OrderDetailPage() {
  const [charges, setCharges] = useState<OrderCharges | null>(null)
   /** Which adjustment row is being reversed — see reverseFee, below the charge rows. */
  const [reversing, setReversing] = useState<string | null>(null)
+  /**
+   * WHY THE REVERSE DID NOT HAPPEN.
+   *
+   * It swallowed both failures: a server refusal fell through `if (!r?.error)` and a thrown
+   * request was eaten by a bare `catch {}`. So pressing ↩ on a refund the server would not
+   * make did nothing at all — no row change, no message, no spinner left behind — which is
+   * indistinguishable from a dead button, and is exactly how it was reported.
+   */
+ const [reverseErr, setReverseErr] = useState<string | null>(null)
  /** OUR side of the same order — what we spent, from the cost ledger. Staff only;
   *  the route refuses a seller outright, so this stays null for them. */
  const [costs, setCosts] = useState<OrderCosts | null>(null)
@@ -970,7 +979,7 @@ export default function OrderDetailPage() {
     /* Only adjustments reach this — see the note on the control. The guard stays because the
        function takes a part and would happily refund any of them if a caller passed one. */
  if (line.part !== "fee") return
- setReversing(key)
+ setReversing(key); setReverseErr(null)
  try {
       /* Named part and exact amount, so it comes off the adjustment and not off the goods —
          an unallocated refund is consumed top-down and would have taken the product cost. */
@@ -996,8 +1005,15 @@ export default function OrderDetailPage() {
          */
  setCharges((prev) => ({ ...(prev ?? {} as OrderCharges), ...r }))
  reloadAll()
+      } else {
+        // The server said no, and it says WHY — a refusal carries its reason (§4).
+ setReverseErr(r.error || "Couldn’t reverse that adjustment.")
       }
-    } catch { /* the row stays; the reload below is what would have changed it */ }
+    } catch (e) {
+      // Nothing answered. The row is unchanged, which is the safe outcome — but silence
+      // about it is what made this read as a broken control.
+ setReverseErr(e instanceof Error && e.message ? e.message : "Couldn’t reach the server — nothing was reversed.")
+    }
  finally { setReversing(null) }
   }
 
@@ -1183,6 +1199,14 @@ export default function OrderDetailPage() {
                       </Fragment>
                       )
                     ))}
+                    {/* THE REFUSAL, WHERE THE PRESS WAS. Not a toast and not the top of the
+                        page: the ↩ is on one of these rows, and an answer that appears
+                        anywhere else is an answer somebody has to go looking for. */}
+                    {reverseErr && (
+                      <div className="mt-1 rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
+                        {reverseErr}
+                      </div>
+                    )}
                     {/* EVERYTHING ELSE SENT BACK. Reversals are already shown on the rows
                         they cancelled, so counting them here too would report the same money
                         twice — once struck through and once as a refund. What is left is a

@@ -3097,9 +3097,31 @@ export function ordersRoutes(app, requireAuth) {
           const keyOf = (t) => Object.keys(methodAddOnsFor(row, fees, [t]))[0];
           const delta = ((adds[keyOf(to)] ?? 0) - (adds[keyOf(from)] ?? 0)) * Math.max(1, Number(wasRow.qty) || 1);
           if (Math.abs(delta) >= 0.005) {
-            /* CONDENSED, and it is what the seller reads on their statement: what changed,
-               from what to what, on which item. */
-            const what = `Method ${from || '—'} → ${to || '—'} · ${wasRow.name || wasRow.sku || 'item'}`;
+            /**
+             * CONDENSED — it is a ledger line, and it wraps to three lines on the Summary if
+             * it carries a product title (owner, 2026-09-10: "just say Method DTG →
+             * Embroidery · Item 1, remove the product name").
+             *
+             * The POSITION, not the name. "Item 1" is what the Summary calls the same line
+             * everywhere else — the design fees above it already read that way — and a
+             * 60-character trade name adds nothing a reader of this row needs: they are
+             * looking at that order, and the number tells them which line.
+             *
+             * Ordered by `id`, which is the order the items aggregate uses, so the number here
+             * and the number on screen cannot disagree.
+             *
+             * The method names lose their " printing" tail for the same reason: "DTG" and
+             * "Embroidery" are how the floor says them, and the word adds width, not meaning.
+             */
+            const shortMethod = (t) => String(t || '').replace(/\s*printing\s*$/i, '').trim();
+            const pos = (await q(
+              `select n from (
+                 select ${lineId ? 'line_id' : 'sku'} as k, row_number() over (order by id) as n
+                   from order_items where order_id=$1
+               ) t where k=$2 limit 1`, [req.params.id, lineId || sku]
+            ).catch(() => ({ rows: [] }))).rows[0];
+            const item = pos ? `Item ${pos.n}` : (wasRow.sku || 'item');
+            const what = `Method ${shortMethod(from) || '—'} → ${shortMethod(to) || '—'} · ${item}`;
             /**
              * ONLY THE CHARGE IS AUTOMATIC. A method that got DEARER is unambiguous — the job
              * costs more, the seller owes the difference, and chargeOrderFee is the same path
