@@ -14,6 +14,7 @@ import { PayoutDialog } from "@/components/app/payout-dialog"
 import { railLabel } from "@/lib/payment-method"
 import { getWallet, getDesignerEarnings, getPayoutRequests, type DesignerEarning, type PayoutRequest } from "@/lib/api"
 import { getToken } from "@/lib/auth"
+import { STATUS_TONE } from "@/lib/status-tone"
 
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -35,11 +36,12 @@ function shortTitle(t: string | null): string {
   return head.length > 64 ? head.slice(0, 63) + "…" : head
 }
 
+// Weight, per lib/status-tone.ts. A rejected payout is the one a person has to act on.
 const TONE = {
-  ok: "bg-shipped/12 text-shipped",
-  wait: "bg-hold/15 text-hold",
-  bad: "bg-alert/12 text-alert",
-  mute: "bg-muted text-muted-foreground",
+  ok: STATUS_TONE.settled,
+  wait: STATUS_TONE.live,
+  bad: STATUS_TONE.attention,
+  mute: STATUS_TONE.settled,
 }
 function payoutTone(status: string): string {
   const s = String(status || "").toLowerCase()
@@ -193,7 +195,7 @@ export function DesignerEarnings() {
                           {p.auto && <span className="ml-1.5 text-xs">{tl("designerEarnings", "monthly")}</span>}
                         </td>
                         <td className="px-4 py-2">
-                          <span className={"inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize " + payoutTone(p.status)}>{p.status}</span>
+                          <span className={"inline-flex text-xs capitalize " + payoutTone(p.status)}>{p.status}</span>
                         </td>
                         <td className="px-4 py-2">
                           {p.status === "paid"

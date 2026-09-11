@@ -9,6 +9,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { DISPATCH_GRID, type DispatchColId } from "@/components/app/dispatch-grid"
 import { uploadDispatchLabel, deleteDispatchUpload, type DispatchUpload } from "@/lib/api"
 import { readLabelPdf, PARSE_NOTE, PARSE_WHY, type LabelParse } from "@/lib/label-pdf"
+import { STATUS_TONE } from "@/lib/status-tone"
 
 /**
  * EXTERNAL LABELS — pre-scan a label that isn't one of our orders.
@@ -124,11 +125,14 @@ function progressOf(u: DispatchUpload): { label: string; tone: "wait" | "warn" |
  return { label: "Waiting to be picked", tone: "part", title: many }
 }
 
+// Weight, per lib/status-tone.ts. This one keeps TONE_ICON below, and that is the point:
+// the icon was already carrying the meaning in a channel a hue cannot reach, so dropping
+// the colour costs this row nothing at all.
 const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
- wait: "text-muted-foreground",
- warn: "text-hold",
- ok: "text-shipped",
- part: "text-packed",
+ wait: STATUS_TONE.settled,
+ warn: STATUS_TONE.attention,
+ ok: STATUS_TONE.settled,
+ part: STATUS_TONE.live,
 }
 const TONE_ICON = { wait: Clock, warn: Warning, ok: CheckCircle, part: Barcode } as const
 
@@ -461,7 +465,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack,
  case "units": return <span className="text-xs text-muted-foreground">{u.total_pages ?? "—"}</span>
  case "shipto": return <span className="truncate text-xs text-muted-foreground" title={u.ship_to || undefined}>{u.ship_to || "—"}</span>
  case "status": return (
-            <span className={"min-w-0 text-xs font-medium " + TONE[p.tone]} title={p.title}>
+            <span className={"min-w-0 text-xs " + TONE[p.tone]} title={p.title}>
               <span className="flex items-center gap-1.5">
                 <PI size={13} weight="bold" className="shrink-0" />
                 <span className="truncate">{tl("externalLabels", p.label)}</span>

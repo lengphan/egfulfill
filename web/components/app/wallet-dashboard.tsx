@@ -1,5 +1,6 @@
 "use client"
 
+import { STATUS_TONE, CATEGORY_TONE } from "@/lib/status-tone"
 import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -57,7 +58,8 @@ function TopupHistory() {
      filled pill on every row — these are four states of one fact, and only two need reading
      twice (§4). */
  const TONE: Record<string, string> = {
- received: "text-success", pending: "text-hold", rejected: "text-alert", abandoned: "text-muted-foreground",
+ received: STATUS_TONE.settled, pending: STATUS_TONE.live,
+ rejected: STATUS_TONE.attention, abandoned: STATUS_TONE.settled,
   }
  const WORD: Record<string, string> = {
  received: "Credited", pending: "Awaiting review", rejected: "Rejected", abandoned: "Not paid",
@@ -389,7 +391,13 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
 // negative being "Charge" and everything positive "Deposit".
 function txMeta(type: string, delta: number): { label: string; tone: string } {
  const t = String(type || "").toLowerCase()
- const EM = "bg-shipped/12 text-shipped", MUT = "bg-muted text-muted-foreground", AM = "bg-hold/15 text-hold"
+ // WHAT KIND OF ROW, not what state it is in — so all three are the same plain text now
+ // (CATEGORY_TONE). There is nothing wrong with a row marked Postage and nothing finished
+ // about one marked Revenue, but they were drawn in `hold` amber and `shipped` green, which
+ // are two of the floor's reserved warning/done colours. A ledger row read as a warning.
+ // The direction is not lost: the comment below already notes the amount's own sign and
+ // colour carry it, which is precisely why the category repeating it was redundant.
+ const EM = CATEGORY_TONE, MUT = CATEGORY_TONE, AM = CATEGORY_TONE
  if (t === "order-charge-in") return { label: "Revenue", tone: EM }
  if (t === "order-charge-out" || t === "charge") return { label: "Order", tone: MUT }
  if (t === "topup") return { label: "Deposit", tone: EM }
@@ -965,7 +973,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  return (
                   <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className={rejected ? "bg-alert/12 text-alert" : "bg-hold/15 text-hold"}>
+                      <Badge variant="secondary" className={rejected ? STATUS_TONE.attention : STATUS_TONE.live}>
                         {rejected ? tl("wallet", "Rejected") : selfServe ? tl("wallet", "Awaiting payment") : tl("wallet", "Awaiting confirmation")}
                       </Badge>
                       <span className="text-muted-foreground">

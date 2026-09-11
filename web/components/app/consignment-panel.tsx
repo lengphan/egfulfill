@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { LabelSheet, type LabelSpec } from "@/components/app/label-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { STATUS_TONE } from "@/lib/status-tone"
 import {
  getConsignmentShipments, receiveConsignment, getWarehouseBins, createWarehouseBin,
  getConsignmentStock, createConsignmentShipment,
@@ -24,13 +25,16 @@ function useFmtDate() {
 }, [fmtDate])
 }
 
-const STATUS_TONE: Record<string, string> = {
- announced: "bg-muted text-muted-foreground",
- in_transit: "bg-hold/15 text-hold",
- received: "bg-blue-100 text-blue-700",
- shelved: "bg-shipped/12 text-shipped",
- closed: "bg-muted text-muted-foreground",
- cancelled: "bg-muted text-muted-foreground",
+// Renamed from STATUS_TONE: it shadowed the real one in lib/status-tone.ts, so this file
+// could import the shared registers and still silently use its own table. `received` was
+// stock blue-100/700, 0.141 from the reserved `pending` token — inside the 0.150 floor.
+const CONSIGNMENT_TONE: Record<string, string> = {
+ announced: STATUS_TONE.settled,
+ in_transit: STATUS_TONE.live,
+ received: STATUS_TONE.live,
+ shelved: STATUS_TONE.settled,
+ closed: STATUS_TONE.settled,
+ cancelled: STATUS_TONE.settled,
 }
 
 /**
@@ -184,7 +188,7 @@ export function ConsignmentPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="tabular-nums text-sm font-semibold">{s.id}</span>
-                    <span className={"rounded-lg px-2 py-0.5 eg-label " + (STATUS_TONE[s.status] ?? "bg-muted text-muted-foreground")}>
+                    <span className={"eg-label " + (CONSIGNMENT_TONE[s.status] ?? STATUS_TONE.settled)}>
                       {s.status.replace(/_/g, " ")}
                     </span>
                     {s.seller_name && <span className="text-sm text-muted-foreground">{s.seller_name}</span>}

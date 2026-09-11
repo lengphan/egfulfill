@@ -12,13 +12,13 @@ import { TabBar } from "@/components/app/tab-bar"
 import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { deliveryWord, DELIVERY_TEXT_TONE } from "@/lib/delivery-status"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getShipments, voidLabel, type ShipmentRow } from "@/lib/api"
 import { plainNum, platformFromId } from "@/lib/order-format"
 import { onLive } from "@/lib/live"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
+import { STATUS_TONE } from "@/lib/status-tone"
 
 /**
  * Every parcel that has a tracking number, searchable, with its label.
@@ -163,10 +163,13 @@ const REFUND_LABEL: Record<string, string> = {
  pending: "Refund pending",
  refused: "Refund refused",
 }
+// A refund's state, in the app's three weight registers (lib/status-tone.ts). It was
+// stock Tailwind: neutral-600 measured 0.087 from the reserved `draft` token and rose-700
+// 0.059 from `alert` — inside the app's own 0.150 floor, so they read as those meanings.
 const REFUND_TONE: Record<string, string> = {
- settled: "bg-neutral-100 text-neutral-600",
- pending: "bg-hold/15 text-hold",
- refused: "bg-rose-100 text-rose-700",
+ settled: STATUS_TONE.settled,
+ pending: STATUS_TONE.live,
+ refused: STATUS_TONE.attention,
 }
 
 export function ShipmentsView() {
@@ -579,9 +582,9 @@ export function ShipmentsView() {
                         // arrived — so a pending one says so, and their own word sits
                         // underneath where it can be matched against their dashboard.
                         <>
-                          <Badge variant="secondary" className={REFUND_TONE[refundState(s)] ?? REFUND_TONE.pending}>
+                          <span className={"whitespace-nowrap text-xs " + (REFUND_TONE[refundState(s)] ?? REFUND_TONE.pending)}>
                             {REFUND_LABEL[refundState(s)] ?? tl("shipments", "Refund pending")}
-                          </Badge>
+                          </span>
                         </>
                       ) : d ? (
                         <span className={"text-xs font-medium " + d.cls}>{tl("shipments", d.label)}</span>

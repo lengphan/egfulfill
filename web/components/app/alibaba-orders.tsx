@@ -8,6 +8,7 @@ import { TabBar } from "@/components/app/tab-bar"
 import { Button } from "@/components/ui/button"
 import { SampleOrderDialog, chatUrl, orderUrl, usd, when } from "@/components/app/sample-orders"
 import { AlibabaReceiveDialog } from "@/components/app/alibaba-receive-dialog"
+import { STATUS_TONE } from "@/lib/status-tone"
 import { getAlibabaOrders, getAlibabaOrder,
  type AlibabaOrderSummary, type AlibabaOrderDetail } from "@/lib/api"
 
@@ -50,10 +51,11 @@ const bucketOf = (o: AlibabaOrderSummary): Exclude<Filter, "all"> => {
  return "closed"
 }
 
+// Weight, per lib/status-tone.ts. Only `open` is still moving.
 const PILL: Record<Exclude<Filter, "all">, string> = {
- open: "bg-pending/12 text-pending",
- done: "bg-shipped/12 text-shipped",
- closed: "bg-muted text-muted-foreground",
+ open: STATUS_TONE.live,
+ done: STATUS_TONE.settled,
+ closed: STATUS_TONE.settled,
 }
 
 /** `refreshKey` — bumped by the tab shell when this view is re-shown, since it stays
@@ -171,7 +173,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                           {loaded?.total != null ? ` · ${usd(loaded.total)}` : ""}
                         </span>
                       </button>
-                      <span className={"rounded-lg px-2 py-0.5 text-xs font-medium " + PILL[bucket]}>
+                      <span className={"text-xs " + PILL[bucket]}>
                         {o.statusLabel || o.status || tl("alibaba", "Unknown")}
                       </span>
                       <div className="flex items-center gap-1.5">

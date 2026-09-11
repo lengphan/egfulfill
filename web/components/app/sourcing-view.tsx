@@ -20,6 +20,7 @@ import { computeProfit, money, pct, FEE_MODELS, PAYMENT_DEFAULT } from "@/lib/pr
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { SampleOrderDialog, SampleOrdersPanel } from "@/components/app/sample-orders"
 import { SupplierTerms } from "@/components/app/supplier-terms"
+import { STATUS_TONE } from "@/lib/status-tone"
 
 /**
  * Sourcing — where a blank comes from, what it lands at, and what it earns.
@@ -66,12 +67,15 @@ const fullImg = (u?: string | null): string =>
  * Colours stay off the reserved factory-status set (emerald shipped, amber hold, red alert):
  * these are sourcing states, and they must not read as floor states on a glance.
  */
+// Weight, not hue — the three registers in lib/status-tone.ts. Talking and sampling are
+// the two where somebody is waiting on us; prospect, rotation and archived are all states
+// with nothing outstanding, however different they are in worth.
 const STAGE_PILL: Record<string, string> = {
- prospect: "bg-muted text-muted-foreground",
- talking:  "bg-packed/12 text-packed",
- sampling: "bg-pending/12 text-pending",
- rotation: "bg-primary/10 text-primary",
- archived: "bg-muted text-muted-foreground",
+ prospect: STATUS_TONE.settled,
+ talking:  STATUS_TONE.live,
+ sampling: STATUS_TONE.live,
+ rotation: STATUS_TONE.settled,
+ archived: STATUS_TONE.settled,
 }
 const STAGE_WHY: Record<string, string> = {
  prospect: "Saved to compare. Nothing has happened against this supplier yet — no exchange recorded, no sample placed.",
@@ -634,7 +638,7 @@ export function SourcingView({ embedded }: {
                            Approved. The title says which fact put it here. */
                         return (
                           <td key={id} className="px-4 py-3">
-                            <span className={"rounded-lg px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
+                            <span className={"text-xs " + STAGE_PILL[r.stage || "prospect"]}
                               title={STAGE_WHY[r.stage || "prospect"]}>
                               {SOURCING_STAGES.find((st) => st.id === (r.stage || "prospect"))?.label ?? tl("sourcing", "Saved")}
                             </span>

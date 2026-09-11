@@ -21,6 +21,15 @@
  * The rule under ATTENTION is a SHAPE, so it survives a colourblind operator, a bad screen
  * on the factory floor, and a printed sheet — none of which a hue survives.
  *
+ * APPLIED EVERYWHERE, 2026-09-11 (owner's call: "weight only, no colour"). For months this
+ * reached four files while twenty others kept their own tinted capsules, and the drift was
+ * measured before the conversion: all SIX raw Tailwind shades in use collided with a
+ * reserved --status-* token under the app's own 0.150 OKLab floor, `bg-hold` was written at
+ * six different alphas, and status-badge.tsx — read by seven surfaces under a comment
+ * calling itself "one source of truth" — drew `packed` in stock pink, 0.111 from `alert`
+ * and 0.314 from the token that actually means packed. A box ready to ship wore the colour
+ * the floor stops for. That is the cost of a hue nobody owns, and it is why this is weight.
+ *
  * ONE definition, imported by both tone maps. lib/factory-status.ts and lib/order-status.ts
  * each carried their own colour table and they had already drifted apart (six tones against
  * seven, `wait` against `review` for the same idea). A second copy disagrees the first time
@@ -36,3 +45,16 @@ export const STATUS_TONE = {
 } as const
 
 export type StatusTone = keyof typeof STATUS_TONE
+
+/**
+ * A CATEGORY IS NOT A STATUS, and conflating the two is why twenty-four colour maps existed.
+ *
+ * "Postage", "Blanks", "Payout", "Revenue", a designer lane's name, a supplier's stage — these
+ * say what KIND of thing a row is. Nothing is wrong with a row marked Postage and nothing is
+ * finished about one marked Revenue, so neither of the three registers above applies, and
+ * dressing them in one made a ledger row read as a warning. They are plain text.
+ *
+ * Kept here rather than typed inline at each site so the next person looking for "how do I
+ * style this label" finds the answer and the reason in the same file as the other three.
+ */
+export const CATEGORY_TONE = "font-normal text-muted-foreground"

@@ -23,6 +23,7 @@ import { useConfirm, usePrompt } from "@/components/app/confirm-dialog"
 import { PageTitle } from "@/components/app/page-title"
 import { TabBar } from "@/components/app/tab-bar"
 import { useActionNode } from "@/components/app/console-shell"
+import { CATEGORY_TONE, STATUS_TONE } from "@/lib/status-tone"
 
 /**
  * Renders a Wilcom TrueView PNG for an EMB card's raw .emb, falling back to `children` (the
@@ -192,17 +193,17 @@ const laneMeta = (id: string, lanes: DesignLane[]) =>
    distinct lanes onto one key and lost a mapping. Only the right-hand side moves to tokens.
    Colours outside the floor's reserved set (blue, teal, rose, cyan, lime, pink, green) map
    to the nearest reserved meaning rather than inventing a token per hue. */
-const LANE_PILL: Record<string, string> = {
-  "bg-slate-400": "bg-draft/12 text-draft", "bg-slate-500": "bg-draft/12 text-draft",
-  "bg-violet-500": "bg-working/12 text-working", "bg-hold": "bg-hold/15 text-hold",
-  "bg-red-500": "bg-alert/12 text-alert", "bg-emerald-500": "bg-shipped/12 text-shipped",
-  "bg-blue-500": "bg-info/12 text-info", "bg-sky-500": "bg-packed/12 text-packed",
-  "bg-green-500": "bg-shipped/12 text-shipped", "bg-orange-500": "bg-backorder/12 text-backorder",
-  "bg-pink-500": "bg-alert/12 text-alert", "bg-indigo-500": "bg-pending/12 text-pending",
-  "bg-teal-500": "bg-packed/12 text-packed", "bg-rose-500": "bg-alert/12 text-alert",
-  "bg-cyan-500": "bg-info/12 text-info", "bg-lime-500": "bg-shipped/12 text-shipped",
-}
-const lanePill = (accent?: string) => LANE_PILL[String(accent || "")] ?? "bg-muted text-muted-foreground"
+/* A LANE IS A CATEGORY, so it is plain text (lib/status-tone.ts). This was a 16-entry
+   translation table from a lane's accent to one of the floor's reserved status tokens, and
+   that was the bug in miniature: a lane somebody coloured red became `alert`, a lane
+   coloured green became `shipped`. The board's own columns are user-defined buckets — a
+   card in "Fix" is not in an error state, it is in a list called Fix — so borrowing the
+   warehouse's warning colours to say which list it is in made every board look like it was
+   full of problems.
+
+   The lane's accent is NOT lost: it still draws the dot on the column header, where it is
+   the user's own choice about their own board rather than a claim about an order. */
+const lanePill = () => CATEGORY_TONE
 // Partner keys are storage values ("pinkdesign"); the board shows a human name. Unknown
 // vendors fall back to the raw key rather than hiding that the card is outsourced.
 const VENDOR_NAMES: Record<string, string> = { pinkdesign: "Pink Design" }
@@ -1050,7 +1051,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   { id: "files", label: "Files", cell: (c) => ((c.file_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Paperclip size={11} weight="bold" /> {c.file_count}</span> : <span className="text-muted-foreground">—</span>) },
   // The lane IS the status, so it's labelled "Status". (The old separate "Status" column only
   // said Credited/—, which the Payout column already implies — removed.)
-  { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className={"inline-flex items-center rounded-md px-2 py-0.5 font-medium " + lanePill(col.accent)}>{col.label}</span> } },
+  { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className={"inline-flex items-center " + lanePill()}>{col.label}</span> } },
   { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
 ]
 const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "lane", "payout"]
@@ -1359,7 +1360,7 @@ function CardDialog({ card, me, designFee, bandRates, onClose, patch, onMove, re
                 </button>
               )}
             </DialogTitle>
-            <span className={"mt-0.5 inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-xs font-medium " + lanePill(laneMeta(col, lanes).accent)}>
+            <span className={"mt-0.5 inline-flex shrink-0 items-center text-xs " + lanePill()}>
               {tl("designer", laneMeta(col, lanes).label)}
             </span>
           </div>
@@ -1623,8 +1624,12 @@ function CardDialog({ card, me, designFee, bandRates, onClose, patch, onMove, re
  plus the two calls that are genuinely ours — accepting a returned proof, and
  sending one back for changes (which goes through THEIR API, not a local move). */
             <>
+              {/* THE STATE STANDING IN FOR AN ACTION. These sit exactly where the buttons
+                  go, so they read as status and take the weight registers (status-tone.ts).
+                  Both land on `live`, and that is correct: two completely different
+                  sentences do not need a hue to tell them apart. */}
               {(col === "incoming" || col === "inprogress") && (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-hold/10 px-2.5 py-1.5 text-xs font-medium text-hold">
+                <span className={"inline-flex items-center gap-1.5 px-0.5 py-1.5 text-xs " + STATUS_TONE.live}>
                   Being designed by {vendorLabel(card.vendor)}
                 </span>
               )}
@@ -1635,7 +1640,7 @@ function CardDialog({ card, me, designFee, bandRates, onClose, patch, onMove, re
                 </>
               )}
               {col === "fix" && (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-alert/12 px-2.5 py-1.5 text-xs font-medium text-alert">
+                <span className={"inline-flex items-center gap-1.5 px-0.5 py-1.5 text-xs " + STATUS_TONE.live}>
                   Sent back to {vendorLabel(card.vendor)} for changes
                 </span>
               )}
