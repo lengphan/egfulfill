@@ -632,7 +632,15 @@ export function ImportOrdersDialog({
                * design row at all — it used to need a template alongside it, so an Artwork ID
                * on its own reached the line as a picture and was never printed.
                */
-              const faces = (it.printSide
+              /* THE SHEET'S OWN FACES FIRST. `it.sides` is set only when two or more rows
+                 shared an Item #, and it is the most explicit statement available: the person
+                 wrote one row per face. It outranks the template's faces for the same reason
+                 a row's own artwork does — the sheet is the instruction, the template is the
+                 default. A face with no artwork is filtered out below, not here, so the list
+                 stays a record of what was asked for. */
+              const faces = (it.sides?.length
+                ? it.sides.map((f) => ({ side: f.side, artwork: f.artwork, pos: null }))
+                : it.printSide
                 ? (it.designUrl ? [{ side: it.printSide, artwork: it.designUrl, pos: it.templatePos ?? null }] : [])
                 : it.templateSides?.length
                   ? it.templateSides

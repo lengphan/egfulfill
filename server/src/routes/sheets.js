@@ -105,6 +105,13 @@ const T_COLUMNS = [
    * It was headed 'Image ID' and documented as the listing photo until 2026-09-08; the
    * rename is in web/lib/order-import.ts with the reasoning. Both spellings still import.
    */
+  /* WHICH ROWS ARE THE SAME GARMENT. Two rows sharing an Order Number AND a Line are one
+     item printed on two faces — the only way to ask a sheet for a front and a back without
+     building a template. Blank means "its own item", which is every sheet written before
+     this column existed.
+     Headed "Line" and not "Item #": canonHeader strips `#` before matching, so "Item #"
+     normalises to "item", which the Product Title column already claims. */
+  { h: 'Line', g: 'product', duty: '', sample: '1' },
   { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
   { h: 'Artwork ID', g: 'product', duty: '', sample: '' },
   /**

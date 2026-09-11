@@ -89,6 +89,21 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * today imports exactly as it did.
    */
   { header: "Blank Product", key: "blank", required: true, section: "product", help: "OUR catalog product — the garment we print on. Pick it and the Print Type, Colour and Size dropdowns narrow to what that product actually comes in. It is what costs, barcodes and produces the line, so a row without one cannot be made." },
+  /**
+   * WHICH ROWS ARE THE SAME GARMENT — the second grouping level, and the only way to print a
+   * front AND a back from a sheet without building a template first.
+   *
+   * Order Number groups rows into an ORDER; this groups them into a LINE. Two rows sharing
+   * both are one garment with two faces, each row carrying its own Placement, Artwork ID and
+   * Machine File. Leave it blank and every row is its own line, exactly as before — which is
+   * what every existing sheet does, so none of them change.
+   */
+  /* HEADER "Line", NOT "Item #". canonHeader strips `#` BEFORE the alias lookup, so "Item #"
+     normalises to "item" — which `item_name` already claims. The column would have been read
+     as Product Title, silently, on every sheet that used it. Found by running a sheet through
+     the real parser: two rows sharing an Item # came out as two separate garments. */
+  { header: "Line", key: "item_key", required: false, section: "product",
+    help: "Optional. Two rows with the SAME Order Number and the same Line are ONE garment printed on two faces — put Front on one row and Back on the other. Leave it blank and each row is its own item." },
   { header: "Template ID", key: "template_id", required: false, section: "product", help: "A SHORTCUT: a saved template already carries the blank, the placement and the artwork, so a row with one ignores Image ID and the variant columns. Leave it blank and the row is built from the columns instead. Type the number — type the number from its card (TPL-12) or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one. An image reference (IMG-30) is not applied here yet — it names artwork in your library, which is a different thing from a template." },
   /**
    * THE ARTWORK, BY ADDRESS — headed "Image ID" until 2026-09-08, and the rename is the
@@ -345,6 +360,11 @@ export const TEMPLATE_TSV = TEMPLATE_HEADERS.join("\t")
 // Header aliases → canonical key. Lets a generic marketplace export import as-is.
 const COL_ALIASES: Record<string, string[]> = {
   order_number: ["order", "order_id", "order_no", "order_number", "order_num"],
+  /* NORMALISED forms only — canonHeader has already lowercased, stripped `#` and collapsed
+     punctuation to `_` by the time these are consulted, so an alias containing a `#` can
+     never match anything. And NOT "item": item_name claims it, and a column read as the
+     wrong one is worse than a column not read at all. */
+  item_key: ["item_key", "line", "line_no", "line_number", "item_no", "item_group", "line_id"],
   ship_name: ["ship_name", "name", "customer", "customer_name", "recipient", "recipient_name", "ship_to", "shipping_name", "deliver_to", "buyer", "buyer_name", "full_name"],
   ship_email: ["ship_email", "email", "customer_email", "buyer_email"],
   // "shipping_address1"/"shipping_province" (no separator before the digit, and Shopify's
@@ -670,6 +690,11 @@ export type ImportItem = {
   /** The seller's own stitch file, by library reference (`MF-12`). Resolved and attached
    *  AFTER the order exists, against this line's own id — see the import dialog. */
   machineFileId: string
+  /** Every face this line prints, when two or more rows shared an Item #. Undefined on a
+   *  single-row line, which keeps the one-face path exactly as it was. Each entry is a face
+   *  the sheet ASKED for; `artwork` may be empty, because a declared face with no picture is
+   *  still a face — the same rule the designer follows. */
+  sides?: { side: string; artwork: string }[]
   /**
    * Filled by applyTemplates, read by the order write — placement, and the other faces.
    *
@@ -715,7 +740,33 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
   return order.map((key) => {
     const rows = groups[key]
     const head = rows[0]
-    const items: ImportItem[] = rows.map((r) => {
+    /**
+     * ROWS → LINES, the second grouping level.
+     *
+     * Order Number decided how many ORDERS came out of N rows; Item # decides how many LINES
+     * come out of an order's rows. Two rows sharing one become a single garment carrying both
+     * faces, which is the only way to ask a sheet for a front AND a back without a template.
+     *
+     * A row with no Item # is its OWN line, keyed on its index — the same trick the order key
+     * uses one level up, and what makes this change invisible to every sheet written before
+     * it: no Item # anywhere means every row keys uniquely and the grouping collapses to
+     * one-row-per-line, exactly as it was.
+     */
+    const lineKeyOf = (r: ImportRecord, i: number) => S(r.item_key) || `${AUTO_KEY}L${i}`
+    const lineGroups: Record<string, ImportRecord[]> = {}
+    const lineOrder: string[] = []
+    rows.forEach((r, i) => {
+      const lk = lineKeyOf(r, i)
+      if (!lineGroups[lk]) { lineGroups[lk] = []; lineOrder.push(lk) }
+      lineGroups[lk].push(r)
+    })
+    const items: ImportItem[] = lineOrder.map((lk) => {
+      const lineRows = lineGroups[lk]
+      /* THE FIRST ROW DESCRIBES THE GARMENT. Blank, colour, size, method, quantity and sku are
+         properties of the ITEM, so a second row repeating them is confirming, not adding —
+         and a second row DISAGREEING is a sheet mistake we must not average away. First wins,
+         which is also the only reading that is stable under re-sorting. */
+      const r = lineRows[0]
       const hero = S(r.hero_image)
       const url = (v: string) => artworkUrl(v, resolveArtwork)
       // The row's own design, most explicit spelling first. Both are the artwork now — see
@@ -764,6 +815,25 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
         templateId: S(r.template_id),
         machineFileId: S(r.machine_file_id),
         notes: S(r.internal_notes),
+        /**
+         * EVERY FACE THIS LINE PRINTS, one per row that named one.
+         *
+         * Only set when the rows actually merged — a single-row line leaves it undefined and
+         * takes the existing designUrl/printSide path, so nothing about a one-face import
+         * changes shape. A row that named a placement but no artwork still contributes: the
+         * face is real and the picture can arrive later, which is the same rule the designer
+         * follows (§ "A declared face with no photo borrows the front's; it is never dropped").
+         */
+        sides: lineRows.length > 1
+          ? lineRows
+              .map((row) => ({
+                side: normalizeSide(S(row.print_side)) || "front",
+                artwork: url(S(row.design_file_url)) || url(S(row.hero_image)),
+              }))
+              /* One entry per FACE. Two rows naming the same face is a sheet mistake, and the
+                 first is kept for the same reason the first row describes the garment. */
+              .filter((f, i, all) => all.findIndex((x) => x.side === f.side) === i)
+          : undefined,
       }
     })
     // Parent row shows the first item's hero — borrow a later line's if the first has none.
