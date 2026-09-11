@@ -12,6 +12,7 @@ import { getToken } from "@/lib/auth"
 import { LedgerEntryDialog } from "@/components/app/ledger-entry-dialog"
 import { PageTitle } from "@/components/app/page-title"
 import { EmptyState } from "@/components/app/empty-state"
+import { FilterMenu } from "@/components/app/filter-menu"
 
 const usd = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -40,11 +41,48 @@ const KNOWN_PARTNERS = ["byeastside", "pinkdesign", "designer", "carrier",
   "Otto Cap", "S&S Activewear", "SanMar", "suppliers"]
 
 /** First and last day of the current month, as yyyy-mm-dd. */
-function thisMonth() {
-  const d = new Date()
-  const first = new Date(d.getFullYear(), d.getMonth(), 1)
-  const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
-  return { from: iso(first), to: iso(d) }
+const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
+
+/**
+ * THE PERIODS A LEDGER IS ASKED FOR, which are not the ones a queue is asked for.
+ *
+ * The orders bar offers Today / Last 7 / 30 / 90 because a floor asks "what came in
+ * recently". Nobody reconciles spend against a rolling ninety days — the question here is
+ * always a closed accounting period, which is why the default was already this month. So
+ * this shares FilterMenu (the control) and not DATE_RANGES (the vocabulary): the two
+ * screens ask different questions with the same widget.
+ */
+const PERIODS: { id: string; label: string; of: () => { from: string; to: string } }[] = [
+  { id: "this_month", label: "This month", of: () => {
+    const d = new Date()
+    return { from: iso(new Date(d.getFullYear(), d.getMonth(), 1)), to: iso(d) }
+  } },
+  { id: "last_month", label: "Last month", of: () => {
+    const d = new Date()
+    return { from: iso(new Date(d.getFullYear(), d.getMonth() - 1, 1)),
+             to: iso(new Date(d.getFullYear(), d.getMonth(), 0)) }
+  } },
+  { id: "this_quarter", label: "This quarter", of: () => {
+    const d = new Date()
+    return { from: iso(new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1)), to: iso(d) }
+  } },
+  { id: "this_year", label: "This year", of: () => {
+    const d = new Date()
+    return { from: iso(new Date(d.getFullYear(), 0, 1)), to: iso(d) }
+  } },
+]
+const CUSTOM = "custom"
+const thisMonth = () => PERIODS[0].of()
+
+/** The trigger says the WINDOW once one is typed — "1 Sep – 11 Sep" — never the word
+ *  "Custom", which would make you open the menu to find out what you are looking at. */
+function periodLabel(id: string, range: { from: string; to: string }, fmt: (s: string) => string) {
+  const p = PERIODS.find((x) => x.id === id)
+  if (p) return p.label
+  if (range.from && range.to) return `${fmt(range.from)} – ${fmt(range.to)}`
+  if (range.from) return `from ${fmt(range.from)}`
+  if (range.to) return `up to ${fmt(range.to)}`
+  return "All time"
 }
 
 /**
@@ -70,6 +108,7 @@ export function BillingView() {
   // team query for months.
   const [partnersErr, setPartnersErr] = useState<string | null>(null)
   const [range, setRange] = useState(thisMonth())
+  const [period, setPeriod] = useState<string>("this_month")
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -179,14 +218,45 @@ export function BillingView() {
               ))}
             </select>
           </label>
+          {/* ONE control, not two fields. Two always-visible date inputs put the rarest way
+              of answering the question permanently on screen, and took the width of the
+              whole row to do it. The menu answers it in a click for every period anyone
+              actually asks for, and the pair of fields appears only for the one that needs
+              them — the same shape the orders bar settled on. */}
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">{tl("billing", "From")}</span>
-            <Input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="h-9 w-40" />
+            <span className="text-xs text-muted-foreground">{tl("billing", "Date")}</span>
+            <FilterMenu
+              label={tl("billing", "Date")}
+              anyLabel={tl("billing", "All time")}
+              value={period}
+              options={[
+                ...PERIODS.map((p) => ({ value: p.id, label: tl("period", p.label) })),
+                { value: CUSTOM, label: period === CUSTOM ? periodLabel(CUSTOM, range, fmtDate) : tl("billing", "Custom range") },
+              ]}
+              onPick={(v) => {
+                setPeriod(v)
+                const p = PERIODS.find((x) => x.id === v)
+                if (p) setRange(p.of())
+                else if (!v) setRange({ from: "", to: "" })
+              }}
+            />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">{tl("billing", "To")}</span>
-            <Input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="h-9 w-40" />
-          </label>
+          {period === CUSTOM && (
+            /* `max`/`min` cross-bind the pair so the calendar cannot offer an end before its
+               own start — the same guard the orders bar uses. */
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">{tl("billing", "Between")}</span>
+              <span className="flex items-center gap-2">
+                <Input type="date" value={range.from} max={range.to || undefined}
+                  aria-label={tl("billing", "From date")}
+                  onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="h-9 w-40" />
+                <span className="shrink-0 text-muted-foreground">–</span>
+                <Input type="date" value={range.to} min={range.from || undefined}
+                  aria-label={tl("billing", "To date")}
+                  onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="h-9 w-40" />
+              </span>
+            </label>
+          )}
           <span className="ml-auto text-sm">
             <span className="text-muted-foreground">{tl("billing", "Period total")} </span>
             <span className={"font-semibold tabular-nums " + (total < 0 ? "text-destructive" : "text-success")}>{usd(total)}</span>

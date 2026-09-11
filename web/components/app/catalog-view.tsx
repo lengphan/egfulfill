@@ -136,8 +136,13 @@ function CatalogCard({
           {/* ProductThumb hardcodes `size-24`, so `w-full` widened the tile and left it 96px
               TALL — a 270px card with a 96px band of photograph in it, which is why the
               garment read as small. The height override has to be important because both
-              rules are the same Tailwind utility group and source order decides otherwise. */}
-          <ProductThumb src={image} alt={p.name || id} className="!h-auto !w-full aspect-[4/5] rounded-none border-0 p-3" />
+              rules are the same Tailwind utility group and source order decides otherwise.
+
+              4/5 was a garment ratio, and the grid is not all garments — a cap fills about
+              half of it and the rest is the white the photo was shot on, so a row of caps
+              read as mostly empty card. 8/9 keeps the portrait a tee needs and takes 10% of
+              the dead air off every row. */}
+          <ProductThumb src={image} alt={p.name || id} className="!h-auto !w-full aspect-[8/9] rounded-none border-0 p-3" />
         </button>
         {/* THE TICK IS THE STATE, and it sits on the picture because the picture is what you
             are deciding about. Not dimming an unticked card: fading is the language of

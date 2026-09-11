@@ -1205,6 +1205,11 @@ const vi: Dict = {
   // Gaps the coverage gate found (tools/check-i18n.mjs) — call sites that were wrapped
   // but never given a Vietnamese side, so they rendered English inside a Vietnamese row.
   "filter.Custom range": "Khoảng tuỳ chọn",
+  "billing.All time": "Tất cả thời gian",
+  "billing.Between": "Trong khoảng",
+  "billing.Custom range": "Khoảng tuỳ chọn",
+  "billing.From date": "Từ ngày",
+  "billing.To date": "Đến ngày",
   "filter.From date": "Từ ngày",
   "filter.To date": "Đến ngày",
   "ui.Click to sort · drag to reorder": "Nhấn để sắp xếp · kéo để đổi thứ tự",

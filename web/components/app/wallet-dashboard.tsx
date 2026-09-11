@@ -63,7 +63,11 @@ function TopupHistory() {
  received: "Credited", pending: "Awaiting review", rejected: "Rejected", abandoned: "Not paid",
   }
  return (
-    <Card className="overflow-hidden">
+    /* `gap-0 p-0`, matching the Transaction history card beside it. A bare Card carries
+       py-5, and a table is edge-to-edge content — so the default left a 20px band of card
+       above the header row with nothing in it, which reads as a header that failed to load
+       rather than as spacing. The sibling tab already solved this; this one had not. */
+    <Card className="gap-0 overflow-hidden p-0">
       <div className="overflow-x-auto">
       <Table>
         <TableHeader>
