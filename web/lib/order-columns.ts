@@ -244,19 +244,41 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // 3rem holds four digits at the weight this is set in; anything larger is an order that
   // wants opening anyway.
   units:    { id: "units",    label: "Items",    grid: "3rem", align: "right" },
-  tracking: { id: "tracking", label: "Tracking", grid: "12rem" },
+  /* 13.5rem, MEASURED, not guessed. A 22-digit USPS number sets at 198px in the row's
+     15px tabular figures, and the external-link glyph and its gap take another 13 — so 12rem
+     (192px) clipped every parcel by 19px, showing "…69182" where the last digits are the
+     ones people compare. It was 12rem when this column was text-xs; moving it into the VALUE
+     band (§4 names a tracking number there) widened the content without widening the track,
+     which is my own doing. */
+ tracking: { id: "tracking", label: "Tracking", grid: "13.5rem" },
   // SHOP · MARKETPLACE · SELLER, stacked two-deep — the three facts that say whose order
   // this is and where it came from. It used to carry the date on its second line, which the
   // Age column two tracks over already answers; the date is still in the cell's tooltip.
   // 9rem, not 7: a shop name and a seller name are both real names, and at 7rem both
   // truncated to a syllable. Every rem here comes off the flexible columns (see the note at
   // the top of this block), so it is deliberately 2 and not 4.
-  store:    { id: "store",    label: "Store",    grid: "9rem" },
+  /* 10.5rem: the SECOND line is the long one — "Manual · (deleted account)" wants 162px
+     against 9rem's 144 — and it is the line carrying the seller, which is the half the
+     tooltip and the opened order both repeat. */
+ store:    { id: "store",    label: "Store",    grid: "10.5rem" },
   // CAPPED, not flexible. As the only 1fr track it swallowed every spare pixel, so a board
   // with room ended up with a very wide Customer column holding "Philipp Bumb" and a lot of
   // white space, while the List chips next to it stayed cramped. A name needs about 11rem;
   // past that the extra width buys nothing, so the slack goes to List instead (below).
-  customer: { id: "customer", label: "Customer", grid: "minmax(5rem,11rem)" },
+  /**
+   * THE ONE TRACK THAT ABSORBS SLACK, and it needs to be one.
+   *
+   * Every other track is fixed, so on a wide board the row's columns summed to ~914px inside
+   * a ~1430px card and simply stopped — 500px of dead white to the right of Customer, which
+   * reads as a table that failed to fill its own box. Capping this at 11rem is what left it
+   * there.
+   *
+   * `1fr` is safe even though every ROW is its own grid: they all share one container width
+   * and one template, so the free space resolves identically down the column. A name is also
+   * the right place to spend it — it is the most variable-length thing in the row, and the
+   * one that was truncating first.
+   */
+ customer: { id: "customer", label: "Customer", grid: "minmax(5rem,1fr)" },
   // The listing name lives here now, like the seller's Items column, and is deliberately
   // the first thing squeezed: an Etsy title runs 130 characters and truncates whatever
   // width it gets, so spending the table's flexible space on it starves everything that

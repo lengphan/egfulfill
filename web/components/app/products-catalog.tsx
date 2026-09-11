@@ -94,6 +94,7 @@ const publicStateOf = (p: CatalogProduct): PublicState => {
 
 import { sizesOf } from "@/lib/variant-resolve"
 import { framingStyle } from "@/lib/product-framing"
+import { FilterMenu } from "@/components/app/filter-menu"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -136,6 +137,24 @@ export function ProductsCatalog() {
  const [isDemo, setIsDemo] = useState(false)
  const [query, setQuery] = useState("")
  const [cat, setCat] = useState<string>("All")
+  /**
+   * THE STATUS FILTER, and its vocabulary is the one the TILES ALREADY COUNT.
+   *
+   * The page had a Category bar and nothing for status, while the banner above it says "2
+   * Active products are not showing on the site" — a sentence naming a set you then had to
+   * find by eye. These ARE those sets, so the count and the filter can never describe
+   * different things:
+   *
+   *   live      Active AND priced — what the public catalogue actually renders
+   *   stranded  Active but no price, so the public route drops it. The banner's own set.
+   *   draft     not published
+   *   internal  "Sellers only" / "Staff only" — deliberately not on the site
+   *
+   * NOT the raw `status` string. A plain "Active" option would report products the site is
+   * not showing, which is the exact drift the stranded count exists to catch — offering it
+   * would put that drift back on screen as a choice.
+   */
+  const [status, setStatus] = useState<string>("")
  const [isStaff, setIsStaff] = useState(false)
  const [editing, setEditing] = useState<CatalogProduct | null>(null)
  const [editorOpen, setEditorOpen] = useState(false)
@@ -207,6 +226,16 @@ export function ProductsCatalog() {
  const filtered = useMemo(() => {
  return (products ?? []).filter((p) => {
  if (cat !== "All" && p.type !== cat) return false
+ if (status) {
+        const raw = (p.status ?? "Active").trim().toLowerCase()
+        const isInternal = raw === "sellers only" || raw === "staff only"
+        const isActive = raw === "active"
+        const priced = publicPriceOf(p) !== null
+        if (status === "live" && !(isActive && priced)) return false
+        if (status === "stranded" && !(isActive && !priced)) return false
+        if (status === "draft" && (isActive || isInternal)) return false
+        if (status === "internal" && !isInternal) return false
+      }
  if (!query) return true
       // The supplier's code is searchable too — it is how a blank is referred to on a spec
       // sheet or a purchase order, and it is the only identifier a product has until ours is
@@ -218,7 +247,7 @@ export function ProductsCatalog() {
  const hay = `${p.name ?? ""} ${p.brand ?? ""} ${p.sku ?? ""} ${p.supplierSku ?? ""} ${p.type ?? ""}`.toLowerCase()
  return hay.includes(query.toLowerCase())
     })
-  }, [products, cat, query])
+  }, [products, cat, query, status])
 
  const paged = usePaged(filtered, 24)
 
@@ -290,7 +319,19 @@ export function ProductsCatalog() {
           <div>
             <strong>{stats.stranded} Active product{stats.stranded === 1 ? " is" : tl("products", "s are")} not showing on the site.</strong>{" "}
             {stats.stranded === 1 ? tl("products", "It has") : tl("products", "They have")} no price, and the public catalogue
- skips anything without one. Set a base price on the product and it appears.
+ skips anything without one. Set a base price on the product and it appears.{" "}
+            {/* THE BANNER NAMES A SET; THIS SHOWS IT. It counted them and then left you to
+                find them by eye among everything else — which on a full catalogue is the
+                whole cost of the warning. One click now narrows the grid to exactly the
+                products the sentence is about. A link, not a button: it changes what you are
+                LOOKING at, and §4 keeps a filled control for the thing a screen is for. */}
+            <button
+              type="button"
+              onClick={() => { setStatus("stranded"); setCat("All"); setQuery("") }}
+              className="font-medium underline underline-offset-2 hover:no-underline"
+            >
+              {tl("products", "Show them")}
+            </button>
           </div>
         </div>
       )}
@@ -306,6 +347,24 @@ export function ProductsCatalog() {
           onChange={setCat}
         />
         <div className="flex items-center gap-2">
+          {/* FilterMenu, not a second TabBar. The category bar is a segmented row because a
+              category is one of a handful of known values you switch between; status is a
+              FACET you set and leave, and filter-menu.tsx exists precisely so every page
+              stops rolling its own (§4 — grep for the primitive). It also names the current
+              STATE rather than the facet, so the trigger reads "Not showing on site" and you
+              never have to open it to find out what you are looking at. */}
+          <FilterMenu
+            label={tl("products", "Status")}
+            anyLabel={tl("products", "All statuses")}
+            value={status}
+            options={[
+              { value: "live", label: tl("products", "Live on site") },
+              { value: "stranded", label: tl("products", "Not showing on site") },
+              { value: "draft", label: tl("products", "Draft") },
+              { value: "internal", label: tl("products", "Internal only") },
+            ]}
+            onPick={setStatus}
+          />
           <SearchField
             value={query}
             onChange={setQuery}
