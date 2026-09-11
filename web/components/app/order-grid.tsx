@@ -532,16 +532,29 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
           }] as const),
       ).values(),
     ).sort((a, b) => a.value.localeCompare(b.value)),
-    hero_image: images
-      .filter((d) => /^https?:\/\//i.test(String(d.thumb ?? "")))
-      .map((d) => ({ value: `IMG-${d.id}`, label: `IMG-${d.id}${d.name ? ` · ${d.name}` : ""}` })),
+    /* ALL FIVE ARTWORK COLUMNS OFFER THE SAME LIBRARY. `hero_image` is pair 1's key (kept
+       from before the five pairs so old sheets still land); artwork_2..5 are the rest. One
+       list built once and shared, because a second opinion about which designs exist is
+       exactly the drift §4's faces rule was written about. */
+    ...Object.fromEntries(
+      ["hero_image", "artwork_2", "artwork_3", "artwork_4", "artwork_5"].map((k) => [
+        k,
+        images
+          .filter((d) => /^https?:\/\//i.test(String(d.thumb ?? "")))
+          .map((d) => ({ value: `IMG-${d.id}`, label: `IMG-${d.id}${d.name ? ` · ${d.name}` : ""}` })),
+      ]),
+    ),
   }), [templates, machineFiles, images, stores])
 
   const optionsFor = useCallback(
     (colKey: string, row: string[]): Opt[] | null => {
       const refs = refOptions[colKey]
       if (refs) return refs.length ? refs : null
-      const dependent = colKey === "item_color" || colKey === "item_size" || colKey === "print_type" || colKey === "print_side"
+      /* EVERY placement column narrows, not just the first. `isPlacement` is the one test, used
+         by both the `dependent` check and the branch below — writing the list twice is how the
+         2nd..5th would have quietly kept offering all eight faces for a cap. */
+      const isPlacement = colKey === "print_side" || /^print_side_[2-5]$/.test(colKey)
+      const dependent = colKey === "item_color" || colKey === "item_size" || colKey === "print_type" || isPlacement
       if (!dependent) return FIXED_OPTIONS[colKey] ?? null
       // resolveProduct, not a private name match — it is the canonical matcher and it is what
       // knows the cell may be "SKU - Name" (CLAUDE.md §5: import, don't re-implement). A
@@ -555,7 +568,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
       /* The faces this garment's TYPE prints, spelled the way the dropdown spells them —
          SIDE_LABEL, so the cell holds "Left sleeve" and never the bare "left" that would
          read as an unfinished sentence in a spreadsheet. normalizeSide reads both back. */
-      if (colKey === "print_side") {
+      if (isPlacement) {
         /* THE PRODUCT'S OWN FACES FIRST, its category's after — and `offeredSides` is that
            rule, shared with the designer's face strip so a blank cannot offer a placement
            here that you then cannot place artwork on there. It answers null for a type
@@ -566,7 +579,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         const declared = offeredSides(p as never)
         return declared
           ? declared.map((sd) => SIDE_LABEL[sd] ?? sd)
-          : FIXED_OPTIONS.print_side ?? null
+          : FIXED_OPTIONS[colKey] ?? null
       }
       /* BOTH FIELDS, NOT ONE. This read `method` alone, and CatalogProduct's own note on
          `methods` says to read it alongside — "or a product that has both loses half its
@@ -673,7 +686,11 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
           next[r][IDX.item_color] = ""
           next[r][IDX.item_size] = ""
           next[r][IDX.print_type] = ""
-          next[r][IDX.print_side] = ""
+          /* ALL FIVE placements, not just the first — a row that now names a beanie must
+             not keep a sleeve in its 3rd slot any more than in its 1st. */
+          for (const k of ["print_side", "print_side_2", "print_side_3", "print_side_4", "print_side_5"] as const) {
+            if (IDX[k] != null) next[r][IDX[k]] = ""
+          }
         }
         for (const c of cols) next[r][c] = src[cLo + (((c - tLo) % width) + width) % width] ?? ""
       }
@@ -738,7 +755,9 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         /* A face is as much a property of the garment as a size is — a sleeve placement
            left behind on a row that now names a beanie is a value its dropdown no longer
            offers, which is the exact thing this block exists to clear. */
-        next[r][IDX.print_side] = ""
+        for (const k of ["print_side", "print_side_2", "print_side_3", "print_side_4", "print_side_5"] as const) {
+          if (IDX[k] != null) next[r][IDX[k]] = ""
+        }
       }
       return next
     /* Tagged with the cell, so a burst of typing in one box is ONE undo — see writeRows. */

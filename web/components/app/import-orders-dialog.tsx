@@ -632,12 +632,15 @@ export function ImportOrdersDialog({
                * design row at all — it used to need a template alongside it, so an Artwork ID
                * on its own reached the line as a picture and was never printed.
                */
-              /* THE SHEET'S OWN FACES FIRST. `it.sides` is set only when two or more rows
-                 shared an Item #, and it is the most explicit statement available: the person
-                 wrote one row per face. It outranks the template's faces for the same reason
-                 a row's own artwork does — the sheet is the instruction, the template is the
-                 default. A face with no artwork is filtered out below, not here, so the list
-                 stays a record of what was asked for. */
+              /* THE SHEET'S OWN FACES FIRST. `it.sides` is set whenever the row names more
+                 than one — from the 1st..5th placement pairs on a current sheet, or from
+                 rows joined by the old Line key on one written before them (order-import.ts
+                 reads both). Either way it is the most explicit statement available: the
+                 person said, in the sheet, which faces this garment prints. It outranks the
+                 template's faces for the same reason a row's own artwork does — the sheet is
+                 the instruction, the template is the default. A face with no artwork is
+                 filtered out below, not here, so the list stays a record of what was asked
+                 for. */
               const faces = (it.sides?.length
                 ? it.sides.map((f) => ({ side: f.side, artwork: f.artwork, pos: null }))
                 : it.printSide

@@ -105,15 +105,7 @@ const T_COLUMNS = [
    * It was headed 'Image ID' and documented as the listing photo until 2026-09-08; the
    * rename is in web/lib/order-import.ts with the reasoning. Both spellings still import.
    */
-  /* WHICH ROWS ARE THE SAME GARMENT. Two rows sharing an Order Number AND a Line are one
-     item printed on two faces — the only way to ask a sheet for a front and a back without
-     building a template. Blank means "its own item", which is every sheet written before
-     this column existed.
-     Headed "Line" and not "Item #": canonHeader strips `#` before matching, so "Item #"
-     normalises to "item", which the Product Title column already claims. */
-  { h: 'Line', g: 'product', duty: '', sample: '1' },
   { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
-  { h: 'Artwork ID', g: 'product', duty: '', sample: '' },
   /**
    * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
    * only one that is not artwork.
@@ -126,7 +118,12 @@ const T_COLUMNS = [
    */
   { h: 'Machine File ID', g: 'product', duty: '', sample: '' },
   /**
-   * WHICH FACE the row's design goes on — the one thing a sheet could never say.
+   * FIVE PLACEMENTS, EACH WITH ITS ARTWORK BESIDE IT — one row is one garment.
+   *
+   * Replaces a single Placement + Artwork ID pair and the 'Line' key column, where two rows
+   * sharing a key meant one garment printed twice. The key had to be invented and meant
+   * nothing on its own; the first real filler typed a template id into it. Pairs put a
+   * garment's faces on the garment's own row instead.
    *
    * A FIXED LIST, not a dependent one, and that is not a shortcut: Sheets will not evaluate
    * INDIRECT inside a validation rule (see the long note by the rules below), so every
@@ -134,10 +131,20 @@ const T_COLUMNS = [
    * sides axis IS these eight, so a per-product range would build the same dropdown out of
    * far more machinery. The narrowing lives in the app's own grid, which can do it properly.
    *
-   * Mirrors CSV_COLUMNS in web/lib/order-import.ts — change one and change the other, or
-   * the sheet we hand out stops importing itself.
+   * HAND-KEPT MIRROR of CSV_COLUMNS in web/lib/order-import.ts — change one and change the
+   * other, or the sheet we hand out stops importing itself. Only the FIRST pair carries a
+   * sample: showing 'Front' five times would read as five required cells.
    */
-  { h: 'Placement', g: 'product', duty: '', sample: 'Front', opts: 'sides' },
+  { h: '1st placement', g: 'product', duty: '', sample: 'Front', opts: 'sides' },
+  { h: '1st artwork', g: 'product', duty: '', sample: '' },
+  { h: '2nd placement', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: '2nd artwork', g: 'product', duty: '', sample: '' },
+  { h: '3rd placement', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: '3rd artwork', g: 'product', duty: '', sample: '' },
+  { h: '4th placement', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: '4th artwork', g: 'product', duty: '', sample: '' },
+  { h: '5th placement', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: '5th artwork', g: 'product', duty: '', sample: '' },
   { h: 'Quantity', g: 'product', duty: '', sample: '1' },
   // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
   // fixed list. See LISTS below for how that is wired.
