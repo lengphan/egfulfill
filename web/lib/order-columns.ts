@@ -170,7 +170,7 @@ export function reorderCols(ids: OrderColId[], id: OrderColId, toIndex: number):
 // `grid` (not a Tailwind width class) because this table is a CSS grid, not a <table>: an
 // order row and its expanded detail have to share one row container, and a grid lets the
 // detail sit as a full-width sibling instead of being forced into a colspan cell.
-export type FactoryColId = "status" | "order" | "age" | "units" | "tracking" | "store" | "customer" | "items" | "ready" | "action"
+export type FactoryColId = "status" | "delivery" | "order" | "age" | "units" | "tracking" | "store" | "customer" | "items" | "ready" | "action"
 
 export type FactoryColDef = { id: FactoryColId; label: string; grid: string; align?: "left" | "right" }
 
@@ -179,7 +179,23 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // number and the item count, which made them truncate, unscannable down the page, and
   // invisible unless you were looking straight at that one row — the seller table gives
   // each its own column, which is most of why it reads more easily.
-  status:   { id: "status",   label: "Status",   grid: "6rem" },
+  /**
+   * TWO STATUSES, TWO COLUMNS — and "Stage", not "Status", because the pair has to be
+   * tellable apart at a glance and two headers both saying some flavour of status would be
+   * worse than the one column they replace.
+   *
+   * Stage is OURS: draft → pending → approved → working → shipped, ours to move. Delivery is
+   * the CARRIER'S, adopted verbatim and touched by nothing. They were stacked in one cell,
+   * which is how an order reading Draft that was Delivered last week stopped looking like a
+   * mistake — a real problem, solved the wrong way round. Stacking made the row height vary
+   * with how much had happened to it, and left the carrier's status unsortable: the `status`
+   * comparator sorts on orderStage alone, so "what is in transit" could not be asked.
+   */
+  status:   { id: "status",   label: "Stage",    grid: "6rem" },
+  /* 7rem holds "In transit" and "Not collected", the two longest words in the set, at the
+     pill sizing this column uses. Empty without a tracking number — there is no parcel to
+     have a status — which is why it is hidden by default below rather than made narrower. */
+  delivery: { id: "delivery", label: "Delivery", grid: "7rem" },
   // THE WHOLE NUMBER, because half of one identifies nothing.
   //
   // 5.5rem (88px) truncated every marketplace order to "#4153554…". That column is the one
@@ -292,7 +308,7 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
  *  loadFactoryColOrder; the columns shown are that list minus loadFactoryHiddenCols. Kept
  *  because it documents the intended left-to-right order, but edit the two loaders below to
  *  change what a board actually opens with. */
-export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "age", "units", "tracking", "store", "customer", "items", "ready", "action"]
+export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "delivery", "order", "age", "units", "tracking", "store", "customer", "items", "ready", "action"]
 
 /**
  * HIDDEN on a board nobody has customised — `items`, and only `items`. One click in the
@@ -311,7 +327,11 @@ export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "age", "
  * explicit what this file already said — items is "deliberately the first thing squeezed" —
  * rather than shipping a column permanently squeezed past legibility.
  */
-export const DEFAULT_HIDDEN_FACTORY_COLS: FactoryColId[] = ["items"]
+/* `delivery` joins it: the carrier's status is empty on every order without a tracking
+   number, which on a production board is most of them, and a column that is blank down the
+   page costs width it never repays. One click in the Columns menu brings it back, and the
+   staff who want it — dispatch, anyone answering "where is it" — turn it on once. */
+export const DEFAULT_HIDDEN_FACTORY_COLS: FactoryColId[] = ["items", "delivery"]
 
 /** The two columns that absorb slack — List, then Product. Losing BOTH leaves a row of
  *  capped tracks and a hole before the actions, which is what SOAK_UP below repairs. */
@@ -339,7 +359,7 @@ export function factoryGridTemplate(ids: FactoryColId[], lead: number): string {
 // Only the DATA columns reorder/hide. `action` (the buttons) is pinned last and always
 // shown, and `order` (the identifier) can never be hidden — a row must stay identifiable
 // and actionable. Same localStorage-backed model as the seller table above.
-export const FACTORY_DATA_COLS: FactoryColId[] = ["status", "order", "age", "units", "tracking", "store", "customer", "items", "ready"]
+export const FACTORY_DATA_COLS: FactoryColId[] = ["status", "delivery", "order", "age", "units", "tracking", "store", "customer", "items", "ready"]
 const FACTORY_LOCKED: FactoryColId[] = ["order"]
 export const isFactoryColLocked = (id: FactoryColId) => FACTORY_LOCKED.includes(id)
 const isFactoryDataId = (v: unknown): v is FactoryColId => typeof v === "string" && (FACTORY_DATA_COLS as string[]).includes(v)

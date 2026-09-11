@@ -123,7 +123,17 @@ export function OrderNumber({
         <span className={BASE}>{label}</span>
         {/* A VALUE, so text-xs and not smaller — it is a reference somebody reads off a sheet
             and matches against ours, which §4 puts at 12px minimum and never at 11. */}
-        <span className="text-xs font-normal tabular-nums text-muted-foreground" title={tl("orderNumber", "The number from the import sheet")}>
+        {/* text-sm, NOT text-xs. §4 puts an order number in the VALUE band — "an account
+            number, a tracking number, a reference, a total, an order number" — with a 14px
+            floor, because it is read, copied and matched against somebody's own records. The
+            Store column's second line IS 12px, and correctly: "Manual · linh" is a label, read
+            once and ignored. This is the other kind.
+            It still sits under #74 rather than beside it, and still gives way to it — by
+            WEIGHT and COLOUR, which is what §4 says carries importance. Shrinking a value
+            below its floor is not a way to make it secondary, it is a way to make it
+            unreadable, and at 12px against a semibold 14px the size jump was the thing that
+            read as untidy. */}
+        <span className="text-sm font-normal tabular-nums text-muted-foreground" title={tl("orderNumber", "The number from the import sheet")}>
           {sheetRef}
         </span>
       </span>
@@ -169,7 +179,7 @@ export function OrderNumber({
         {/* The editable state shows it too, or pressing the number would make the seller's own
             reference disappear — a control that hides a fact while you use it. */}
         {sheetRef && (
-          <span className="ml-1.5 text-xs font-normal tabular-nums text-muted-foreground">{sheetRef}</span>
+          <span className="ml-1.5 text-sm font-normal tabular-nums text-muted-foreground">{sheetRef}</span>
         )}
       </button>
     )

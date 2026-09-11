@@ -1080,6 +1080,27 @@ export function OrdersHub() {
  age: (a, b) => at(b).localeCompare(at(a)),
  order: (a, b) => String(numOf(a)).localeCompare(String(numOf(b)), undefined, { numeric: true }),
  status: (a, b) => orderStage(a.items ?? []).localeCompare(orderStage(b.items ?? [])),
+      /**
+       * DELIVERY, WHICH COULD NOT BE SORTED AT ALL while it lived inside the status cell.
+       *
+       * Ordered by the parcel's PROGRESS, not alphabetically: preshipment → in transit →
+       * delivered, with the two failures last because they are the rows somebody has to do
+       * something about, and a sort that buries them under every delivered parcel is a sort
+       * nobody would use twice.
+       *
+       * No tracking sorts last in BOTH directions, the same rule the tracking comparator
+       * above already follows — "no parcel yet" is the absence of a value, and letting it
+       * lead one direction hands half the sorts an empty screen.
+       */
+ delivery: (a, b) => {
+ const RANK: Record<string, number> = {
+          awaiting_pickup: 1, in_transit: 2, delivered: 3, returned: 4, failed: 5,
+        }
+ const x = a.tracking ? (RANK[String(a.delivery_status ?? "")] ?? 0) : -1
+ const y = b.tracking ? (RANK[String(b.delivery_status ?? "")] ?? 0) : -1
+ if ((x < 0) !== (y < 0)) return x < 0 ? 1 : -1
+ return x - y
+      },
  store: (a, b) => platformOf(a).localeCompare(platformOf(b)),
  customer: (a, b) => (a.customer?.name ?? "").localeCompare(b.customer?.name ?? ""),
       // Blank tracking sorts last in BOTH directions — "not shipped yet" is the absence of
@@ -2067,14 +2088,6 @@ export function OrdersHub() {
  return (
                     <span className="flex min-w-0 flex-col items-start gap-1 justify-self-start">
                       <StageBadge status={stage} />
-                      {/* THE SECOND STATUS, and only for the factory. The stage above is
- what WE did; this is what the carrier says about the same parcel,
- adopted verbatim and touching nothing. It is what makes an order
- that reads Draft and arrived at the buyer last week legible: it
- was made somewhere else, and the row can finally say so instead of
- looking like a mistake. Hidden without a tracking number, because
- then there is no parcel to have a status. */}
-                      {isStaff && <DeliveryBadge order={o} />}
                       {p.mixed && (
                         <span className="flex items-center gap-1.5" title={`${p.started} of ${p.total} lines started — this order shows the least-advanced one`}>
                           <span className="block h-1 w-10 overflow-hidden rounded-full bg-muted">
@@ -2086,6 +2099,22 @@ export function OrdersHub() {
                     </span>
                   )
                 })(),
+                /**
+                 * THE CARRIER'S STATUS, in its own column now.
+                 *
+                 * It used to stack under the stage, which is how an order reading Draft that
+                 * was Delivered last week stopped looking like a mistake — a real problem
+                 * solved the wrong way round. Two owners, two questions: the stage is ours to
+                 * move, this is adopted from the carrier and touched by nothing. Stacked, the
+                 * row's height varied with how much had happened to the order, and the
+                 * carrier's status could not be sorted at all — the `status` comparator reads
+                 * orderStage alone.
+                 *
+                 * STAFF ONLY, exactly as before: a seller never had this and still does not.
+                 * DeliveryBadge returns null without a tracking number, so the cell is simply
+                 * empty on an order with no parcel yet.
+                 */
+                delivery: isStaff ? <DeliveryBadge order={o} /> : null,
                 /* `truncate` stays as the safety net, but the track is now measured to hold
                    a full Etsy number (order-columns.ts) so it should never fire. The title
                    is what covers the case it does — a longer id from a source we haven't
