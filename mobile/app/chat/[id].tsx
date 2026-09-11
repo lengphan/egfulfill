@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { getMe, getOrderMessages, postOrderMessage, type ChatEntry } from "@/lib/api"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { F, C, R } from "@/lib/theme"
+import { Bubble, Skeleton, EmptyState } from "@/components/kit"
 
 /**
  * ONE CONVERSATION.
@@ -112,36 +113,21 @@ export default function ChatThread() {
           onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: false })}
         >
           {msgs === null && !err ? (
-            <View style={{ paddingVertical: 60, alignItems: "center" }}><ActivityIndicator color={C.primary} /></View>
+            /* Bubbles in the shape of bubbles. A spinner in the middle of an empty thread
+               says nothing about what is coming. */
+            <View style={{ gap: 10 }}>
+              <Skeleton w="62%" h={40} radius={20} />
+              <Skeleton w="46%" h={40} radius={20} style={{ alignSelf: "flex-end" }} />
+              <Skeleton w="72%" h={58} radius={20} />
+            </View>
           ) : msgs && msgs.length === 0 ? (
             /* An empty thread and a broken one must never look the same. */
-            <Text style={{ fontSize: 14, fontFamily: F.body, color: C.muted, textAlign: "center", marginTop: 40 }}>
-              Nothing here yet — say something.
-            </Text>
-          ) : (msgs ?? []).map((m) => {
-            const mine = !!m.me
-            return (
-              <View key={String(m.id)} style={{ alignItems: mine ? "flex-end" : "flex-start" }}>
-                {/* WHO SAID IT, on the other side only. Your own name over your own message
-                    is the one label nobody needs. */}
-                {!mine && !!m.by && (
-                  <Text style={{ fontSize: 11.5, fontFamily: F.medium, color: C.muted, marginBottom: 3, marginLeft: 4 }}>
-                    {m.by}
-                  </Text>
-                )}
-                <View style={{
-                  maxWidth: "84%", borderRadius: R.control, paddingHorizontal: 13, paddingVertical: 9,
-                  // Ink for yours, the warm well for theirs — the same two surfaces the rest of
-                  // the app uses, rather than a third palette invented for chat.
-                  backgroundColor: mine ? C.ink : C.accent,
-                }}>
-                  <Text style={{ fontSize: 15, fontFamily: F.body, color: mine ? C.onInk : C.fg, lineHeight: 21 }}>
-                    {m.text}
-                  </Text>
-                </View>
-              </View>
-            )
-          })}
+            <EmptyState obj="balloon" icon="chatbubble-ellipses-outline"
+                        line="Nothing here yet"
+                        note="Say something — this thread goes straight to the people making your orders." />
+          ) : (msgs ?? []).map((m) => (
+            <Bubble key={String(m.id)} text={m.text ?? ""} mine={!!m.me} by={m.by} />
+          ))}
           {!!err && (
             <Text style={{ fontSize: 13, fontFamily: F.body, color: C.alert, textAlign: "center" }}>{err}</Text>
           )}

@@ -322,6 +322,63 @@ export function EmptyState({ icon, obj, line, note, action, onAction, bad }: {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   BUBBLE — a message that arrives.
+   ──────────────────────────────────────────────────────────────────────────── */
+/**
+ * TWO THINGS MAKE A BUBBLE READ AS A MESSAGE rather than a rounded box of text.
+ *
+ * THE CORNER. All four radii equal is a card. A message is anchored to the side it came
+ * from, and the corner nearest that side is drawn tight — that single asymmetry is what
+ * every chat app uses to say who is speaking, before colour does.
+ *
+ * THE ARRIVAL. It springs in from 0.96 rather than being already there. A thread where
+ * everything simply exists reads as a transcript; one where the last line lands reads as a
+ * conversation. It is one mount-time animation, not a stagger — twenty bubbles cascading on
+ * open would be a performance, and only the newest message is news.
+ */
+export function Bubble({ text, mine, by }: { text: string; mine: boolean; by?: string | null }) {
+  const reduced = useReducedMotion()
+  const v = useRef(new Animated.Value(reduced ? 1 : 0)).current
+  useEffect(() => {
+    if (reduced) { v.setValue(1); return }
+    const a = Animated.spring(v, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 7 })
+    a.start()
+    return () => a.stop()
+  }, [reduced, v])
+  return (
+    <Animated.View style={{
+      alignItems: mine ? "flex-end" : "flex-start",
+      opacity: v,
+      transform: [
+        { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
+        { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) },
+      ],
+    }}>
+      {/* WHO SAID IT, on the other side only. Your own name over your own message is the one
+          label nobody needs. */}
+      {!mine && !!by && (
+        <Text style={{ fontSize: 11.5, fontFamily: F.medium, color: C.muted, marginBottom: 3, marginLeft: 4 }}>
+          {by}
+        </Text>
+      )}
+      <View style={{
+        maxWidth: "84%", paddingHorizontal: 14, paddingVertical: 10,
+        borderRadius: 20,
+        borderBottomRightRadius: mine ? 6 : 20,
+        borderBottomLeftRadius: mine ? 20 : 6,
+        // Ink for yours, the flat well for theirs — the same two surfaces the rest of the app
+        // uses, rather than a third palette invented for chat.
+        backgroundColor: mine ? C.ink : C.accent,
+      }}>
+        <Text style={{ fontSize: 15, fontFamily: F.body, color: mine ? C.onInk : C.fg, lineHeight: 21 }}>
+          {text}
+        </Text>
+      </View>
+    </Animated.View>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    SKELETON — a block in the SHAPE of what is coming.
    A spinner says "something is happening somewhere"; a skeleton says "this is
    what will be here, and it will not move when it lands". The pulse is opacity
