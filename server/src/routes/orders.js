@@ -3218,15 +3218,60 @@ export function ordersRoutes(app, requireAuth) {
    */
   app.post('/api/orders/:id/items', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
-    // Staff only. A seller adding a line to an order they have already been charged for
-    // would be asking to be produced something nobody billed them for.
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'forbidden' }; }
-    const stageNow = await q('select factory_status from orders where id=$1', [req.params.id])
-      .then((r) => (r.rowCount ? normalizeStage(r.rows[0].factory_status) : null)).catch(() => null);
-    if (stageNow === null) { reply.code(404); return { error: 'order not found' }; }
-    if (!(stageNow === '' || stageNow === 'in_review')) {
-      reply.code(409);
-      return { error: 'This order has been approved — add a line before approval, or raise a new order.' };
+    /**
+     * TWO WINDOWS, BECAUSE THE RISK IS NOT THE SAME ONE.
+     *
+     * Staff may add up to APPROVAL: approval is where a human has confirmed the blank on
+     * every line, and the charge froze at submit, so a line added after it is made and not
+     * billed — a deliberate asymmetry stated on the card.
+     *
+     * A seller may add only BEFORE THEY SUBMIT (owner's call, 2026-09-11). This route was
+     * staff-only for one reason, and it is still the right one: a seller adding a line to an
+     * order they have already been charged for is asking to be produced something nobody
+     * billed them for. But that argument only reaches as far as the charge — before submit
+     * nothing has been quoted, nothing has been billed, and it is the seller's own draft.
+     * It is the same reasoning that already lets a seller REMOVE a line from a draft.
+     *
+     * THE SELLER'S TEST READS THE RAW COLUMN, NOT normalizeStage — this is the trap in this
+     * file. normalizeStage folds new / draft / none / PENDING onto '', and `pending` is not
+     * pre-submit. Gating the seller on the normalised value would hand them a window that
+     * reaches past their own submission, which is the exact case the paragraph above
+     * forbids. The staff test below keeps using it, because for staff '' vs 'in_review' is
+     * genuinely all that matters.
+     *
+     * The stage list is SUBMIT'S OWN (PATCH /api/orders/:id refuses `in_review` unless
+     * factory_status is one of these), so the two boundaries cannot drift apart: if you can
+     * still submit it, you can still add to it.
+     */
+    const row = await q('select factory_status from orders where id=$1', [req.params.id])
+      .then((r) => (r.rowCount ? r.rows[0] : null)).catch(() => null);
+    if (row === null) { reply.code(404); return { error: 'order not found' }; }
+    const rawStage = String(row.factory_status || '').toLowerCase().trim();
+
+    if (isStaff(req.user)) {
+      const stageNow = normalizeStage(rawStage);
+      if (!(stageNow === '' || stageNow === 'in_review')) {
+        reply.code(409);
+        return { error: 'This order has been approved — add a line before approval, or raise a new order.' };
+      }
+    } else {
+      if (!['', 'new', 'draft'].includes(rawStage)) {
+        reply.code(409);
+        return { error: 'This order has been submitted, so a new line would be made without being billed. Add items before you submit, or raise a new order.' };
+      }
+      /**
+       * AND THE MONEY ITSELF, not just the stage that usually implies it.
+       *
+       * chargedAmount() reads wallet_ledger rather than a flag, because the ledger is the
+       * source of truth and a flag could drift from it — the same reason the charge guard
+       * at the top of this file does. A draft that has somehow been charged (a stage
+       * written back by hand, a half-finished submit) would pass the test above while
+       * being exactly the case the whole gate exists to prevent. Cheap query, real hole.
+       */
+      if (await chargedAmount(req.params.id) > 0) {
+        reply.code(409);
+        return { error: 'This order has already been charged, so a new line would be made without being billed. Raise a new order instead.' };
+      }
     }
     const b = req.body || {};
     const qty = Math.max(1, Math.min(999, Math.round(Number(b.qty) || 1)));

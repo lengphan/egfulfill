@@ -548,8 +548,21 @@ export default function OrderDetailPage() {
        end (blanks ordered), a different WHO. Mirrors mayEditVariants and the server's
        item-setup carve-out; all three move together. */
     || (role === "operator" && editAfterApproval && !(order as { blanks_ordered?: boolean }).blanks_ordered)
-  /** Adding a LINE is staff-only and stops at approval — the server refuses it after. */
- const canAddItem = isStaff && beforeApproval
+  /**
+   * ADDING A LINE — two windows, mirroring the server's two (orders.js, POST items).
+   *
+   * Staff: up to approval. A line added after submit is made and not billed, which is the
+   * stated asymmetry on the card.
+   *
+   * Seller: only before THEY submit, and not on an order already approved. `preSubmit` is
+   * the RAW column (`"" | new | draft`) — deliberately not `beforeApproval`, which also
+   * counts `pending` and `in_review`. Both of those are past the charge, and a seller
+   * adding a line there is asking to be produced something nobody billed them for.
+   *
+   * That list is submit's own, on both sides of the wire, so the two boundaries cannot
+   * drift: if the seller can still submit it, they can still add to it.
+   */
+ const canAddItem = isStaff ? beforeApproval : (preSubmit && !order.approved_at)
   /**
    * REMOVING IS A DIFFERENT TEST FROM ADDING, and it mirrors the server's, not this file's
    * `beforeApproval`.
