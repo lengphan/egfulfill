@@ -301,7 +301,12 @@ export function ImportOrdersDialog({
      * Metadata only: the resolve returns names and sizes, never bytes. The bytes never
      * touch the browser on this path at all.
      */
-    const refs = [...new Set(records.map((r) => String(r.machine_file_id || "").trim()).filter(Boolean))]
+    /* EVERY POSITION'S REF, or a file named in position 2 is fetched by nobody and then
+       reported "no such file in your library" — a lookup gap wearing the costume of a typo. */
+    const refs = [...new Set(records.flatMap((r) =>
+      ["machine_file_id", "machine_file_id_2", "machine_file_id_3", "machine_file_id_4", "machine_file_id_5"]
+        .map((k) => String((r as unknown as Record<string, unknown>)[k] ?? "").trim())
+    ).filter(Boolean))]
     if (refs.length) {
       resolveMachineFiles(refs)
         .then((m) => setMachineFiles(m ?? {}))
@@ -392,21 +397,32 @@ export function ImportOrdersDialog({
    */
   const machineOutcome = useMemo(() => {
     if (!records) return null
-    const rows = records.filter((r) => r._valid && String(r.machine_file_id || "").trim())
+    /* ALL FIVE POSITIONS, not just the first. A stitch file is per POSITION now, so reading
+       `machine_file_id` alone left four columns unchecked — every one of them a reference
+       that could be a typo, and the whole point of this preview is answering that while the
+       sheet is still on screen. */
+    const MF_KEYS = ["machine_file_id", "machine_file_id_2", "machine_file_id_3", "machine_file_id_4", "machine_file_id_5"] as const
+    const refsOn = (r: Record<string, unknown>) =>
+      MF_KEYS.map((k) => String(r[k] ?? "").trim()).filter(Boolean)
+    const rows = records.filter((r) => r._valid && refsOn(r as unknown as Record<string, unknown>).length)
     if (!rows.length) return null
-    const typed = rows.length
+    // COUNTED PER FILE, not per row: one row can now name five, and "3 rows" would under-
+    // report a sheet where every garment carries a front and a back file.
+    const typed = rows.reduce((n, r) => n + refsOn(r as unknown as Record<string, unknown>).length, 0)
     if (machineLookupFailed || !machineFiles) return { typed, ok: 0, unknown: [] as string[], wrongMethod: [] as string[], failed: machineLookupFailed }
     const unknown = new Set<string>()
     const wrongMethod = new Set<string>()
     let ok = 0
     for (const r of rows) {
-      const ref = String(r.machine_file_id || "").trim()
-      if (!machineFiles[ref]) { unknown.add(ref); continue }
       // The row's own method. Blank is allowed through — the line has not said it ISN'T
       // embroidery, and the server makes the final call against the saved line.
       const m = String(r.print_type || "").toUpperCase()
-      if (m && !/EMB|STITCH|EMBROID/.test(m)) { wrongMethod.add(ref); continue }
-      ok++
+      const dead = !!m && !/EMB|STITCH|EMBROID/.test(m)
+      for (const ref of refsOn(r as unknown as Record<string, unknown>)) {
+        if (!machineFiles[ref]) { unknown.add(ref); continue }
+        if (dead) { wrongMethod.add(ref); continue }
+        ok++
+      }
     }
     return { typed, ok, unknown: [...unknown], wrongMethod: [...wrongMethod], failed: false }
   }, [records, machineFiles, machineLookupFailed])

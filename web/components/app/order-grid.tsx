@@ -110,6 +110,36 @@ const widthFor = (key: string) => (NARROW.has(key) ? "min-w-20" : "min-w-32")
 /** Column index by key, so the narrowing below never counts columns by hand. */
 const IDX = Object.fromEntries(CSV_COLUMNS.map((c, i) => [c.key, i])) as Record<string, number>
 
+/** The five Machine File columns, by key. One list, so a cell and its warning cannot disagree. */
+const MACHINE_FILE_KEYS = ["machine_file_id", "machine_file_id_2", "machine_file_id_3", "machine_file_id_4", "machine_file_id_5"]
+
+/**
+ * IS A STITCH FILE OF ANY USE ON THIS ROW?
+ *
+ * There is no machine to run a .EMB on a DTG line, so the server refuses the attach outright
+ * ("a stitch file has no machine to run on it"). That refusal arrives AFTER the import, from
+ * a screen the filler has left — so the sheet says it first, where the cell is still on
+ * screen and still editable.
+ *
+ * A BLANK print type does NOT grey the cell, and it deliberately DISAGREES with the import
+ * warning, which does flag it. Both are right for where they sit:
+ *
+ *   · The import defaults a blank method to DTG (order-import.ts), so by the time a stitch
+ *     file reaches the server it genuinely has nothing to run on — the warning says so, and
+ *     tells you to set Print Type to Embroidery.
+ *   · The GRID is where the row is still being filled, and people fill columns in whatever
+ *     order they like. Greying the Machine File cells of every fresh row — which all start
+ *     blank — would read as a broken column, and would fight anyone who types the file
+ *     before the method.
+ *
+ * So the cell greys only on a method we can read that ISN'T embroidery, and the warning
+ * catches the blank case a moment later. Do not "fix" this into agreement.
+ */
+const stitchDeadOn = (row: string[]) => {
+  const m = String(row[IDX.print_type] ?? "").trim()
+  return !!m && !/emb|stitch|embroid/i.test(m)
+}
+
 export type OrderGridProps = {
   /** Given the filled rows, make the orders. The caller owns createOrder — this file does
    *  not know what an order is, only what a row is. */
@@ -1152,13 +1182,20 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                     const opts = optionsFor(col.key, row)
                     const list = col.key === "blank" ? productNames : opts
                     const missing = started && col.required && !(row[c] ?? "").trim()
+                    /* GREYED, NOT DISABLED. A disabled input silently swallows a paste, and
+                       a sheet is filled by pasting; it would also fight anyone who types the
+                       Machine File before the Print Type. So the cell says it is pointless
+                       and still accepts what you put there — validation then warns, and the
+                       server has the final word against the saved line. */
+                    const inert = MACHINE_FILE_KEYS.includes(col.key) && stitchDeadOn(row)
                     return (
                       <td
                         key={col.key}
                         /* `relative` so the handle can sit on the cell's own corner, and
                            `group` so it can appear on hover as well as on focus — a sheet
                            shows you the grip before you have committed to the cell. */
-                        className={`group relative border-b border-l border-border p-0 ${missing ? "bg-destructive/10" : ""}`}
+                        title={inert ? `This row is ${row[IDX.print_type]}, so a stitch file has nothing to run on — it will not be attached.` : undefined}
+                        className={`group relative border-b border-l border-border p-0 ${missing ? "bg-destructive/10" : ""}${inert ? " bg-muted/60" : ""}`}
                       >
                         <input
                           data-cell={`${r}-${c}`}
@@ -1255,7 +1292,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                           /* medium, not normal: a 14px value at 400 on a white sheet is
                              still the lightest thing on screen, and these are codes read
                              character by character. */
-                          className="h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none focus:bg-accent focus:ring-1 focus:ring-ring"
+                          className={"h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none focus:bg-accent focus:ring-1 focus:ring-ring" + (inert ? " text-muted-foreground/50" : "")}
                         />
                         {/**
                           * THE SELECTION ITSELF. Shift-click extends the anchor sideways, and

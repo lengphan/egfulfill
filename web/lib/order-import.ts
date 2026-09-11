@@ -654,6 +654,11 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
     const rec: ImportRecord = { _rowNum: i + 2 + hdrIdx, _valid: false, _errors: "", _warnings: "" }
     headers.forEach((h, j) => { if (h && rec[h] === undefined) rec[h] = row[j] != null ? String(row[j]).trim() : "" })
     if (!rec.item_quantity) rec.item_quantity = "1"
+    /* Remembered BEFORE the default, because "blank" and "DTG" are different facts to a
+       person even though they import identically. A stitch file on a blank row is not a
+       contradiction the filler typed — it is one the default is about to create — and the
+       warning below can only say so if it knows which happened. */
+    const methodWasBlank = !rec.print_type
     if (!rec.print_type) rec.print_type = "DTG"
     // NO derived SKU. This used to slug the title into item_sku, which manufactured a value
     // that is neither a real listing SKU nor a catalog blank — it matches nothing in the
@@ -720,6 +725,40 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
            caught by running a real sheet through this, not by reading it. */
         if (!looksLikeArtwork(pr.art) && !looksLikeTemplate(pr.art) && !S(rec.template_id)) {
           warn.push(`${pr.label} has no design beside it — nothing to place there`)
+        }
+      }
+    }
+    /**
+     * A STITCH FILE WITH NO MACHINE TO RUN ON.
+     *
+     * The server refuses the attach outright — "a stitch file has no machine to run on it" —
+     * but that refusal arrives after the import, from a screen the filler has left. Said
+     * here it is still cheap to fix. A WARNING and not an error: the row still makes a
+     * garment, and refusing the whole thing over a file that simply will not be attached is
+     * the harsher mistake.
+     *
+     * A BLANK Print Type IS caught, and this is the half that was wrong when first written.
+     * "The row has not said it isn't embroidery" sounds right and is false here: line 657
+     * defaults a blank method to DTG, which the column's own help states. So a stitch file
+     * on a blank row is refused exactly like one on a DTG row — it just is not the filler's
+     * doing, so the message names the default instead of a method they never typed.
+     */
+    if (rec._valid) {
+      const method = S(rec.print_type).trim()
+      if (!/emb|stitch|embroid/i.test(method)) {
+        const named = [
+          ["Machine File 1", S(rec.machine_file_id)],
+          ["Machine File 2", S(rec.machine_file_id_2)],
+          ["Machine File 3", S(rec.machine_file_id_3)],
+          ["Machine File 4", S(rec.machine_file_id_4)],
+          ["Machine File 5", S(rec.machine_file_id_5)],
+        ].filter(([, v]) => v)
+        // NAMED, because with five slots "a stitch file was ignored" does not say which.
+        if (named.length) {
+          const which = named.map(([k]) => k).join(", ")
+          warn.push(methodWasBlank
+            ? `${which} named, but Print Type is blank — a blank row imports as DTG printing, so the stitch file will not be attached. Set Print Type to Embroidery.`
+            : `${which} on a ${method} row — a stitch file has no machine to run on, so it will not be attached`)
         }
       }
     }
