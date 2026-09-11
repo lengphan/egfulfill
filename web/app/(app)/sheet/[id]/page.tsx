@@ -244,7 +244,7 @@ export default function SheetPage() {
         )}
 
         {done && (
-          <span className="rounded-lg bg-shipped/10 px-2 py-0.5 text-2xs font-medium text-shipped">{tl("sheet_[id]", "Sent")}</span>
+          <span className="rounded-lg bg-shipped/10 px-2 py-0.5 text-2xs font-medium text-shipped">{tl("sheet_[id]", "Submitted")}</span>
         )}
 
         {/* ONE ROW OF CONTROLS, AND IT IS THIS ONE.

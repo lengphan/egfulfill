@@ -1,7 +1,7 @@
 "use client"
 
 import { type OrderRow } from "@/lib/api"
-import { deliveryWord, DELIVERY_PILL_TONE } from "@/lib/delivery-status"
+import { deliveryWord, DELIVERY_TEXT_TONE } from "@/lib/delivery-status"
 
 /**
  * What the CARRIER says about a parcel — the second status an order carries, beside the
@@ -49,13 +49,23 @@ export function DeliveryBadge({ order, className }: {
   const word = deliveryWord(order.delivery_status)
   if (!word) return null
 
+  /**
+   * NO CAPSULE, for the reason StageBadge already gives beside the same decision: "a pill has
+   * to carry meaning, and an order stage did — until every label in the app became one and
+   * the shape stopped saying anything. The word is the chip now."
+   *
+   * That applies doubly now the two sit in ADJACENT columns. A bare word beside a capsule
+   * reads as two different kinds of fact, when they are the same kind from two owners — and
+   * the capsule was the louder of the pair while carrying the less actionable half.
+   *
+   * DELIVERY_TEXT_TONE was written for this and its own note says so: "coloured type, for a
+   * column of them". It was a column of them the moment Delivery got its own.
+   */
   return (
-    <span className={"inline-flex items-center " + (className ?? "")}>
-      <span title={order.delivery_detail ?? undefined}
-            className={"rounded px-1.5 py-0.5 text-2xs font-medium "
-              + (DELIVERY_PILL_TONE[order.delivery_status ?? ""] ?? "bg-muted text-muted-foreground")}>
-        {word}
-      </span>
+    <span title={order.delivery_detail ?? undefined}
+          className={(DELIVERY_TEXT_TONE[order.delivery_status ?? ""] ?? "text-muted-foreground")
+            + " " + (className ?? "")}>
+      {word}
     </span>
   )
 }

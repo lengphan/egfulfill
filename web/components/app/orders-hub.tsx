@@ -2114,7 +2114,13 @@ export function OrdersHub() {
                  * DeliveryBadge returns null without a tracking number, so the cell is simply
                  * empty on an order with no parcel yet.
                  */
-                delivery: isStaff ? <DeliveryBadge order={o} /> : null,
+                /* ALWAYS AN ELEMENT, never null — the row places its cells with
+                   `<Fragment>{cell[id]}</Fragment>`, and a Fragment around null renders NO
+                   DOM node at all. The grid then has one child fewer than it has tracks and
+                   every cell after this one slides a track to the left: Age landed in the
+                   Delivery column and the ⋯ menu stopped lining up down the page. A cell that
+                   is empty still has to occupy its track. */
+                delivery: <span className="min-w-0">{isStaff ? <DeliveryBadge order={o} /> : null}</span>,
                 /* `truncate` stays as the safety net, but the track is now measured to hold
                    a full Etsy number (order-columns.ts) so it should never fire. The title
                    is what covers the case it does — a longer id from a source we haven't

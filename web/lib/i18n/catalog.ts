@@ -3941,6 +3941,8 @@ const vi: Dict = {
   "sheet.Status": "Trạng thái",
   "sheet.Updated": "Cập nhật",
   "sheet.Draft": "Nháp",
+  "sheet.Submitted": "Đã gửi",
+  "sheet_[id].Submitted": "Đã gửi",
   "sheet.Sent": "Đã gửi",
   "sheet.Untitled": "Chưa đặt tên",
   "sheet.Delete": "Xoá",

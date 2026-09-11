@@ -38,11 +38,12 @@ export const DELIVERY_TEXT_TONE: Record<string, string> = {
   failed: "text-rose-700 dark:text-rose-400",
 }
 
-/** A pill, for standing beside a stage pill. */
-export const DELIVERY_PILL_TONE: Record<string, string> = {
-  awaiting_pickup: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
-  in_transit: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
-  delivered: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-  returned: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-  failed: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-}
+/* DELIVERY_PILL_TONE lived here and is GONE (2026-09-11). It dressed the carrier's status as
+   a capsule, which StageBadge had already argued against for the stage beside it — "a pill has
+   to carry meaning, and an order stage did, until every label in the app became one". Once
+   Delivery got its own column the two sat adjacent, and a capsule beside a bare word read as
+   two different kinds of fact. DELIVERY_TEXT_TONE below is what draws it now.
+
+   Deleted rather than left unused: a colour table nothing renders is the shape check-skins.mjs
+   was written about — PLATE_ACCENT sat at 2.10:1 for weeks with a comment claiming 6.53,
+   because a dead export cannot look wrong. */

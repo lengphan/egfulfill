@@ -162,7 +162,7 @@ export default function SheetsPage() {
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {s.status === "completed" ? tl("sheet", "Sent") : tl("sheet", "Draft")}
+                      {s.status === "completed" ? tl("sheet", "Submitted") : tl("sheet", "Draft")}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right">{s.rowCount}</td>
