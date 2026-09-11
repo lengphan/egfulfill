@@ -6,7 +6,7 @@ import {
   designsFor, lineArt, lineListing, lineTitle, lineFacts, nextLineStage, normalizeStage,
   STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork, stageDenialReason, isFactoryOrder, heldFromOf,
 } from "@/lib/orders"
-import { F,C, R } from "@/lib/theme"
+import { F, C, R, TYPE } from "@/lib/theme"
 import { ImagePeek } from "@/components/order-row"
 
 /**
@@ -38,23 +38,23 @@ function FileChip({ d }: { d: OrderDesign }) {
       onPress={() => url && Linking.openURL(url)}
       style={({ pressed }) => ({
         flexDirection: "row", alignItems: "center", gap: 10,
-        paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.control,
-        backgroundColor: pressed ? C.accent : "transparent",
+        paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.chip,
+        backgroundColor: pressed ? C.hueMist : "transparent",
       })}
     >
       {art && url ? (
         <Image source={{ uri: assetUrl(url) || undefined }}
-          style={{ width: 34, height: 34, borderRadius: R.badge, backgroundColor: C.accent }} />
+          style={{ width: 34, height: 34, borderRadius: R.chip, backgroundColor: C.hueMist }} />
       ) : (
         <View style={{
-          width: 34, height: 34, borderRadius: R.badge, backgroundColor: C.ink,
+          width: 34, height: 34, borderRadius: R.chip, backgroundColor: C.hueMist,
           alignItems: "center", justifyContent: "center",
         }}>
-          <Ionicons name="document-text" size={16} color={C.onInk} />
+          <Ionicons name="document-text" size={16} color={C.hueDeep} />
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontFamily: F.medium, color: C.fg }} numberOfLines={1}>
+        <Text style={{ fontSize: 14, fontFamily: F.medium, color: C.ink }} numberOfLines={1}>
           {kind}{side ? ` · ${side}` : ""}
           {d.name ? <Text style={{ fontFamily: F.body, color: C.muted }}>{`  ${d.name}`}</Text> : null}
         </Text>
@@ -215,7 +215,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
       /* A LINE ON THE PAGE. Each line was its own bordered, shadowed card inside the
          order's own card — a box in a box, and the reason nothing on this screen shared a
          left edge. A rule between lines separates them just as clearly. */
-      borderTopWidth: 1, borderTopColor: C.border,
+      borderTopWidth: 1, borderTopColor: C.hairline,
       paddingTop: 16, paddingBottom: 16,
     }}>
       <ImagePeek shots={pics} index={peek} onClose={() => setPeek(null)} />
@@ -237,11 +237,11 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
           {String(index + 1).padStart(2, "0")}
         </Text>
         {Number(item.qty ?? 1) > 1 && (
-          <Text style={{ fontSize: 12.5, fontFamily: F.semi, color: C.fg }}>×{Number(item.qty)}</Text>
+          <Text style={{ fontSize: 12.5, fontFamily: F.semi, color: C.ink }}>×{Number(item.qty)}</Text>
         )}
       </View>
 
-      <Text numberOfLines={2} style={{ fontSize: 15, fontFamily: F.medium, color: C.fg, marginTop: 3, letterSpacing: -0.2 }}>
+      <Text numberOfLines={2} style={{ fontSize: 15, fontFamily: F.medium, color: C.ink, marginTop: 3, letterSpacing: -0.2 }}>
         {lineTitle(item)}
       </Text>
 
@@ -254,17 +254,17 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
       {(item.blank || facts.length > 0) && (
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 }}>
           {item.blank ? (
-            <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.semi, color: C.fg }}>{item.blank}</Text>
+            <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.semi, color: C.ink }}>{item.blank}</Text>
           ) : null}
           {facts.map((f, i) => {
             const method = i === facts.length - 1 && !!String(item.print_type || "").trim()
             return (
               <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                {(i > 0 || item.blank) && <Text style={{ fontSize: 12, color: C.muted, opacity: 0.6 }}>·</Text>}
+                {(i > 0 || item.blank) && <Text style={{ ...TYPE.small, color: C.ink40 }}>·</Text>}
                 <Text style={{
                   fontSize: 12.5,
                   fontFamily: method ? F.semi : F.body,
-                  color: method ? C.primary : C.muted,
+                  color: method ? C.ink : C.muted,
                   letterSpacing: method ? 0.3 : 0,
                 }}>{f}</Text>
               </View>
@@ -277,7 +277,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
           is — and it carries a print-method suffix the blank does not, so it is deliberately
           not the same string as the line above. */}
       {item.sku ? (
-        <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: F.body, color: C.muted, opacity: 0.8, marginTop: 3 }}>
+        <Text numberOfLines={1} style={{ ...TYPE.small, fontFamily: F.body, color: C.muted, marginTop: 3 }}>
           {item.sku}
         </Text>
       ) : null}
@@ -300,7 +300,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
                 style={{
                   width: pics.length === 1 ? 200 : 168,
                   height: pics.length === 1 ? 200 : 168,
-                  borderRadius: R.control, backgroundColor: C.accent,
+                  borderRadius: R.chip, backgroundColor: C.hueMist,
                 }}
                 resizeMode="cover"
               />
@@ -317,22 +317,22 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
               disabled={stitchBusy || !!stitchWhy}
               onPress={renderStitch}
               style={({ pressed }) => ({
-                width: 168, height: 168, borderRadius: R.control,
+                width: 168, height: 168, borderRadius: R.chip,
                 // The image well the pictures beside it sit on, not white — a white tile among
                 // warm wells is the stuck-on look the theme note warns about.
-                borderWidth: 1, borderColor: C.border, backgroundColor: C.accent,
+                borderWidth: 1, borderColor: C.hairline, backgroundColor: C.hueMist,
                 alignItems: "center", justifyContent: "center", paddingHorizontal: 14,
                 opacity: pressed ? 0.75 : 1,
               })}
             >
               {stitchBusy ? (
-                <ActivityIndicator color={C.primary} />
+                <ActivityIndicator color={C.ink} />
               ) : stitchWhy ? (
                 <Text style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, textAlign: "center" }}>{stitchWhy}</Text>
               ) : (
                 <>
                   <Ionicons name="git-network-outline" size={22} color={C.muted} />
-                  <Text style={{ fontSize: 13.5, fontFamily: F.semi, color: C.fg, marginTop: 8 }}>Stitch view</Text>
+                  <Text style={{ fontSize: 13.5, fontFamily: F.semi, color: C.ink, marginTop: 8 }}>Stitch view</Text>
                   {/* Said out loud: the first render is slow and metered and every one after
                       is free, which is the difference between "this is broken" and "of
                       course, it is rendering". */}
@@ -373,15 +373,15 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
           disabled={busy}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            marginTop: 12, height: 44, borderRadius: R.control,
-            backgroundColor: to === "working" ? C.brand : C.ink,
+            marginTop: 12, height: 44, borderRadius: R.chip,
+            backgroundColor: to === "working" ? C.hueDeep : C.hueMist,
             opacity: pressed || busy ? 0.7 : 1,
           })}
         >
           {/* No glyph. "Start Item" needs no picture of starting, and arrow-forward was the
               second arrow on a card that already had one. */}
-          {busy && <ActivityIndicator color={C.onInk} />}
-          <Text style={{ fontSize: 15, fontFamily: F.semi, color: to === "working" ? C.onBrand : C.onInk, letterSpacing: -0.1 }}>
+          {busy && <ActivityIndicator color={to === "working" ? "#FFFFFF" : C.hueDeep} />}
+          <Text style={{ fontSize: 15, fontFamily: F.semi, color: to === "working" ? "#FFFFFF" : C.hueDeep, letterSpacing: -0.1 }}>
             {stageActionLine(to)}
           </Text>
         </Pressable>

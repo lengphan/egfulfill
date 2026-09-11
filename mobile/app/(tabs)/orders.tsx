@@ -5,7 +5,7 @@ import { router, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
 import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB, canSetStage, isFactoryOrder, heldFromOf } from "@/lib/orders"
-import { TAB_BAR,F,C, R, CARD_INK } from "@/lib/theme"
+import { TAB_BAR, F, C, R, S, TYPE, CARD, LIFT } from "@/lib/theme"
 import { OrderRow } from "@/components/order-row"
 import { SkeletonRows, EmptyState, GUTTER } from "@/components/kit"
 
@@ -270,21 +270,21 @@ export default function Orders() {
       : `Move ${n} on`
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: C.canvas, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: GUTTER, paddingBottom: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
           {/* The one DISPLAY moment on the screen — a weight and a size, not a second
               alphabet. It used to be Playfair, on the argument that a high-contrast serif
               earns its place at 34pt; the face is dropped on both front-ends now, so what
               makes this the title is that it is 32pt bold with the tracking pulled in. */}
-          <Text style={{ fontSize: 32, fontFamily: F.display, color: C.fg, marginTop: 6, letterSpacing: -0.6 }}>Orders</Text>
+          <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.ink, marginTop: 6, letterSpacing: -0.6 }}>Orders</Text>
           {staff && orders !== null && (
             <Pressable
               onPress={() => (selecting ? clearSelection() : setSelecting(true))}
               hitSlop={10}
               style={{ paddingVertical: 6, paddingHorizontal: 4 }}
             >
-              <Text style={{ fontSize: 14.5, fontFamily: F.semi, color: C.primary }}>
+              <Text style={{ fontSize: 14.5, fontFamily: F.semi, color: C.ink }}>
                 {selecting ? "Done" : "Select"}
               </Text>
             </Pressable>
@@ -293,8 +293,8 @@ export default function Orders() {
 
         <View style={{
           flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12,
-          height: 44, borderRadius: R.control, paddingHorizontal: 12,
-          backgroundColor: C.card, borderWidth: 1, borderColor: C.edge,
+          height: 44, borderRadius: R.chip, paddingHorizontal: 12,
+          backgroundColor: C.surface, borderWidth: 1, borderColor: C.edge,
         }}>
           <Ionicons name="search" size={17} color={C.muted} />
           <TextInput
@@ -304,7 +304,7 @@ export default function Orders() {
             placeholderTextColor={C.muted}
             autoCapitalize="none"
             autoCorrect={false}
-            style={{ flex: 1, color: C.fg, fontSize: 15 }}
+            style={{ flex: 1, color: C.ink, fontSize: 15 }}
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch("")} hitSlop={8}>
@@ -344,14 +344,14 @@ export default function Orders() {
                 style={{ paddingBottom: 7 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 15.5, fontFamily: on ? F.semi : F.body, color: on ? C.fg : C.muted }}>{f}</Text>
+                  <Text style={{ fontSize: 15.5, fontFamily: on ? F.semi : F.body, color: on ? C.ink : C.muted }}>{f}</Text>
                   <Text style={{ fontSize: 13, fontFamily: F.medium, color: hot ? C.alert : C.muted, opacity: on ? 1 : 0.75 }}>
                     {orders === null ? "" : n}
                   </Text>
                 </View>
                 <View style={{
                   position: "absolute", left: 0, right: 0, bottom: 0, height: 2,
-                  backgroundColor: on ? C.fg : "transparent",
+                  backgroundColor: on ? C.ink : "transparent",
                 }} />
               </Pressable>
             )
@@ -372,12 +372,12 @@ export default function Orders() {
                 style={{ paddingBottom: 7 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 15.5, fontFamily: on ? F.semi : F.body, color: on ? C.fg : C.muted }}>{label}</Text>
+                  <Text style={{ fontSize: 15.5, fontFamily: on ? F.semi : F.body, color: on ? C.ink : C.muted }}>{label}</Text>
                   <Text style={{ fontSize: 13, fontFamily: F.medium, color: C.muted, opacity: on ? 1 : 0.75 }}>{n}</Text>
                 </View>
                 <View style={{
                   position: "absolute", left: 0, right: 0, bottom: 0, height: 2,
-                  backgroundColor: on ? C.fg : "transparent",
+                  backgroundColor: on ? C.ink : "transparent",
                 }} />
               </Pressable>
             )
@@ -403,7 +403,7 @@ export default function Orders() {
               paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 8,
               /* OPAQUE, because it is sticky — rows sliding under a transparent header is
                  the classic version of this control looking broken. */
-              backgroundColor: C.bg,
+              backgroundColor: C.canvas,
             }}>
               <View style={{
                 flexDirection: "row", alignItems: "center", gap: 8,
@@ -412,27 +412,27 @@ export default function Orders() {
                    reads as an object rather than a coloured word — and alert stays on the
                    count, where it is reporting a number of orders rather than tinting a
                    whole band of the screen. */
-                backgroundColor: section.urgent ? C.ink : "transparent",
-                borderRadius: R.control,
+                backgroundColor: section.urgent ? C.alertTint : "transparent",
+                borderRadius: R.chip,
                 paddingHorizontal: section.urgent ? 10 : 0,
                 paddingVertical: section.urgent ? 6 : 0,
               }}>
                 <Text style={{
                   fontSize: 12.5, fontFamily: F.semi, letterSpacing: 1.2,
-                  color: section.urgent ? C.onInk : C.muted,
+                  color: section.urgent ? C.alert : C.muted,
                 }}>
                   {section.title.toUpperCase()}
                 </Text>
                 <Text style={{
                   fontSize: 12.5, fontFamily: F.semi,
-                  color: section.urgent ? C.lit : C.muted,
+                  color: section.urgent ? C.alert : C.muted,
                 }}>
                   {section.data.length}
                 </Text>
               </View>
             </View>
           )}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.ink} />}
           /* NO horizontal padding here. The row owns it (18, the same 18 the title, the
              search field and the filters use), so content lines up down the whole screen and
              the hairline runs edge to edge the way a printed rule does. Padding in BOTH
@@ -460,7 +460,7 @@ export default function Orders() {
              by its own bottom border. Inset past the thumbnails, the way a printed list
              indents its rule past the picture column. */
           ItemSeparatorComponent={() => (
-            <View style={{ height: 1, backgroundColor: C.border, marginLeft: 74, marginRight: GUTTER }} />
+            <View style={{ height: 1, backgroundColor: C.hairline, marginLeft: 74, marginRight: GUTTER }} />
           )}
           renderItem={({ item }) => (
             <OrderRow
@@ -489,13 +489,13 @@ export default function Orders() {
         <View style={{
           position: "absolute", left: 14, right: 14, bottom: insets.bottom + TAB_BAR.clearance - 4,
           flexDirection: "row", alignItems: "center", gap: 12,
-          ...CARD_INK, padding: 12,
+          ...CARD, ...LIFT, padding: 12,
         }}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onInk }}>
+            <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.ink }}>
               {picked.length} selected
             </Text>
-            <Text style={{ fontSize: 12, color: C.onInk, opacity: 0.6, marginTop: 1 }}>
+            <Text style={{ ...TYPE.small, fontFamily: F.body, color: C.muted, marginTop: 1 }}>
               {movable.length === picked.length
                 ? "Long-press a row to add more"
                 : `${picked.length - movable.length} can’t move from where they are`}
@@ -506,20 +506,20 @@ export default function Orders() {
             disabled={moving || !movable.length}
             style={({ pressed }) => ({
               flexDirection: "row", alignItems: "center", gap: 8,
-              paddingHorizontal: 16, height: 44, borderRadius: R.control,
+              paddingHorizontal: 16, height: 44, borderRadius: R.chip,
               /* THE LIT THING, and this bar is the reason the token is not chrome: it
                  appears when a selection exists and leaves when it does not, so it marks
                  something rather than decorating the app. `pop` used to fill it, which the
                  palette now forbids on the block — see lib/theme.ts. Disabled is the
                  block’s own state step, not a hand-typed grey. */
-              backgroundColor: movable.length ? C.lit : C.inkAccent,
+              backgroundColor: movable.length ? C.hueDeep : C.hueMist,
               opacity: pressed || moving ? 0.7 : 1,
             })}
           >
             {moving
-              ? <ActivityIndicator color={C.onLit} />
-              : <Ionicons name="arrow-forward" size={16} color={movable.length ? C.onLit : C.onInk} />}
-            <Text style={{ fontSize: 15, fontFamily: F.bold, color: movable.length ? C.onLit : C.onInk }}>
+              ? <ActivityIndicator color="#FFFFFF" />
+              : <Ionicons name="arrow-forward" size={16} color={movable.length ? "#FFFFFF" : C.muted} />}
+            <Text style={{ fontSize: 15, fontFamily: F.bold, color: movable.length ? "#FFFFFF" : C.muted }}>
               {batchLabel}
             </Text>
           </Pressable>

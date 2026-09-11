@@ -9,14 +9,9 @@ import * as Notifications from "expo-notifications"
 import { router } from "expo-router"
 import { routeForHref } from "@/lib/push"
 import {
-  Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
-} from "@expo-google-fonts/inter"
-/* THE BRAND'S DISPLAY FACE, inherited rather than chosen. The web has set every poster
-   moment in Anton since the ploy homepage landed; mobile shipped Inter-only and so the two
-   halves of one product had different voices in the place a seller looks first. This is not
-   the "one face" rule being broken — that rule is about BODY type, and it stands: Anton is
-   allowed nowhere near a sentence. It is a display face drawn for capitals. */
-import { Anton_400Regular } from "@expo-google-fonts/anton"
+  PlusJakartaSans_400Regular, PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold,
+} from "@expo-google-fonts/plus-jakarta-sans"
 import { C } from "@/lib/theme"
 
 /**
@@ -24,23 +19,22 @@ import { C } from "@/lib/theme"
  *
  * Not a light one, not a wrong one — none. There was no useFonts call and assets/fonts was
  * empty, so every screen rendered in the OS default at weight 800, which is precisely what
- * "looks AI-generated" is: system sans, extra-bold, on rounded cards.
+ * "looks AI-generated" is: system sans, extra-bold, on rounded cards. That is the failure
+ * this call exists to prevent, and it is why `F` in lib/theme.ts is the only legal source of
+ * a fontFamily anywhere in the app.
  *
- * ONE FACE NOW. It shipped as a PAIR — Playfair Display for titles, Inter for the rest,
- * matching the web at the time. The web has since resolved both display tokens to the body
- * stack, and this did not follow: three Playfair weights were still being downloaded and
- * still setting every screen title, so the two halves of one product had different
- * letterforms in the place a seller looks first.
- *
- * Dropping them also drops three font files from the bundle and three from the boot path,
- * which is the splash this file holds open.
+ * ONE FACE: PLUS JAKARTA SANS, four weights. It has been three things before this — a
+ * Playfair/Inter pair, then Inter alone, then Inter with Anton for display — and each change
+ * was made to follow the WEB. This one is not: the phone has its own direction now
+ * (lib/theme.ts), and Anton and Inter are gone from it entirely. A title here is a heavier
+ * line, never a second alphabet.
  */
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
 export default function RootLayout() {
   const [ready] = useFonts({
-    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
-    Anton_400Regular,
+    PlusJakartaSans_400Regular, PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold,
   })
   // Hold the splash until the face is in. A frame of system font followed by a reflow into
   // Inter is worse than waiting — it is the flash this app was just fixed for elsewhere.
@@ -83,7 +77,7 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       {/* Native stack: real platform transitions and the iOS edge-swipe back, which is the
           single biggest thing a web view cannot give you. */}
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.canvas } }} />
     </SafeAreaProvider>
     </GestureHandlerRootView>
   )

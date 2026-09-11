@@ -68,17 +68,17 @@ export default function ChatIndex() {
      app draws its own back row — see app/order/[id].tsx, which this matches deliberately
      rather than turning the native header on for one route and having two idioms. */
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: C.canvas, paddingTop: insets.top }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10 }}>
-        <Text style={{ fontSize: 30, fontFamily: F.display, color: C.fg }}>Chat</Text>
+        <Text style={{ fontSize: 30, fontFamily: F.bold, color: C.ink }}>Chat</Text>
       </View>
       <ScrollView
-        style={{ flex: 1, backgroundColor: C.bg }}
+        style={{ flex: 1, backgroundColor: C.canvas }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: TAB_BAR.clearance }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.ink} />}
       >
         {threads === null && !err ? (
-          <View style={{ paddingVertical: 60, alignItems: "center" }}><ActivityIndicator color={C.primary} /></View>
+          <View style={{ paddingVertical: 60, alignItems: "center" }}><ActivityIndicator color={C.ink} /></View>
         ) : err ? (
           <Text style={{ fontSize: 14, fontFamily: F.body, color: C.alert, marginTop: 16 }}>{err}</Text>
         ) : isStaff && threads ? (
@@ -91,13 +91,13 @@ export default function ChatIndex() {
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                 <View style={{
-                  width: 40, height: 40, borderRadius: R.pill, backgroundColor: C.ink,
+                  width: 40, height: 40, borderRadius: R.pill, backgroundColor: C.hueDeep,
                   alignItems: "center", justifyContent: "center",
                 }}>
-                  <Ionicons name="people" size={19} color={C.onInk} />
+                  <Ionicons name="people" size={19} color={"#FFFFFF"} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontFamily: F.semi, color: C.fg }}>Team</Text>
+                  <Text style={{ fontSize: 16, fontFamily: F.semi, color: C.ink }}>Team</Text>
                   <Text style={{ fontSize: 13, fontFamily: F.body, color: C.muted, marginTop: 1 }}>
                     Everyone on the floor
                   </Text>
@@ -119,12 +119,12 @@ export default function ChatIndex() {
                   key={t.order_id}
                   onPress={() => router.push({ pathname: "/chat/[id]", params: { id: t.order_id, title: t.seller_name || "Seller" } })}
                   style={({ pressed }) => ({
-                    borderBottomWidth: 1, borderBottomColor: C.border, paddingVertical: 14,
+                    borderBottomWidth: 1, borderBottomColor: C.hairline, paddingVertical: 14,
                     opacity: pressed ? 0.7 : 1,
                   })}
                 >
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <Text style={{ flex: 1, fontSize: 15.5, fontFamily: F.semi, color: C.fg }} numberOfLines={1}>
+                    <Text style={{ flex: 1, fontSize: 15.5, fontFamily: F.semi, color: C.ink }} numberOfLines={1}>
                       {t.seller_name || "Seller"}
                     </Text>
                     {/* UNANSWERED, not unread. The server counts messages since our last HUMAN
@@ -133,9 +133,9 @@ export default function ChatIndex() {
                     {!!t.unanswered && t.unanswered > 0 && (
                       <View style={{
                         minWidth: 20, height: 20, borderRadius: R.pill, paddingHorizontal: 6,
-                        backgroundColor: C.pop, alignItems: "center", justifyContent: "center",
+                        backgroundColor: C.hueDeep, alignItems: "center", justifyContent: "center",
                       }}>
-                        <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.onPop }}>{t.unanswered}</Text>
+                        <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: "#FFFFFF" }}>{t.unanswered}</Text>
                       </View>
                     )}
                     <Text style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted }}>{when(t.last_at)}</Text>

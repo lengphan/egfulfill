@@ -100,7 +100,7 @@ export function ConfirmShipment({ orderId, role, by, onDone }: {
       disabled={!!busy}
       style={({ pressed }) => ({
         ...HERO_BUTTON,
-        marginTop: 8, backgroundColor: C.ink,
+        marginTop: 8, backgroundColor: C.hueDeep,
         opacity: pressed || busy ? 0.8 : 1,
       })}
     >
@@ -116,9 +116,9 @@ export function ConfirmShipment({ orderId, role, by, onDone }: {
       {/* Same shape as Start Order — see HERO_BUTTON. These sit within a screen of each
           other and are the same kind of control, so they are the same size. */}
       {busy
-        ? <ActivityIndicator color={C.onInk} />
-        : <Ionicons name="camera" size={HERO_GLYPH} color={C.onInk} />}
-      <Text style={{ ...HERO_LABEL, color: C.onInk }}>{label}</Text>
+        ? <ActivityIndicator color={"#FFFFFF"} />
+        : <Ionicons name="camera" size={HERO_GLYPH} color={"#FFFFFF"} />}
+      <Text style={{ ...HERO_LABEL, color: "#FFFFFF" }}>{label}</Text>
     </Pressable>
   )
 }

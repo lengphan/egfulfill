@@ -80,7 +80,7 @@ function AmountScrub({ value, min, max, step, onChange }: {
        decoration — shape says kind here as everywhere else, and this one is a field. */
     <View
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
-      style={{ marginTop: 12, height: 46, borderRadius: R.control, backgroundColor: C.accent, overflow: "hidden" }}
+      style={{ marginTop: 12, height: 46, borderRadius: R.chip, backgroundColor: C.hueMist, overflow: "hidden" }}
     >
       <ScrollView
         ref={ref}
@@ -115,7 +115,7 @@ function AmountScrub({ value, min, max, step, onChange }: {
           value off a moving pointer, which is what makes a slider hard to land precisely. */}
       <View pointerEvents="none" style={{
         position: "absolute", left: "50%", marginLeft: -1.5, top: 7, bottom: 7,
-        width: 3, borderRadius: 2, backgroundColor: C.ink,
+        width: 3, borderRadius: 2, backgroundColor: C.hueDeep,
       }} />
     </View>
   )
@@ -328,53 +328,53 @@ export default function TopUp() {
   }, [payment])
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: C.canvas, paddingTop: insets.top }}>
       <Pressable
         onPress={() => router.back()}
         style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 16, paddingVertical: 10 }}
         hitSlop={8}
       >
-        <Ionicons name="chevron-back" size={22} color={C.primary} />
-        <Text style={{ color: C.primary, fontSize: 16 }}>Wallet</Text>
+        <Ionicons name="chevron-back" size={22} color={C.ink} />
+        <Text style={{ color: C.ink, fontSize: 16 }}>Wallet</Text>
       </Pressable>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 32 }}>
-        <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg }}>Add funds</Text>
+        <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.ink }}>Add funds</Text>
 
         {phase === "paid" ? (
           <View style={{ alignItems: "center", marginTop: 48 }}>
             <Ionicons name="checkmark-circle" size={64} color={C.success} />
-            <Text style={{ fontSize: 22, fontFamily: F.bold, color: C.fg, marginTop: 14 }}>Payment received</Text>
+            <Text style={{ fontSize: 22, fontFamily: F.bold, color: C.ink, marginTop: 14 }}>Payment received</Text>
             <Text style={{ fontSize: 15, color: C.muted, marginTop: 6, textAlign: "center" }}>
               {payment?.amountUsd ? `${usd0(payment.amountUsd)} is on its way to your balance.` : "Your balance is being updated."}
             </Text>
             <Pressable
               onPress={() => router.back()}
               style={({ pressed }) => ({
-                marginTop: 28, height: 52, borderRadius: R.control, paddingHorizontal: 32,
-                alignItems: "center", justifyContent: "center", backgroundColor: C.ink,
+                marginTop: 28, height: 52, borderRadius: R.chip, paddingHorizontal: 32,
+                alignItems: "center", justifyContent: "center", backgroundColor: C.hueDeep,
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 16 }}>Back to wallet</Text>
+              <Text style={{ color: "#FFFFFF", fontFamily: F.bold, fontSize: 16 }}>Back to wallet</Text>
             </Pressable>
           </View>
         ) : phase === "qr" && payment ? (
           <View style={{ alignItems: "center", marginTop: 20 }}>
-            <View style={{ padding: 16, borderRadius: R.card, backgroundColor: C.card, borderWidth: 1, borderColor: C.border }}>
+            <View style={{ padding: 16, borderRadius: R.card, backgroundColor: C.surface, borderWidth: 1, borderColor: C.hairline }}>
               {payment.qrCode
                 ? <QRCode value={payment.qrCode} size={qrSize} getRef={(c) => { qrRef.current = c }} />
                 : <Text style={{ color: C.muted }}>No scannable code</Text>}
             </View>
 
-            <Text style={{ fontSize: 26, fontFamily: F.bold, color: C.fg, marginTop: 18 }}>
+            <Text style={{ fontSize: 26, fontFamily: F.bold, color: C.ink, marginTop: 18 }}>
               {vnd0(payment.amount ?? vndAmt)}
             </Text>
             <Text style={{ fontSize: 14, color: C.muted, marginTop: 2 }}>
               {usd0(payment.amountUsd ?? usdAmt)}
             </Text>
 
-            <View style={{ alignSelf: "stretch", marginTop: 24, borderRadius: R.card, backgroundColor: C.accent, padding: 16 }}>
+            <View style={{ alignSelf: "stretch", marginTop: 24, borderRadius: R.card, backgroundColor: C.hueMist, padding: 16 }}>
               <Field label="Receiver" value={payment.name} />
               <Field label="Bank" value={payment.bankCode} />
               <Field label="Account" value={payment.vaAccount || payment.account} />
@@ -384,7 +384,7 @@ export default function TopUp() {
             </View>
 
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 20 }}>
-              <ActivityIndicator color={C.primary} />
+              <ActivityIndicator color={C.ink} />
               <Text style={{ fontSize: 14, color: C.muted }}>Waiting for your transfer…</Text>
             </View>
 
@@ -396,14 +396,14 @@ export default function TopUp() {
               disabled={saving || !payment.qrCode}
               style={({ pressed }) => ({
                 flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                marginTop: 20, height: 50, borderRadius: R.control, paddingHorizontal: 24,
+                marginTop: 20, height: 50, borderRadius: R.chip, paddingHorizontal: 24,
                 borderWidth: 1, borderColor: C.edge, opacity: pressed || saving ? 0.6 : 1,
               })}
             >
               {saving
-                ? <ActivityIndicator color={C.primary} />
-                : <Ionicons name="download-outline" size={18} color={C.fg} />}
-              <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg }}>Save QR image</Text>
+                ? <ActivityIndicator color={C.ink} />
+                : <Ionicons name="download-outline" size={18} color={C.ink} />}
+              <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.ink }}>Save QR image</Text>
             </Pressable>
 
             <Text style={{ fontSize: 13, color: C.muted, marginTop: 14, textAlign: "center", paddingHorizontal: 12 }}>
@@ -429,9 +429,9 @@ export default function TopUp() {
               * than being part of it.
               */}
             <View style={{
-              marginTop: 10, borderRadius: R.control, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 8,
+              marginTop: 10, borderRadius: R.chip, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 8,
               borderWidth: 1, borderColor: C.edge,
-              backgroundColor: C.card,
+              backgroundColor: C.surface,
             }}>
               <TextInput
                 value={amount}
@@ -439,7 +439,7 @@ export default function TopUp() {
                 keyboardType="decimal-pad"
                 placeholder="0"
                 placeholderTextColor={C.muted}
-                style={{ height: 52, padding: 0, color: C.fg, fontSize: 30, fontFamily: F.bold }}
+                style={{ height: 52, padding: 0, color: C.ink, fontSize: 30, fontFamily: F.bold }}
               />
               {/* Only once there is an amount to convert. "≈ 0 ₫" under a blank field is a
                   sum nobody asked for. */}
@@ -469,14 +469,14 @@ export default function TopUp() {
                     key={p}
                     onPress={() => { setAmount(String(p)); setErr(null) }}
                     style={({ pressed }) => ({
-                      paddingHorizontal: 16, height: 40, borderRadius: R.control, justifyContent: "center",
-                      backgroundColor: String(p) === amount ? C.ink : C.accent,
+                      paddingHorizontal: 16, height: 40, borderRadius: R.chip, justifyContent: "center",
+                      backgroundColor: String(p) === amount ? C.hueDeep : C.hueMist,
                       opacity: pressed ? 0.7 : 1,
                     })}
                   >
                     <Text style={{
                       fontSize: 15, fontFamily: F.semi,
-                      color: String(p) === amount ? C.onInk : C.fg,
+                      color: String(p) === amount ? "#FFFFFF" : C.ink,
                     }}>{usd0(p)}</Text>
                   </Pressable>
                 ))}
@@ -499,18 +499,18 @@ export default function TopUp() {
               onPress={start}
               disabled={busy || !cfg}
               style={({ pressed }) => ({
-                marginTop: 28, height: 54, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-                backgroundColor: C.ink, opacity: pressed || busy || !cfg ? 0.7 : 1,
+                marginTop: 28, height: 54, borderRadius: R.chip, alignItems: "center", justifyContent: "center",
+                backgroundColor: C.hueDeep, opacity: pressed || busy || !cfg ? 0.7 : 1,
               })}
             >
               {busy
-                ? <ActivityIndicator color={C.onInk} />
-                : <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 16 }}>Show payment QR</Text>}
+                ? <ActivityIndicator color={"#FFFFFF"} />
+                : <Text style={{ color: "#FFFFFF", fontFamily: F.bold, fontSize: 16 }}>Show payment QR</Text>}
             </Pressable>
 
             {!cfg && !err && (
               <View style={{ alignItems: "center", marginTop: 20 }}>
-                <ActivityIndicator color={C.primary} />
+                <ActivityIndicator color={C.ink} />
               </View>
             )}
 
@@ -545,11 +545,11 @@ export default function TopUp() {
                       <View
                         style={{
                           flexDirection: "row", alignItems: "center", gap: 12,
-                          paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border,
+                          paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.hairline,
                         }}
                       >
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.fg }}>
+                          <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.ink }}>
                             {e.paid ? "+" : ""}{usd0(e.usd)}
                           </Text>
                           <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
@@ -558,7 +558,7 @@ export default function TopUp() {
                           </Text>
                         </View>
                         <View style={{
-                          paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.badge,
+                          paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.chip,
                           backgroundColor: e.paid ? C.successTint : C.warnTint,
                         }}>
                           <Text style={{ fontSize: 12, fontFamily: F.bold, color: e.paid ? C.success : C.warn }}>
@@ -600,10 +600,10 @@ function Field({ label, value, last }: { label: string; value?: string | null; l
   return (
     <View style={{
       flexDirection: "row", justifyContent: "space-between", gap: 16, paddingVertical: 10,
-      borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border,
+      borderBottomWidth: last ? 0 : 1, borderBottomColor: C.hairline,
     }}>
       <Text style={{ fontSize: 14, color: C.muted }}>{label}</Text>
-      <Text selectable style={{ fontSize: 14, fontFamily: F.semi, color: C.fg, flexShrink: 1, textAlign: "right" }}>
+      <Text selectable style={{ fontSize: 14, fontFamily: F.semi, color: C.ink, flexShrink: 1, textAlign: "right" }}>
         {value || "—"}
       </Text>
     </View>

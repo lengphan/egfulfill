@@ -72,7 +72,7 @@ function RowMenu({ open, onClose, title, actions }: {
   const change = live.filter((a) => a.strong)
 
   const Block = ({ items }: { items: Exclude<Action, null>[] }) => (
-    <View style={{ backgroundColor: C.card, borderRadius: R.card, overflow: "hidden", marginTop: 10 }}>
+    <View style={{ backgroundColor: C.surface, borderRadius: R.card, overflow: "hidden", marginTop: 10 }}>
       {items.map((a, i) => (
         <Pressable
           key={a.label}
@@ -84,14 +84,14 @@ function RowMenu({ open, onClose, title, actions }: {
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", gap: 12,
             paddingHorizontal: 18, height: 60,
-            borderTopWidth: i === 0 ? 0 : 1, borderTopColor: C.border,
-            backgroundColor: pressed ? C.accent : "transparent",
+            borderTopWidth: i === 0 ? 0 : 1, borderTopColor: C.hairline,
+            backgroundColor: pressed ? C.hueMist : "transparent",
           })}
         >
-          <Text style={{ flex: 1, fontSize: 16.5, fontFamily: a.strong ? F.semi : F.body, color: C.fg }}>{a.label}</Text>
+          <Text style={{ flex: 1, fontSize: 16.5, fontFamily: a.strong ? F.semi : F.body, color: C.ink }}>{a.label}</Text>
           {/* Icon trailing, as Threads has it: the words are what you read down, and a
               column of glyphs on the left pushes every label away from the edge. */}
-          <Ionicons name={a.icon} size={21} color={a.strong ? C.fg : C.muted} />
+          <Ionicons name={a.icon} size={21} color={a.strong ? C.ink : C.muted} />
         </Pressable>
       ))}
     </View>
@@ -115,13 +115,13 @@ function RowMenu({ open, onClose, title, actions }: {
               // construction the white card replaces. White on the tinted page separates on
               // its own, and the border finishes it. The shadow that used to be here is the
               // one Workshop forbids at every level.
-              backgroundColor: C.card,
+              backgroundColor: C.surface,
               borderTopLeftRadius: R.card, borderTopRightRadius: R.card,
               paddingTop: 10, paddingBottom: 40, paddingHorizontal: 14,
-              borderTopWidth: 1, borderColor: C.border,
+              borderTopWidth: 1, borderColor: C.hairline,
             }}
           >
-            <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: R.pill, backgroundColor: C.border, marginBottom: 14 }} />
+            <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: R.pill, backgroundColor: C.hairline, marginBottom: 14 }} />
             <Text style={{ fontSize: 12, fontFamily: F.semi, color: C.muted, letterSpacing: 1.2, paddingHorizontal: 4 }}>
               {title.toUpperCase()}
             </Text>
@@ -253,11 +253,11 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
         /* Inset by 8 so the selected FILL is an object with corners, while the content
            still starts at the screen's 18pt gutter — the same line the header and the
            search field sit on. */
-        paddingVertical: 11, paddingHorizontal: 10, marginHorizontal: 8, borderRadius: R.control,
+        paddingVertical: 11, paddingHorizontal: 10, marginHorizontal: 8, borderRadius: R.chip,
         /* NO BORDER. Selection is a FILL, the way Apple Books does it in edit mode: nothing
            arrives at the edge, the row simply becomes a solid object. A rule between rows
            is drawn by the list, so a selected row is not also cut in half by one. */
-        backgroundColor: selected ? C.accent : pressed ? C.accent : "transparent",
+        backgroundColor: selected ? C.hueMist : pressed ? C.hueMist : "transparent",
       })}
     >
       {lead.length > 0 && (
@@ -267,9 +267,9 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
               <Image
                 source={{ uri: sh.uri }}
                 style={{
-                  width: 44, height: 44, borderRadius: R.control, backgroundColor: C.accent,
+                  width: 44, height: 44, borderRadius: R.chip, backgroundColor: C.hueMist,
                   marginLeft: i === 0 ? 0 : -14,
-                  borderWidth: i === 0 ? 0 : 2, borderColor: C.bg,
+                  borderWidth: i === 0 ? 0 : 2, borderColor: C.canvas,
                 }}
                 resizeMode="cover"
               />
@@ -277,18 +277,18 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
           ))}
           {rest > 0 && (
             <View style={{
-              width: 44, height: 44, borderRadius: R.control, marginLeft: -14,
-              borderWidth: 2, borderColor: C.bg, backgroundColor: C.primary,
+              width: 44, height: 44, borderRadius: R.chip, marginLeft: -14,
+              borderWidth: 2, borderColor: C.canvas, backgroundColor: C.ink,
               alignItems: "center", justifyContent: "center",
             }}>
-              <Text style={{ fontSize: 12, fontFamily: F.medium, color: C.onPrimary }}>+{rest}</Text>
+              <Text style={{ fontSize: 12, fontFamily: F.medium, color: "#FFFFFF" }}>+{rest}</Text>
             </View>
           )}
         </View>
       )}
 
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ fontSize: 14.5, fontFamily: F.displaySemi, color: C.fg, letterSpacing: -0.15 }}>
+        <Text numberOfLines={1} style={{ fontSize: 14.5, fontFamily: F.semi, color: C.ink, letterSpacing: -0.15 }}>
           {numOf(order)}
         </Text>
         {/* The buyer, and the size of the job — the two things that tell one row from the
@@ -306,10 +306,10 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
         <View style={{
           width: 20, height: 20, borderRadius: R.pill,
           alignItems: "center", justifyContent: "center",
-          backgroundColor: selected ? C.primary : "transparent",
+          backgroundColor: selected ? C.ink : "transparent",
           borderWidth: selected ? 0 : 1.5, borderColor: C.edge,
         }}>
-          {selected && <Ionicons name="checkmark" size={12} color={C.onPrimary} />}
+          {selected && <Ionicons name="checkmark" size={12} color={"#FFFFFF"} />}
         </View>
       ) : (
         <Pressable onPress={() => setMenu(true)} hitSlop={12}>
@@ -343,13 +343,13 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
         <Pressable
           onPress={onAdvance}
           style={{
-            width: 132, marginVertical: 2, marginRight: 8, borderRadius: R.control,
+            width: 132, marginVertical: 2, marginRight: 8, borderRadius: R.chip,
             alignItems: "center", justifyContent: "center", gap: 5,
-            backgroundColor: C.ink,
+            backgroundColor: C.hueDeep,
           }}
         >
-          <Ionicons name="arrow-forward" size={18} color={C.onInk} />
-          <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.semi, color: C.onInk }}>
+          <Ionicons name="arrow-forward" size={18} color={"#FFFFFF"} />
+          <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.semi, color: "#FFFFFF" }}>
             {advanceLabel}
           </Text>
         </Pressable>

@@ -84,9 +84,9 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
   }, [t, fee, who, onDone])
 
   return (
-    <View style={{ borderBottomWidth: 1, borderBottomColor: C.border, paddingVertical: 16 }}>
+    <View style={{ borderBottomWidth: 1, borderBottomColor: C.hairline, paddingVertical: 16 }}>
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
-        <Text style={{ fontSize: 20, fontFamily: F.semi, color: C.fg, letterSpacing: -0.3 }}>{MONEY(t.amount_usd)}</Text>
+        <Text style={{ fontSize: 20, fontFamily: F.semi, color: C.ink, letterSpacing: -0.3 }}>{MONEY(t.amount_usd)}</Text>
         <Text style={{ fontSize: 13, fontFamily: F.body, color: C.muted, flex: 1 }} numberOfLines={1}>
           {methodLabel(t.method)}
         </Text>
@@ -94,12 +94,12 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
             was the half that cannot be read: it needs the word to mean anything, while the
             word never needed it. Colour moves onto the lettering, which is where the status
             chips elsewhere in this app already put it. */}
-        <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: TONE[String(t.status)] ?? C.fg }}>
+        <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: TONE[String(t.status)] ?? C.ink }}>
           {WORD[String(t.status)] ?? t.status}
         </Text>
       </View>
 
-      <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: F.medium, color: C.fg, marginTop: 4 }}>{who}</Text>
+      <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: F.medium, color: C.ink, marginTop: 4 }}>{who}</Text>
       <Text style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, marginTop: 2 }}>
         {[when(t.created_at), t.ref ? `ref ${t.ref}` : null].filter(Boolean).join("  ·  ")}
       </Text>
@@ -121,15 +121,15 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
                 placeholder="0.00"
                 placeholderTextColor={C.muted}
                 style={{
-                  flex: 1, height: 38, borderRadius: R.control, paddingHorizontal: 10,
+                  flex: 1, height: 38, borderRadius: R.chip, paddingHorizontal: 10,
                   borderWidth: 1, borderColor: C.edge,
-                  backgroundColor: C.card, color: C.fg, fontFamily: F.medium, fontSize: 15,
+                  backgroundColor: C.surface, color: C.ink, fontFamily: F.medium, fontSize: 15,
                 }}
               />
             </View>
           ) : (
             <Pressable onPress={() => setFeeOpen(true)} hitSlop={8} style={{ marginTop: 10 }}>
-              <Text style={{ fontSize: 13, fontFamily: F.medium, color: C.primary }}>Add a transfer fee</Text>
+              <Text style={{ fontSize: 13, fontFamily: F.medium, color: C.ink }}>Add a transfer fee</Text>
             </Pressable>
           )}
 
@@ -138,9 +138,9 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
               onPress={() => act("no")}
               disabled={!!busy}
               style={({ pressed }) => ({
-                flex: 1, height: 44, borderRadius: R.control, flexDirection: "row", gap: 8,
+                flex: 1, height: 44, borderRadius: R.chip, flexDirection: "row", gap: 8,
                 alignItems: "center", justifyContent: "center",
-                borderWidth: 1, borderColor: C.border,
+                borderWidth: 1, borderColor: C.hairline,
                 opacity: pressed || busy ? 0.6 : 1,
               })}
             >
@@ -151,14 +151,14 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
               onPress={() => act("ok")}
               disabled={!!busy}
               style={({ pressed }) => ({
-                flex: 1, height: 44, borderRadius: R.control, flexDirection: "row", gap: 8,
+                flex: 1, height: 44, borderRadius: R.chip, flexDirection: "row", gap: 8,
                 alignItems: "center", justifyContent: "center",
-                backgroundColor: C.ink,
+                backgroundColor: C.hueDeep,
                 opacity: pressed || busy ? 0.7 : 1,
               })}
             >
-              {busy === "ok" && <ActivityIndicator color={C.onInk} />}
-              <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.onInk }}>Confirm</Text>
+              {busy === "ok" && <ActivityIndicator color={"#FFFFFF"} />}
+              <Text style={{ fontSize: 15, fontFamily: F.semi, color: "#FFFFFF" }}>Confirm</Text>
             </Pressable>
           </View>
         </>
@@ -185,10 +185,10 @@ export function TopupApprovals({ bottomInset }: { bottomInset: number }) {
   return (
     <ScrollView
       contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: bottomInset + TAB_BAR.clearance }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.primary} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.ink} />}
     >
       {rows === null && !err ? (
-        <View style={{ paddingVertical: 60, alignItems: "center" }}><ActivityIndicator color={C.primary} /></View>
+        <View style={{ paddingVertical: 60, alignItems: "center" }}><ActivityIndicator color={C.ink} /></View>
       ) : err ? (
         <Text style={{ fontSize: 14, fontFamily: F.body, color: C.alert, marginTop: 16 }}>{err}</Text>
       ) : (

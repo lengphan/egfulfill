@@ -145,9 +145,9 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
         onChangeText={(t) => setForm((f) => ({ ...f, [k]: t }))}
         autoCapitalize={k === "state" || k === "country" ? "characters" : "words"}
         style={{
-          height: 44, borderRadius: R.control, paddingHorizontal: 12,
-          borderWidth: 1, borderColor: C.edge, backgroundColor: C.card,
-          color: C.fg, fontSize: 15,
+          height: 44, borderRadius: R.chip, paddingHorizontal: 12,
+          borderWidth: 1, borderColor: C.edge, backgroundColor: C.surface,
+          color: C.ink, fontSize: 15,
         }}
       />
     </View>
@@ -157,15 +157,15 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
     <View style={{ gap: 12 }}>
       {/* DELIVER TO, above the price. Reviewed, then paid for — never the other way. */}
       <View style={{
-        borderRadius: R.card, borderWidth: 1, borderColor: C.border,
-        backgroundColor: C.card, padding: 14, gap: 10,
+        borderRadius: R.card, borderWidth: 1, borderColor: C.hairline,
+        backgroundColor: C.surface, padding: 14, gap: 10,
       }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={{ flex: 1, fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 1 }}>
             DELIVER TO
           </Text>
           <Pressable onPress={() => setEdit((v) => !v)} hitSlop={8}>
-            <Text style={{ fontSize: 13, fontFamily: F.semi, color: C.primary }}>
+            <Text style={{ fontSize: 13, fontFamily: F.semi, color: C.ink }}>
               {edit ? "Done" : "Edit"}
             </Text>
           </Pressable>
@@ -193,7 +193,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
         ) : (
           <View>
             {addressLines({ address: form }).map((l, i) => (
-              <Text key={i} style={{ fontSize: 15, color: i === 0 ? C.fg : C.muted, fontWeight: i === 0 ? "700" : "400" }}>
+              <Text key={i} style={{ fontSize: 15, color: i === 0 ? C.ink : C.muted, fontWeight: i === 0 ? "700" : "400" }}>
                 {l}
               </Text>
             ))}
@@ -207,12 +207,12 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
           disabled={busy === "rates"}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            height: 52, borderRadius: R.control, backgroundColor: C.ink,
+            height: 52, borderRadius: R.chip, backgroundColor: C.hueDeep,
             opacity: pressed || busy === "rates" ? 0.8 : 1,
           })}
         >
-          {busy === "rates" && <ActivityIndicator color={C.onInk} />}
-          <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onInk }}>
+          {busy === "rates" && <ActivityIndicator color={"#FFFFFF"} />}
+          <Text style={{ fontSize: 16, fontFamily: F.bold, color: "#FFFFFF" }}>
             {busy === "rates" ? "Getting rates…" : "Buy shipping label"}
           </Text>
         </Pressable>
@@ -228,13 +228,13 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
               style={({ pressed }) => ({
                 flexDirection: "row", alignItems: "center", gap: 12,
                 paddingVertical: 12, paddingHorizontal: 14,
-                borderRadius: R.control, borderWidth: 1, borderColor: C.border,
-                backgroundColor: pressed ? C.accent : C.card,
+                borderRadius: R.chip, borderWidth: 1, borderColor: C.hairline,
+                backgroundColor: pressed ? C.hueMist : C.surface,
                 opacity: busy && busy !== r.token ? 0.5 : 1,
               })}
             >
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }} numberOfLines={1}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.ink }} numberOfLines={1}>
                   {r.carrier} {r.service}
                 </Text>
                 {r.days != null && (
@@ -244,8 +244,8 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
                 )}
               </View>
               {busy === r.token
-                ? <ActivityIndicator color={C.primary} />
-                : <Text style={{ fontSize: 17, fontFamily: F.bold, color: C.fg }}>{money(r.amount)}</Text>}
+                ? <ActivityIndicator color={C.ink} />
+                : <Text style={{ fontSize: 17, fontFamily: F.bold, color: C.ink }}>{money(r.amount)}</Text>}
             </Pressable>
           ))}
           <Pressable onPress={() => { setRates(null); setErr(null) }} disabled={!!busy}>

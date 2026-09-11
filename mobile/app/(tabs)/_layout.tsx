@@ -1,176 +1,96 @@
+/**
+ * THE TAB BAR — a floating white pill, four places, and nothing else in it.
+ *
+ * FOUR TABS, AND THAT IS THE CEILING. Five labels in a 375pt-wide bar leaves ~66pt each,
+ * which is not enough for a word plus its target, so the fifth thing always becomes a glyph
+ * nobody can name. Settings, Chat, Top-up and an order are all reached by PUSHING a screen —
+ * from the Home header, from a row, from a notification — because they are things you go and
+ * come back from, not places you live.
+ *
+ * "HOME", NOT "DASHBOARD". Dashboard is nine characters and the longest word in the bar; at
+ * 13pt it either wraps, ellipsises or forces every other label narrower to accommodate it.
+ * It is also the wrong word: this is the screen you land on, not a console.
+ *
+ * WHITE, ON THE PAGE'S OWN PALETTE. The bar this replaces was a dark slate lozenge carrying
+ * a pale periwinkle pill — the one dark object in a light app, which made the chrome the
+ * loudest thing on every screen. Here the live tab is the WORD going heavy and inking up,
+ * with a lime dot under it. Lime is 1.19:1 on paper and therefore cannot be a label; as a
+ * 6pt dot beneath one it is exactly what it should be — a mark you recognise, not read.
+ */
 import { Tabs } from "expo-router"
 import { Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
-import { F, C, R, TAB_BAR } from "@/lib/theme"
+import { F, C, R, S, TYPE, TAB_BAR, LIFT } from "@/lib/theme"
 import { ChatPeek } from "@/components/chat-peek"
 
-/**
- * THE UNLIT TABS, on the block.
- *
- * The bar was WHITE, and the unlit glyph was ink at 60% on it — 5.25:1, a real reading. That
- * construction is gone with the bar itself (see tabBarStyle), so this is re-measured against
- * slate rather than carried over: #DDE0E3 at 70% composites to #AAADB1, which is 5.32:1 on
- * the block. The live tab is ink on periwinkle at 11.22:1 — a 2.1x jump, plus a fill, plus a
- * weight change. Three channels, none of them hue, so it survives greyscale and a colourblind
- * operator both.
- */
-const INACTIVE = "rgba(221,224,227,0.7)"
-
-/** Keyed by the FILLED glyph name, which is what the focused branch passes. One word each:
- *  a second word does not fit the slot and a bar is not where you explain anything. */
-const LABEL = { grid: "Dashboard", cube: "Orders", scan: "Scan", wallet: "Wallet" } as const
-
-/**
- * The three things worth opening a phone for: what needs doing, a specific order, and the
- * money. Deliberately not a mirror of the web nav — a tab bar with nine entries is a menu,
- * and the point of the phone app is that it is quick.
- *
- * FOUR SLOTS, NOT FIVE — and Settings is the one that left.
- *
- * Five items on a 358pt bar is ~71pt each, and 71pt has to hold a glyph, a word and the
- * space around both. That is why the glyph was 21pt when Apple's tab icons are ~25 and
- * Material's are 24: it was sized to fit the crowd, not to be read across a workshop. Four
- * slots are ~89pt, which pays for a 24pt glyph and an 11pt word with room left.
- *
- * Settings did not vanish — it is a control on the Dashboard header, which is the screen it
- * belongs to: it answers "is this phone working properly", and that is a thing you check,
- * not a place you go. The ROUTE is untouched, so `/(tabs)/settings` still resolves and the
- * push notification map still lands on it; `href: null` only takes it out of the bar.
- */
-
-/**
- * THE BAR IS THE DARK BLOCK, AND THE LIVE TAB IS THE ONE LIT THING ON IT.
- *
- * Two earlier versions of this control are worth recording, because this is the third and
- * each of the first two was fixing something real.
- *
- * It was a ROSE DISC behind the live glyph. Wrong because a tab indicator is the most
- * PERMANENT element in the app — every screen, same place, always lit — so putting the one
- * bright thing there meant the accent stopped marking anything and simply became what the
- * tab bar looks like. An accent that is always on screen is a background.
- *
- * It then became a WHITE BAR with a light-grey pill. That fixed the accent and introduced a
- * different defect: a light grey on white can only ever reach ~1.2:1, so the pill could not
- * be what tells you which tab is live, and the bar's own edge (C.border, 1.33:1) meant the
- * floating control had no shape against a light screen either. Ink and weight were carrying
- * the whole state on their own.
- *
- * The block solves both at once, and it is not a new idea — it is the web's sidebar. A dark
- * bounded panel carrying the nav, with exactly ONE item lit on it, is what answers "where am
- * I" over there, and the periwinkle exists in the palette for precisely this job. It is
- * 7.18:1 on slate and 1.67:1 on white, so this is the only surface in the app it can sit on
- * at all; the white bar could never have had it.
- *
- * It is also what lets the bar lose its shadow, which Workshop forbids at every level. Slate
- * is 10.88:1 against the page — the control has a shape because of what it IS, not because
- * of a blur underneath it.
- *
- * THE LABELS STAY. Five recognisable glyphs was the argument for dropping them, but `scan`
- * and `today` are not recognisable, they are guesses, and the bar is the one control a new
- * operator meets first. Rendered whole in `tabBarIcon` rather than through
- * `tabBarShowLabel`, because the ground has to enclose the glyph AND its word — the
- * navigator draws those in two separate slots and nothing can span them.
- */
 function TabGlyph({ name, label, focused }: {
   name: keyof typeof Ionicons.glyphMap
   label: string
   focused: boolean
 }) {
-  const ink = focused ? C.onLit : INACTIVE
+  /* `muted` for the inactive state, NOT `ink40`. The kit set inactive labels in a 40% ink
+     that measures 2.47:1 — a label you cannot read is not a label, and a tab bar is the one
+     piece of chrome that is on screen on every single screen. `muted` is 4.79:1 on white. */
+  const ink = focused ? C.ink : C.muted
   return (
-    <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
-      {/* THE LIVE PILL IS ROUND, and this reverses a note that used to sit here.
-          It was R.control — 10pt on a ~49pt-tall pill — chosen so the shapes would "nest
-          rather than repeat" inside a bar whose own radius is 30. In the hand it does not
-          read as nesting, it reads as a square sitting in a lozenge, because the two shapes
-          are close enough to compare and different enough to look like a mistake. Every
-          reference bar draws its indicator as a capsule for the same reason. R.pill is the
-          token for a thing that is genuinely round, and at this size it is one. */}
-      <View
+    <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center", gap: 3 }}>
+      <Ionicons name={name} size={21} color={ink} />
+      <Text
+        numberOfLines={1}
         style={{
-          minWidth: 72, paddingHorizontal: 14, paddingTop: 6, paddingBottom: 5,
-          borderRadius: R.pill, gap: 1,
-          alignItems: "center", justifyContent: "center",
-          backgroundColor: focused ? C.lit : "transparent",
+          ...TYPE.small,
+          fontSize: 12,
+          lineHeight: 14,
+          fontFamily: focused ? F.semi : F.medium,
+          color: ink,
         }}
       >
-        {/* 24, which is Material's tab icon and one under Apple's. It was 21 because five
-            slots left no room; four do. */}
-        <Ionicons name={name} size={24} color={ink} />
-        <Text
-          numberOfLines={1}
-          style={{
-            fontSize: 11,
-            lineHeight: 13,
-            fontFamily: focused ? F.semi : F.medium,
-            color: ink,
-          }}
-        >
-          {label}
-        </Text>
-      </View>
+        {label}
+      </Text>
+      {/* THE LIVE MARK. One of the three places lime is allowed. */}
+      <View style={{
+        width: 6, height: 6, borderRadius: R.pill,
+        backgroundColor: focused ? C.lime : "transparent",
+      }} />
     </View>
   )
 }
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets()
-  /* The home indicator (iOS) and the gesture pill (Android) both sit where this bar does,
-     so it clears the safe-area inset rather than a hard-coded 16. */
+  /* The bar floats, so it clears the safe-area inset rather than a hard-coded 16. */
   const bottom = Math.max(insets.bottom, 10)
-  /* THE PEEK IS A SIBLING OF THE TABS, not a fifth tab.
-     The bar holds places you GO; a conversation is something that INTERRUPTS you, which is
-     a different kind of thing — so it is drawn only while someone is waiting, over whichever
-     screen is showing, and it says who and what rather than carrying a bare count. When
-     nobody is waiting there is nothing there at all; chat is then the control on the
-     Dashboard header, which is also a seller's only route since the count is staff-only. */
+
+  /* CHAT IS NOT IN THE BAR, and that is a decision rather than an omission. The bar holds
+     places you GO; a conversation is something that INTERRUPTS you. So it is drawn only
+     while someone is waiting, over whichever screen is showing, and it says who and what
+     rather than carrying a bare count. */
   return (
     <>
     <Tabs
       screenOptions={{
         headerShown: false,
-        /* TabGlyph inks its own glyph and label, because the ground has to enclose both
-           and the navigator's two tint options cannot reach inside one View. These stay
-           declared so anything the navigator draws itself agrees with it. */
-        tabBarActiveTintColor: C.onLit,
-        tabBarInactiveTintColor: INACTIVE,
+        tabBarActiveTintColor: C.ink,
+        tabBarInactiveTintColor: C.muted,
         tabBarShowLabel: false,
-        /*
-         * AN OPAQUE BAR, AND NOW A DARK ONE. See the note above TabGlyph for why the white
-         * version could not carry a live state, and why nothing lighter would have.
-         *
-         * NO SHADOW. Workshop's depth model is a change of background value, and the block is
-         * 10.88:1 against the page — there is nothing left for a blur to add. The `elevation`
-         * and `shadow*` keys that used to sit here are the exact thing lib/theme.ts removed
-         * with LIFT, and a floating bar was the case most likely to argue for an exception.
-         * It does not need one.
-         */
         tabBarStyle: {
           position: "absolute",
-          /*
-           * INSET 16, NOT 58.
-           *
-           * 58 a side squeezed five 42pt targets into roughly 274pt on a 390pt phone — under
-           * 55pt each, below Apple's 44pt with no space between them, and with nowhere to put
-           * a word. The lozenge read as compact, and compact is not the same as legible.
-           *
-           * A 16pt inset still detaches the bar from the screen edge, which is the whole
-           * point of floating it, and gives each of the five ~71pt to sit in.
-           */
-          left: 16, right: 16, bottom,
+          left: S.lg, right: S.lg, bottom,
           height: TAB_BAR.height,
-          // Half the height: still a true lozenge, just a wider one. The pills inside it are
-          // R.control, so the shapes nest rather than repeat.
-          borderRadius: TAB_BAR.height / 2,
-          backgroundColor: C.ink,
-          borderTopWidth: 0,
-          borderWidth: 0,
+          borderRadius: R.pill,
+          backgroundColor: C.surface,
+          /* 1.5pt, matching every card. At 1pt a white bar on warm paper has no edge at all,
+             and the shadow alone is not a boundary. */
+          borderWidth: 1.5,
+          borderColor: C.hairline,
+          borderTopWidth: 1.5,
+          borderTopColor: C.hairline,
           paddingBottom: 0,
+          ...LIFT,
         },
-        /* CENTRED, AND MEANT IT. With the labels hidden the item keeps the padding the
-           navigator reserves for a label, so every glyph sat high in the capsule rather than
-           in the middle of it. Zero the padding and centre on both axes. */
+        /* The navigator reserves vertical room for a label it is not drawing, which is what
+           made every glyph sit high in its slot. Zero it and centre on both axes. */
         tabBarItemStyle: {
           height: TAB_BAR.height,
           justifyContent: "center",
@@ -179,18 +99,15 @@ export default function TabsLayout() {
           paddingBottom: 0,
           paddingVertical: 0,
         },
-        /* The icon slot is given the bar's FULL height and centres its own content, so the
-           glyph no longer floats against space the (hidden) label used to occupy — that is
-           what made every icon sit high in the capsule. */
         tabBarIconStyle: { flex: 1, marginTop: 0, marginBottom: 0, justifyContent: "center" },
       }}
     >
       <Tabs.Screen
-        name="dashboard"
+        name="home"
         options={{
-          title: "Dashboard",
+          title: "Home",
           tabBarIcon: ({ focused }) => (
-            <TabGlyph name={focused ? "grid" : "grid-outline"} label={LABEL.grid} focused={focused} />
+            <TabGlyph name={focused ? "home" : "home-outline"} label="Home" focused={focused} />
           ),
         }}
       />
@@ -199,7 +116,7 @@ export default function TabsLayout() {
         options={{
           title: "Orders",
           tabBarIcon: ({ focused }) => (
-            <TabGlyph name={focused ? "cube" : "cube-outline"} label={LABEL.cube} focused={focused} />
+            <TabGlyph name={focused ? "cube" : "cube-outline"} label="Orders" focused={focused} />
           ),
         }}
       />
@@ -208,7 +125,7 @@ export default function TabsLayout() {
         options={{
           title: "Scan",
           tabBarIcon: ({ focused }) => (
-            <TabGlyph name={focused ? "scan" : "scan-outline"} label={LABEL.scan} focused={focused} />
+            <TabGlyph name={focused ? "scan" : "scan-outline"} label="Scan" focused={focused} />
           ),
         }}
       />
@@ -217,12 +134,12 @@ export default function TabsLayout() {
         options={{
           title: "Wallet",
           tabBarIcon: ({ focused }) => (
-            <TabGlyph name={focused ? "wallet" : "wallet-outline"} label={LABEL.wallet} focused={focused} />
+            <TabGlyph name={focused ? "wallet" : "wallet-outline"} label="Wallet" focused={focused} />
           ),
         }}
       />
-      {/* Still a screen, no longer a slot. Reached from the Dashboard header and from the
-          notification map, both of which push this exact route. */}
+      {/* Still a screen, no longer a slot — the fifth thing that would have broken the bar.
+          Reached from the Home header and from the notification map. */}
       <Tabs.Screen name="settings" options={{ title: "Settings", href: null }} />
     </Tabs>
     <ChatPeek />
