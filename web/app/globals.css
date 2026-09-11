@@ -412,6 +412,13 @@
  as a grid. Neutral rather than the warm cream it used to borrow from --muted, because
  this is the one surface whose job is judging artwork colour. */
     --studio-bed: oklch(0.982 0.002 255);
+    /* A SELECTED ROW IN THE IMPORT SHEET. Not --accent or --muted: both are
+       oklch(0.9417 …) — the SAME value — which is ~6% off the white the grid sits on, so a
+       selected block read as a faint wash rather than as a selection. The cells themselves
+       are transparent and their <td>s have no ground, so this one value paints every box in
+       the row, which is what "grey all the boxes" means. ~90% lightness is where a spreadsheet
+       selection sits and still leaves black text at full contrast. */
+    --grid-select: oklch(0.902 0.006 247.88);
     --destructive: oklch(0.577 0.245 27.325);
     /* HAIRLINES ARE NEUTRAL, because every surface they sit on is.
        These were oklch(… 0.013 91) and oklch(… 0.015 91) — hue 91 is yellow, so every line
@@ -628,6 +635,8 @@
     --status-backorder: oklch(0.760 0.125 50);
     --status-draft: oklch(0.755 0.012 250);
     --studio-bed: oklch(0.245 0.008 255);
+    /* Dark: a LIFT off the 0.175 card rather than a darkening, for the same reason. */
+    --grid-select: oklch(0.310 0.004 247.88);
     --destructive: oklch(0.704 0.191 22.216);
     /* The ONLY thing separating a card from the canvas now, so it stays strong. */
     --border: oklch(0.315 0 0);
@@ -864,6 +873,11 @@ td[align="right"] {
 }
 .eg-control:hover { background: var(--muted); }
 .eg-control:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 30%, transparent); }
+
+/* Every cell of a selected sheet row. One rule on the <tr>, because the inputs are
+   bg-transparent and their <td>s paint nothing — so the row's own ground is what shows
+   through each box. See --grid-select for why this is not --accent. */
+.eg-row-selected { background: var(--grid-select); }
 /* THE GUTTER, WIDENED. Content used to start 32px from the sidebar on a laptop and 48px on
  a large monitor — close enough to the chrome that the page read as one continuous slab,
  and the space that WAS there sat inside the cards rather than around them. A page needs
@@ -1767,12 +1781,26 @@ td[align="right"] {
 
 /* Display type: uppercase, tight, set solid. Anton is a display face drawn for capitals,
    which is why the transform is part of the class rather than left to each call site — set
-   in lower case it looks like a mistake rather than a choice. */
+   in lower case it looks like a mistake rather than a choice.
+
+   TRACKING IS NOT ZERO, and 0.005em was effectively zero: at the hero's 166px it computed to
+   0.83 of a pixel. Anton is a CONDENSED face — its letters are drawn narrow and its sidebearings
+   are already minimal — so at display size the counters and the gaps between letters collapse
+   into one grey mass and the word stops being read as letters. 0.022em is 3.7px at 166px and
+   1.6px at 72px: enough to separate, far short of the airy tracked-out look that would make a
+   condensed face pointless.
+
+   WORD-SPACING IS SET SEPARATELY, and this is the part tracking alone cannot fix. Adding letter
+   space widens the gaps INSIDE words as much as between them, so "STOP TOUCHING ORDERS" stays
+   one run whatever the tracking. A condensed uppercase face needs its word gap opened further
+   than its letter gap or the words read as one long word — which is exactly what that heading
+   was doing. */
 .ploy-display {
   font-family: var(--font-anton), "Arial Narrow", sans-serif;
   text-transform: uppercase;
-  line-height: 0.9;
-  letter-spacing: 0.005em;
+  line-height: 0.92;
+  letter-spacing: 0.022em;
+  word-spacing: 0.08em;
   font-weight: 400;
 }
 

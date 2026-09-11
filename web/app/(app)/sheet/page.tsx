@@ -20,6 +20,7 @@ import { cameFromImport, clearCameFromImport, requestImportOpen } from "@/lib/sh
 import { ordersHomeFor } from "@/lib/staff-nav"
 import { getUser } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
+import { STATUS_TONE } from "@/lib/status-tone"
 import {
   getOrderSheets, createOrderSheet, duplicateOrderSheet, deleteOrderSheet,
   type OrderSheet,
@@ -153,14 +154,22 @@ export default function SheetsPage() {
                     </button>
                   </td>
                   <td className="px-3 py-2">
-                    {/* A pill carries MEANING here — the one-way draft/completed state — which
-                        is the only thing §4 allows one for. */}
+                    {/* WEIGHT, NOT A CAPSULE. This argued a pill was earned here because the
+                        draft/completed state carries meaning — but so does every status in
+                        the app, and they are all weight now (lib/status-tone.ts). It also
+                        set an 11px capsule, which the type scale forbids for anything read
+                        rather than recognised.
+
+                        Draft is the LIVE one and Submitted the settled one, which inverts
+                        the order ladder on purpose: a draft ORDER is settled because nothing
+                        is required of the factory, while a draft SHEET is explicitly the
+                        seller's own unfinished work. A column of submitted sheets with one
+                        draft in it should show you the draft. */}
                     <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-2xs font-medium ${
-                        s.status === "completed"
-                          ? "bg-shipped/10 text-shipped"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+                      className={
+                        "text-sm " +
+                        (s.status === "completed" ? STATUS_TONE.settled : STATUS_TONE.live)
+                      }
                     >
                       {s.status === "completed" ? tl("sheet", "Submitted") : tl("sheet", "Draft")}
                     </span>

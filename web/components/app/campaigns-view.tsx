@@ -14,14 +14,18 @@ import { getAdsConfig, getAdConnections, getAdCampaigns, createAdCampaign, setAd
 import { getToken, getUser } from "@/lib/auth"
 import { PageTitle } from "@/components/app/page-title"
 import { EmptyState } from "@/components/app/empty-state"
+import { STATUS_TONE, CATEGORY_TONE } from "@/lib/status-tone"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const int = (n: number) => (n ?? 0).toLocaleString("en-US")
 const DAYS = [7, 14, 30, 90]
 
+// WHICH PLATFORM is a category, not a status (lib/status-tone.ts) — and these two were
+// wearing `packed` and `hold`, two of the floor's reserved meanings, to say "Meta" and
+// "Google". The label is already the whole of the information.
 const CHANNEL: Record<string, { label: string; cls: string }> = {
- meta: { label: "Meta", cls: "bg-packed/12 text-packed" },
- google: { label: "Google", cls: "bg-hold/15 text-hold" },
+ meta: { label: "Meta", cls: CATEGORY_TONE },
+ google: { label: "Google", cls: CATEGORY_TONE },
 }
 
 // Meta + Google campaign performance for the team. Read is the point; create makes
@@ -165,9 +169,9 @@ export function CampaignsView() {
                   {data.campaigns.map((c) => (
                     <tr key={`${c.channel}-${c.id}`} className="border-t border-border">
                       <td className="px-4 py-2.5"><div className="max-w-[260px] truncate font-medium">{c.name}</div><div className="truncate text-xs text-muted-foreground">{c.account}</div></td>
-                      <td className="px-4 py-2.5"><span className={"rounded-lg px-2 py-0.5 text-xs font-semibold uppercase " + (CHANNEL[c.channel]?.cls ?? "bg-muted")}>{CHANNEL[c.channel]?.label ?? c.channel}</span></td>
+                      <td className="px-4 py-2.5"><span className={"text-xs uppercase " + (CHANNEL[c.channel]?.cls ?? CATEGORY_TONE)}>{CHANNEL[c.channel]?.label ?? c.channel}</span></td>
                       <td className="px-4 py-2.5">
-                        <span className={"rounded-lg px-2 py-0.5 text-xs font-medium capitalize " + (c.status === "active" ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>{c.status || "—"}</span>
+                        <span className={"text-xs capitalize " + (c.status === "active" ? STATUS_TONE.live : STATUS_TONE.settled)}>{c.status || "—"}</span>
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{c.dailyBudget != null ? usd(c.dailyBudget) : "—"}</td>
                       <td className="px-4 py-2.5 text-right font-medium tabular-nums">{usd(c.spend)}</td>

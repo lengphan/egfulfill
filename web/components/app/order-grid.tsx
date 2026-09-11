@@ -1044,7 +1044,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
               const h = rowH[r]
               const isSel = !!selRange && r >= selRange[0] && r <= selRange[1]
               return (
-                <tr key={r} style={h ? { height: h } : undefined} data-selected={isSel || undefined} className={isSel ? "bg-accent" : undefined}>
+                <tr key={r} style={h ? { height: h } : undefined} data-selected={isSel || undefined} className={isSel ? "eg-row-selected" : undefined}>
                   <td
                     title={started ? (rec?._errors || rec?._warnings || undefined) : tl("orderGrid", "Click to select the row")}
                     tabIndex={0}

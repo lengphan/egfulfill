@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button"
 import { OrderGrid } from "@/components/app/order-grid"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { CSV_COLUMNS, TEMPLATE_HEADERS } from "@/lib/order-import"
+import { STATUS_TONE } from "@/lib/status-tone"
 import {
   getOrderSheet, saveOrderSheet, duplicateOrderSheet, completeOrderSheet,
   type OrderSheet,
@@ -244,7 +245,7 @@ export default function SheetPage() {
         )}
 
         {done && (
-          <span className="rounded-lg bg-shipped/10 px-2 py-0.5 text-2xs font-medium text-shipped">{tl("sheet_[id]", "Submitted")}</span>
+          <span className={"text-sm " + STATUS_TONE.settled}>{tl("sheet_[id]", "Submitted")}</span>
         )}
 
         {/* ONE ROW OF CONTROLS, AND IT IS THIS ONE.
