@@ -11,6 +11,12 @@ import { routeForHref } from "@/lib/push"
 import {
   Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
 } from "@expo-google-fonts/inter"
+/* THE BRAND'S DISPLAY FACE, inherited rather than chosen. The web has set every poster
+   moment in Anton since the ploy homepage landed; mobile shipped Inter-only and so the two
+   halves of one product had different voices in the place a seller looks first. This is not
+   the "one face" rule being broken — that rule is about BODY type, and it stands: Anton is
+   allowed nowhere near a sentence. It is a display face drawn for capitals. */
+import { Anton_400Regular } from "@expo-google-fonts/anton"
 import { C } from "@/lib/theme"
 
 /**
@@ -34,6 +40,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {})
 export default function RootLayout() {
   const [ready] = useFonts({
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+    Anton_400Regular,
   })
   // Hold the splash until the face is in. A frame of system font followed by a reflow into
   // Inter is worse than waiting — it is the flash this app was just fixed for elsewhere.

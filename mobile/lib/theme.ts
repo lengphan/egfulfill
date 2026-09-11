@@ -184,6 +184,21 @@ export const C = {
  * from the list under it, it is a heavier one.
  */
 export const F = {
+  /**
+   * THE POSTER FACE — Anton, and ONLY for display.
+   *
+   * Inherited from the web, where globals.css has set every poster moment in it since the
+   * ploy homepage: uppercase, tight, set solid. It does not contradict the one-face rule —
+   * that rule was written about BODY type, after three weights of Playfair were setting
+   * every screen title, and it stands. Anton never touches a sentence.
+   *
+   * TWO THINGS IT DEMANDS, both from the web's own note:
+   *  · UPPERCASE. It is drawn for capitals; set in lower case it reads as a mistake.
+   *  · TRACKING, not zero. It is a CONDENSED face with minimal sidebearings, so at display
+   *    size the counters collapse into one grey mass. The web uses 0.022em; `POSTER_TRACK`
+   *    is that, converted — React Native takes points, not ems, so it is applied per size.
+   */
+  poster: "Anton_400Regular",
   display: "Inter_700Bold",
   displaySemi: "Inter_600SemiBold",
   displayMed: "Inter_500Medium",
@@ -223,6 +238,9 @@ export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const
  * There is no fourth value. Soften `card` back toward 14–16 "to be safe" and the direction
  * collapses into every other warm-minimal app.
  */
+/** Anton's tracking at a given size — the web's 0.022em, which RN cannot express. */
+export const posterTrack = (size: number) => Math.round(size * 0.022 * 10) / 10
+
 export const R = { badge: 8, control: 10, card: 26, pill: 999 } as const
 
 /**

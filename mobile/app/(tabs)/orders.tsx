@@ -7,6 +7,7 @@ import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/ap
 import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB, canSetStage, isFactoryOrder, heldFromOf } from "@/lib/orders"
 import { TAB_BAR,F,C, R, CARD_INK } from "@/lib/theme"
 import { OrderRow } from "@/components/order-row"
+import { SkeletonRows, EmptyState, GUTTER } from "@/components/kit"
 
 /**
  * ORDERS — a searchable list, and the way into one order.
@@ -270,7 +271,7 @@ export default function Orders() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
-      <View style={{ paddingHorizontal: 18, paddingBottom: 10 }}>
+      <View style={{ paddingHorizontal: GUTTER, paddingBottom: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
           {/* The one DISPLAY moment on the screen — a weight and a size, not a second
               alphabet. It used to be Playfair, on the argument that a high-contrast serif
@@ -384,10 +385,11 @@ export default function Orders() {
         </ScrollView>
       </View>
 
+      {/* THE SHAPE OF WHAT IS COMING. A centred spinner tells you something is happening
+          somewhere; rows tell you a list is arriving and stop the screen jumping when it
+          does. */}
       {orders === null && !err ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={C.primary} />
-        </View>
+        <SkeletonRows n={7} />
       ) : (
         <SectionList
           sections={sections}
@@ -398,7 +400,7 @@ export default function Orders() {
           stickySectionHeadersEnabled
           renderSectionHeader={({ section }) => (
             <View style={{
-              paddingHorizontal: 18, paddingTop: 14, paddingBottom: 8,
+              paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 8,
               /* OPAQUE, because it is sticky — rows sliding under a transparent header is
                  the classic version of this control looking broken. */
               backgroundColor: C.bg,
@@ -438,20 +440,27 @@ export default function Orders() {
           contentContainerStyle={{ paddingBottom: insets.bottom + TAB_BAR.clearance + (selecting ? 86 : 0) }}
           ListEmptyComponent={
             /* Says WHICH it is. An empty list that reads the same as a failed one is how a
-               broken fetch gets mistaken for a quiet day. */
-            /* ...and it needs the 18 itself. The list deliberately carries no horizontal
-               padding because every ROW owns it — but this is not a row, so it was the one
-               thing on the screen sitting flush against the left edge. */
-            <Text style={{ color: err ? C.alert : C.muted, fontSize: 14, marginTop: 24, paddingHorizontal: 18 }}>
-              {err ?? (search ? `Nothing matches “${search}”.` : `No ${filter.toLowerCase()} orders.`)}
-            </Text>
+               broken fetch gets mistaken for a quiet day — and all three of these are
+               genuinely different: nothing matched, nothing is in this lens, or nothing
+               loaded at all. */
+            err ? (
+              <EmptyState bad icon="cloud-offline-outline" line="Couldn't load your orders"
+                          note={err} action="Try again" onAction={onRefresh} />
+            ) : search ? (
+              <EmptyState obj="squiggle" icon="search-outline" line={`Nothing matches “${search}”`}
+                          note="Search covers the order number, the buyer, a SKU and the tracking number."
+                          action="Clear search" onAction={() => setSearch("")} />
+            ) : (
+              <EmptyState obj="star" icon="checkmark-done-outline" line={`No ${filter.toLowerCase()} orders`}
+                          note="Nothing in this view right now. Try another lens above." />
+            )
           }
           /* THE RULE BETWEEN ROWS, drawn by the LIST rather than by each row, because a
-             selected row is a filled object and a filled object must not also be cut in
-             half by its own bottom border. Inset past the thumbnails, the way a printed
-             list indents its rule past the picture column. */
+             selected row is a filled object and a filled object must not also be cut in half
+             by its own bottom border. Inset past the thumbnails, the way a printed list
+             indents its rule past the picture column. */
           ItemSeparatorComponent={() => (
-            <View style={{ height: 1, backgroundColor: C.border, marginLeft: 74, marginRight: 18 }} />
+            <View style={{ height: 1, backgroundColor: C.border, marginLeft: 74, marginRight: GUTTER }} />
           )}
           renderItem={({ item }) => (
             <OrderRow

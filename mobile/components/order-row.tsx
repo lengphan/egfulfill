@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { View, Text, Image, Pressable, Modal, Animated, Easing, PanResponder } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 import { assetUrl, type Order } from "@/lib/api"
 import { isOverdue, normalizeStage, units, numOf, lineTitle, STAGE_LABEL } from "@/lib/orders"
 import { F, C, R } from "@/lib/theme"
@@ -227,7 +228,22 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
   const lead = shots.slice(0, 2)
   const rest = shots.length - lead.length
 
-  return (
+  /*
+   * SWIPE TO MOVE IT ON.
+   *
+   * The stage advance was reachable only through the ellipsis menu — two taps and a sheet
+   * for the single most repeated action on the floor. A swipe is the gesture every list on
+   * a phone already teaches, and it costs one hand.
+   *
+   * ONE ACTION, ONE SIDE. A row with an action on each edge makes a person remember which
+   * is which; there is nothing here that deserves the second side. It appears only when the
+   * order can actually move and the reader is allowed to move it — the same condition the
+   * menu item uses, so the gesture can never offer what the sheet would refuse.
+   *
+   * NOT GATED ON REDUCED MOTION. The setting asks us to stop movement we cause, not movement
+   * a finger is causing — the same line the draggable objects on the web band draw.
+   */
+  const row = (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
@@ -314,5 +330,32 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
         ]}
       />
     </Pressable>
+  )
+
+  if (!(onAdvance && advanceLabel) || selecting) return row
+
+  return (
+    <ReanimatedSwipeable
+      friction={2}
+      rightThreshold={44}
+      overshootRight={false}
+      renderRightActions={() => (
+        <Pressable
+          onPress={onAdvance}
+          style={{
+            width: 132, marginVertical: 2, marginRight: 8, borderRadius: R.control,
+            alignItems: "center", justifyContent: "center", gap: 5,
+            backgroundColor: C.ink,
+          }}
+        >
+          <Ionicons name="arrow-forward" size={18} color={C.onInk} />
+          <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.semi, color: C.onInk }}>
+            {advanceLabel}
+          </Text>
+        </Pressable>
+      )}
+    >
+      {row}
+    </ReanimatedSwipeable>
   )
 }

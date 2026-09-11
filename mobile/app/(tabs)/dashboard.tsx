@@ -9,6 +9,7 @@ import { getOrders, getMe, assetUrl, type Order, type User } from "@/lib/api"
 import {
   Screen, Head, HeadButton, SectionHead, Tile, TileRow, Skeleton, EmptyState, Appear, GUTTER,
 } from "@/components/kit"
+import { useCountUp, useReducedMotion } from "@/lib/motion"
 import { router, useFocusEffect } from "expo-router"
 import { isOpen, isOverdue, normalizeStage, platformOf, numOf, lineListing } from "@/lib/orders"
 import { TAB_BAR, F, C, R, S, CARD } from "@/lib/theme"
@@ -26,16 +27,6 @@ import { TAB_BAR, F, C, R, S, CARD } from "@/lib/theme"
  */
 const D = { fast: 200, base: 320, count: 420 } as const
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false)
-  useEffect(() => {
-    let alive = true
-    AccessibilityInfo.isReduceMotionEnabled().then((v) => { if (alive) setReduced(!!v) })
-    const sub = AccessibilityInfo.addEventListener("reduceMotionChanged", (v) => setReduced(!!v))
-    return () => { alive = false; sub?.remove?.() }
-  }, [])
-  return reduced
-}
 
 /** A value that eases to its target. Under Reduce Motion it simply IS its target. */
 function useGrow(target: number, reduced: boolean, duration: number = D.base, delay = 0) {
@@ -252,8 +243,12 @@ function NeedsYouStrip({ orders, reduced }: { orders: Order[]; reduced: boolean 
  */
 
 
-function PhotoCard({ art, title, note, thumbs, onPress, height, top }: {
+function PhotoCard({ art, figure, title, note, thumbs, onPress, height, top }: {
   art: number; title: string; note?: string | null
+  /** A number to lead with. "1,065 orders need you" is correct and flat — the figure is the
+   *  thing worth seeing from across a room, and a sentence at 25pt buries it in its own
+   *  middle. Big number, short phrase under it. */
+  figure?: number | null
   thumbs?: string[]; onPress: () => void
   /** Space above it. The card lost its section heading, so it now owns the gap the heading
    *  used to provide. */
@@ -264,6 +259,8 @@ function PhotoCard({ art, title, note, thumbs, onPress, height, top }: {
      decision anyway; it should not change because someone re-crops the art. */
   height: number
 }) {
+  const reduced = useReducedMotion()
+  const shownFigure = useCountUp(figure ?? 0, reduced)
   return (
     <Pressable
       onPress={onPress}
@@ -289,7 +286,16 @@ function PhotoCard({ art, title, note, thumbs, onPress, height, top }: {
             ))}
           </View>
         )}
-        <Text style={{ fontSize: height >= 200 ? 25 : 22, fontFamily: F.bold, color: C.fg, letterSpacing: -0.6 }}>
+        {figure != null && (
+          <Text style={{ fontSize: 58, lineHeight: 60, fontFamily: F.bold, color: C.fg, letterSpacing: -2.6 }}>
+            {Math.round(shownFigure).toLocaleString()}
+          </Text>
+        )}
+        <Text style={{
+          fontSize: figure != null ? 20 : height >= 200 ? 25 : 22,
+          fontFamily: figure != null ? F.displaySemi : F.bold,
+          color: C.fg, letterSpacing: -0.4, marginTop: figure != null ? 1 : 0,
+        }}>
           {title}
         </Text>
         {note ? (
@@ -434,11 +440,16 @@ export default function Dashboard() {
     [rows],
   )
 
-  /* What is on the floor right now, as pictures. Capped at eight: this is a glance, and a
-     strip you scroll for a minute is a list wearing a different coat. */
+  /* THE NEWEST ARRIVALS, as pictures.
+     It was the working stage under the heading "On the floor" — a phrase that names nothing
+     anyone would search for and duplicates the Working tile directly above it. New is a real
+     stage in STAGE_LABEL and a real lens on the Orders screen, and the newest orders are the
+     ones a person has not seen yet, which is the only list a home screen owes them.
+     Capped at eight: this is a glance, and a strip you scroll for a minute is a list wearing
+     a different coat. */
   const inWorks = useMemo(
-    () => open
-      .filter((o) => normalizeStage(o.factory_status) === "working")
+    () => [...open]
+      .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
       .map((o) => {
         const it = (o.items ?? [])[0]
         const uri = it ? assetUrl(it.img_ref || it.img) : null
@@ -504,7 +515,8 @@ export default function Dashboard() {
               height={228}
               top={S.xl}
               art={require("../../assets/card-sky.webp")}
-              title={needsYou === 0 ? "Nothing needs you" : `${needsYou} ${needsYou === 1 ? "order needs" : "orders need"} you`}
+              figure={needsYou === 0 ? null : needsYou}
+              title={needsYou === 0 ? "All clear" : needsYou === 1 ? "order needs you" : "orders need you"}
               note={needsYou === 0 ? "Everything open is on time." : needsNote}
               onPress={() => router.push("/(tabs)/orders")}
             />
@@ -535,7 +547,7 @@ export default function Dashboard() {
               where they are. */}
           {inWorks.length > 0 && (
             <Appear index={3}>
-              <SectionHead label="On the floor" action="View all"
+              <SectionHead label="New" action="View all"
                            onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Open" } })} />
               <ScrollView
                 horizontal

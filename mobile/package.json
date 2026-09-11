@@ -11,6 +11,7 @@
     "tunnel:clear": "expo start --tunnel --clear"
   },
   "dependencies": {
+    "@expo-google-fonts/anton": "^0.4.2",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.3",

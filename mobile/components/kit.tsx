@@ -20,11 +20,11 @@
  */
 import { ReactNode, useEffect, useRef } from "react"
 import {
-  View, Text, Pressable, ScrollView, RefreshControl, Animated, ViewStyle, StyleProp,
+  View, Text, Pressable, ScrollView, RefreshControl, Animated, Image, ViewStyle, StyleProp,
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
-import { TAB_BAR, F, C, R, S } from "@/lib/theme"
+import { TAB_BAR, F, C, R, S, posterTrack } from "@/lib/theme"
 import { useCountUp, usePressScale, useReducedMotion } from "@/lib/motion"
 
 /** The one horizontal inset. Everything on every screen starts here. */
@@ -72,7 +72,13 @@ export function Head({ title, sub, right }: { title: string; sub?: string; right
     }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         {sub ? <Text style={{ fontSize: 13, color: C.muted, marginBottom: 2 }}>{sub}</Text> : null}
-        <Text style={{ fontSize: 32, fontFamily: F.display, color: C.fg, letterSpacing: -0.8 }}>{title}</Text>
+        {/* THE POSTER FACE. Uppercase because Anton is drawn for capitals, and tracked
+            because it is condensed — both rules come from the web's own display class, so a
+            title reads the same on the phone as it does on the site. */}
+        <Text style={{
+          fontSize: 34, lineHeight: 36, fontFamily: F.poster, color: C.fg,
+          textTransform: "uppercase", letterSpacing: posterTrack(34),
+        }}>{title}</Text>
       </View>
       {right}
     </View>
@@ -144,7 +150,7 @@ export function Tile({ n, label, bg, fg, prefix, onPress }: {
         onPressOut={press.onPressOut}
         style={{ borderRadius: R.card, backgroundColor: bg, padding: 16, minHeight: 104, justifyContent: "space-between" }}
       >
-        <Text style={{ fontSize: 34, fontFamily: F.bold, color: fg, letterSpacing: -1.2 }}>
+        <Text style={{ fontSize: 38, lineHeight: 40, fontFamily: F.poster, color: fg, letterSpacing: posterTrack(38) }}>
           {prefix ?? ""}{Math.round(shown).toLocaleString()}
         </Text>
         <Text style={{ fontSize: 13, fontFamily: F.medium, color: fg, opacity: 0.72 }}>{label}</Text>
@@ -257,8 +263,28 @@ export function Button({ label, icon, onPress, tone = "primary" }: {
    a small filled square is an object it lands on. That single difference is what
    separates a region that reads as a PLACE from one that reads as a GAP.
    ──────────────────────────────────────────────────────────────────────────── */
-export function EmptyState({ icon, line, note, action, onAction, bad }: {
+/**
+ * THE OBJECTS — the brand's own motif set, carried over from the web band.
+ *
+ * Every style with real personality repeats a small ownable graphic: Gumroad's pink coins,
+ * PostHog's hedgehogs. EGFUL already has one — the rendered 3D family the marketing site
+ * floats through its band — and mobile was drawing grey Ionicons in grey squares instead.
+ */
+export const OBJ = {
+  star: require("../assets/obj/star.webp"),
+  torus: require("../assets/obj/torus.webp"),
+  blob: require("../assets/obj/blob-lime.webp"),
+  bubble: require("../assets/obj/blob-peri.webp"),
+  balloon: require("../assets/obj/balloon-peri.webp"),
+  squiggle: require("../assets/obj/squiggle.webp"),
+} as const
+
+export function EmptyState({ icon, obj, line, note, action, onAction, bad }: {
   icon: keyof typeof Ionicons.glyphMap
+  /** One of the brand's objects, in place of the glyph. Preferred wherever the region is a
+   *  quiet moment rather than a failure — a failure keeps the icon, because a cheerful
+   *  balloon over "couldn't load" is the wrong face for bad news. */
+  obj?: keyof typeof OBJ
   line: string
   /** One sentence, and only here: an empty region may carry one because there is nothing
    *  else to read. A populated screen may not. */
@@ -270,12 +296,16 @@ export function EmptyState({ icon, line, note, action, onAction, bad }: {
 }) {
   return (
     <View style={{ alignItems: "center", paddingTop: 44, paddingHorizontal: GUTTER + 8 }}>
-      <View style={{
-        width: 46, height: 46, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-        backgroundColor: bad ? C.alert : C.accent,
-      }}>
-        <Ionicons name={icon} size={22} color={bad ? "#fff" : C.fg} />
-      </View>
+      {obj && !bad ? (
+        <Image source={OBJ[obj]} style={{ width: 84, height: 84 }} resizeMode="contain" />
+      ) : (
+        <View style={{
+          width: 46, height: 46, borderRadius: R.control, alignItems: "center", justifyContent: "center",
+          backgroundColor: bad ? C.alert : C.accent,
+        }}>
+          <Ionicons name={icon} size={22} color={bad ? "#fff" : C.fg} />
+        </View>
+      )}
       <Text style={{ color: C.fg, fontSize: 15, fontFamily: F.semi, marginTop: 14, textAlign: "center" }}>{line}</Text>
       {note ? (
         <Text style={{ color: C.muted, fontSize: 13, lineHeight: 19, marginTop: 5, textAlign: "center", maxWidth: 280 }}>

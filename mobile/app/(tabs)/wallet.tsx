@@ -6,6 +6,7 @@ import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { TAB_BAR,CARD,F,C, R } from "@/lib/theme"
 import { useCountUp, useReducedMotion } from "@/lib/motion"
+import { EmptyState } from "@/components/kit"
 import { TopupApprovals } from "@/components/topup-approvals"
 
 /**
@@ -183,31 +184,17 @@ export default function Wallet() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + TAB_BAR.clearance }}
         ListEmptyComponent={
-          /* THE FOUR PARTS (CLAUDE.md §4): a mark, a line, a note, a way out. One grey
-             sentence in a screen's worth of empty space was the "looks dead" complaint in
-             miniature — and a 20pt stroke floating in whitespace is decoration the eye reads
-             past, while the same glyph on a filled tile is an object it lands on.
-             The way out is the Add funds button already above this, so there is no second
-             button here: two routes to one end need a word between them or the first reads
-             as the thing you were supposed to press. */
-          <View style={{ alignItems: "center", paddingTop: 44, paddingHorizontal: 24 }}>
-            <View style={{
-              width: 46, height: 46, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-              backgroundColor: err ? C.alert : C.accent,
-            }}>
-              <Ionicons name={err ? "alert" : "swap-vertical"} size={22} color={err ? "#fff" : C.fg} />
-            </View>
-            <Text style={{ color: C.fg, fontSize: 15, fontFamily: F.semi, marginTop: 14 }}>
-              {err ? "Couldn't load your history" : "Nothing has moved yet"}
-            </Text>
-            {/* An empty region may carry one sentence, because there is nothing else to read.
-                A populated screen may not — see the same rule in §4. */}
-            <Text style={{ color: C.muted, fontSize: 13, lineHeight: 19, marginTop: 5, textAlign: "center", maxWidth: 260 }}>
-              {err
-                ? "The balance above is still correct — only the list failed."
-                : "Every charge and top-up will show up here, newest first."}
-            </Text>
-          </View>
+          /* THE FOUR PARTS (§4), with the brand's own object as the mark. A grey glyph in a
+             grey square is the house shape for a FAILURE; a quiet moment gets the motif the
+             marketing site floats through its band, which is the only thing on this screen
+             that says whose app it is. */
+          err ? (
+            <EmptyState bad icon="alert" line="Couldn't load your history"
+                        note="The balance above is still correct — only the list failed." />
+          ) : (
+            <EmptyState obj="bubble" icon="swap-vertical" line="Nothing has moved yet"
+                        note="Every charge and top-up will show up here, newest first." />
+          )
         }
         renderItem={({ item }) => {
           const d = delta(item)
