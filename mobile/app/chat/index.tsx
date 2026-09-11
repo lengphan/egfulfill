@@ -20,7 +20,11 @@ import { F, C, R, SECTION, TAB_BAR } from "@/lib/theme"
  * `order_messages` table the web uses, so a conversation started on either is one thread.
  */
 const when = (ms?: number | null) => {
-  if (!ms) return ""
+  /* A NON-NUMBER PRINTS NOTHING, not "NaNd". The guard was `!ms`, which catches null and 0
+     and passes anything unparseable straight into the arithmetic — a string timestamp from a
+     payload that changed shape renders as literal "NaNd" beside a seller's name. §4: an
+     empty state and a broken one must never look alike, and "NaNd" looks like neither. */
+  if (!ms || !Number.isFinite(Number(ms))) return ""
   const d = Math.floor((Date.now() - ms) / 60000)
   if (d < 1) return "now"
   if (d < 60) return `${d}m`

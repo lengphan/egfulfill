@@ -363,35 +363,66 @@ it has to.
 
 ### Mobile (`mobile/` — Expo · React Native)
 
-Its own theme (`mobile/lib/theme.ts`), because RN has neither CSS variables nor oklch. Same
-palette, converted once. **It does NOT follow the white-card rule above** — that was reversed
-here on 2026-08-19 and the two front-ends genuinely differ.
+**The phone has its OWN direction as of 2026-09-11, and that is deliberate.** It ran the
+web's look for its whole life — first the grey/rose system, then Workshop — on the rule that
+the web is canonical and the phone follows. The owner chose a phone direction; the two
+front-ends now genuinely differ in surface. **What still mirrors the web exactly is every
+RULE and GATE** — stages, permissions, money, what a seller may see. Only the look diverges,
+and `web-is-canonical-mobile-extends` still holds for everything that is not paint.
 
+Its own theme (`mobile/lib/theme.ts`), because RN has neither CSS variables nor oklch.
+
+- **WARM PAPER, WHITE CARD.** The page is `#FBFAF7`; a card is white behind a **1.5pt**
+  hairline at `R.card` (24). This reverses "paper all the way down, never a white card"
+  (2026-08-19) — and note that rule was ALREADY dead when this section still stated it:
+  Workshop reversed it on 2026-08-28 and only the theme file said so. The reversal holds for
+  the same reason it did there: the old rule was about white on warm paper held apart by
+  nothing, and 1pt was the actual defect. At 1.5pt with a large radius a card is an object.
+- **ONE ACTION COLOUR: periwinkle.** `hue.base` `#6B7CFF` is identity — large fills, the
+  aura, a thumbnail well — and it **never carries small text** (white on it is 3.53:1, ink
+  4.81:1). `hue.deep` `#505FDF` is the one value that does both jobs a hue has to do: the
+  action FILL (white on it 5.19:1) and periwinkle as TYPE (4.51:1 on its own wash). Two
+  near-identical periwinkles is how a palette starts lying.
+- **LIME IS A HIGHLIGHT, NEVER A LARGE FILL.** The live tab dot, the shipped mark, the
+  balance underline, the torch when it is on, the lit end of a moment icon. It is 1.19:1 on
+  paper — it has no shape there at all — so it can never be a surface you read on.
+- **AURA ONLY ON MOMENTS** (`components/aura.tsx`). A welcome, a hero card, an empty state,
+  a success. Lists and forms stay on the plain page: a wash behind a 700-row queue is a sheet
+  you read *through* all day. `AuraCard` MEASURES ITSELF — the wash defaults to window
+  geometry, and a 168pt card given an 844pt composition shows a corner of it and reads grey.
+- **Not Skia, not Haptics.** The kit drew the aura with `@shopify/react-native-skia`. A
+  native module means a new EAS binary; `react-native-svg` was already here and a radial
+  gradient that fades to transparent IS the blur. Keeping both out is what lets a whole
+  redesign reach a phone over OTA — weigh that before adding any native dependency.
 - **There is no global font default in React Native.** A bare `fontWeight` renders the OS
   face, which is why the app shipped for months in system sans at weight 800 with no
   `useFonts` call and an empty `assets/fonts` — the look people call "AI-generated". Every
   piece of type comes through `F` in the theme; a `fontWeight` without a `fontFamily` is a bug.
-- **ONE face: Inter.** Playfair was dropped on the web first (`--font-display` resolves to the
-  body stack) and mobile followed on 2026-08-21 — three weights of it were still being
-  downloaded and still setting every screen title, so the two halves of one product had
-  different letterforms in the place a seller looks first. `F.display` / `displaySemi` /
-  `displayMed` all survive as WEIGHTS; a title is a heavier line, not a second alphabet.
-  Body is `F.body` (400). The app previously had 25 declarations at weight 900 and exactly
-  one at 400, which is why no line ever looked more important than another.
-- **`C.pop` is the web's rose (`#F472DC`), converted — not chosen here.** It was coral, which
-  `check-pop-presets.mjs` had already ruled out: coral's band sits between `alert` and
-  `backorder` with negative dark-mode headroom, and the shipped value was 0.048 in OKLab from
-  dark `backorder`. An accent that reads as an order status is the one thing an accent must
-  not do, least of all on a factory floor.
-- **Paper all the way down.** Warm paper, sections divided by a hairline rule via `SECTION` —
-  never a white card. White-on-warm is two near-identical surfaces held apart by a border,
-  and it reads as stuck-on. Cards also nest: the queue had four different left margins in one
-  screen (title, card inset, card padding, thumbnail) which is what "nothing is aligned" is.
-- **The dark hero block is the exception** and the only place a filled chip belongs.
+- **ONE face: Plus Jakarta Sans**, four weights. Inter and Anton are gone from the phone (the
+  web keeps both). A title is a heavier line, never a second alphabet — the rule survives
+  every change of face, and it has now survived four.
+- **A STATUS IS A WORD**, in one of three registers by WEIGHT (`STATUS_REGISTER`). This is
+  the one place the kit was NOT followed: it ships six tinted stage capsules, and the web
+  measured that vocabulary and retired it (16 of 36 hue pairs under the 0.150 OKLab floor,
+  `packed`↔`info` at 0.010 — the same colour twice). A hue survives neither a bad screen nor
+  a colourblind reader, and this app is read across a table on a factory floor.
+- **`node tools/check-mobile-theme.mjs` IS THE GATE.** It reads the real tokens out of
+  `lib/theme.ts` and measures all 34 pairs, in two halves: **FLOOR** must clear, and **SHAPE**
+  must NOT — lime has to stay unreadable on paper so nobody sets type on it. It then greps
+  every `.ts`/`.tsx` under `mobile/` for a colour typed outside the theme; camera and
+  photo-viewer scrims are allow-listed per file WITH A REASON, and only as pure black/white
+  alpha. Add a colour to the theme, never to a component.
+  **The theme it replaced cited `tools/check-theme.mjs` beside every single figure and that
+  file has never existed** — which is exactly how its numbers came to describe a palette two
+  generations old. A measurement in a comment is a claim; run the gate.
 - **Seed a pushed screen from what the list already holds** (`lib/order-cache.ts`, wired
   inside `getOrders`/`getOrder` so no screen can forget). `/api/orders` aggregates full
   `order_items`, so the detail screen can draw everything immediately. Sliding into a spinner
   is what reads as "the whole page flashes"; the native stack animation was never the problem.
+- **Four tabs is the ceiling** (`app/(tabs)/_layout.tsx`): Home · Orders · Scan · Wallet. A
+  fifth leaves ~66pt a slot and the extra thing becomes a glyph nobody can name. Settings,
+  Chat, Top-up and an order are PUSHED routes. The tab formerly called Dashboard is **Home**,
+  and `lib/push.ts` routes to `/home`.
 
 ### Shape says KIND, weight says IMPORTANCE (2026-08-21)
 
