@@ -2173,7 +2173,12 @@ export function OrdersHub() {
                  */
  units: (
                   <div
- className="text-sm font-semibold tabular-nums text-foreground"
+ /* A COUNT IS A VALUE, NOT AN EMPHASIS. This was font-semibold, which made a single
+                       digit the heaviest mark in the row — heavier than the customer's name and
+                       level with the order number and a LIVE status, so semibold meant three
+                       unrelated things at once. Weight belongs to identity and to status
+                       (lib/status-tone.ts); size says this is a value. */
+ className="text-sm tabular-nums text-foreground"
  title={`${items.length} line${items.length === 1 ? "" : "s"} · ${units} unit${units === 1 ? "" : "s"}`}
                   >
                     {units || "—"}
@@ -2182,11 +2187,11 @@ export function OrdersHub() {
  tracking: (
                   <div className="flex min-w-0 items-center gap-1.5">
                     {track ? (
-                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-xs font-medium tabular-nums text-success hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
+                      <a href={trackUrl(o.carrier || label?.carrier, track)} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-sm tabular-nums text-success hover:underline" title={`${o.carrier || label?.carrier || "USPS"} ${track}`}>
                         <span className="truncate">{track}</span><ArrowSquareOut size={9} weight="bold" className="shrink-0" />
                       </a>
                     ) : (
-                      <span className="text-xs text-muted-foreground/60">—</span>
+                      <span className="text-sm text-muted-foreground/60">—</span>
                     )}
                     {/* The parcel came from TikTok, so its LABEL did too — and this is where
  someone looks for it. Fetched on demand (it lives in TikTok's system,
@@ -2230,7 +2235,7 @@ export function OrdersHub() {
  const seller = sellerLabelOf(o, { deactivated: tl("orders", "deactivated"), deleted: tl("orders", "deleted account") })
  return (
                     <div className="min-w-0" title={[o.store || platform, seller && `Seller: ${seller}`, o.created_at && fmtDate(o.created_at)].filter(Boolean).join(" · ")}>
-                      <div className="truncate text-sm font-medium">{o.store || platform}</div>
+                      <div className="truncate text-sm">{o.store || platform}</div>
                       {/* One line, two facts, in the order you narrow by: the marketplace
  first because it is a handful of known values, the seller after
  because it is the long one — so what truncates is the name, and the
@@ -2241,7 +2246,7 @@ export function OrdersHub() {
                     </div>
                   )
                 })(),
- customer: <div className="min-w-0 truncate text-sm font-medium">{o.customer?.name || "—"}</div>,
+ customer: <div className="min-w-0 truncate text-sm">{o.customer?.name || "—"}</div>,
                 /* THE PICTURES ARE THE CELL. The name beside them was truncated to
                    "Cust…" in the width this column gets — a word that identifies nothing —
  and under it a count the Items column already carries. Two lines of

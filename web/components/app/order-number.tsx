@@ -39,8 +39,21 @@ import { cn } from "@/lib/utils"
  * and rendered whatever it was handed. A primitive that owns behaviour but not appearance
  * is half a primitive; the size drifts at the speed new call sites are written.
  *
- * It is the row's IDENTITY, so it is the largest thing in the row: `text-sm font-semibold`
- * against a table body that is `text-sm` and a store/date/tracking that are `text-xs`.
+ * It is the row's IDENTITY, so it is the heaviest thing in the row: `text-sm font-semibold`
+ * against a table body that is `text-sm` at normal weight.
+ *
+ * That line used to end "and a store/date/tracking that are text-xs", and the TRACKING half
+ * of it was wrong — §4 names a tracking number in the VALUE band explicitly ("something
+ * read, copied or transcribed: an account number, a tracking number, a reference, a total,
+ * an order number"), and it is the longest identifier in the row and the one people
+ * actually transcribe. It is text-sm now. Only the genuinely derived captions — Age, and
+ * the store's second line — stay text-xs.
+ *
+ * SIZE says what a thing IS, WEIGHT says what is happening to it. A staff row was measured
+ * at two sizes and three weights with no rule joining them: the order number and a single
+ * digit of quantity were both semibold, and so is a LIVE status (lib/status-tone.ts) — so
+ * semibold meant three unrelated things in one row. Weight now belongs to identity and to
+ * status; every other value sits at text-sm, normal.
  * `cn()` is tailwind-merge, so a caller that genuinely needs another size still wins by
  * passing one — but it has to say so.
  *
