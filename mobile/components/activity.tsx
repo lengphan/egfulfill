@@ -17,11 +17,11 @@ export function ActivityRow({ e }: {
       {/* The rail: a log reads as a sequence, and the dot-and-line is what says so without
           a heading per entry. */}
       <View style={{ alignItems: "center", width: 10, paddingTop: 5 }}>
-        <View style={{ width: 7, height: 7, borderRadius: R.pill, backgroundColor: C.primary }} />
-        <View style={{ flex: 1, width: 1, backgroundColor: C.border, marginTop: 4 }} />
+        <View style={{ width: 7, height: 7, borderRadius: R.pill, backgroundColor: C.ink }} />
+        <View style={{ flex: 1, width: 1, backgroundColor: C.hairline, marginTop: 4 }} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15, color: C.fg, lineHeight: 20 }}>{e.text || "—"}</Text>
+        <Text style={{ fontSize: 15, color: C.ink, lineHeight: 20 }}>{e.text || "—"}</Text>
         <Text style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
           {[e.by, when].filter(Boolean).join(" · ")}
         </Text>
@@ -30,7 +30,7 @@ export function ActivityRow({ e }: {
         {e.attachment?.url && String(e.attachment.mime || "").startsWith("image/") && (
           <Image
             source={{ uri: e.attachment.url }}
-            style={{ width: "100%", height: 190, marginTop: 10, borderRadius: R.card, backgroundColor: C.accent }}
+            style={{ width: "100%", height: 190, marginTop: 10, borderRadius: R.card, backgroundColor: C.hueMist }}
             resizeMode="cover"
           />
         )}

@@ -9,10 +9,12 @@ import { getOrders, getMe, assetUrl, type Order, type User } from "@/lib/api"
 import {
   Screen, Head, HeadButton, SectionHead, Tile, TileRow, Skeleton, EmptyState, Appear, GUTTER,
 } from "@/components/kit"
-import { useCountUp, useReducedMotion } from "@/lib/motion"
+import { useCountUp, usePressScale, useReducedMotion } from "@/lib/motion"
 import { router, useFocusEffect } from "expo-router"
 import { isOpen, isOverdue, normalizeStage, platformOf, numOf, lineListing } from "@/lib/orders"
-import { TAB_BAR, F, C, R, S, CARD } from "@/lib/theme"
+import { TAB_BAR, F, C, R, S, CARD, TYPE, LADDER_FILL } from "@/lib/theme"
+import { AuraCard } from "@/components/kit"
+import { MomentIcon } from "@/components/moment-icon"
 
 /**
  * MOTION, AND THE ONE RULE IT OBEYS.
@@ -108,14 +110,15 @@ function Counter({ value, reduced, style }: { value: number; reduced: boolean; s
  * also mean four more hues on a screen that has to keep red, amber and violet meaning
  * exactly one thing each.
  *
- * The dark end is the block colour, so the ramp finishes on something already in the app
- * rather than on a fifth grey invented for a chart.
+ * The ramp is four steps of the ONE action hue and finishes on `hueDeep`, so a chart of
+ * where work sits is drawn in the app's own colour rather than in greys invented for it.
+ * See LADDER_FILL in lib/theme.ts.
  */
 const LADDER = [
-  { stage: "", label: "New", fill: "#C6CBD0" },
-  { stage: "in_review", label: "Pending", fill: "#A2AAB1" },
-  { stage: "approved", label: "Approved", fill: "#6E7880" },
-  { stage: "working", label: "Working", fill: C.ink },
+  { stage: "", label: "New", fill: LADDER_FILL[0] },
+  { stage: "in_review", label: "Pending", fill: LADDER_FILL[1] },
+  { stage: "approved", label: "Approved", fill: LADDER_FILL[2] },
+  { stage: "working", label: "Working", fill: LADDER_FILL[3] },
 ] as const
 
 
@@ -151,15 +154,15 @@ function FilterRow({ value, options, onPick }: {
             onPress={() => onPick(o)}
             style={({ pressed }) => ({
               paddingHorizontal: 14, height: 34, justifyContent: "center",
-              borderRadius: R.control,
-              backgroundColor: live ? C.fg : pressed ? C.accent : C.card,
-              borderWidth: 1, borderColor: live ? C.fg : C.border,
+              borderRadius: R.chip,
+              backgroundColor: live ? C.hueDeep : pressed ? C.hueMist : C.surface,
+              borderWidth: 1.5, borderColor: live ? C.hueDeep : C.hairline,
             })}
           >
             <Text style={{
               fontSize: 13.5,
               fontFamily: live ? F.semi : F.medium,
-              color: live ? C.onPrimary : C.muted,
+              color: live ? "#FFFFFF" : C.muted,
             }}>
               {o}
             </Text>
@@ -172,145 +175,54 @@ function FilterRow({ value, options, onPick }: {
 
 
 /**
- * THE ONLY PICTURES ON THE SCREEN, AND THEY ARE REAL.
+ * THE HERO — the screen's one moment.
  *
- * A dashboard is where decorative imagery goes to be meaningless — a stock photograph of a
- * factory costs a download and tells an operator nothing. So the imagery here is the WORK:
- * the orders that are overdue or rushed, as the things they are, in the order you would pick
- * them up. Tapping one opens it.
+ * IT WAS A PHOTOGRAPH: a stock sky, cropped by scanning every window of the source for the
+ * highest contrast under the type block. That was the right solution to the old direction's
+ * problem, which was that it had no colour of its own to make a hero out of. This one does.
+ * The wash IS the brand here, so a photograph of a different sky sitting on top of it is two
+ * identities on one card — and the aura is rationed precisely so that this card can spend it.
  *
- * These are the marketplace's listing photos, not artwork — the list payload does not carry
- * design files, and lineArt is explicit that a product photo must never stand in for one. So
- * the strip is never labelled as artwork, and a line with no photo shows its order number on
- * a plain ground rather than borrowing a picture from somewhere else.
+ * The card IS the action. An earlier draft put a circular button in the corner, which is one
+ * more thing to explain when the whole card is already pressable.
  *
- * It only exists when something is wrong. On a calm morning there is nothing here at all,
- * which is the same argument as the peek: a signal, not chrome.
+ * assets/card-sky.webp and card-hill.webp are now referenced by nothing. They are left in
+ * place rather than deleted — CLAUDE.md §2.2, and they are the only two photographs the app
+ * ships if this is ever reversed.
  */
-function NeedsYouStrip({ orders, reduced }: { orders: Order[]; reduced: boolean }) {
-  const fade = useGrow(1, reduced, D.fast)
-  if (!orders.length) return null
+function HeroCard({ figure, title, note, onPress }: {
+  figure: number | null
+  title: string
+  note?: string | null
+  onPress: () => void
+}) {
+  const reduced = useReducedMotion()
+  const press = usePressScale(reduced, 0.985)
+  const shown = useCountUp(figure ?? 0, reduced)
   return (
-    <Animated.View style={{ opacity: fade }}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: S.sm }}
-        style={{ marginTop: S.lg, flexGrow: 0 }}
-      >
-        {orders.map((o) => {
-          const src = assetUrl(lineListing(o.items?.[0] ?? {}))
-          return (
-            <Pressable
-              key={o.id}
-              onPress={() => router.push(`/order/${encodeURIComponent(o.id)}`)}
-              style={({ pressed }) => ({ width: 68, opacity: pressed ? 0.7 : 1, gap: 5 })}
-            >
-              <View style={{
-                width: 68, height: 68, borderRadius: R.badge, overflow: "hidden",
-                backgroundColor: C.inkAccent, alignItems: "center", justifyContent: "center",
-              }}>
-                {src ? (
-                  <Image source={{ uri: src }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                ) : (
-                  <Ionicons name="shirt-outline" size={22} color={C.onInk} />
-                )}
-              </View>
-              <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: F.medium, color: C.onInk, opacity: 0.7 }}>
-                {numOf(o)}
-              </Text>
-            </Pressable>
-          )
-        })}
-      </ScrollView>
+    <Animated.View style={{ transform: [{ scale: press.scale }], marginTop: S.lg }}>
+      <Pressable onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut}>
+        <AuraCard style={{ minHeight: 168, justifyContent: "flex-end", padding: 22 }}>
+          {figure === null ? (
+            /* ALL CLEAR is a moment in its own right, and it gets the drawn mark rather than
+               a zero — "0 orders need you" is a figure you have to parse to feel good about. */
+            <MomentIcon kind="done" size={64} />
+          ) : (
+            <Text style={{ fontSize: 56, lineHeight: 58, fontFamily: F.bold, color: C.ink, letterSpacing: -2 }}>
+              {Math.round(shown)}
+            </Text>
+          )}
+          <Text style={{ ...TYPE.h3, fontFamily: F.semi, color: C.ink, marginTop: 6 }}>{title}</Text>
+          {note ? (
+            <Text style={{ ...TYPE.small, fontFamily: F.body, color: C.muted, marginTop: 3 }}>{note}</Text>
+          ) : null}
+        </AuraCard>
+      </Pressable>
     </Animated.View>
   )
 }
 
-
-
-/**
- * A PHOTO CARD — the picture is INSIDE it, not behind the page.
- *
- * Behind the page a photograph fights every word on top of it: on the sky used here, ink
- * measured 1.7:1 and white 1.1:1, because a mid blue sits between both and neither wins.
- * Inside a card the crop is a decision — each of these was chosen by scanning every window
- * of the source and taking the highest contrast under the type block, then softening the
- * lower third where the words actually sit. Ink clears 5.9:1 on both.
- *
- * The card IS the action. An earlier draft put a circular button on the corner, which is
- * one more thing to explain when the whole card is already pressable.
- */
-
-
-function PhotoCard({ art, figure, title, note, thumbs, onPress, height, top }: {
-  art: number; title: string; note?: string | null
-  /** A number to lead with. "1,065 orders need you" is correct and flat — the figure is the
-   *  thing worth seeing from across a room, and a sentence at 25pt buries it in its own
-   *  middle. Big number, short phrase under it. */
-  figure?: number | null
-  thumbs?: string[]; onPress: () => void
-  /** Space above it. The card lost its section heading, so it now owns the gap the heading
-   *  used to provide. */
-  top?: number
-  /* AN EXPLICIT HEIGHT, not an aspectRatio. aspectRatio on an <Image> resolved against the
-     file's own dimensions rather than the given width, and a 4:3 crop drew 555pt tall on a
-     414pt screen — one card filling the whole home screen. A card's height is a layout
-     decision anyway; it should not change because someone re-crops the art. */
-  height: number
-}) {
-  const reduced = useReducedMotion()
-  const shownFigure = useCountUp(figure ?? 0, reduced)
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        marginHorizontal: S.xl, marginTop: top ?? 0, borderRadius: 26, overflow: "hidden",
-        opacity: pressed ? 0.92 : 1, backgroundColor: C.accent,
-      })}
-    >
-      <Image source={art} style={{ width: "100%", height }} resizeMode="cover" />
-      <View style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
-        {thumbs && thumbs.length > 0 && (
-          <View style={{ flexDirection: "row", marginBottom: 10 }}>
-            {thumbs.slice(0, 3).map((u, i) => (
-              <Image
-                key={i}
-                source={{ uri: u }}
-                style={{
-                  width: 38, height: 38, borderRadius: R.control, backgroundColor: C.accent,
-                  marginLeft: i === 0 ? 0 : -12, borderWidth: 2, borderColor: "#fff",
-                }}
-                resizeMode="cover"
-              />
-            ))}
-          </View>
-        )}
-        {figure != null && (
-          <Text style={{ fontSize: 58, lineHeight: 60, fontFamily: F.bold, color: C.fg, letterSpacing: -2.6 }}>
-            {Math.round(shownFigure).toLocaleString()}
-          </Text>
-        )}
-        <Text style={{
-          fontSize: figure != null ? 20 : height >= 200 ? 25 : 22,
-          fontFamily: figure != null ? F.displaySemi : F.bold,
-          color: C.fg, letterSpacing: -0.4, marginTop: figure != null ? 1 : 0,
-        }}>
-          {title}
-        </Text>
-        {note ? (
-          <Text style={{ fontSize: 13, lineHeight: 19, fontFamily: F.body, color: C.fg, opacity: 0.75, marginTop: 5 }}>
-            {note}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
-  )
-}
-
-
-
-export default function Dashboard() {
+export default function Home() {
   const insets = useSafeAreaInsets()
   const [orders, setOrders] = useState<Order[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -511,10 +423,7 @@ export default function Dashboard() {
               is the difference between an app that feels built and one that feels assembled —
               and it is one property, because two fighting over one element never shows. */}
           <Appear index={0}>
-            <PhotoCard
-              height={228}
-              top={S.xl}
-              art={require("../../assets/card-sky.webp")}
+            <HeroCard
               figure={needsYou === 0 ? null : needsYou}
               title={needsYou === 0 ? "All clear" : needsYou === 1 ? "order needs you" : "orders need you"}
               note={needsYou === 0 ? "Everything open is on time." : needsNote}
@@ -527,17 +436,17 @@ export default function Dashboard() {
               lens, Scan a tab — so the word on a tile is the word on the screen it opens. */}
           <Appear index={1}>
             <TileRow first>
-              <Tile n={open.length} label="Open" bg={C.brand} fg={C.onBrand}
+              <Tile n={open.length} label="Open" bg={C.hueDeep} fg={"#FFFFFF"}
                     onPress={() => router.push("/(tabs)/orders")} />
-              <Tile n={stageCounts.working ?? 0} label="Working" bg={C.lit} fg={C.onLit}
+              <Tile n={stageCounts.working ?? 0} label="Working" bg={C.hueMist} fg={C.hueDeep}
                     onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Open" } })} />
             </TileRow>
           </Appear>
           <Appear index={2}>
             <TileRow>
-              <Tile n={awaitingScan ?? 0} label="Scan" bg={C.acid} fg={C.onAcid}
+              <Tile n={awaitingScan ?? 0} label="Scan" bg={C.warnTint} fg={C.warn}
                     onPress={() => router.push("/(tabs)/scan")} />
-              <Tile n={shipped} label="Shipped" bg={C.pop} fg={C.onPop}
+              <Tile n={shipped} label="Shipped" bg={C.successTint} fg={C.success}
                     onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "All" } })} />
             </TileRow>
           </Appear>
@@ -558,7 +467,7 @@ export default function Dashboard() {
                   <Pressable key={w.id} onPress={() => router.push(`/order/${encodeURIComponent(w.id)}`)}
                              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
                     <Image source={{ uri: w.uri }}
-                           style={{ width: 132, height: 132, borderRadius: R.card, backgroundColor: C.accent }}
+                           style={{ width: 132, height: 132, borderRadius: R.card, backgroundColor: C.hueMist }}
                            resizeMode="cover" />
                     <Text numberOfLines={1} style={{ width: 132, marginTop: 7, fontSize: 12.5, fontFamily: F.medium, color: C.muted }}>
                       {w.num}

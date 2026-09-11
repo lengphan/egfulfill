@@ -88,7 +88,7 @@ export default function ChatThread() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: C.canvas, paddingTop: insets.top }}>
       {/* The app's own back row — the root Stack runs headerShown:false, so a native title
           bar here would be the only one in the app. */}
       <Pressable
@@ -96,13 +96,13 @@ export default function ChatThread() {
         style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 16, paddingVertical: 10 }}
         hitSlop={8}
       >
-        <Ionicons name="chevron-back" size={22} color={C.primary} />
-        <Text style={{ color: C.primary, fontSize: 16, fontFamily: F.medium }} numberOfLines={1}>
+        <Ionicons name="chevron-back" size={22} color={C.ink} />
+        <Text style={{ color: C.ink, fontSize: 16, fontFamily: F.medium }} numberOfLines={1}>
           {String(title ?? "Chat")}
         </Text>
       </Pressable>
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: C.bg }}
+        style={{ flex: 1, backgroundColor: C.canvas }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 96 : 0}
       >
@@ -136,7 +136,7 @@ export default function ChatThread() {
         <View style={{
           flexDirection: "row", alignItems: "flex-end", gap: 10,
           paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14,
-          borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bg,
+          borderTopWidth: 1, borderTopColor: C.hairline, backgroundColor: C.canvas,
         }}>
           <TextInput
             value={text}
@@ -145,22 +145,22 @@ export default function ChatThread() {
             placeholderTextColor={C.muted}
             multiline
             style={{
-              flex: 1, maxHeight: 120, minHeight: 42, borderRadius: R.control,
+              flex: 1, maxHeight: 120, minHeight: 42, borderRadius: R.chip,
               borderWidth: 1, borderColor: C.edge,
-              backgroundColor: C.card, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 11,
-              fontSize: 15, fontFamily: F.body, color: C.fg,
+              backgroundColor: C.surface, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 11,
+              fontSize: 15, fontFamily: F.body, color: C.ink,
             }}
           />
           <Pressable
             onPress={send}
             disabled={!text.trim() || sending}
             style={({ pressed }) => ({
-              width: 42, height: 42, borderRadius: R.pill, backgroundColor: C.ink,
+              width: 42, height: 42, borderRadius: R.pill, backgroundColor: C.hueDeep,
               alignItems: "center", justifyContent: "center",
               opacity: !text.trim() || sending ? 0.4 : pressed ? 0.75 : 1,
             })}
           >
-            {sending ? <ActivityIndicator color={C.onInk} /> : <Ionicons name="arrow-up" size={20} color={C.onInk} />}
+            {sending ? <ActivityIndicator color={"#FFFFFF"} /> : <Ionicons name="arrow-up" size={20} color={"#FFFFFF"} />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>

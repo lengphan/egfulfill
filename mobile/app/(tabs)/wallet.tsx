@@ -73,16 +73,16 @@ export default function Wallet() {
 
   if (w === null && !err) {
     return (
-      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color={C.primary} />
+      <View style={{ flex: 1, backgroundColor: C.canvas, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={C.ink} />
       </View>
     )
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: C.canvas, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: 20 }}>
-        <Text style={{ fontSize: 32, fontFamily: F.display, color: C.fg, marginTop: 8, letterSpacing: -0.8 }}>{noWallet && canReview ? "Top-ups" : "Wallet"}</Text>
+        <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.ink, marginTop: 8, letterSpacing: -0.8 }}>{noWallet && canReview ? "Top-ups" : "Wallet"}</Text>
 
         {/* A BALANCE IS READ OFTEN, so it is a quiet card rather than a coloured block —
             and "low" is a chip, not a repaint. Turning the whole panel red made a working
@@ -122,7 +122,7 @@ export default function Wallet() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             <Text style={{ color: C.muted, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>BALANCE</Text>
             {w?.low && (
-              <View style={{ paddingHorizontal: 10, height: 24, borderRadius: R.badge, justifyContent: "center", backgroundColor: C.warnTint }}>
+              <View style={{ paddingHorizontal: 10, height: 24, borderRadius: R.chip, justifyContent: "center", backgroundColor: C.warnTint }}>
                 <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.warn }}>
                   LOW{w.lowBelow != null ? ` · UNDER ${money(w.lowBelow)}` : ""}
                 </Text>
@@ -133,7 +133,7 @@ export default function Wallet() {
               reads as a redaction rather than as "not known" — and on a BALANCE that is the
               worst possible misreading. */}
           <Text style={{
-            color: err ? C.muted : C.fg,
+            color: err ? C.muted : C.ink,
             fontSize: 62, fontFamily: F.bold, letterSpacing: -2.4, marginTop: 6,
           }}>
             {err ? "—" : money(shownBalance)}
@@ -146,15 +146,15 @@ export default function Wallet() {
           onPress={() => router.push("/topup")}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            marginTop: 18, height: 54, borderRadius: R.pill, backgroundColor: C.ink,
+            marginTop: 18, height: 54, borderRadius: R.pill, backgroundColor: C.hueDeep,
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Ionicons name="add" size={20} color={C.onInk} />
+          <Ionicons name="add" size={20} color={"#FFFFFF"} />
           {/* The one action on the screen, so it is filled rather than outlined. Acid was
               tried here and is wrong on white: the kit measures it at 1.1:1 and forbids it
               off the plate, which is exactly this case. */}
-          <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 16 }}>Add funds</Text>
+          <Text style={{ color: "#FFFFFF", fontFamily: F.bold, fontSize: 16 }}>Add funds</Text>
         </Pressable>
         )}
 
@@ -171,7 +171,7 @@ export default function Wallet() {
         /* Staff with no seller wallet AND no business confirming transfers. Says which of
            the two it is rather than showing an empty ledger, which reads as a failed load. */
         <View style={{ paddingHorizontal: 20, paddingTop: 4 }}>
-          <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>No wallet on this account</Text>
+          <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.ink }}>No wallet on this account</Text>
           <Text style={{ fontSize: 14, color: C.muted, marginTop: 4, lineHeight: 20 }}>
             Only a seller account carries a balance. Confirming a seller&apos;s top-up is
             admin or warehouse.
@@ -181,7 +181,7 @@ export default function Wallet() {
       <FlatList
         data={w?.ledger ?? []}
         keyExtractor={(r) => String(r.id)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.ink} />}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + TAB_BAR.clearance }}
         ListEmptyComponent={
           /* THE FOUR PARTS (§4), with the brand's own object as the mark. A grey glyph in a
@@ -201,17 +201,17 @@ export default function Wallet() {
           return (
             <View style={{
               flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12,
-              paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border,
+              paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.hairline,
             }}>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: F.medium, color: C.fg }}>
+                <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: F.medium, color: C.ink }}>
                   {item.note || item.type}
                 </Text>
                 <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                   {new Date(item.created_at).toLocaleDateString()}
                 </Text>
               </View>
-              <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.fg }}>
+              <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.ink }}>
                 {d < 0 ? "−" : "+"}{money(Math.abs(d))}
               </Text>
             </View>

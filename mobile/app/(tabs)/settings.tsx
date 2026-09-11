@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { getMe, clearToken, getConnections, getNotifyPrefs, setNotifyPref, type User, type StoreConnection, type NotifyChannel } from "@/lib/api"
 import { enablePush, disablePush, pushState, type PushState } from "@/lib/push"
 import { useFocusEffect } from "expo-router"
-import { TAB_BAR,F,C, R, CARD } from "@/lib/theme"
+import { TAB_BAR, F, C, R, CARD, TYPE } from "@/lib/theme"
 
 /** The channels the product supports, in the order the web lists them. A channel with no
  *  connection still gets a row: "we don't do TikTok" and "you haven't connected TikTok" are
@@ -42,10 +42,10 @@ function Line({ label, value, last }: { label: string; value: string; last?: boo
     <View style={{
       flexDirection: "row", justifyContent: "space-between", gap: 16,
       paddingVertical: 15, paddingHorizontal: 16,
-      borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border,
+      borderBottomWidth: last ? 0 : 1, borderBottomColor: C.hairline,
     }}>
       <Text style={{ fontSize: 15, color: C.muted }}>{label}</Text>
-      <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
+      <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.ink, flexShrink: 1, textAlign: "right" }}>{value}</Text>
     </View>
   )
 }
@@ -148,10 +148,10 @@ export default function Settings() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: C.bg }}
+      style={{ flex: 1, backgroundColor: C.canvas }}
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 8, paddingBottom: insets.bottom + TAB_BAR.clearance + 8 }}
     >
-      <Text style={{ fontSize: 30, fontFamily: F.display, color: C.fg, letterSpacing: -0.5 }}>Settings</Text>
+      <Text style={{ fontSize: 30, fontFamily: F.bold, color: C.ink, letterSpacing: -0.5 }}>Settings</Text>
 
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>ACCOUNT</Text>
       <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
@@ -184,6 +184,13 @@ export default function Settings() {
           origin, so Connect genuinely cannot happen on the phone — §4 says explain, never
           hide, so the row names the reason rather than offering a button that would fail. */}
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>STORES</Text>
+      {/* ONCE, not once per row. Connecting runs through a redirect_uri registered with
+          Etsy, Shopify and TikTok that points at the web origin, so it genuinely cannot
+          happen on the phone — §4 says explain rather than hide, and explaining it three
+          times over is how an explanation stops being read. */}
+      <Text style={{ ...TYPE.small, fontFamily: F.body, color: C.muted, marginTop: 4 }}>
+        Channels are connected on the web.
+      </Text>
       <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
         {STORES.map((st, i) => {
           const mine = conns?.filter((c) => c.platform === st.key) ?? []
@@ -199,24 +206,24 @@ export default function Settings() {
               key={st.key}
               style={{
                 paddingHorizontal: 16, paddingVertical: 13,
-                borderBottomWidth: i === STORES.length - 1 ? 0 : 1, borderBottomColor: C.border,
+                borderBottomWidth: i === STORES.length - 1 ? 0 : 1, borderBottomColor: C.hairline,
               }}
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg, flex: 1 }}>{st.label}</Text>
-                <Text style={{ fontSize: 13, fontFamily: F.medium, color: dead ? C.alert : mine.length ? C.fg : C.muted }}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.ink, flex: 1 }}>{st.label}</Text>
+                <Text style={{ fontSize: 13, fontFamily: F.medium, color: dead ? C.alert : mine.length ? C.ink : C.muted }}>
                   {conns === null ? "…" : dead ? "Reconnect" : mine.length ? "Connected" : "Not connected"}
                 </Text>
               </View>
-              {conns !== null && (
-                <Text style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, marginTop: 3 }}>
+              {conns !== null && mine.length > 0 && (
+                <Text style={{ ...TYPE.small, fontFamily: F.body, color: C.muted, marginTop: 3 }}>
                   {mine.length
                     ? [mine.map((c) => c.shop_name || c.shop_id).join(", "),
                        dead
                          ? `token expired ${new Date(dead.token_expires_at as string).toLocaleDateString()} — orders not syncing`
                          : synced ? `synced ${new Date(synced).toLocaleDateString()}` : "never synced"]
                         .filter(Boolean).join("  ·  ")
-                    : "Connect this channel on the web"}
+                    : null}
                 </Text>
               )}
             </View>
@@ -258,22 +265,22 @@ export default function Settings() {
             }}
             style={({ pressed }) => ({
               height: 48, alignItems: "center", justifyContent: "center",
-              borderTopWidth: 1, borderTopColor: C.border,
-              backgroundColor: pressed ? C.accent : "transparent",
+              borderTopWidth: 1, borderTopColor: C.hairline,
+              backgroundColor: pressed ? C.hueMist : "transparent",
             })}
           >
-            <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>Turn on notifications</Text>
+            <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.ink }}>Turn on notifications</Text>
           </Pressable>
         ) : push === "blocked" ? (
           <Pressable
             onPress={() => Linking.openSettings()}
             style={({ pressed }) => ({
               height: 48, alignItems: "center", justifyContent: "center",
-              borderTopWidth: 1, borderTopColor: C.border,
-              backgroundColor: pressed ? C.accent : "transparent",
+              borderTopWidth: 1, borderTopColor: C.hairline,
+              backgroundColor: pressed ? C.hueMist : "transparent",
             })}
           >
-            <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>Open iOS Settings</Text>
+            <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.ink }}>Open iOS Settings</Text>
           </Pressable>
         ) : null}
       </View>
@@ -290,19 +297,19 @@ export default function Settings() {
               style={{
                 flexDirection: "row", alignItems: "center", gap: 12,
                 paddingHorizontal: 16, paddingVertical: 9,
-                borderBottomWidth: i === chans.length - 1 ? 0 : 1, borderBottomColor: C.border,
+                borderBottomWidth: i === chans.length - 1 ? 0 : 1, borderBottomColor: C.hairline,
               }}
             >
-              <Text style={{ fontSize: 15, fontFamily: F.body, color: C.fg, flex: 1 }}>{c.label}</Text>
+              <Text style={{ fontSize: 15, fontFamily: F.body, color: C.ink, flex: 1 }}>{c.label}</Text>
               <Switch
                 value={c.on}
                 /* NOT THE OS GREEN. Emerald is a reserved status colour here — it means an
                    order shipped — and a settings toggle borrowing it puts a stage colour on
                    a screen that has no stages. Ink is what "on" looks like everywhere else
                    in this app. */
-                trackColor={{ false: C.border, true: C.ink }}
+                trackColor={{ false: C.hairline, true: C.hueDeep }}
                 thumbColor="#FFFFFF"
-                ios_backgroundColor={C.border}
+                ios_backgroundColor={C.hairline}
                 /* Optimistic, and it puts the switch BACK if the server refuses. A toggle
                    that waits for a round trip feels broken; one that lies about the result
                    is worse. */
@@ -328,11 +335,11 @@ export default function Settings() {
           disabled={upd === "checking" || upd === "fetching"}
           style={({ pressed }) => ({
             height: 48, alignItems: "center", justifyContent: "center",
-            borderTopWidth: 1, borderTopColor: C.border,
-            backgroundColor: pressed ? C.accent : "transparent",
+            borderTopWidth: 1, borderTopColor: C.hairline,
+            backgroundColor: pressed ? C.hueMist : "transparent",
           })}
         >
-          <Text style={{ fontSize: 15, fontFamily: F.semi, color: upd === "current" ? C.muted : C.fg }}>
+          <Text style={{ fontSize: 15, fontFamily: F.semi, color: upd === "current" ? C.muted : C.ink }}>
             {upd === "checking" ? "Checking…"
               : upd === "fetching" ? "Downloading…"
               : upd === "current" ? "Already the newest"
@@ -348,18 +355,18 @@ export default function Settings() {
         onPress={() => Linking.openURL("https://app.egful.store")}
         style={({ pressed }) => ({
           flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-          marginTop: 28, height: 50, borderRadius: R.control, borderWidth: 1, borderColor: C.edge,
+          marginTop: 28, height: 50, borderRadius: R.chip, borderWidth: 1, borderColor: C.edge,
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Ionicons name="open-outline" size={18} color={C.fg} />
-        <Text style={{ fontSize: 16, fontFamily: F.medium, color: C.fg }}>Open the full app</Text>
+        <Ionicons name="open-outline" size={18} color={C.ink} />
+        <Text style={{ fontSize: 16, fontFamily: F.medium, color: C.ink }}>Open the full app</Text>
       </Pressable>
 
       <Pressable
         onPress={signOut}
         style={({ pressed }) => ({
-          marginTop: 12, height: 50, borderRadius: R.control, alignItems: "center", justifyContent: "center",
+          marginTop: 12, height: 50, borderRadius: R.chip, alignItems: "center", justifyContent: "center",
           borderWidth: 1, borderColor: C.edge, opacity: pressed ? 0.6 : 1,
         })}
       >

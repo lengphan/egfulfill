@@ -11,7 +11,8 @@ import {
   normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines, PIPELINE,
   STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder, recordedRevenue, heldFromOf,
 } from "@/lib/orders"
-import { F,C, R, CARD_INK, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
+import { F, C, R, S, TYPE, SECTION, toneOf, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
+import { AuraCard } from "@/components/kit"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
@@ -61,9 +62,9 @@ function Section({ title, right }: { title: string; right?: string }) {
   return (
     <View style={{
       flexDirection: "row", alignItems: "baseline", justifyContent: "space-between",
-      marginTop: 22, paddingBottom: 7, borderBottomWidth: 1, borderBottomColor: C.border,
+      marginTop: 22, paddingBottom: 7, borderBottomWidth: 1, borderBottomColor: C.hairline,
     }}>
-      <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.fg, letterSpacing: 1.4 }}>{title}</Text>
+      <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.ink, letterSpacing: 1.4 }}>{title}</Text>
       {right ? <Text style={{ fontSize: 12, color: C.muted, fontFamily: F.medium }}>{right}</Text> : null}
     </View>
   )
@@ -76,10 +77,10 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={{
       flexDirection: "row", justifyContent: "space-between", gap: 16,
-      paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border,
+      paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.hairline,
     }}>
       <Text style={{ fontSize: 14, color: C.muted }}>{label}</Text>
-      <Text style={{ fontSize: 14, fontFamily: F.semi, color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
+      <Text style={{ fontSize: 14, fontFamily: F.semi, color: C.ink, flexShrink: 1, textAlign: "right" }}>{value}</Text>
     </View>
   )
 }
@@ -198,7 +199,7 @@ export default function OrderDetail() {
   const link = trackingLink(o?.carrier, code)
   const stage = normalizeStage(o?.factory_status)
   /* The header is the INK block, so the pill takes the on-ink pair. */
-  const tone = toneOnInk(stage)
+  const tone = toneOf(stage)
   const role = me?.role ?? ""
   const staff = !!role && role !== "seller"
   const to = o ? nextStage(o) : null
@@ -235,29 +236,29 @@ export default function OrderDetail() {
   const sizeText = `${itemCount} ${itemCount === 1 ? "item" : "items"}`
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: C.canvas, paddingTop: insets.top }}>
       <Pressable
         onPress={() => router.back()}
         style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 16, paddingVertical: 10 }}
         hitSlop={8}
       >
-        <Ionicons name="chevron-back" size={22} color={C.primary} />
-        <Text style={{ color: C.primary, fontSize: 16, fontFamily: F.medium }}>Orders</Text>
+        <Ionicons name="chevron-back" size={22} color={C.ink} />
+        <Text style={{ color: C.ink, fontSize: 16, fontFamily: F.medium }}>Orders</Text>
       </Pressable>
 
       {!o && !err ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={C.primary} />
+          <ActivityIndicator color={C.ink} />
         </View>
       ) : err ? (
         <Text style={{ color: C.alert, fontSize: 14, paddingHorizontal: 20, marginTop: 12 }}>{err}</Text>
       ) : o ? (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.ink} />}
         >
           {/* ── THE JOB, in one block ──────────────────────────────────────────── */}
-          <View style={{ ...CARD_INK, padding: 22 }}>
+          <AuraCard style={{ padding: 22, marginHorizontal: 0 }}>
             {/*
              * THE HEADER ANSWERS ONE QUESTION: where has this got to.
              *
@@ -267,7 +268,7 @@ export default function OrderDetail() {
              * the money are all LOOKUPS: they belong in a group you scroll to, and each of
              * them already has a home further down (Details, the ITEMS heading, Details).
              */}
-            <Text selectable style={{ fontSize: 42, fontFamily: F.bold, color: C.onInk, letterSpacing: -1.6 }}>
+            <Text selectable style={{ fontSize: 42, fontFamily: F.bold, color: C.ink, letterSpacing: -1.6 }}>
               {numOf(o)}
             </Text>
 
@@ -279,7 +280,7 @@ export default function OrderDetail() {
               {PIPELINE.map((st, i) => (
                 <View key={st} style={{
                   flex: 1, height: 3, borderRadius: R.pill,
-                  backgroundColor: C.onInk, opacity: i <= PIPELINE.indexOf(stage as never) ? 0.92 : 0.2,
+                  backgroundColor: i <= PIPELINE.indexOf(stage as never) ? C.hueDeep : C.hairline,
                 }} />
               ))}
             </View>
@@ -298,16 +299,16 @@ export default function OrderDetail() {
                   facts here that are not a lookup — they are the reason to act today. */}
               {o.rush && (
                 <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: C.warn }}>
-                  <Text style={{ fontSize: 10, fontFamily: F.bold, color: "#fff", letterSpacing: 0.6 }}>RUSH</Text>
+                  <Text style={{ fontSize: 11, fontFamily: F.bold, color: "#fff", letterSpacing: 0.6 }}>RUSH</Text>
                 </View>
               )}
               {late && (
                 <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: C.alert }}>
-                  <Text style={{ fontSize: 10, fontFamily: F.bold, color: "#fff", letterSpacing: 0.6 }}>LATE</Text>
+                  <Text style={{ fontSize: 11, fontFamily: F.bold, color: "#fff", letterSpacing: 0.6 }}>LATE</Text>
                 </View>
               )}
             </View>
-          </View>
+          </AuraCard>
 
           {/* ── THE ONE THING TO PRESS ─────────────────────────────────────────────
               Directly under the job and nowhere else. Which button it is depends on where
@@ -317,7 +318,7 @@ export default function OrderDetail() {
             stage === "working" ? (
               shipDenial ? (
                 <View style={{ ...SECTION_FLUSH }}>
-                  <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>Not yours to ship</Text>
+                  <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.ink }}>Not yours to ship</Text>
                   <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>{shipDenial}</Text>
                 </View>
               ) : (
@@ -328,7 +329,7 @@ export default function OrderDetail() {
                  learned from. A control that silently vanishes leaves the rule unlearnable;
                  the stage and whose call it is are both named. */
               <View style={{ ...SECTION_FLUSH }}>
-                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.ink }}>
                   {stageAction(to)}
                 </Text>
                 <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>{denial}</Text>
@@ -345,7 +346,7 @@ export default function OrderDetail() {
                 disabled={moving}
                 style={({ pressed }) => ({
                   ...HERO_BUTTON,
-                  marginTop: 12, backgroundColor: C.ink,
+                  marginTop: 12, backgroundColor: C.hueDeep,
                   opacity: pressed || moving ? 0.8 : 1,
                 })}
               >
@@ -353,11 +354,11 @@ export default function OrderDetail() {
                     picture of the word next to it — starting has a universal mark and
                     "Approve" does not, which is why the arrow came off that one. */}
                 {moving
-                  ? <ActivityIndicator color={C.onInk} />
+                  ? <ActivityIndicator color={"#FFFFFF"} />
                   : to === "working"
-                    ? <Ionicons name="play" size={HERO_GLYPH} color={C.onInk} />
+                    ? <Ionicons name="play" size={HERO_GLYPH} color={"#FFFFFF"} />
                     : null}
-                <Text style={{ ...HERO_LABEL, color: C.onInk }}>
+                <Text style={{ ...HERO_LABEL, color: "#FFFFFF" }}>
                   {stageAction(to)}
                 </Text>
               </Pressable>
@@ -396,7 +397,7 @@ export default function OrderDetail() {
                     style={{
                       fontSize: i === 0 ? 17 : 15,
                       fontWeight: i === 0 ? "800" : "400",
-                      color: i === 0 ? C.fg : C.muted,
+                      color: i === 0 ? C.ink : C.muted,
                       letterSpacing: i === 0 ? -0.3 : 0,
                     }}
                   >
@@ -411,7 +412,7 @@ export default function OrderDetail() {
               </>
             ) : (
               <>
-                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.ink }}>
                   {o.customer?.name || "No name on this order"}
                 </Text>
                 <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
@@ -429,7 +430,7 @@ export default function OrderDetail() {
           }}>
             {code ? (
               <>
-                <Text selectable style={{ fontSize: 20, fontFamily: F.bold, color: C.fg, letterSpacing: -0.4 }}>{code}</Text>
+                <Text selectable style={{ fontSize: 20, fontFamily: F.bold, color: C.ink, letterSpacing: -0.4 }}>{code}</Text>
                 <Text style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
                   {[o.carrier ? String(o.carrier).toUpperCase() : null, o.label_printed_at ? "label printed" : null]
                     .filter(Boolean).join(" · ") || "Carrier unknown"}
@@ -439,12 +440,12 @@ export default function OrderDetail() {
                     <Pressable
                       onPress={() => Linking.openURL(link)}
                       style={({ pressed }) => ({
-                        flex: 1, height: 46, borderRadius: R.control, flexDirection: "row", gap: 8,
+                        flex: 1, height: 46, borderRadius: R.chip, flexDirection: "row", gap: 8,
                         alignItems: "center", justifyContent: "center",
-                        backgroundColor: C.ink, opacity: pressed ? 0.85 : 1,
+                        backgroundColor: C.hueDeep, opacity: pressed ? 0.85 : 1,
                       })}
                     >
-                      <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 15 }}>Track</Text>
+                      <Text style={{ color: "#FFFFFF", fontFamily: F.bold, fontSize: 15 }}>Track</Text>
                     </Pressable>
                   )}
                   {/* Staff only, and only when there is a PDF: the server nulls the label
@@ -454,13 +455,13 @@ export default function OrderDetail() {
                       onPress={printLabel}
                       disabled={printing}
                       style={({ pressed }) => ({
-                        flex: 1, height: 46, borderRadius: R.control, flexDirection: "row", gap: 8,
+                        flex: 1, height: 46, borderRadius: R.chip, flexDirection: "row", gap: 8,
                         alignItems: "center", justifyContent: "center",
-                        borderWidth: 1.5, borderColor: C.ink, opacity: pressed || printing ? 0.6 : 1,
+                        borderWidth: 1.5, borderColor: C.hueDeep, opacity: pressed || printing ? 0.6 : 1,
                       })}
                     >
-                      {printing && <ActivityIndicator color={C.ink} />}
-                      <Text style={{ color: C.ink, fontFamily: F.bold, fontSize: 15 }}>Print label</Text>
+                      {printing && <ActivityIndicator color={C.hueDeep} />}
+                      <Text style={{ color: C.hueDeep, fontFamily: F.bold, fontSize: 15 }}>Print label</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -488,13 +489,13 @@ export default function OrderDetail() {
                     onPress={printLabel}
                     disabled={printing}
                     style={({ pressed }) => ({
-                      height: 46, borderRadius: R.control, flexDirection: "row", gap: 8,
+                      height: 46, borderRadius: R.chip, flexDirection: "row", gap: 8,
                       alignItems: "center", justifyContent: "center",
-                      borderWidth: 1.5, borderColor: C.ink, opacity: pressed || printing ? 0.6 : 1,
+                      borderWidth: 1.5, borderColor: C.hueDeep, opacity: pressed || printing ? 0.6 : 1,
                     })}
                   >
-                    {printing && <ActivityIndicator color={C.ink} />}
-                    <Text style={{ color: C.ink, fontFamily: F.bold, fontSize: 15 }}>Print label</Text>
+                    {printing && <ActivityIndicator color={C.hueDeep} />}
+                    <Text style={{ color: C.hueDeep, fontFamily: F.bold, fontSize: 15 }}>Print label</Text>
                   </Pressable>
                 ) : null}
                 {/* BUYING A LABEL IS NOT A PHONE JOB, and it was the biggest panel on this
@@ -560,7 +561,7 @@ export default function OrderDetail() {
             ...SECTION_FLUSH, paddingBottom: 4,
           }}>
             {activity === null
-              ? <ActivityIndicator style={{ marginVertical: 16 }} color={C.primary} />
+              ? <ActivityIndicator style={{ marginVertical: 16 }} color={C.ink} />
               : activity.length === 0
                 ? <Text style={{ fontSize: 15, color: C.muted, paddingVertical: 14 }}>Nothing logged yet.</Text>
                 : activity.slice().reverse().map((e) => <ActivityRow key={String(e.id)} e={e} />)}

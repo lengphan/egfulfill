@@ -136,8 +136,8 @@ export default function Scan() {
   const mayScan = !me || me.role === "admin" || me.role === "warehouse"
   if (me && !mayScan) {
     return (
-      <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 40, paddingHorizontal: 24 }}>
-        <Text style={{ fontSize: 28, fontFamily: F.bold, color: C.fg }}>Scan stock</Text>
+      <View style={{ flex: 1, backgroundColor: C.canvas, paddingTop: insets.top + 40, paddingHorizontal: 24 }}>
+        <Text style={{ fontSize: 28, fontFamily: F.bold, color: C.ink }}>Scan stock</Text>
         {/* NEVER HIDE, EXPLAIN — the web's rule. It names the roles rather than saying
             "not allowed", so the answer to "who do I ask" is on the screen. */}
         <Text style={{ fontSize: 16, color: C.muted, marginTop: 10, lineHeight: 22 }}>
@@ -150,38 +150,38 @@ export default function Scan() {
 
   if (!perm) {
     return (
-      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color={C.primary} />
+      <View style={{ flex: 1, backgroundColor: C.canvas, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={C.ink} />
       </View>
     )
   }
 
   if (!perm.granted) {
     return (
-      <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 40, paddingHorizontal: 24 }}>
-        <Text style={{ fontSize: 28, fontFamily: F.bold, color: C.fg }}>Scan stock</Text>
+      <View style={{ flex: 1, backgroundColor: C.canvas, paddingTop: insets.top + 40, paddingHorizontal: 24 }}>
+        <Text style={{ fontSize: 28, fontFamily: F.bold, color: C.ink }}>Scan stock</Text>
         <Text style={{ fontSize: 16, color: C.muted, marginTop: 10, lineHeight: 22 }}>
           The camera reads the code on a shelf label or a carton, and moves that stock in or out.
         </Text>
         <Pressable
           onPress={requestPerm}
           style={({ pressed }) => ({
-            marginTop: 24, height: 54, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-            backgroundColor: C.ink, opacity: pressed ? 0.85 : 1,
+            marginTop: 24, height: 54, borderRadius: R.chip, alignItems: "center", justifyContent: "center",
+            backgroundColor: C.hueDeep, opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 16 }}>Allow camera</Text>
+          <Text style={{ color: "#FFFFFF", fontFamily: F.bold, fontSize: 16 }}>Allow camera</Text>
         </Pressable>
         {/* The camera is not the only way in, and a refused permission is exactly when that
             matters. */}
         <Pressable
           onPress={() => setManual(true)}
           style={({ pressed }) => ({
-            marginTop: 12, height: 48, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-            borderWidth: 1, borderColor: C.border, backgroundColor: pressed ? C.accent : C.card,
+            marginTop: 12, height: 48, borderRadius: R.chip, alignItems: "center", justifyContent: "center",
+            borderWidth: 1, borderColor: C.hairline, backgroundColor: pressed ? C.hueMist : C.surface,
           })}
         >
-          <Text style={{ color: C.fg, fontFamily: F.semi, fontSize: 15 }}>Enter code manually</Text>
+          <Text style={{ color: C.ink, fontFamily: F.semi, fontSize: 15 }}>Enter code manually</Text>
         </Pressable>
         <ManualSheet
           open={manual} dir={dir} value={typed} onChange={setTyped}
@@ -252,17 +252,17 @@ export default function Scan() {
                 style={{
                   flex: 1, height: 42, borderRadius: R.pill,
                   flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
-                  backgroundColor: on ? C.lit : "transparent",
+                  backgroundColor: on ? C.lime : "transparent",
                 }}
               >
                 <Ionicons
                   name={d === "in" ? "arrow-down" : "arrow-up"}
                   size={17}
-                  color={on ? C.onLit : "rgba(255,255,255,0.8)"}
+                  color={on ? C.limeInk : "rgba(255,255,255,0.8)"}
                 />
                 <Text style={{
                   fontSize: 15, fontFamily: on ? F.semi : F.medium,
-                  color: on ? C.onLit : "rgba(255,255,255,0.8)",
+                  color: on ? C.limeInk : "rgba(255,255,255,0.8)",
                 }}>
                   {d === "in" ? "Stock in" : "Stock out"}
                 </Text>
@@ -285,7 +285,7 @@ export default function Scan() {
         <Pressable
           onPress={() => setManual(true)}
           style={({ pressed }) => ({
-            height: 46, borderRadius: R.control,
+            height: 46, borderRadius: R.chip,
             alignItems: "center", justifyContent: "center",
             borderWidth: 1, borderColor: "rgba(255,255,255,0.45)",
             backgroundColor: pressed ? "rgba(255,255,255,0.14)" : "transparent",
@@ -352,11 +352,11 @@ function ManualSheet({ open, dir, value, onChange, onClose, onSubmit }: {
         style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}
       >
         <View style={{
-          backgroundColor: C.card, borderTopLeftRadius: R.card, borderTopRightRadius: R.card,
+          backgroundColor: C.surface, borderTopLeftRadius: R.card, borderTopRightRadius: R.card,
           padding: S.xl, gap: S.md,
         }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={{ flex: 1, fontSize: 18, fontFamily: F.displaySemi, color: C.fg }}>
+            <Text style={{ flex: 1, fontSize: 18, fontFamily: F.semi, color: C.ink }}>
               Enter code
             </Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
@@ -375,9 +375,9 @@ function ManualSheet({ open, dir, value, onChange, onClose, onSubmit }: {
             onSubmitEditing={onSubmit}
             returnKeyType="done"
             style={{
-              height: 52, borderRadius: R.control, borderWidth: 1, borderColor: C.edge,
-              paddingHorizontal: S.md, fontSize: 17, fontFamily: F.medium, color: C.fg,
-              backgroundColor: C.bg,
+              height: 52, borderRadius: R.chip, borderWidth: 1, borderColor: C.edge,
+              paddingHorizontal: S.md, fontSize: 17, fontFamily: F.medium, color: C.ink,
+              backgroundColor: C.canvas,
             }}
           />
 
@@ -385,14 +385,14 @@ function ManualSheet({ open, dir, value, onChange, onClose, onSubmit }: {
             onPress={onSubmit}
             disabled={!value.trim()}
             style={({ pressed }) => ({
-              height: 50, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-              backgroundColor: value.trim() ? C.ink : C.accent,
+              height: 50, borderRadius: R.chip, alignItems: "center", justifyContent: "center",
+              backgroundColor: value.trim() ? C.hueDeep : C.hueMist,
               opacity: pressed ? 0.85 : 1,
             })}
           >
             <Text style={{
               fontSize: 15.5, fontFamily: F.semi,
-              color: value.trim() ? C.onInk : C.muted,
+              color: value.trim() ? "#FFFFFF" : C.muted,
             }}>
               Record {dir === "in" ? "IN" : "OUT"}
             </Text>

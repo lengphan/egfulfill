@@ -34,13 +34,13 @@ export function ItemPhotos({ open, onClose, title, art, listing }: {
 
   return (
     <Modal visible={open} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
-      <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ flex: 1, backgroundColor: C.canvas }}>
         <View style={{
           flexDirection: "row", alignItems: "center", gap: 12,
           paddingHorizontal: 20, paddingVertical: 14,
-          borderBottomWidth: 1, borderBottomColor: C.border,
+          borderBottomWidth: 1, borderBottomColor: C.hairline,
         }}>
-          <Text numberOfLines={1} style={{ flex: 1, fontSize: 17, fontFamily: F.bold, color: C.fg, letterSpacing: -0.3 }}>
+          <Text numberOfLines={1} style={{ flex: 1, fontSize: 17, fontFamily: F.bold, color: C.ink, letterSpacing: -0.3 }}>
             {title}
           </Text>
           <Pressable
@@ -49,7 +49,7 @@ export function ItemPhotos({ open, onClose, title, art, listing }: {
             accessibilityLabel="Close"
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
           >
-            <Ionicons name="close" size={26} color={C.fg} />
+            <Ionicons name="close" size={26} color={C.ink} />
           </Pressable>
         </View>
 
@@ -64,13 +64,13 @@ export function ItemPhotos({ open, onClose, title, art, listing }: {
                    cannot check the edges of. */
                 <Image
                   source={{ uri: assetUrl(s.url) || undefined }}
-                  style={{ width: "100%", aspectRatio: 1, borderRadius: R.card, backgroundColor: C.card }}
+                  style={{ width: "100%", aspectRatio: 1, borderRadius: R.card, backgroundColor: C.surface }}
                   resizeMode="contain"
                 />
               ) : (
                 <View style={{
-                  width: "100%", aspectRatio: 1, borderRadius: R.card, backgroundColor: C.card,
-                  borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center", gap: 10,
+                  width: "100%", aspectRatio: 1, borderRadius: R.card, backgroundColor: C.surface,
+                  borderWidth: 1, borderColor: C.hairline, alignItems: "center", justifyContent: "center", gap: 10,
                 }}>
                   <Ionicons name="image-outline" size={30} color={C.muted} />
                   <Text style={{ fontSize: 14, color: C.muted }}>{s.empty}</Text>

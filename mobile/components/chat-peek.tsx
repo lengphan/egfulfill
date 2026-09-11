@@ -132,7 +132,7 @@ export function ChatPeek() {
       style={{ position: "absolute", right: S.lg, bottom: TAB_BAR.clearance + S.sm, alignItems: "flex-end" }}
     >
       <Animated.View
-        style={{ width: boxW, height: boxH, borderRadius: boxR, backgroundColor: C.ink, overflow: "hidden" }}
+        style={{ width: boxW, height: boxH, borderRadius: boxR, backgroundColor: C.hueDeep, overflow: "hidden" }}
       >
         {/* THE BUBBLE. Pinned to the bottom-right at its FINAL size rather than filling the
             box: centred content in a box that is growing drifts across the screen while it
@@ -149,7 +149,7 @@ export function ChatPeek() {
               flex: 1, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Text style={{ color: C.onInk, fontSize: 20, fontFamily: F.semi }}>{initial}</Text>
+            <Text style={{ color: "#FFFFFF", fontSize: 20, fontFamily: F.semi }}>{initial}</Text>
           </Pressable>
         </Animated.View>
 
@@ -170,19 +170,19 @@ export function ChatPeek() {
             })}
           >
             <View style={{
-              width: 30, height: 30, borderRadius: R.pill, backgroundColor: C.inkAccent,
+              width: 30, height: 30, borderRadius: R.pill, backgroundColor: C.hueMist,
               alignItems: "center", justifyContent: "center",
             }}>
-              <Text style={{ color: C.onInk, fontSize: 13, fontFamily: F.semi }}>{initial}</Text>
+              <Text style={{ color: "#FFFFFF", fontSize: 13, fontFamily: F.semi }}>{initial}</Text>
             </View>
 
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text numberOfLines={1} style={{ color: C.onInk, fontSize: 14, fontFamily: F.semi }}>
+              <Text numberOfLines={1} style={{ color: "#FFFFFF", fontSize: 14, fontFamily: F.semi }}>
                 {top.seller_name || "Seller"}
               </Text>
             </View>
 
-            <Ionicons name="close" size={20} color={C.onInk} />
+            <Ionicons name="close" size={20} color={"#FFFFFF"} />
           </Pressable>
 
           {/* THE CONVERSATION, READ-ONLY. Replying is the full screen — it has the composer, the
@@ -203,9 +203,9 @@ export function ChatPeek() {
               onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: false })}
             >
               {msgs === null ? (
-                <ActivityIndicator color={C.onInk} />
+                <ActivityIndicator color={"#FFFFFF"} />
               ) : msgs.length === 0 ? (
-                <Text style={{ color: C.onInk, opacity: 0.7, fontSize: 13 }}>Couldn’t load this conversation.</Text>
+                <Text style={{ color: "#FFFFFF", opacity: 0.7, fontSize: 13 }}>Couldn’t load this conversation.</Text>
               ) : (
                 msgs.map((m) => (
                   <View
@@ -213,11 +213,11 @@ export function ChatPeek() {
                     style={{
                       alignSelf: m.me ? "flex-end" : "flex-start",
                       maxWidth: "85%",
-                      backgroundColor: m.me ? C.lit : C.inkAccent,
-                      borderRadius: R.control, paddingHorizontal: 11, paddingVertical: 7,
+                      backgroundColor: m.me ? C.hueDeep : C.hueMist,
+                      borderRadius: R.chip, paddingHorizontal: 11, paddingVertical: 7,
                     }}
                   >
-                    <Text style={{ fontSize: 13.5, fontFamily: F.body, color: m.me ? C.onLit : C.onInk }}>
+                    <Text style={{ fontSize: 13.5, fontFamily: F.body, color: m.me ? "#FFFFFF" : "#FFFFFF" }}>
                       {m.text}
                     </Text>
                   </View>
@@ -231,11 +231,11 @@ export function ChatPeek() {
                 router.push(`/chat/${encodeURIComponent(top.order_id)}`)
               }}
               style={({ pressed }) => ({
-                height: 42, borderRadius: R.control, backgroundColor: C.lit,
+                height: 42, borderRadius: R.chip, backgroundColor: C.hueDeep,
                 alignItems: "center", justifyContent: "center", opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ fontSize: 14.5, fontFamily: F.semi, color: C.onLit }}>Reply</Text>
+              <Text style={{ fontSize: 14.5, fontFamily: F.semi, color: "#FFFFFF" }}>Reply</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -251,10 +251,10 @@ export function ChatPeek() {
         style={{
           position: "absolute", top: -3, right: -3, opacity: bubbleOp,
           minWidth: 22, height: 22, borderRadius: R.pill, paddingHorizontal: 6,
-          backgroundColor: C.pop, alignItems: "center", justifyContent: "center",
+          backgroundColor: C.hueDeep, alignItems: "center", justifyContent: "center",
         }}
       >
-        <Text style={{ fontSize: 11, fontFamily: F.semi, color: C.onPop }}>
+        <Text style={{ fontSize: 11, fontFamily: F.semi, color: "#FFFFFF" }}>
           {waiting > 99 ? "99+" : waiting}
         </Text>
       </Animated.View>
