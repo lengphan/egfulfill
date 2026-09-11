@@ -3917,8 +3917,14 @@ export function resolveMachineFiles(refs: string[]) {
 }
 /** Put one library file on ONE order line. The server mints the design id and always writes
  *  `line_id` — a null line means "every line on the order", which is the bug this replaces. */
-export function attachMachineFile(id: string, body: { orderId: string; lineId: string }) {
-  return api<{ ok?: boolean; designId?: string; ref?: string; fileName?: string; error?: string }>(
+/**
+ * `side` is OPTIONAL and means what it says: which face of the line this stitch file is
+ * for. Absent = the whole line, which is what every caller meant before a sheet could ask
+ * for five placements, so an old caller is unchanged. The server folds it into the
+ * design_id — without it, a second file on one line overwrote the first.
+ */
+export function attachMachineFile(id: string, body: { orderId: string; lineId: string; side?: string }) {
+  return api<{ ok?: boolean; designId?: string; ref?: string; fileName?: string; side?: string | null; error?: string }>(
     `/api/machine_files/${encodeURIComponent(id)}/attach`, { method: "POST", body: JSON.stringify(body) })
 }
 

@@ -89,7 +89,6 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * today imports exactly as it did.
    */
   { header: "Blank Product", key: "blank", required: true, section: "product", help: "OUR catalog product — the garment we print on. Pick it and the Print Type, Colour and Size dropdowns narrow to what that product actually comes in. It is what costs, barcodes and produces the line, so a row without one cannot be made." },
-  { header: "Template ID", key: "template_id", required: false, section: "product", help: "A SHORTCUT: a saved template already carries the blank, the placement and the artwork, so a row with one ignores Image ID and the variant columns. Leave it blank and the row is built from the columns instead. Type the number — type the number from its card (TPL-12) or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one. An image reference (IMG-30) is not applied here yet — it names artwork in your library, which is a different thing from a template." },
   /**
    * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
    * only one that is not artwork.
@@ -103,7 +102,6 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * shows and what the floor checks the sewing against — so this sits alongside Template ID
    * rather than instead of it. What it replaces is the upload.
    */
-  { header: "Machine File ID", key: "machine_file_id", required: false, section: "product", help: "YOUR OWN STITCH FILE, from Design Lab › Machine files. Type the reference off its card (MF-12). It is attached to THIS row’s unit, not to the whole order — so a two-line order can carry two different files. Embroidered lines only: there is no machine to run a stitch file on a DTG line, so a row that names one is rejected rather than charged for a file nothing can use." },
   /**
    * WHICH FACE — the one thing a sheet could never say about a design.
    *
@@ -118,34 +116,43 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * prices exactly as a front-only line does today.
    */
   /**
-   * FIVE PLACEMENTS, FIVE ARTWORKS — AND ONE ROW IS ONE GARMENT.
+   * FIVE POSITIONS, THREE CELLS EACH — and one row is one GARMENT.
    *
-   * This replaced a single Placement + Artwork pair plus a "Line" key column, where two rows
-   * sharing a key meant one garment printed twice. That model was correct and nobody could
-   * use it: the key had to be INVENTED, it meant nothing on its own, and the rows for one
-   * garment sat apart in the sheet. The first real filler typed a template id into it.
+   * Replaced a single Placement + Artwork ID pair plus a "Line" key column, where two rows
+   * sharing an invented key meant one garment printed twice. The key meant nothing on its
+   * own and the rows sat apart in the sheet; the first real filler typed a template id into
+   * it. A garment's faces belong on the garment's own row.
    *
-   * Pairs instead. A row is a garment; its faces are columns beside it, so "front and back"
-   * is two cells on one line instead of two rows and a key you made up. Five because that is
-   * more faces than anything we print carries in practice, and the unused pairs simply stay
-   * empty — owner's call: "doesn't matter if they don't use all".
+   * THE MIDDLE CELL TAKES EITHER, which is why this is three columns and not four. An
+   * artwork and a template were never additive — the old help said so outright ("an Artwork
+   * ID typed beside a template overrides both") — so they are alternatives, and alternatives
+   * belong in one cell. `IMG-30`, `TPL-12` and a bare URL are told apart by their prefix,
+   * the way every other reference in this sheet is.
    *
-   * PAIR 1 KEEPS THE OLD KEYS (`print_side` / `hero_image`) ON PURPOSE. Every sheet written
-   * before today has a "Placement" and an "Artwork ID" column, and COL_ALIASES still points
-   * both at pair 1 — so an old file imports unchanged and lands its single face exactly
-   * where it used to. "Line" stays in the aliases for the same reason; it is gone from the
+   * Five because that is more faces than anything we print carries in practice, and unused
+   * positions simply stay empty — owner's call, "doesn't matter if they don't use all".
+   *
+   * POSITION 1 KEEPS THE OLD KEYS (`print_side` / `hero_image` / `machine_file_id`) on
+   * purpose, and `item_key`/`template_id` stay in COL_ALIASES. A sheet filled before today
+   * lands its Placement, Artwork ID, Template ID and Machine File ID on position 1 and
+   * imports unchanged; rows joined by a Line key still merge. The columns are gone from the
    * template, not from the parser.
    */
-  { header: "1st placement", key: "print_side", required: false, section: "product", help: "WHERE ON THE GARMENT the artwork beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Leave the whole row of placements blank and a template keeps the placement it was drawn with, and a bare 1st artwork goes on the front." },
-  { header: "1st artwork", key: "hero_image", required: false, section: "product", help: "THE DESIGN that goes on the placement beside it — either the reference off your library card (IMG-30) or a URL. It does NOT conflict with a Template ID: a template brings its own artwork and placement, and an artwork typed here overrides both." },
-  { header: "2nd placement", key: "print_side_2", required: false, section: "product", help: "WHERE ON THE GARMENT the artwork beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when this garment is printed in two or more places — leave it blank otherwise." },
-  { header: "2nd artwork", key: "artwork_2", required: false, section: "product", help: "THE DESIGN that goes on the placement beside it — either the reference off your library card (IMG-30) or a URL. Pairs with the placement immediately to its left; a placement with no artwork still books the face, and the picture can arrive later." },
-  { header: "3rd placement", key: "print_side_3", required: false, section: "product", help: "WHERE ON THE GARMENT the artwork beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when this garment is printed in three or more places — leave it blank otherwise." },
-  { header: "3rd artwork", key: "artwork_3", required: false, section: "product", help: "THE DESIGN that goes on the placement beside it — either the reference off your library card (IMG-30) or a URL. Pairs with the placement immediately to its left; a placement with no artwork still books the face, and the picture can arrive later." },
-  { header: "4th placement", key: "print_side_4", required: false, section: "product", help: "WHERE ON THE GARMENT the artwork beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when this garment is printed in four or more places — leave it blank otherwise." },
-  { header: "4th artwork", key: "artwork_4", required: false, section: "product", help: "THE DESIGN that goes on the placement beside it — either the reference off your library card (IMG-30) or a URL. Pairs with the placement immediately to its left; a placement with no artwork still books the face, and the picture can arrive later." },
-  { header: "5th placement", key: "print_side_5", required: false, section: "product", help: "WHERE ON THE GARMENT the artwork beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when this garment is printed in five or more places — leave it blank otherwise." },
-  { header: "5th artwork", key: "artwork_5", required: false, section: "product", help: "THE DESIGN that goes on the placement beside it — either the reference off your library card (IMG-30) or a URL. Pairs with the placement immediately to its left; a placement with no artwork still books the face, and the picture can arrive later." },
+  { header: "Placement 1", key: "print_side", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Leave every placement blank and a template keeps the one it was drawn with, and a bare artwork goes on the front." },
+  { header: "Artwork/Template 1", key: "hero_image", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: a template also carries the blank, and where several positions name one it is the FIRST that sets it — the rest contribute only their design." },
+  { header: "Machine File 1", key: "machine_file_id", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Per POSITION, not per garment: a front logo and a back design are two different .EMB files. Embroidered lines only — there is no machine to run a stitch file on a DTG line, so a row that names one is rejected rather than charged for a file nothing can use." },
+  { header: "Placement 2", key: "print_side_2", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 2 or more places." },
+  { header: "Artwork/Template 2", key: "artwork_2", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
+  { header: "Machine File 2", key: "machine_file_id_2", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
+  { header: "Placement 3", key: "print_side_3", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 3 or more places." },
+  { header: "Artwork/Template 3", key: "artwork_3", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
+  { header: "Machine File 3", key: "machine_file_id_3", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
+  { header: "Placement 4", key: "print_side_4", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 4 or more places." },
+  { header: "Artwork/Template 4", key: "artwork_4", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
+  { header: "Machine File 4", key: "machine_file_id_4", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
+  { header: "Placement 5", key: "print_side_5", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 5 or more places." },
+  { header: "Artwork/Template 5", key: "artwork_5", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
+  { header: "Machine File 5", key: "machine_file_id_5", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
   { header: "Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
   { header: "Print Type", key: "print_type", required: false, section: "product", help: "Embroidery, DTG printing, Appliqué … Defaults to DTG printing if blank." },
   { header: "Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
@@ -411,8 +418,12 @@ const COL_ALIASES: Record<string, string[]> = {
   design_file_url: ["design_file_url", "design", "design_url", "art_url", "design_file"],
   // Every spelling somebody might already have in a sheet. "emb"/"emb_file" are here
   // because .EMB is what actually arrives and it is what people call the column.
-  machine_file_id: ["machine_file_id", "machine_file", "machine", "mf", "mf_id", "stitch_file",
+  machine_file_id: ["machine_file_id", "machine_file_1", "machine_file", "machine", "mf", "mf_1", "mf_id", "stitch_file", "stitch_file_1",
     "stitch_file_id", "emb", "emb_file", "emb_id", "dst", "pes", "machine_file_ref"],
+  machine_file_id_2: ["machine_file_id_2", "machine_file_2", "mf_2", "stitch_file_2"],
+  machine_file_id_3: ["machine_file_id_3", "machine_file_3", "mf_3", "stitch_file_3"],
+  machine_file_id_4: ["machine_file_id_4", "machine_file_4", "mf_4", "stitch_file_4"],
+  machine_file_id_5: ["machine_file_id_5", "machine_file_5", "mf_5", "stitch_file_5"],
   /**
    * THE DESIGN — and the photo-ish spellings are NOT here any more.
    *
@@ -428,15 +439,15 @@ const COL_ALIASES: Record<string, string[]> = {
    */
   /* "1st artwork" normalises to "1st_artwork"; the bare spellings stay so every sheet
      written before the five pairs still lands its design on pair 1. */
-  hero_image: ["hero_image", "artwork_id", "artwork", "art", "image_link_id", "image_link", "image_id", "hero", "hero_img", "hero_url", "1st_artwork", "artwork_1", "first_artwork"],
-  artwork_2: ["artwork_2", "2nd_artwork", "artwork2", "design_2"],
-  artwork_3: ["artwork_3", "3rd_artwork", "artwork3", "design_3"],
-  artwork_4: ["artwork_4", "4th_artwork", "artwork4", "design_4"],
-  artwork_5: ["artwork_5", "5th_artwork", "artwork5", "design_5"],
+  hero_image: ["hero_image", "artwork_id", "artwork", "art", "image_link_id", "image_link", "image_id", "hero", "hero_img", "hero_url", "artwork_1", "artwork_template_1", "1st_artwork", "first_artwork", "template_id", "template", "tpl"],
+  artwork_2: ["artwork_2", "artwork_template_2", "2nd_artwork", "artwork2", "design_2"],
+  artwork_3: ["artwork_3", "artwork_template_3", "3rd_artwork", "artwork3", "design_3"],
+  artwork_4: ["artwork_4", "artwork_template_4", "4th_artwork", "artwork4", "design_4"],
+  artwork_5: ["artwork_5", "artwork_template_5", "5th_artwork", "artwork5", "design_5"],
   /** A PICTURE OF THE LINE, never printed — the spellings a marketplace export uses. */
   listing_image: ["listing_image", "listing_img", "product_image", "product_img", "product_photo", "main_image", "image", "image_url", "image_src", "img_url", "photo"],
   /** WHICH FACE the row's design lands on. Free text in, a face key out — normalizeSide. */
-  print_side: ["print_side", "placement", "side", "surface", "print_location", "print_placement", "design_side", "design_placement", "print_area", "1st_placement", "placement_1", "first_placement"],
+  print_side: ["print_side", "placement", "side", "surface", "print_location", "print_placement", "design_side", "design_placement", "print_area", "placement_1", "1st_placement", "first_placement"],
   print_side_2: ["print_side_2", "2nd_placement", "placement_2", "side_2"],
   print_side_3: ["print_side_3", "3rd_placement", "placement_3", "side_3"],
   print_side_4: ["print_side_4", "4th_placement", "placement_4", "side_4"],
@@ -607,6 +618,21 @@ export function artworkUrl(v: string, resolve?: ArtworkResolver): string {
   return ""
 }
 
+/**
+ * IS THIS CELL NAMING A TEMPLATE RATHER THAN A PICTURE?
+ *
+ * One cell per position takes EITHER (Artwork/Template N), because the two were never
+ * additive — a template brings its own artwork, and an artwork typed beside one used to
+ * override it. Alternatives belong in one cell, and the prefix is what tells them apart,
+ * exactly as it does for IMG- and MF- elsewhere in this sheet.
+ *
+ * Deliberately NOT "anything that isn't a URL": a bare `12` is accepted by the template
+ * matcher below (people type either half of the card's "TPL-12"), and treating every
+ * unrecognised scrap as a template id would turn a typo into a silent template lookup.
+ * This asks for the prefix.
+ */
+export const looksLikeTemplate = (v: string): boolean => /^tpl[\s-]*\d+$/i.test(String(v ?? "").trim())
+
 /** Is this at least SHAPED like something that could name a design? Used by validation,
  *  which runs without a library and must not warn "no design" at a well-formed reference. */
 export const looksLikeArtwork = (v: string): boolean => {
@@ -662,11 +688,11 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
        falling back to the front without a word. The ordinal is in the message because "a
        placement isn't a face we print" is useless on a row with five of them. */
     const PAIRS = [
-      { label: "1st", side: S(rec.print_side), art: S(rec.design_file_url) || S(rec.hero_image) },
-      { label: "2nd", side: S(rec.print_side_2), art: S(rec.artwork_2) },
-      { label: "3rd", side: S(rec.print_side_3), art: S(rec.artwork_3) },
-      { label: "4th", side: S(rec.print_side_4), art: S(rec.artwork_4) },
-      { label: "5th", side: S(rec.print_side_5), art: S(rec.artwork_5) },
+      { label: "Placement 1", side: S(rec.print_side), art: S(rec.design_file_url) || S(rec.hero_image) },
+      { label: "Placement 2", side: S(rec.print_side_2), art: S(rec.artwork_2) },
+      { label: "Placement 3", side: S(rec.print_side_3), art: S(rec.artwork_3) },
+      { label: "Placement 4", side: S(rec.print_side_4), art: S(rec.artwork_4) },
+      { label: "Placement 5", side: S(rec.print_side_5), art: S(rec.artwork_5) },
     ]
     if (rec._valid) {
       const faces: string[] = []
@@ -674,23 +700,26 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
         if (!pr.side) {
           // An artwork with no placement beside it is not an error — it lands on the front,
           // which is what a bare design has always done. Worth saying once, not five times.
-          if (pr.label !== "1st" && looksLikeArtwork(pr.art)) {
-            warn.push(`${pr.label} artwork has no placement beside it — it goes on the front`)
+          if (pr.label !== "Placement 1" && (looksLikeArtwork(pr.art) || looksLikeTemplate(pr.art))) {
+            warn.push(`Artwork/Template ${pr.label.slice(-1)} has no placement beside it — it goes on the front`)
           }
           continue
         }
         const face = normalizeSide(pr.side)
-        if (!face) { warn.push(`${pr.label} placement “${pr.side}” isn’t a face we print — the design goes on the front`); continue }
+        if (!face) { warn.push(`${pr.label} — “${pr.side}” isn’t a face we print — the design goes on the front`); continue }
         // TWO SLOTS NAMING ONE FACE is a sheet mistake that silently loses a design: the
         // grouping keeps the first and drops the second, so the artwork beside it prints
         // nowhere. It was impossible to express before — one row had one placement.
-        if (faces.includes(face)) { warn.push(`${pr.label} placement repeats ${face} — only the first of the two is printed`); continue }
+        if (faces.includes(face)) { warn.push(`${pr.label} repeats ${face} — only the first of the two is printed`); continue }
         faces.push(face)
         // The SAME test groupToOrders applies. Reading these for mere emptiness said a row
         // was fine when it carried `IMG-30` in an artwork column — a value the parser drops
         // for not being an address, so nothing would have been placed and nothing said.
-        if (!looksLikeArtwork(pr.art) && !S(rec.template_id)) {
-          warn.push(`${pr.label} placement has no design beside it — nothing to place there`)
+        /* A TEMPLATE IS A DESIGN. The cell beside a placement takes either, so asking only
+           `looksLikeArtwork` warned "nothing to place there" at a perfectly good TPL-12 —
+           caught by running a real sheet through this, not by reading it. */
+        if (!looksLikeArtwork(pr.art) && !looksLikeTemplate(pr.art) && !S(rec.template_id)) {
+          warn.push(`${pr.label} has no design beside it — nothing to place there`)
         }
       }
     }
@@ -734,7 +763,15 @@ export type ImportItem = {
    *  single-row line, which keeps the one-face path exactly as it was. Each entry is a face
    *  the sheet ASKED for; `artwork` may be empty, because a declared face with no picture is
    *  still a face — the same rule the designer follows. */
-  sides?: { side: string; artwork: string }[]
+  /**
+   * EVERY POSITION THIS LINE PRINTS — face, design and stitch file, per position.
+   *
+   * `artwork` and `templateId` are the two readings of ONE cell (Artwork/Template N): a
+   * TPL- reference sets the second, anything else the first. `machineFileId` is its own
+   * column because a stitch file is not a design — a front logo and a back design are two
+   * different .EMB files, which is why the server's attach carries a side now.
+   */
+  sides?: { side: string; artwork: string; templateId: string; machineFileId: string }[]
   /**
    * Filled by applyTemplates, read by the order write — placement, and the other faces.
    *
@@ -807,12 +844,23 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
          and a second row DISAGREEING is a sheet mistake we must not average away. First wins,
          which is also the only reading that is stable under re-sorting. */
       const r = lineRows[0]
-      const hero = S(r.hero_image)
+      /**
+       * POSITION 1'S CELL, READ BOTH WAYS.
+       *
+       * Artwork/Template 1 keeps the `hero_image` key so every sheet written before the
+       * position columns still lands here — but that cell can now hold `TPL-12`, and
+       * treating a template reference as an address would have set designUrl to an empty
+       * string and lost the template entirely. Split it once, here, and the item-level
+       * fields below each take the half that is theirs.
+       */
+      const ref1 = S(r.design_file_url) || S(r.hero_image)
+      const tpl1 = looksLikeTemplate(ref1) ? ref1 : ""
+      const hero = tpl1 ? "" : ref1
       const url = (v: string) => artworkUrl(v, resolveArtwork)
       // The row's own design, most explicit spelling first. Both are the artwork now — see
       // COL_ALIASES. A URL passes through, an `IMG-30` is looked up in the seller's library,
       // and anything that resolves to neither is dropped rather than filed as an address.
-      const artwork = url(S(r.design_file_url)) || url(hero)
+      const artwork = url(hero)
       return {
         sku: S(r.item_sku),
         // THE BLANK IS THE FALLBACK NAME, and it sits ahead of the listing SKU because it is
@@ -852,7 +900,11 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
         // Carried through so the board can resolve production. `blank` is what we make on;
         // `templateId` names a saved design to apply, which fills the rest.
         blank: S(r.blank),
-        templateId: S(r.template_id),
+        /* A TEMPLATE NAMED IN POSITION 1, or the legacy Template ID column — whichever
+           the sheet used. Where SEVERAL positions name a template it is this one that sets
+           the BLANK, because a template also carries the garment and five of them cannot
+           each claim it; the rest contribute only their face and design (see `sides`). */
+        templateId: tpl1 || S(r.template_id),
         machineFileId: S(r.machine_file_id),
         notes: S(r.internal_notes),
         /**
@@ -866,42 +918,47 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
          */
         sides: (() => {
           /**
-           * THE FACES, FROM TWO SHAPES OF SHEET.
+           * THE POSITIONS, FROM TWO SHAPES OF SHEET.
            *
-           * NEW (the template since the five pairs): every face is on THIS row — 1st..5th
-           * placement, each with the artwork in the column beside it. One row is one garment.
+           * NEW (Placement / Artwork-or-Template / Machine File, x5): every position is on
+           * THIS row. One row is one garment.
            *
-           * OLD (any sheet written before it): one face per row, with a "Line" key joining
-           * the rows of one garment. Still parsed, because a file somebody filled last week
-           * has to keep importing — the column is gone from the template, not from here.
-           *
-           * The pairs win when the row uses them, and the two can't fight: a sheet built the
-           * new way has no Line column at all, so `lineRows` is always length 1 there.
+           * OLD (any sheet written before them): one face per row, joined by a "Line" key.
+           * Still parsed — a file somebody filled last week has to keep importing. The
+           * column is gone from the template, not from here, and the two cannot fight: a
+           * sheet built the new way has no Line column, so `lineRows` is always length 1.
            */
           const seen = new Set<string>()
-          const out: { side: string; artwork: string }[] = []
-          const add = (rawSide: string, rawArt: string) => {
-            const side = normalizeSide(rawSide) || (rawArt ? "front" : "")
-            // A pair with NOTHING in it is an unused slot, not a face. This is the whole
-            // reason five columns can sit on every row without polluting a one-face order.
-            if (!side && !rawArt) return
+          const out: { side: string; artwork: string; templateId: string; machineFileId: string }[] = []
+          const add = (rawSide: string, ref: string, mfRef: string) => {
+            /* ONE CELL, TWO READINGS. A TPL- reference names a template (which brings its
+               own artwork); anything else is the artwork itself. See looksLikeTemplate for
+               why this asks for the prefix rather than assuming. */
+            const isTpl = looksLikeTemplate(ref)
+            const templateId = isTpl ? ref : ""
+            const rawArt = isTpl ? "" : ref
+            const side = normalizeSide(rawSide) || ((rawArt || templateId) ? "front" : "")
+            // A position with NOTHING in it is an unused slot, not a face. This is what lets
+            // five positions sit on every row without polluting a one-face order.
+            if (!side && !rawArt && !templateId && !mfRef) return
             const key = side || "front"
-            if (seen.has(key)) return          // first wins, as it does for the garment itself
+            // First wins, as it does for the garment itself — and a second slot naming one
+            // face would otherwise lose its design entirely.
+            if (seen.has(key)) return
             seen.add(key)
-            out.push({ side: key, artwork: url(rawArt) })
+            out.push({ side: key, artwork: url(rawArt), templateId, machineFileId: mfRef })
           }
-          // Pair 1 keeps the original keys, so an old "Placement"/"Artwork ID" row lands here.
-          add(S(r.print_side), S(r.design_file_url) || S(r.hero_image))
-          add(S(r.print_side_2), S(r.artwork_2))
-          add(S(r.print_side_3), S(r.artwork_3))
-          add(S(r.print_side_4), S(r.artwork_4))
-          add(S(r.print_side_5), S(r.artwork_5))
+          add(S(r.print_side), S(r.design_file_url) || S(r.hero_image), S(r.machine_file_id))
+          add(S(r.print_side_2), S(r.artwork_2), S(r.machine_file_id_2))
+          add(S(r.print_side_3), S(r.artwork_3), S(r.machine_file_id_3))
+          add(S(r.print_side_4), S(r.artwork_4), S(r.machine_file_id_4))
+          add(S(r.print_side_5), S(r.artwork_5), S(r.machine_file_id_5))
           // The legacy shape: extra ROWS joined by a Line key, each carrying one face.
           for (const row of lineRows.slice(1)) {
-            add(S(row.print_side), S(row.design_file_url) || S(row.hero_image))
+            add(S(row.print_side), S(row.design_file_url) || S(row.hero_image), S(row.machine_file_id))
           }
-          /* ONE face is not a multi-face line — leave it undefined so a plain order keeps the
-             existing designUrl/printSide path and nothing about a one-face import changes
+          /* ONE position is not a multi-face line — leave it undefined so a plain order keeps
+             the existing designUrl/printSide path and nothing about a one-face import changes
              shape. That was true of the old grouping too and is worth keeping true. */
           return out.length > 1 ? out : undefined
         })(),

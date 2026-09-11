@@ -302,6 +302,10 @@ export function machineFilesRoutes(app, requireAuth) {
     const b = req.body || {};
     const orderId = String(b.orderId || '').trim();
     const lineId = String(b.lineId || '').trim();
+    /* WHICH FACE, optional. Absent = the whole line, which is what every caller meant
+       before a sheet could ask for five placements — so an old client keeps working
+       unchanged. Lower-cased here because the design_id is built from it. */
+    const side = String(b.side || '').trim().toLowerCase();
     if (!orderId || !lineId) { reply.code(400); return { error: 'orderId + lineId required' }; }
 
     // The order has to be the caller's. Staff may attach anywhere; a seller may not reach
@@ -333,27 +337,38 @@ export function machineFilesRoutes(app, requireAuth) {
       return { error: `That line is ${line.print_type} — a stitch file has no machine to run on it, so it was not attached.` };
     }
 
-    // MINTED HERE, and scoped to the line. Not the library ref: two lines using one library
-    // file would write the same primary key and the second would overwrite the first.
-    const designId = `MF-${row.seq ?? row.id}-${lineId}`.replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 120);
+    /**
+     * MINTED HERE, AND SCOPED TO THE LINE **AND THE FACE**.
+     *
+     * Not the library ref: two lines using one library file would write the same primary
+     * key and the second would overwrite the first. The SIDE is in it for exactly the same
+     * reason one level down — a garment embroidered front and back names two different
+     * .EMB files, and without the face in this key the second attach silently overwrote
+     * the first through the `on conflict (design_id) do update` below. The bug was
+     * unreachable while a sheet row could only name one placement; five pairs made it real.
+     *
+     * A sideless attach keeps its ORIGINAL key, so nothing already stored moves.
+     */
+    const designId = `MF-${row.seq ?? row.id}-${lineId}${side ? `-${side}` : ''}`.replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 120);
     await q(
       `insert into design_file_data
-         (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, storage_key, content_hash, price, kind, source, created_at, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,$11,'seller',now(),now())
+         (design_id, order_id, sku, line_id, side, seller_id, file_name, mime, data, storage_key, content_hash, price, kind, source, created_at, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,'seller',now(),now())
        on conflict (design_id) do update set
          order_id=excluded.order_id, sku=excluded.sku, line_id=excluded.line_id,
+         side=excluded.side,
          seller_id=excluded.seller_id, file_name=excluded.file_name, mime=excluded.mime,
          data=excluded.data, storage_key=excluded.storage_key,
          content_hash=excluded.content_hash, kind=excluded.kind, updated_at=now()`,
-      [designId, orderId, line.sku || null, lineId, owner, row.file_name, row.mime,
+      [designId, orderId, line.sku || null, lineId, side || null, owner, row.file_name, row.mime,
        row.storage_key ? null : row.data, row.storage_key, row.content_hash, row.kind]);
     /* 'design_file.uploaded', not an action of its own: the Design readiness tag matches
        /^design_file\./ and this IS a machine file arriving on a line. A new verb would have
        left the tag's history with a gap exactly where the bulk path filled it. */
     audit(req, 'design_file.uploaded', {
       entityType: 'order', entityId: orderId,
-      after: { name: row.file_name, sku: line.sku || null, kind: row.kind, lineId, from: shape(row).ref },
+      after: { name: row.file_name, sku: line.sku || null, kind: row.kind, lineId, side: side || null, from: shape(row).ref },
     });
-    return { ok: true, designId, ref: shape(row).ref, fileName: row.file_name };
+    return { ok: true, designId, ref: shape(row).ref, fileName: row.file_name, side: side || null };
   });
 }

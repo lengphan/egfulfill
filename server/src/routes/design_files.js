@@ -51,6 +51,18 @@ export function designFilesRoutes(app, requireAuth) {
      */
     .then(() => q('alter table design_file_data add column if not exists line_id text'))
     /**
+     * WHICH FACE, when the line prints on more than one. NULL means "the whole line",
+     * which is every row written before the sheet could ask for five placements — so
+     * nothing has to be backfilled and every existing reader keeps its answer.
+     *
+     * It exists because the machine file genuinely is per POSITION: a front logo and a
+     * back design are two different .EMB files. Without a side here, `attach` minted its
+     * design_id as MF-<seq>-<lineId> and its own `on conflict (design_id) do update`
+     * silently OVERWROTE the first file with the second — the same collision its comment
+     * already warned about one level up, for two lines sharing one library file.
+     */
+    .then(() => q('alter table design_file_data add column if not exists side text'))
+    /**
      * WHO PUT THIS FILE HERE — 'seller' or 'factory'.
      *
      * Visibility was decided by `kind` alone, and `kind` is a fact about the FILE TYPE, not

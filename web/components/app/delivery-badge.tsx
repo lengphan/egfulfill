@@ -18,8 +18,37 @@ export function DeliveryBadge({ order, className }: {
   order: OrderRow
   className?: string
 }) {
-  // Only meaningful once it's left us — before that, the pipeline stage is the answer.
-  if (!order.tracking) return null
+  /**
+   * NO LABEL IS A STATUS TOO (owner, 2026-09-11).
+   *
+   * This returned null, so the cell was EMPTY — and §4's honesty rule turns on exactly
+   * that: a blank cell cannot be told from a status we failed to read. "No label" says the
+   * fact plainly, and it is a different fact from "Preshipment", which means a label EXISTS
+   * and the carrier has not collected it yet.
+   *
+   * Settled weight, which is the quietest register there is (lib/status-tone.ts) — most
+   * orders in a queue have no label yet, so this appears on most rows and must not compete
+   * with the stage beside it. It is the answer to "has this shipped", not a call to act.
+   *
+   * NOT extended to the other null below. A parcel with a label and no carrier answer still
+   * shows nothing, deliberately — that would be a fact about OUR polling printed in the
+   * column where the CARRIER speaks, which is the 2026-09-09 decision recorded there.
+   */
+  if (!order.tracking) {
+    /* A DASH, NOT THE WORDS (owner, 2026-09-11). "No label" was the first attempt and it
+       was too loud: most orders in a queue have no label yet, so it printed a two-word
+       sentence down almost every row of a column people scan for the exceptions. The dash
+       is what the TRACKING column beside it already uses for the same absence, so the pair
+       now says the same thing the same way — and it still satisfies the honesty rule,
+       because a mark means "we looked and there is nothing" where a blank cell cannot be
+       told from a status we failed to read. The sentence moves to the tooltip. */
+    return (
+      <span title="No shipping label has been produced for this order yet"
+            className={"text-muted-foreground/60 " + (className ?? "")}>
+        —
+      </span>
+    )
+  }
 
   /**
    * NO PILL FOR "WE HAVEN'T ASKED" (owner's call, 2026-09-09).

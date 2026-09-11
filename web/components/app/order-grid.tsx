@@ -509,13 +509,25 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * Entries with no http(s) address are still left out: a reference that resolves to nothing
    * printable is worse than not offering it.
    */
-  const refOptions = useMemo<Record<string, Opt[]>>(() => ({
-    template_id: templates
+  const refOptions = useMemo<Record<string, Opt[]>>(() => {
+    const tpls = templates
       .filter((t) => t.seq != null)
-      .map((t) => ({ value: `TPL-${t.seq}`, label: `TPL-${t.seq}${t.name ? ` · ${t.name}` : ""}` })),
-    machine_file_id: machineFiles
+      .map((t) => ({ value: `TPL-${t.seq}`, label: `TPL-${t.seq}${t.name ? ` · ${t.name}` : ""}` }))
+    const mfs = machineFiles
       .filter((m) => m.ref)
-      .map((m) => ({ value: m.ref, label: `${m.ref}${m.name ? ` · ${m.name}` : ""}` })),
+      .map((m) => ({ value: m.ref, label: `${m.ref}${m.name ? ` · ${m.name}` : ""}` }))
+    return ({
+    // `template_id` has no column of its own any more — a template is typed into the
+    // Artwork/Template cell beside its placement. Kept so a sheet with the old header, which
+    // still aliases to this key, keeps its dropdown.
+    template_id: tpls,
+    /* ONE LIST PER SLOT, all five built from the same two arrays. A stitch file is per
+       POSITION now — a front logo and a back design are two different .EMB files — so each
+       Machine File column offers the whole library, exactly as the first always did. */
+    ...Object.fromEntries(
+      ["machine_file_id", "machine_file_id_2", "machine_file_id_3", "machine_file_id_4", "machine_file_id_5"]
+        .map((k) => [k, mfs]),
+    ),
     /* A SUGGESTION, NOT A LIST TO PICK FROM. Store Name is free text and stays that way —
        a seller may sell somewhere we have no connector for, and the column has always
        accepted whatever is typed. This only removes the need to remember the spelling of a
@@ -536,15 +548,22 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
        from before the five pairs so old sheets still land); artwork_2..5 are the rest. One
        list built once and shared, because a second opinion about which designs exist is
        exactly the drift §4's faces rule was written about. */
+    /* ARTWORK **OR** TEMPLATE, so the cell offers both lists. The two were never additive —
+       a template brings its own artwork — so they are alternatives, and a picker that showed
+       only half of what the column accepts would teach the wrong thing about the cell.
+       Designs first: they are the common case, and TPL- sorts visibly apart from IMG-. */
     ...Object.fromEntries(
       ["hero_image", "artwork_2", "artwork_3", "artwork_4", "artwork_5"].map((k) => [
         k,
-        images
-          .filter((d) => /^https?:\/\//i.test(String(d.thumb ?? "")))
-          .map((d) => ({ value: `IMG-${d.id}`, label: `IMG-${d.id}${d.name ? ` · ${d.name}` : ""}` })),
+        [
+          ...images
+            .filter((d) => /^https?:\/\//i.test(String(d.thumb ?? "")))
+            .map((d) => ({ value: `IMG-${d.id}`, label: `IMG-${d.id}${d.name ? ` · ${d.name}` : ""}` })),
+          ...tpls,
+        ],
       ]),
     ),
-  }), [templates, machineFiles, images, stores])
+  }) }, [templates, machineFiles, images, stores])
 
   const optionsFor = useCallback(
     (colKey: string, row: string[]): Opt[] | null => {

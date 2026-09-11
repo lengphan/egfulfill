@@ -604,18 +604,42 @@ export function ImportOrdersDialog({
                * silently importing an embroidered line with no stitch file is a job the
                * floor cannot start, and the count is what the summary reports.
                */
-              const mfRef = String(it.machineFileId || "").trim()
-              const mf = mfRef ? machineFiles?.[mfRef] : null
-              if (mfRef) {
+              /**
+               * ONE STITCH FILE PER POSITION, NOT PER LINE.
+               *
+               * A garment embroidered front and back names two different .EMB files, and
+               * the sheet can now say so — Machine File 1..5, beside their placements. So
+               * this walks the positions rather than reading a single line-level ref.
+               *
+               * The SIDE goes to the server, and it has to: attach mints its design_id as
+               * MF-<seq>-<lineId>, and without the face in that key its own
+               * `on conflict (design_id) do update` silently OVERWROTE the first file with
+               * the second. Unreachable while a row could name one placement; real now.
+               *
+               * A row with no positions (the single-face path) still sends ONE attach with
+               * no side, which is exactly what every caller meant before today — so nothing
+               * already stored moves and an old sheet behaves identically.
+               */
+              const mfJobs = it.sides?.length
+                ? it.sides
+                    .filter((f) => String(f.machineFileId || "").trim())
+                    .map((f) => ({ ref: String(f.machineFileId).trim(), side: f.side }))
+                : String(it.machineFileId || "").trim()
+                  ? [{ ref: String(it.machineFileId).trim(), side: undefined as string | undefined }]
+                  : []
+              for (const job of mfJobs) {
+                const mf = machineFiles?.[job.ref]
                 if (!mf) {
-                  mfFailed.push(`${mfRef} — no such file in your library`)
-                } else {
-                  const a = await attachMachineFile(mf.id, { orderId, lineId: lineIds[li] }).catch((e: unknown) => ({
-                    error: e instanceof Error ? e.message : "attach failed",
-                  }))
-                  if (a?.error) mfFailed.push(`${mfRef} on ${it.name || it.sku || "a line"} — ${a.error}`)
-                  else mfAttached++
+                  mfFailed.push(`${job.ref} — no such file in your library`)
+                  continue
                 }
+                const a = await attachMachineFile(mf.id, { orderId, lineId: lineIds[li], side: job.side }).catch((e: unknown) => ({
+                  error: e instanceof Error ? e.message : "attach failed",
+                }))
+                // The face is NAMED in the failure. With up to five files on one line, "MF-13
+                // on a line — rejected" does not say which of them to go and fix.
+                if (a?.error) mfFailed.push(`${job.ref}${job.side ? ` (${job.side})` : ""} on ${it.name || it.sku || "a line"} — ${a.error}`)
+                else mfAttached++
               }
               /**
                * WHICH FACES THIS LINE PRINTS ON — and the row's Placement outranks all of it.

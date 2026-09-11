@@ -105,46 +105,43 @@ const T_COLUMNS = [
    * It was headed 'Image ID' and documented as the listing photo until 2026-09-08; the
    * rename is in web/lib/order-import.ts with the reasoning. Both spellings still import.
    */
-  { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
   /**
-   * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
-   * only one that is not artwork.
+   * FIVE POSITIONS, THREE CELLS EACH — and one row is one GARMENT.
    *
-   * Template ID and Artwork ID hand us a PICTURE we cut a machine file from. This hands us the
-   * machine file, which is what actually arrives: sellers send .EMB. It rides beside the
-   * other two because it answers the same question, and this list is a HAND-KEPT MIRROR of
-   * web/lib/order-import.ts's CSV_COLUMNS — change one and change the other, or the sheet we
-   * hand out stops importing itself.
-   */
-  { h: 'Machine File ID', g: 'product', duty: '', sample: '' },
-  /**
-   * FIVE PLACEMENTS, EACH WITH ITS ARTWORK BESIDE IT — one row is one garment.
+   * Replaced a single Placement + Artwork ID pair plus a 'Line' key column, where two rows
+   * sharing an invented key meant one garment printed twice. The key meant nothing on its
+   * own and the rows sat apart; the first real filler typed a template id into it.
    *
-   * Replaces a single Placement + Artwork ID pair and the 'Line' key column, where two rows
-   * sharing a key meant one garment printed twice. The key had to be invented and meant
-   * nothing on its own; the first real filler typed a template id into it. Pairs put a
-   * garment's faces on the garment's own row instead.
+   * THE MIDDLE CELL TAKES EITHER a design (IMG-30 / a URL) or a template (TPL-12), which is
+   * why this is three columns and not four — the two were never additive, so they are
+   * alternatives and belong in one cell. The MACHINE FILE gets its own column because it is
+   * not a design: a front logo and a back design are two different .EMB files, which is why
+   * the attach route carries a `side` now.
    *
-   * A FIXED LIST, not a dependent one, and that is not a shortcut: Sheets will not evaluate
-   * INDIRECT inside a validation rule (see the long note by the rules below), so every
-   * "dependent" column here already degrades to the union of its axis. The union of the
-   * sides axis IS these eight, so a per-product range would build the same dropdown out of
-   * far more machinery. The narrowing lives in the app's own grid, which can do it properly.
+   * Placements are a FIXED list, not a dependent one, and that is not a shortcut: Sheets
+   * will not evaluate INDIRECT inside a validation rule (see the note by the rules below),
+   * so every "dependent" column here already degrades to the union of its axis. The union of
+   * the sides axis IS these eight. The narrowing lives in the app's own grid.
    *
    * HAND-KEPT MIRROR of CSV_COLUMNS in web/lib/order-import.ts — change one and change the
-   * other, or the sheet we hand out stops importing itself. Only the FIRST pair carries a
-   * sample: showing 'Front' five times would read as five required cells.
+   * other, or the sheet we hand out stops importing itself. Only POSITION 1 carries samples:
+   * showing them five times would read as five required cells.
    */
-  { h: '1st placement', g: 'product', duty: '', sample: 'Front', opts: 'sides' },
-  { h: '1st artwork', g: 'product', duty: '', sample: '' },
-  { h: '2nd placement', g: 'product', duty: '', sample: '', opts: 'sides' },
-  { h: '2nd artwork', g: 'product', duty: '', sample: '' },
-  { h: '3rd placement', g: 'product', duty: '', sample: '', opts: 'sides' },
-  { h: '3rd artwork', g: 'product', duty: '', sample: '' },
-  { h: '4th placement', g: 'product', duty: '', sample: '', opts: 'sides' },
-  { h: '4th artwork', g: 'product', duty: '', sample: '' },
-  { h: '5th placement', g: 'product', duty: '', sample: '', opts: 'sides' },
-  { h: '5th artwork', g: 'product', duty: '', sample: '' },
+  { h: 'Placement 1', g: 'product', duty: '', sample: 'Front', opts: 'sides' },
+  { h: 'Artwork/Template 1', g: 'product', duty: '', sample: '' },
+  { h: 'Machine File 1', g: 'product', duty: '', sample: '' },
+  { h: 'Placement 2', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: 'Artwork/Template 2', g: 'product', duty: '', sample: '' },
+  { h: 'Machine File 2', g: 'product', duty: '', sample: '' },
+  { h: 'Placement 3', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: 'Artwork/Template 3', g: 'product', duty: '', sample: '' },
+  { h: 'Machine File 3', g: 'product', duty: '', sample: '' },
+  { h: 'Placement 4', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: 'Artwork/Template 4', g: 'product', duty: '', sample: '' },
+  { h: 'Machine File 4', g: 'product', duty: '', sample: '' },
+  { h: 'Placement 5', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: 'Artwork/Template 5', g: 'product', duty: '', sample: '' },
+  { h: 'Machine File 5', g: 'product', duty: '', sample: '' },
   { h: 'Quantity', g: 'product', duty: '', sample: '1' },
   // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
   // fixed list. See LISTS below for how that is wired.
