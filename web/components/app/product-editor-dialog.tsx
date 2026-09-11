@@ -846,31 +846,18 @@ export function ProductEditorDialog({
   // Dim-weight check for the packaging suggestion (÷166, USPS/Shippo). Deterministic math.
  const pkg = packagingHint(weightOz, boxL, boxW, boxH)
 
-  // Apply the bulk Base/Shipping to every size at once. The base value is an UPCHARGE OVER
-  // the product cost, never a fixed price: in $ mode it ADDS dollars (cost $10 + $5 = base
-  // $15); in % mode it adds a percentage (cost $10 + 20% = base $12). Each size uses its own
-  // product cost, else the product-level one. Shipping is a flat fee. A blank field is left
-  // alone, so you can bulk-set just one column.
+  // Apply the rule to every size at once. Base is an UPCHARGE OVER the product cost, never
+  // a fixed price: in $ mode it ADDS dollars (cost $10 + $5 = base $15); in % mode it adds
+  // a percentage (cost $10 + 20% = base $12). Each size uses its own product cost, else the
+  // product-level one. Blank and Shipping are absolute fees. A blank field is left alone,
+  // so you can set just one column.
+  //
+  // STOCK IS NOT IN HERE ANY MORE — see applyBulkStock below. It writes per VARIANT
+  // (size × colour) while these three write per SIZE, so a single "apply to all" meant two
+  // different granularities depending on which box you had typed in.
  const applyBulk = () => {
- const b = bulkBase.trim(), sh = bulkShip.trim(), st = bulkStock.trim(), bl = bulkBlank.trim()
- if (b === "" && sh === "" && st === "" && bl === "") return
-    // Stock too, now that it is a column of this table. An "apply to all" that skipped one
-    // of the three fields beside it would mean something different depending on which one
-    // you typed in.
-    // EVERY VARIANT, which is every colourway of every size — the same shape the shelf is
-    // keyed by. Filling one number per size would leave each size holding a count no order
-    // line can draw from, since a line always names a colour.
- if (st !== "" && ourSku) {
- setStock((p) => {
- const n = { ...p }
- if (colors.length) {
- for (const v of variantPairs(sizes, colors)) n[variantSku(ourSku, v.size, v.color).toUpperCase()] = st
-        } else {
- for (const sz of sizes) n[variantSku(ourSku, sz, null).toUpperCase()] = st
-        }
- return n
-      })
-    }
+ const b = bulkBase.trim(), sh = bulkShip.trim(), bl = bulkBlank.trim()
+ if (b === "" && sh === "" && bl === "") return
  const amt = Number(b) || 0
  setTiers((prev) => {
  const nextT: Record<string, Tier> = { ...prev }
@@ -892,6 +879,43 @@ export function ProductEditorDialog({
  return nextT
     })
   }
+
+  // EVERY VARIANT, which is every colourway of every size — the same shape the shelf is
+  // keyed by. Filling one number per size would leave each size holding a count no order
+  // line can draw from, since a line always names a colour.
+ const applyBulkStock = () => {
+ const st = bulkStock.trim()
+ if (st === "" || !ourSku) return
+ setStock((p) => {
+ const n = { ...p }
+ if (colors.length) {
+ for (const v of variantPairs(sizes, colors)) n[variantSku(ourSku, v.size, v.color).toUpperCase()] = st
+      } else {
+ for (const sz of sizes) n[variantSku(ourSku, sz, null).toUpperCase()] = st
+      }
+ return n
+    })
+  }
+
+  /**
+   * WHAT THE RULE PRODUCES, shown before the button is pressed.
+   *
+   * This row takes a DELTA and the column it fills holds an ABSOLUTE: type 5 against a
+   * $12.00 blank and the Base cost cells read 17.00. Nothing on screen said so, which is
+   * most of why the panel read as a second pricing system sitting on top of the table.
+   * Resolved against the first size that carries a cost, else the product-level one — the
+   * same order applyBulk itself resolves in, so the arrow cannot disagree with the result.
+   */
+ const bulkPreview = useMemo(() => {
+ if (bulkBase.trim() === "") return null
+ const amt = Number(bulkBase)
+ if (!isFinite(amt)) return null
+ const first = sizes.find((s) => num(tiers[s]?.cost) > 0)
+ const cost = first ? num(tiers[first].cost) : (num(productCost) || 0)
+ if (!(cost > 0)) return null
+ const next = bulkPct ? cost * (1 + amt / 100) : cost + amt
+ return { cost: cost.toFixed(2), base: (Math.round(next * 100) / 100).toFixed(2) }
+  }, [bulkBase, bulkPct, sizes, tiers, productCost])
 
   /** OUR sku, as it will be saved — the stock grid keys off it, so it has to be the same
    * string `save` writes and not the raw field. */
@@ -1187,9 +1211,18 @@ export function ProductEditorDialog({
                 Nothing about the mockup's BEHAVIOUR changes: `img` is still the value the
                 Design Maker treats as the blank and the item rows hydrate from. This is
  purely where it's uploaded and how it's shown. */}
-            <div className="shrink-0 space-y-1.5">
+            {/* WIDTH-LOCKED TO THE IMAGE. The sliders below used to be WIDER than the
+                picture they frame — a 32px label plus a range input, whose intrinsic
+                width is ~170px, inside a shrink-0 column with no width of its own, so
+                the block grew past the 176px well and read as something dangling off
+                the bottom rather than part of it. w-56 pins the column to the image;
+                min-w-0 on each range is what actually lets flex-1 shrink an input below
+                its intrinsic width, which is the half that gets left out.
+                The well itself goes 44 -> 56 for free: the fields beside it already run
+                well past 224px, so nothing below moves. */}
+            <div className="w-56 shrink-0 space-y-1.5">
             <div
- className="relative flex size-44 items-center justify-center overflow-hidden rounded-xl border border-border bg-white"
+ className="relative flex size-56 items-center justify-center overflow-hidden rounded-xl border border-border bg-white"
  title={img ? tl("product", "The main image, chosen in Images below") : tl("product", "No image yet — add one in Images below")}
             >
               {img ? (
@@ -1242,15 +1275,15 @@ export function ProductEditorDialog({
             {img && (
               <div className="space-y-1">
                 <label className="flex items-center gap-1.5">
-                  <span className="w-8 shrink-0 eg-label text-muted-foreground">{tl("product", "Zoom")}</span>
+                  <span className="w-11 shrink-0 eg-label text-muted-foreground">{tl("product", "Zoom")}</span>
                   <input
  type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={5} value={imgZoom || 100}
  onChange={(e) => setImgZoom(Number(e.target.value))}
- className="h-1 flex-1 accent-primary" aria-label={tl("product", "Main image zoom")}
+ className="h-1 min-w-0 flex-1 accent-primary" aria-label={tl("product", "Main image zoom")}
                   />
                 </label>
                 <label className="flex items-center gap-1.5">
-                  <span className="w-8 shrink-0 eg-label text-muted-foreground">{tl("product", "Up/dn")}</span>
+                  <span className="w-11 shrink-0 eg-label text-muted-foreground">{tl("product", "Up/dn")}</span>
                   {/* The ENDS are the same numbers they always were (0–100, 50 centre) — what
  grew is how far each one moves the picture. It used to pan through the
  cover overflow, which on a 4:3 photo in a square box is zero: the slider
@@ -1258,7 +1291,7 @@ export function ProductEditorDialog({
                   <input
  type="range" min={FOCUS_MIN} max={FOCUS_MAX} step={1} value={imgFocusY ?? 50}
  onChange={(e) => setImgFocusY(Number(e.target.value))}
- className="h-1 flex-1 accent-primary" aria-label={tl("product", "Main image vertical position")}
+ className="h-1 min-w-0 flex-1 accent-primary" aria-label={tl("product", "Main image vertical position")}
                   />
                 </label>
                 {((imgZoom || 100) !== 100 || (imgFocusY ?? 50) !== 50) && (
@@ -1301,7 +1334,8 @@ export function ProductEditorDialog({
                   <span className="text-sm text-muted-foreground">{tl("product", "Our SKU")}</span>
                   {/* The placeholder is the number this product would ACTUALLY get, not a
  hardcoded example — "EG-1005" over an empty field reads as filled. */}
-                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? tl("product", "EG-1005")} className="h-9 tabular-nums" />
+                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? tl("product", "EG-1005")} className="h-9 tabular-nums"
+ title={tl("product", "Stock is held against this, and the seller sees it on their listing.")} />
                   {/*
                     * SAY IT HERE, WHERE IT CAN STILL BE FIXED.
                     *
@@ -1329,14 +1363,12 @@ export function ProductEditorDialog({
                         </button>
                       )}
                     </span>
-                  ) : (
-                    <span className="text-2xs text-muted-foreground">{tl("product", "Stock is held against this, and the seller sees it on their listing.")}</span>
-                  )}
+                  ) : null}
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-muted-foreground">{tl("product", "Supplier SKU")}</span>
-                  <Input value={supplierSku} onChange={(e) => setSupplierSku(e.target.value)} placeholder="optional" className="h-9 tabular-nums" />
-                  <span className="text-2xs text-muted-foreground">{tl("product", "Never shown to sellers or published anywhere.")}</span>
+                  <Input value={supplierSku} onChange={(e) => setSupplierSku(e.target.value)} placeholder="optional" className="h-9 tabular-nums"
+ title={tl("product", "Never shown to sellers or published anywhere.")} />
                 </label>
               </div>
               {/* WHO WE BUY IT FROM, AND WHERE — the two facts that decide whether a shortage
@@ -1351,13 +1383,13 @@ export function ProductEditorDialog({
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-muted-foreground">{tl("product", "Supplier")}</span>
-                  <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder={tl("product", "S&S Activewear, a local shop, Alibaba…")} className="h-9" />
-                  <span className="text-2xs text-muted-foreground">{tl("product", "Groups this product’s shortages in the purchase cart.")}</span>
+                  <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder={tl("product", "S&S Activewear, a local shop, Alibaba…")} className="h-9"
+ title={tl("product", "Groups this product’s shortages in the purchase cart.")} />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-muted-foreground">{tl("product", "Where to buy")}</span>
-                  <Input value={supplierUrl} onChange={(e) => setSupplierUrl(e.target.value)} placeholder={tl("product", "https://… (optional)")} className="h-9" inputMode="url" />
-                  <span className="text-2xs text-muted-foreground">{tl("product", "Opens straight from the cart, so “order by hand” is one click.")}</span>
+                  <Input value={supplierUrl} onChange={(e) => setSupplierUrl(e.target.value)} placeholder={tl("product", "https://… (optional)")} className="h-9" inputMode="url"
+ title={tl("product", "Opens straight from the cart, so “order by hand” is one click.")} />
                 </label>
               </div>
               {/* Type + Status share the top row; Status used to sit alone far down the
@@ -1513,36 +1545,57 @@ export function ProductEditorDialog({
                     <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">{tl("product", "Clear pricing")}</button>
                   )}
                 </div>
-                {/* Bulk-fill every size at once. Base is an UPCHARGE over the product cost,
- never a fixed price: $ adds dollars (cost 10 + 5 = base 15), % adds a
- percentage. Shipping is a flat fee. A blank field is left as-is. */}
+                {/* SET EVERY SIZE AT ONCE — one rule, three columns, each carrying the name
+                    of the column it fills and each in the SAME UNIT as that column.
+                    It used to read "Base = product cost + [ ]" followed by three boxes
+                    labelled only by their placeholders — "upcharge $", "$ each", "$ flat",
+                    "units". Two problems, and they compounded. The row took a DELTA while
+                    the table holds an ABSOLUTE, so you typed 5 and the Base cost column
+                    filled with 17 and nothing connected the two. And a grey word inside a
+                    box means something ELSE four lines below: in the table a placeholder is
+                    a live inherited VALUE (12.00 = "using the product cost"), so the same
+                    styling was a label here and a number there.
+                    So: real labels above the fields, "product cost +" moved INSIDE the Base
+                    group where it only qualifies the one field it applies to, and the arrow
+                    showing what the rule resolves to before anything is pressed. */}
                 {sizes.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-2.5 py-2">
-                    <span className="text-xs font-medium text-muted-foreground">{tl("product", "Base = product cost +")}</span>
-                    <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
-                      {([[false, "$"], [true, "%"]] as const).map(([v, lbl]) => (
-                        <button key={lbl} type="button" onClick={() => setBulkPct(v)}
+                  <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2.5">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">{tl("product", "Base cost")}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground">{tl("product", "product cost +")}</span>
+                        <span className="inline-flex rounded-md border border-border p-0.5 text-xs">
+                          {([[false, "$"], [true, "%"]] as const).map(([v, lbl]) => (
+                            <button key={lbl} type="button" onClick={() => setBulkPct(v)}
  className={"eg-tap rounded px-2 py-0.5 font-medium transition-colors " + (bulkPct === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                          {lbl}
-                        </button>
-                      ))}
-                    </div>
-                    <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
- placeholder={bulkPct ? tl("product", "upcharge %") : tl("product", "upcharge $")} className="h-8 w-32 text-xs" inputMode="decimal" aria-label={tl("product", "Base upcharge over product cost")} />
-                    {/* BLANK, in the same bulk row. "Apply to all" that skipped it would
- mean something different depending on which box you typed in — the
- same argument that put stock in here. */}
-                    <span className="text-xs text-muted-foreground">{tl("product", "· blank")}</span>
-                    <Input value={bulkBlank} onChange={(e) => setBulkBlank(e.target.value.replace(/[^0-9.]/g, ""))}
- placeholder={tl("product", "$ each")} className="h-8 w-20 text-xs" inputMode="decimal" aria-label={tl("product", "Bulk blank price")} />
-                    <span className="text-xs text-muted-foreground">{tl("product", "· shipping")}</span>
-                    <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
- placeholder={tl("product", "$ flat")} className="h-8 w-20 text-xs" inputMode="decimal" aria-label={tl("product", "Bulk shipping fee")} />
-                    <span className="text-xs text-muted-foreground">{tl("product", "· stock")}</span>
-                    <Input value={bulkStock} onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
- placeholder="units" className="h-8 w-20 text-xs" inputMode="numeric" aria-label={tl("product", "Bulk stock")} disabled={!ourSku}
- title={ourSku ? undefined : tl("product", "Give the product a SKU — stock is held against it")} />
-                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkStock.trim() && !bulkBlank.trim()}>{tl("product", "Apply to all")}</Button>
+                              {lbl}
+                            </button>
+                          ))}
+                        </span>
+                        <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
+ className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Base upcharge over product cost")} />
+                        {/* The result, not the rule. Muted because it is a readout and not
+                            somewhere to type — but text-sm, because it is a VALUE. */}
+                        {bulkPreview && (
+                          <span className="whitespace-nowrap text-sm tabular-nums text-muted-foreground"
+ title={`Product cost ${bulkPreview.cost} ${bulkPct ? `+ ${bulkBase}%` : `+ ${bulkBase}`} = base cost ${bulkPreview.base}`}>
+                            → ${bulkPreview.base}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">{tl("product", "Blank ($)")}</span>
+                      <Input value={bulkBlank} onChange={(e) => setBulkBlank(e.target.value.replace(/[^0-9.]/g, ""))}
+ className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Blank price for every size")} />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">{tl("product", "Shipping ($)")}</span>
+                      <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
+ className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Shipping fee for every size")} />
+                    </label>
+                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk}
+ disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkBlank.trim()}>{tl("product", "Apply to all sizes")}</Button>
                   </div>
                 )}
                 {/* STOCK IS A COLUMN HERE. It was a size × colour grid of its own below —
@@ -1778,6 +1831,25 @@ export function ProductEditorDialog({
                 )}
                 {sizes.length === 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">{tl("product", "No sizes yet — add one above to price it.")}</p>
+                )}
+                {/* STOCK IN BULK, on its own line and saying out loud what it fills.
+                    It used to sit in the rule row above, beside Base / Blank / Shipping —
+                    which made one "Apply to all" mean two different things: those three
+                    write per SIZE, this writes per VARIANT, every colourway of every size.
+                    Its own button, its own label, and the count is still the same number
+                    the cells in the Stock column hold, so nothing about the shelf moved. */}
+                {sizes.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2 border-t border-border pt-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">{tl("product", "Stock")}</span>
+                      <Input value={bulkStock} onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
+ className="h-8 w-20 text-sm tabular-nums" inputMode="numeric" disabled={!ourSku}
+ aria-label={tl("product", "Stock for every variant")}
+ title={ourSku ? tl("product", "The same count on every size and colourway") : tl("product", "Give the product a SKU — stock is held against it")} />
+                    </label>
+                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulkStock}
+ disabled={!bulkStock.trim() || !ourSku}>{tl("product", "Fill every variant")}</Button>
+                  </div>
                 )}
               </div>
           </div>
