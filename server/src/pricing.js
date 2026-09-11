@@ -353,10 +353,24 @@ function costPartsOf(row, item, fees) {
  * meaning "free" — deliberate, because `methodPrices` behaves that way and one of the two
  * reading zero differently is worse than neither supporting it.
  *
- * ONE RATE PER PRODUCT, not one per face. `sides` reaches here as a COUNT — order_designs is
- * aggregated to `count(distinct side)` long before pricing — so charging a back differently
- * from a sleeve would mean threading the face names through priceLines and unitCostOf, and
- * a per-face grid in the editor. Worth doing if it is asked for; not something to fake.
+ * PER FACE, AND IT HAS BEEN SINCE THE FACE NAMES WERE THREADED THROUGH.
+ *
+ * This paragraph used to say the opposite — "ONE RATE PER PRODUCT, not one per face… `sides`
+ * reaches here as a COUNT… Worth doing if it is asked for; not something to fake" — and it
+ * was true when written and false by the time anyone read it. `priceLines` hands sideAddOn
+ * NAMES now (it still tolerates a count), so all three tiers below are live:
+ *
+ *   d.sidePrice as a MAP   per product, per face      highest precedence
+ *   fees.side_<face>       per platform, per face     e.g. side_back, side_sleeve
+ *   d.sidePrice as a NUMBER / fees.method_side        the flat "each additional side"
+ *
+ * Measured against a real database: base $10 + embroidery $5, with side_back $3.50 and
+ * side_sleeve $1.50 — front alone $15.00, front+back $18.50, front+sleeve $16.50,
+ * front+back+sleeve $20.00, and a face with no override falling to the $2.00 flat at $17.00.
+ *
+ * WHAT IS ACTUALLY MISSING is the editor: Settings and the product dialog expose one "Each
+ * additional side" box, so the per-face rates can only be set by writing fee keys directly.
+ * That is a UI gap, not an engine one — do not "add" what is already here.
  */
 function sideAddOn(faces, fees, d) {
   /**

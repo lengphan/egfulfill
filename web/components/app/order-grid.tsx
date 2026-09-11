@@ -892,9 +892,27 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
     else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) setEditing(key)
   }, [editing, undo, redo, setCell])
 
+  /**
+   * MEASURED A FRAME LATE, ON PURPOSE.
+   *
+   * This read getBoundingClientRect() synchronously in onFocus — and focusing an input the
+   * browser then SCROLLS INTO VIEW, which happens after the handler returns. So on any cell
+   * that was partly off-screen the rect was pre-scroll and the list opened one column to the
+   * left of the cell it belonged to: a Artwork/Template menu hanging under Placement.
+   *
+   * rAF puts the measurement after the scroll has settled. It also lands before the effect
+   * that closes the menu on scroll attaches (that runs on the next render, once `menu` is
+   * set), so the scroll-into-view cannot close the list it just opened.
+   *
+   * The element is captured, not the event — React pools nothing here, but `currentTarget`
+   * is null by the time a deferred callback runs, so the caller's `el` is what we keep.
+   */
   const openMenu = useCallback((el: HTMLElement, key: string, typed = false) => {
-    const r = el.getBoundingClientRect()
-    setMenu({ key, left: r.left, top: r.bottom, width: r.width, typed })
+    requestAnimationFrame(() => {
+      if (!el.isConnected) return
+      const r = el.getBoundingClientRect()
+      setMenu({ key, left: r.left, top: r.bottom, width: r.width, typed })
+    })
   }, [setMenu])
 
   /* The menu is fixed, so it does not travel with the cell — anything that MOVES the cell
