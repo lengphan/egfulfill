@@ -4,6 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch, CaretDown, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { TabBar, type TabBarItem } from "@/components/app/tab-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
@@ -188,6 +189,27 @@ const SUGGESTED_COLORS = ["Black", "White", "Navy", "Sand", "Heather Grey", "Red
 const imageOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
 const genId = (seed: number) => "PROD-" + seed.toString(36).toUpperCase()
 const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v))
+
+/**
+ * THE FOUR PANELS.
+ *
+ * Grouped by the question each answers, not by how the file happens to be ordered — the
+ * blocks are wrapped where they already sit, so source order inside a panel is preserved
+ * and nothing moved.
+ *
+ *   details   what the product IS — the picture, its names, both skus, who we buy it from,
+ *             type, status, the methods it takes, and the description.
+ *   pricing   what it COSTS — the rule row, the per-size table, bulk stock, the print sides,
+ *             and the method/extra-side overrides. Sides and overrides belong HERE and not
+ *             with the photos: the extra-side rate is the price of the sides configured
+ *             immediately above it, which is the adjacency that section's own comment argues
+ *             for, and a tab is the only thing that could have broken it.
+ *   photos    what it LOOKS like — the photo grid and the colours. One panel because the
+ *             photo tiles are where a colour is tagged; splitting them puts one job in two
+ *             places.
+ *   shipping  what it WEIGHS — the parcel and the dim-weight guard.
+ */
+export type EditorTab = "details" | "pricing" | "photos" | "shipping"
 
 // The stored sizePrices ARRAY ([{size, price, shipping}] — the canonical shape from
 // eg-products.js) → editable strings keyed by size, for the inputs below.
@@ -672,6 +694,10 @@ export function ProductEditorDialog({
  setImg(p ? imageOf(p) : "")
  setColorInput("")
  setErr(null)
+      // Back to the first panel. Opening a DIFFERENT product on whichever tab the last one
+      // was left on shows a page of fields with no idea which garment they belong to —
+      // and if the last dialog closed on a refusal, it opens on that refusal's panel.
+ setTab("details")
     }, 0)
  return () => clearTimeout(id)
   }, [open, product])
@@ -906,6 +932,37 @@ export function ProductEditorDialog({
    * Resolved against the first size that carries a cost, else the product-level one — the
    * same order applyBulk itself resolves in, so the arrow cannot disagree with the result.
    */
+ const [tab, setTab] = useState<EditorTab>("details")
+
+  /**
+   * THE ONLY NUMBER ON THE BAR, and it is there because it is the one save refuses on.
+   *
+   * tab-bar.tsx is explicit that a count belongs on a tab only where a non-zero value is a
+   * call to action — "when everything is counted, the count stops being a signal and becomes
+   * texture". So no "4 sizes" or "3 colours" tallies: those are inventory. A size with no
+   * base cost is the single thing that will turn a save away, so it earns the badge and the
+   * alert tint, and at zero the badge is absent rather than reading "0".
+   *
+   * Mirrors save()'s own test exactly — including that a product-level base covers every
+   * size — or the bar would promise a refusal that never comes, or stay silent before one
+   * that does.
+   */
+ const unpricedCount = useMemo(() => {
+    // firstTierNum's fallback, inlined: it is declared below this line, so calling it here
+    // is a temporal-dead-zone crash on first render rather than a style question.
+ const tv = (sizes.length ? tiers[sizes[0]]?.price : "")?.trim()
+ const savedBase = Number(tv || basePrice.trim()) || 0
+ if (savedBase > 0) return 0
+ return sizes.filter((sz) => !(num(tiers[sz]?.price) > 0)).length
+  }, [sizes, tiers, basePrice])
+
+ const TABS: readonly TabBarItem<EditorTab>[] = useMemo(() => [
+    { id: "details", label: tl("product", "Details") },
+    { id: "pricing", label: tl("product", "Sizes & pricing"), count: unpricedCount, alert: unpricedCount > 0 },
+    { id: "photos", label: tl("product", "Photos") },
+    { id: "shipping", label: tl("product", "Shipping") },
+  ], [tl, unpricedCount])
+
  const bulkPreview = useMemo(() => {
  if (bulkBase.trim() === "") return null
  const amt = Number(bulkBase)
@@ -972,9 +1029,24 @@ export function ProductEditorDialog({
   }
 
  const [saving, setSaving] = useState(false)
+
+  /**
+   * A REFUSAL MUST BE ABLE TO POINT AT ITS FIELD.
+   *
+   * This is what makes the form safe to tab. `save` turns away a product with no base cost
+   * — the one refusal protecting the margin — and on a single scrolling column the message
+   * and the field were at least both present. Behind tabs they need not be: the sizes table
+   * can be two panels away, and an error naming a size you cannot see is worse than no
+   * tabs at all.
+   *
+   * So every refusal names the tab that owns it, and raising one SWITCHES there first. The
+   * error itself also moved out of the scrolling body and up against the buttons, so it is
+   * on screen whichever panel is open and however far down it is scrolled.
+   */
+ const fail = (t: EditorTab, msg: string) => { setTab(t); setErr(msg) }
  const save = () => {
  if (saving) return
- if (!name.trim()) { setErr("Give the product a name."); return }
+ if (!name.trim()) { fail("details", "Give the product a name."); return }
     /**
      * ONE SKU, ONE PRODUCT. Nothing below this line enforces it: the column has no unique
      * index, the whole-list POST rewrites every row without looking, and the number offered
@@ -986,7 +1058,7 @@ export function ProductEditorDialog({
      */
  const mySku = cleanSku(sku) || cleanSku(nextSku ?? "")
  if (mySku && (takenSkus ?? []).some((t) => cleanSku(t) === mySku)) {
- setErr(`${mySku} already belongs to another product. Give this one its own number — stock and pricing are both held against it.`)
+ fail("details", `${mySku} already belongs to another product. Give this one its own number — stock and pricing are both held against it.`)
  return
     }
     /**
@@ -1011,21 +1083,21 @@ export function ProductEditorDialog({
      */
  const savedBase = Number(firstTierNum("price", basePrice) ?? 0) || 0
  if (sizes.length === 0) {
- if (!(savedBase > 0)) { setErr("Set a base cost before saving — it is what the seller is charged. Without one the order prices itself at what we pay the supplier plus the markup setting, which can be no margin at all."); return }
+ if (!(savedBase > 0)) { fail("pricing", "Set a base cost before saving — it is what the seller is charged. Without one the order prices itself at what we pay the supplier plus the markup setting, which can be no margin at all."); return }
     } else {
  const unpriced = sizes.filter((s) => {
  const p = num(tiers[s]?.price)
  return !(p > 0) && !(savedBase > 0)
       })
  if (unpriced.length) {
- setErr(`Set a base cost for ${unpriced.length === sizes.length ? "each size" : unpriced.join(", ")} before saving — it is what the seller is charged, and without it the order prices itself at what we pay the supplier plus the markup setting.`)
+ fail("pricing", `Set a base cost for ${unpriced.length === sizes.length ? "each size" : unpriced.join(", ")} before saving — it is what the seller is charged, and without it the order prices itself at what we pay the supplier plus the markup setting.`)
  return
       }
  const atCost = sizes
         .map((s) => ({ s, base: num(tiers[s]?.price) > 0 ? num(tiers[s].price) : savedBase, cost: num(tiers[s]?.cost) > 0 ? num(tiers[s].cost) : (num(productCost) || 0) }))
         .find((r) => r.cost > 0 && r.base > 0 && r.base <= r.cost)
  if (atCost) {
- setErr(`Base cost for ${atCost.s} is $${atCost.base.toFixed(2)} against the $${atCost.cost.toFixed(2)} the blank costs us — that order makes nothing. Price it above the product cost.`)
+ fail("pricing", `Base cost for ${atCost.s} is $${atCost.base.toFixed(2)} against the $${atCost.cost.toFixed(2)} the blank costs us — that order makes nothing. Price it above the product cost.`)
  return
       }
     }
@@ -1195,12 +1267,34 @@ export function ProductEditorDialog({
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
         <DialogHeader className="border-b border-border px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
-            {title ?? (product ? tl("product", "Edit product") : tl("product", "New product"))}
+            {/* THE PRODUCT, not the verb. "Edit product" was the only thing this said
+                while four panels of its fields sat below; with the bar naming the section,
+                the header is free to name the thing. Falls back to the verb for a product
+                with no name yet, which is every new one. */}
+            {title ?? (product ? (name.trim() || tl("product", "Edit product")) : tl("product", "New product"))}
+            {product && sku.trim() && <span className="text-sm font-normal tabular-nums text-muted-foreground">{cleanSku(sku)}</span>}
             {importSupplier && <span className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"><Tag size={11} weight="fill" /> {importSupplier}</span>}
           </DialogTitle>
         </DialogHeader>
 
+        {/* ABOVE THE SCROLL, NOT INSIDE IT — a bar that scrolls away with the panel it
+            switches has moved the problem rather than solved it. It sits between the header
+            and the body, so the four panels are always one click apart however far down you
+            are. `spacing="none"` keeps the bar's own -mb-px, so its rule and the body meet
+            on one line instead of two; px-6 on the nav itself rather than a wrapper, so the
+            rule still spans the full width while the first tab lines up with the fields. */}
+        <TabBar
+          size="sm"
+          spacing="none"
+          className="px-6"
+          items={TABS}
+          value={tab}
+          onChange={setTab}
+          ariaLabel={tl("product", "Product sections")}
+        />
+
         <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+          {tab === "details" && (<>
           {/* Mockup + name */}
           <div className="flex gap-4">
             {/* PREVIEW, not an uploader.
@@ -1526,6 +1620,8 @@ export function ProductEditorDialog({
             </div>
           </div>
 
+          </>)}
+          {tab === "pricing" && (<>
           {/* Sizes & pricing — the per-size cost / base / shipping below is the source of truth.
               The product-level summary row + margin readout were removed as redundant; the
  product-level defaults are derived from the first size's tier on save. */}
@@ -1860,6 +1956,8 @@ export function ProductEditorDialog({
               Rows written under the old per-colour skus are summed into their size when the
  dialog reads them, and are never rewritten or deleted — they stay on Inventory. */}
 
+          </>)}
+          {tab === "shipping" && (<>
           {/* Shipping physicals + dim-weight guard. Carriers bill the greater of actual and
  dimensional weight (L×W×H÷166); keep the box under the ceiling so you're always
  billed on weight and never reweighed up. */}
@@ -1890,6 +1988,8 @@ export function ProductEditorDialog({
             )}
           </div>
 
+          </>)}
+          {tab === "photos" && (<>
           {/* ── Images ──────────────────────────────────────────────────────────────
               Every picture we hold for this product, in one place. Supplier extras and
  per-colour shots used to be fetched and discarded because the editor had a
@@ -2089,6 +2189,8 @@ export function ProductEditorDialog({
             </p>
           </div>
 
+          </>)}
+          {tab === "pricing" && (<>
           {/* ── Print sides ─────────────────────────────────────────────────────────
               Sides come from the TYPE (Settings → Platform), so a category change reaches
  every product that never disagreed with it. A board can override a side here
@@ -2343,6 +2445,8 @@ export function ProductEditorDialog({
             </div>
           </div>
 
+          </>)}
+          {tab === "photos" && (<>
           {/* Colors — chips + suggested */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -2393,6 +2497,8 @@ export function ProductEditorDialog({
  the pricing table above already shows, so a size could be added in one place
  and priced in another. Sizes are now added and removed on their own row.) */}
 
+          </>)}
+          {tab === "details" && (<>
           {/* Description */}
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">{tl("product", "Description")}</span>
@@ -2401,8 +2507,14 @@ export function ProductEditorDialog({
 
           {/* Status moved to the top row beside Type. */}
 
-          {err && <div className="text-sm text-destructive">{err}</div>}
+          </>)}
         </div>
+
+        {/* PINNED, because the field it talks about may be behind another tab. It used to
+            sit at the foot of the scrolling column, which was survivable while everything
+            was one column and is not now: `fail` switches to the owning panel, and this
+            keeps the sentence on screen while you fix what it names. */}
+        {err && <div className="border-t border-border bg-destructive/5 px-6 py-3 text-sm text-destructive">{err}</div>}
 
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("product", "Cancel")}</Button>
