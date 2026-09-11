@@ -6,7 +6,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, getMe, assetUrl, type Order, type User } from "@/lib/api"
-import { useCountUp, usePressScale } from "@/lib/motion"
+import {
+  Screen, Head, HeadButton, SectionHead, Tile, TileRow, Skeleton, EmptyState, Appear, GUTTER,
+} from "@/components/kit"
 import { router, useFocusEffect } from "expo-router"
 import { isOpen, isOverdue, normalizeStage, platformOf, numOf, lineListing } from "@/lib/orders"
 import { TAB_BAR, F, C, R, S, CARD } from "@/lib/theme"
@@ -125,10 +127,6 @@ const LADDER = [
   { stage: "working", label: "Working", fill: C.ink },
 ] as const
 
-const SECTION_LABEL = {
-  paddingHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm,
-  fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4, color: C.muted,
-} as const
 
 /**
  * THE CHANNEL FILTER.
@@ -181,85 +179,6 @@ function FilterRow({ value, options, onPick }: {
   )
 }
 
-/**
- * THE ONE NUMBER, ON THE BLOCK, WITH SOMETHING TO BE READ AGAINST.
- *
- * The dark block is the app's one filled surface and this is what it is for — the thing you
- * look at from arm's length. What is new is the bar underneath: the figure is drawn as a
- * proportion of the whole open queue, which is the difference between "seven" and "seven of
- * thirty-one".
- *
- * No status colour in here. Red on slate is not a pair anyone has measured, and the block
- * already has a way to be loud: the bar. A calm morning is a short bar, which is exactly
- * how a zero morning should look.
- */
-function HeroFigure({ needsYou, openTotal, loading, reduced, urgent, days }: {
-  needsYou: number
-  openTotal: number
-  loading: boolean
-  reduced: boolean
-  urgent: Order[]
-  days: { key: string; letter: string; n: number }[]
-}) {
-  const share = openTotal > 0 ? Math.min(1, needsYou / openTotal) : 0
-  const grown = useGrow(loading ? 0 : share, reduced)
-  return (
-    <View style={{
-      marginHorizontal: S.xl, marginTop: S.lg,
-      backgroundColor: C.ink, borderRadius: R.card, padding: S.xl,
-    }}>
-      <Text style={{ color: C.onInk, opacity: 0.75, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>
-        NEEDS YOU NOW
-      </Text>
-      <View style={{ flexDirection: "row", alignItems: "baseline", gap: S.sm, marginTop: 2 }}>
-        {/* The placeholder stays QUIET. An em-dash at 60pt in the brightest ink on the block
-            is a bar three characters wide, and it reads as a redaction rather than as "not
-            known yet" — while being the largest thing on the screen. */}
-        {loading ? (
-          <Text style={{ color: C.inkAccent, fontSize: 60, fontFamily: F.display, letterSpacing: -1.5 }}>—</Text>
-        ) : (
-          <Counter
-            value={needsYou}
-            reduced={reduced}
-            style={{ color: C.onInk, fontSize: 60, fontFamily: F.display, letterSpacing: -1.5 }}
-          />
-        )}
-        {!loading && openTotal > 0 ? (
-          <Text style={{ color: C.onInk, opacity: 0.7, fontSize: 15, fontFamily: F.medium }}>
-            of {openTotal} open
-          </Text>
-        ) : null}
-      </View>
-
-      {/* VALUE, NOT HUE. Two greys off the block itself: the track is the block one step up,
-          the fill is the block's own ink. It survives greyscale, which a red-on-slate bar
-          would have to be measured to claim. */}
-      <View style={{
-        height: 6, borderRadius: R.pill, backgroundColor: C.inkAccent,
-        marginTop: S.lg, overflow: "hidden",
-      }}>
-        <Animated.View style={{
-          width: grown.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
-          height: "100%", borderRadius: R.pill, backgroundColor: C.onInk,
-        }} />
-      </View>
-
-      <Text style={{ color: C.onInk, opacity: 0.7, fontSize: 13, fontFamily: F.body, marginTop: S.sm }}>
-        {loading ? "Loading…" : needsYou === 0 ? "Nothing overdue or rushed" : "overdue and rush"}
-      </Text>
-
-      {/* THE STRIP IS PART OF THE FIGURE, not a second thing under it. These ARE the orders
-          the number counts, so they belong on the same object — as two blocks they said the
-          same fact twice and cost a whole band of the screen to do it. */}
-      <NeedsYouStrip orders={urgent} reduced={reduced} />
-
-      {/* AND THE WEEK, as a line rather than a card. It answers "how is it going" under the
-          bar that answers "how bad is it" — one object, two readings, no second legend and
-          no third section heading. */}
-      <Trend days={days} loading={loading} reduced={reduced} />
-    </View>
-  )
-}
 
 /**
  * THE ONLY PICTURES ON THE SCREEN, AND THEY ARE REAL.
@@ -317,138 +236,7 @@ function NeedsYouStrip({ orders, reduced }: { orders: Order[]; reduced: boolean 
   )
 }
 
-/**
- * THE PIPELINE AS ONE BAR.
- *
- * Four separate tracks was the web's problem too: with hundreds in New and a handful in
- * Working, a shared linear scale makes every later stage a three-pixel stub, so the chart
- * cannot show the one thing it exists for — where the work is piling up. Proportion survives
- * a range that magnitude does not.
- *
- * A stage with anything in it keeps a visible sliver (minWidth), because "a few" and "none"
- * are different answers and a 0.4% segment would round to neither.
- */
-function Funnel({ counts, loading, awaitingScan }: {
-  counts: Record<string, number>; loading: boolean; awaitingScan: number
-}) {
-  const total = LADDER.reduce((n, s) => n + (counts[s.stage] ?? 0), 0)
-  return (
-    /* ON NIGHT, so it is a lifted PANEL rather than a white card cut out of the dark. A
-       white card here read as the old app showing through a hole in the new one. */
-    <View style={{
-      marginHorizontal: S.xl, padding: S.lg, borderRadius: R.card,
-      backgroundColor: "rgba(255,255,255,0.06)",
-    }}>
-      <View style={{ flexDirection: "row", height: 14, gap: 2 }}>
-        {LADDER.map((s) => {
-          const n = counts[s.stage] ?? 0
-          if (total > 0 && n === 0) return null
-          return (
-            <View
-              key={s.stage || "new"}
-              style={{
-                flexGrow: total > 0 ? n : 1, flexBasis: 0, minWidth: 8,
-                borderRadius: R.badge,
-                backgroundColor: loading || total === 0 ? C.accent : s.fill,
-              }}
-            />
-          )
-        })}
-      </View>
 
-      <View style={{ marginTop: S.md }}>
-        {LADDER.map((s, i) => (
-          <Pressable
-            key={s.stage || "new"}
-            onPress={() => router.push({
-              pathname: "/(tabs)/orders",
-              params: s.stage ? { lens: "Open", stage: s.stage } : { lens: "Open" },
-            })}
-            disabled={(counts[s.stage] ?? 0) === 0}
-            style={({ pressed }) => ({
-              flexDirection: "row", alignItems: "center", gap: S.md,
-              paddingVertical: 9,
-              borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "rgba(255,255,255,0.10)",
-              backgroundColor: pressed ? "rgba(255,255,255,0.08)" : "transparent",
-            })}
-          >
-            <View style={{ width: 10, height: 10, borderRadius: R.badge / 2, backgroundColor: s.fill }} />
-            <Text style={{ flex: 1, fontSize: 14.5, fontFamily: F.medium, color: C.onNight }}>{s.label}</Text>
-            <Text style={{
-              fontSize: 15, fontFamily: F.semi, fontVariant: ["tabular-nums"],
-              color: C.onNight, opacity: (counts[s.stage] ?? 0) === 0 ? 0.4 : 1,
-            }}>
-              {loading ? "—" : counts[s.stage] ?? 0}
-            </Text>
-          </Pressable>
-        ))}
-
-        {/* AWAITING SCAN IS NOT A STAGE, and it is the one row that survived "What needs
-            doing" — everything else on that card said something the figure or this funnel
-            already said. It is a label printed and not yet scanned out, so it sits under
-            the ladder behind a heavier rule, with no ramp swatch: the swatch means "a
-            position in the pipeline" and this is not one. */}
-        <Pressable
-          onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Open" } })}
-          disabled={awaitingScan === 0}
-          style={({ pressed }) => ({
-            flexDirection: "row", alignItems: "center", gap: S.md,
-            paddingVertical: 9, marginTop: 2,
-            borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.22)",
-            backgroundColor: pressed ? "rgba(255,255,255,0.08)" : "transparent",
-          })}
-        >
-          <Ionicons name="scan-outline" size={14} color={C.onNight} style={{ width: 10, opacity: 0.6 }} />
-          <Text style={{ flex: 1, fontSize: 14.5, fontFamily: F.medium, color: C.onNight }}>Awaiting scan</Text>
-          <Text style={{
-            fontSize: 15, fontFamily: F.semi, fontVariant: ["tabular-nums"],
-            color: C.onNight, opacity: awaitingScan === 0 ? 0.4 : 1,
-          }}>
-            {loading ? "—" : awaitingScan}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  )
-}
-
-/**
- * SEVEN DAYS OF INTAKE.
- *
- * The screen could say how bad it is and could not say how it is going. This is the cheapest
- * honest answer to the second question: orders CREATED per day for the last seven, off
- * `created_at`, which every row carries.
- *
- * It is deliberately not "shipped per day". There is no shipped timestamp on this payload —
- * `label_scanned_at` is a pre-scan mark and not a dispatch — and a throughput chart built on
- * the nearest-looking column would be a confident wrong answer rather than a missing one.
- */
-function Column({ height, today, letter, loading, reduced, delay, dark }: {
-  height: number; today: boolean; letter: string; loading: boolean; reduced: boolean; delay: number
-  dark?: boolean
-}) {
-  /* The columns RISE, oldest first. Left-to-right is the direction the axis is read in, so
-     the stagger is the reading order rather than a flourish — and at 30ms apart the whole
-     week is up in a fifth of a second. */
-  const h = useGrow(height, reduced, D.fast, delay)
-  return (
-    <View style={{ flex: 1, alignItems: "center", gap: 6 }}>
-      <Animated.View style={{
-        width: "100%", height: h, borderRadius: R.badge,
-        backgroundColor: dark
-          ? (loading ? C.inkAccent : today ? C.onInk : "rgba(221,224,227,0.42)")
-          : (loading ? C.accent : today ? C.fg : C.edge),
-      }} />
-      <Text style={{
-        fontSize: 10,
-        fontFamily: today ? F.semi : F.body,
-        color: dark ? (today ? C.onInk : "rgba(221,224,227,0.6)") : (today ? C.fg : C.muted),
-      }}>
-        {letter}
-      </Text>
-    </View>
-  )
-}
 
 /**
  * A PHOTO CARD — the picture is INSIDE it, not behind the page.
@@ -462,36 +250,6 @@ function Column({ height, today, letter, loading, reduced, delay, dark }: {
  * The card IS the action. An earlier draft put a circular button on the corner, which is
  * one more thing to explain when the whole card is already pressable.
  */
-/**
- * A TILE — a figure, a word, and a colour that is the tile rather than a dot on it.
- *
- * Rows were the whole app: label left, value right, hairline, repeat, on six screens. A row
- * is for reading a list; a tile is for recognising one thing at a glance, which is what a
- * home screen is for. The colour is a large FILL and never type, which is the one thing the
- * house rules are strict about and the reason `brand` and `acid` are safe to use this way.
- */
-function Tile({ n, label, bg, fg, prefix, reduced, onPress }: {
-  n: number; label: string; bg: string; fg: string; prefix?: string
-  reduced: boolean; onPress: () => void
-}) {
-  const shown = useCountUp(n, reduced)
-  const press = usePressScale(reduced)
-  return (
-    <Animated.View style={{ flex: 1, transform: [{ scale: press.scale }] }}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={press.onPressIn}
-        onPressOut={press.onPressOut}
-        style={{ borderRadius: R.card, backgroundColor: bg, padding: 16, minHeight: 108, justifyContent: "space-between" }}
-      >
-        <Text style={{ fontSize: 34, fontFamily: F.bold, color: fg, letterSpacing: -1.2 }}>
-          {prefix ?? ""}{Math.round(shown).toLocaleString()}
-        </Text>
-        <Text style={{ fontSize: 13, fontFamily: F.medium, color: fg, opacity: 0.72 }}>{label}</Text>
-      </Pressable>
-    </Animated.View>
-  )
-}
 
 
 function PhotoCard({ art, title, note, thumbs, onPress, height, top }: {
@@ -544,59 +302,7 @@ function PhotoCard({ art, title, note, thumbs, onPress, height, top }: {
   )
 }
 
-/** A heading in sentence case with its way out on the right. The tracked-out caps this
- *  replaces read as technical rather than spoken, which is the wrong register for a screen
- *  whose whole job is to say good morning and point at two numbers. */
-function CardHead({ label, action, onPress }: { label: string; action: string; onPress: () => void }) {
-  return (
-    <View style={{
-      flexDirection: "row", alignItems: "baseline", justifyContent: "space-between",
-      marginHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm,
-    }}>
-      <Text style={{ fontSize: 15.5, fontFamily: F.displaySemi, color: C.onNight, letterSpacing: -0.2 }}>{label}</Text>
-      <Pressable onPress={onPress} hitSlop={8}>
-        <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: C.onNight, opacity: 0.55 }}>{action}</Text>
-      </Pressable>
-    </View>
-  )
-}
 
-function Trend({ days, loading, reduced, dark = true }: {
-  days: { key: string; letter: string; n: number }[]; loading: boolean; reduced: boolean
-  /** It was drawn only for the ink hero. It now also runs on the page, so the two colour
-   *  choices below have to follow the ground rather than assume it. */
-  dark?: boolean
-}) {
-  const peak = Math.max(1, ...days.map((d) => d.n))
-  const total = days.reduce((n, d) => n + d.n, 0)
-  return (
-    <View style={{ marginTop: S.lg }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6, height: 36 }}>
-        {days.map((d, i) => (
-          <Column
-            key={d.key}
-            dark={dark}
-            /* A day with nothing gets a 2pt baseline rather than no bar: an absent column
-               and a zero column must not look like the same day. */
-            height={loading ? 2 : Math.max(2, Math.round((d.n / peak) * 26))}
-            today={i === days.length - 1}
-            letter={d.letter}
-            loading={loading}
-            reduced={reduced}
-            delay={i * 30}
-          />
-        ))}
-      </View>
-      {/* Silent while loading: the block already says "Loading…" once above, and the same
-          word twice in one object reads as two things failing rather than one waiting. */}
-      {loading ? null : (
-        <Text style={{ marginTop: S.sm, fontSize: 12.5, fontFamily: F.body, color: dark ? C.onInk : C.muted, opacity: dark ? 0.7 : 1 }}>
-          {`${total} in seven days`}
-        </Text>
-      )}
-    </View>
-  )
-}
 
 export default function Dashboard() {
   const insets = useSafeAreaInsets()
@@ -754,151 +460,110 @@ export default function Dashboard() {
      pass exists to remove, and on a photograph they read as stickers. */
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: C.night }}
-      contentContainerStyle={{ paddingTop: insets.top + S.lg, paddingBottom: insets.bottom + TAB_BAR.clearance + S.lg }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
-    >
-      {/* SETTINGS LIVES HERE NOW. The bar went to four so each tab could carry a legible
-          glyph and its word; Settings is the one of the five you open least, and this is the
-          screen it belongs to — it is where the app reports on itself. */}
-      <View style={{ paddingHorizontal: S.xl, flexDirection: "row", alignItems: "flex-start", gap: S.md }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: 13, color: C.onNight, opacity: 0.55 }}>
-            {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-          </Text>
-          {/* A GREETING, NOT A LABEL. "Dashboard" is the word on the tab directly below it,
-            and printing it twice tells a person nothing they did not already know. */}
-        <Text style={{ marginTop: 2, fontSize: 32, fontFamily: F.display, letterSpacing: -0.8, color: C.onNight }}>
-          {hello}
-        </Text>
-        </View>
-        {/* A BORDERED CONTROL, NOT A LOOSE GLYPH. It shipped as a bare 22pt outline in muted
-            ink against a big display heading, and the first person to look for Settings did
-            not find it — which, with the tab gone, is the same as having deleted it. Shape
-            says kind here as everywhere else: this is something you press, so it has the
-            edge a control has. */}
-        {/* CHAT'S PERMANENT ROUTE. The peek only exists while someone is waiting, and a
-            seller never gets one at all — the count is staff-only. So this is not a
-            convenience, it is the door: without it the feature would be reachable only when
-            the app decided to offer it. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Chat"
-          onPress={() => router.push("/chat")}
-          hitSlop={10}
-          style={({ pressed }) => ({
-            width: 40, height: 40, marginTop: 2,
-            alignItems: "center", justifyContent: "center",
-            borderRadius: R.pill,
-            borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
-            backgroundColor: pressed ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)",
-          })}
-        >
-          <Ionicons name="chatbubble-ellipses-outline" size={20} color={C.onNight} />
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          onPress={() => router.push("/(tabs)/settings")}
-          hitSlop={10}
-          style={({ pressed }) => ({
-            width: 40, height: 40, marginTop: 2,
-            alignItems: "center", justifyContent: "center",
-            borderRadius: R.pill,
-            borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
-            backgroundColor: pressed ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)",
-          })}
-        >
-          <Ionicons name="settings-outline" size={20} color={C.onNight} />
-        </Pressable>
-      </View>
+    <Screen onRefresh={onRefresh} refreshing={refreshing}>
+      {/* SETTINGS LIVES HERE. The bar went to four so each tab could carry a legible glyph
+          and its word; Settings is the one you open least, and this is the screen it belongs
+          to — it is where the app reports on itself. */}
+      <Head
+        title={hello}
+        sub={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+        right={
+          <View style={{ flexDirection: "row", gap: S.sm }}>
+            <HeadButton icon="chatbubble-ellipses-outline" label="Chat" onPress={() => router.push("/chat")} />
+            <HeadButton icon="settings-outline" label="Settings" onPress={() => router.push("/(tabs)/settings")} />
+          </View>
+        }
+      />
 
       {channels.length > 2 ? (
         <FilterRow value={channel} options={channels} onPick={setChannel} />
       ) : null}
 
-      {/* TWO CARDS, AND THEY ARE THE SCREEN.
-          What stood here was one ink block carrying a 4-digit figure, a progress bar, a
-          photo strip and a seven-day chart — four readouts stacked inside one object, which
-          is a report rather than a home screen. The two questions a morning actually asks
-          are "is anything waiting on me" and "how much is being made", so each gets a card,
-          and everything that block also carried is still on this screen, further down. */}
-      <PhotoCard
-        height={228}
-        art={require("../../assets/card-sky.webp")}
-        title={loading ? "Counting…" : needsYou === 0 ? "Nothing needs you" : `${needsYou} ${needsYou === 1 ? "order needs" : "orders need"} you`}
-        note={loading ? null : needsYou === 0 ? "Everything open is on time." : needsNote}
-        top={S.xl}
-        onPress={() => router.push("/(tabs)/orders")}
-      />
-
-      {/* FOUR TILES, NOT FOURTEEN ROWS.
-          Everything under here used to be label-left / value-right rows — the same shape as
-          Wallet, Settings and Details, on all six screens. A row is for reading a list; a
-          tile is for recognising one thing at a glance, which is the only thing a home
-          screen is for. The colour is the tile, not a dot on it. */}
-      {/* THE CARD OWNS "needs you", so the tiles are VOLUMES and none of them repeats it.
-          Three sayings of one number — a heading, a headline and a tile — was most of what
-          made this screen read as padded.
-          THE LABELS ARE THE APP'S OWN WORDS, not descriptions of them. Working and Shipped
-          come straight out of STAGE_LABEL, Open is a lens on the Orders screen and Scan is a
-          tab. "In production" and "On the way" were this screen inventing a second name for
-          a status that already has one — which is how a person ends up learning the same
-          pipeline twice. */}
-      <View style={{ flexDirection: "row", gap: 10, marginHorizontal: S.xl, marginTop: S.xl }}>
-        <Tile n={open.length} label="Open" bg={C.brand} fg={C.onBrand} reduced={reduced}
-              onPress={() => router.push("/(tabs)/orders")} />
-        <Tile n={stageCounts.working ?? 0} label="Working" bg={C.lit} fg={C.onLit} reduced={reduced}
-              onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Working" } })} />
-      </View>
-      <View style={{ flexDirection: "row", gap: 10, marginHorizontal: S.xl, marginTop: 10 }}>
-        <Tile n={awaitingScan ?? 0} label="Scan" bg={C.acid} fg={C.onAcid} reduced={reduced}
-              onPress={() => router.push("/(tabs)/scan")} />
-        <Tile n={shipped} label="Shipped" bg={C.pop} fg={C.onPop} reduced={reduced}
-              onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Shipped" } })} />
-      </View>
-
-      {/* WHAT IS BEING MADE, as pictures.
-          The heading is a PLACE, not a stage — "Working" is already the tile directly above
-          and printing it twice on one screen is the repetition this pass just removed. The
-          floor is where these orders are; the tile is how many of them there are.
-          Two grey blocks stood here — a stage funnel and a seven-day bar chart — and both
-          were lists of numbers on a screen whose whole point is not being one. The funnel
-          said what the Orders screen's own lens tabs already say, one tap away. The chart
-          counted orders CREATED per day, which is a report, and it was labelled ARRIVING,
-          which is not even what it counted. */}
-      {inWorks.length > 0 && (
+      {/* LOADING IS THE SHAPE OF WHAT IS COMING, not a spinner. A spinner says something is
+          happening somewhere; a skeleton says this is what will be here, and nothing jumps
+          when it lands. */}
+      {loading && !orders ? (
+        <View style={{ paddingHorizontal: GUTTER, marginTop: S.xl, gap: 10 }}>
+          <Skeleton h={228} radius={26} />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Skeleton h={104} radius={26} style={{ flex: 1 }} />
+            <Skeleton h={104} radius={26} style={{ flex: 1 }} />
+          </View>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Skeleton h={104} radius={26} style={{ flex: 1 }} />
+            <Skeleton h={104} radius={26} style={{ flex: 1 }} />
+          </View>
+        </View>
+      ) : (
         <>
-          <CardHead label="On the floor" action="View all"
-                    onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Working" } })} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 10, paddingHorizontal: S.xl }}
-          >
-            {inWorks.map((w) => (
-              <Pressable key={w.id} onPress={() => router.push(`/order/${encodeURIComponent(w.id)}`)}
-                         style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
-                <Image source={{ uri: w.uri }}
-                       style={{ width: 132, height: 132, borderRadius: R.card, backgroundColor: "rgba(255,255,255,0.08)" }}
-                       resizeMode="cover" />
-                <Text numberOfLines={1} style={{ width: 132, marginTop: 7, fontSize: 12.5, fontFamily: F.medium, color: C.onNight, opacity: 0.75 }}>
-                  {w.num}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          {/* EACH BLOCK ARRIVES, one after another. A screenful that is simply already there
+              is the difference between an app that feels built and one that feels assembled —
+              and it is one property, because two fighting over one element never shows. */}
+          <Appear index={0}>
+            <PhotoCard
+              height={228}
+              top={S.xl}
+              art={require("../../assets/card-sky.webp")}
+              title={needsYou === 0 ? "Nothing needs you" : `${needsYou} ${needsYou === 1 ? "order needs" : "orders need"} you`}
+              note={needsYou === 0 ? "Everything open is on time." : needsNote}
+              onPress={() => router.push("/(tabs)/orders")}
+            />
+          </Appear>
+
+          {/* THE CARD OWNS "needs you", so the tiles are VOLUMES and none repeats it. The
+              labels are the app's own words — Working and Shipped out of STAGE_LABEL, Open a
+              lens, Scan a tab — so the word on a tile is the word on the screen it opens. */}
+          <Appear index={1}>
+            <TileRow first>
+              <Tile n={open.length} label="Open" bg={C.brand} fg={C.onBrand}
+                    onPress={() => router.push("/(tabs)/orders")} />
+              <Tile n={stageCounts.working ?? 0} label="Working" bg={C.lit} fg={C.onLit}
+                    onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Open" } })} />
+            </TileRow>
+          </Appear>
+          <Appear index={2}>
+            <TileRow>
+              <Tile n={awaitingScan ?? 0} label="Scan" bg={C.acid} fg={C.onAcid}
+                    onPress={() => router.push("/(tabs)/scan")} />
+              <Tile n={shipped} label="Shipped" bg={C.pop} fg={C.onPop}
+                    onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "All" } })} />
+            </TileRow>
+          </Appear>
+
+          {/* WHAT IS BEING MADE, as pictures. The heading is a PLACE, not a stage: Working is
+              the tile directly above, and the tile is how many there are while the floor is
+              where they are. */}
+          {inWorks.length > 0 && (
+            <Appear index={3}>
+              <SectionHead label="On the floor" action="View all"
+                           onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Open" } })} />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 10, paddingHorizontal: GUTTER }}
+              >
+                {inWorks.map((w) => (
+                  <Pressable key={w.id} onPress={() => router.push(`/order/${encodeURIComponent(w.id)}`)}
+                             style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
+                    <Image source={{ uri: w.uri }}
+                           style={{ width: 132, height: 132, borderRadius: R.card, backgroundColor: C.accent }}
+                           resizeMode="cover" />
+                    <Text numberOfLines={1} style={{ width: 132, marginTop: 7, fontSize: 12.5, fontFamily: F.medium, color: C.muted }}>
+                      {w.num}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Appear>
+          )}
         </>
       )}
 
       {/* Say WHICH state this is: a failed fetch and an empty queue must never look alike. */}
       {err ? (
-        <Text style={{ marginHorizontal: S.xl, marginTop: S.lg, color: C.alert, fontSize: 13 }}>{err}</Text>
-      ) : loading ? (
-        <ActivityIndicator style={{ marginTop: S.xl }} color={C.primary} />
+        <EmptyState bad icon="cloud-offline-outline" line="Couldn't load your orders"
+                    note={err} action="Try again" onAction={onRefresh} />
       ) : null}
-
-    </ScrollView>
+    </Screen>
   )
 }
