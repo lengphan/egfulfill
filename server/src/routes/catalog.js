@@ -883,8 +883,15 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         order by min(p.style_name)
         limit $${args.length - 1} offset $${args.length}`, args
     ).catch(() => ({ rows: [] }));
-    const total = await q(`select count(distinct style_id)::int as n from ss_products ${term ? '' : ''}`)
-      .then((x) => x.rows[0]?.n ?? 0).catch(() => 0);
+    // The COUNT HAS TO CARRY THE SAME WHERE as the page above it. This read
+    // `${term ? '' : ''}` — a ternary whose two branches are both the empty string, so the
+    // filter was never applied and the total was always all 825 styles. Searching "cap"
+    // returned five rows under a pager offering twenty-one pages, twenty of them empty.
+    // Same `where`, same args minus the limit/offset pair.
+    const total = await q(
+      `select count(distinct p.style_id)::int as n from ss_products p ${where}`,
+      args.slice(0, args.length - 2)
+    ).then((x) => x.rows[0]?.n ?? 0).catch(() => 0);
     return {
       total,
       styles: r.rows.map((x) => ({

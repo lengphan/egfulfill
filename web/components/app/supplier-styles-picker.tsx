@@ -24,11 +24,20 @@ const PAGE = 40
  * Paged rather than scrolled: there are 825 styles behind this, and loading them to filter
  * in the browser would move the entire catalogue over the wire to save one round trip.
  */
-export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) {
+export function SupplierStylesPicker({ onChanged, search }: {
+  onChanged?: () => void
+  /** The search term from the merged toolbar. When given, this component stops drawing its
+   *  own field — one list gets one search box, and two that filter halves of the same grid
+   *  is the shape that made these read as separate catalogues in the first place. */
+  search?: string
+}) {
   const tl = useLabelT()
  const [rows, setRows] = useState<SupplierStyle[] | null>(null)
  const [total, setTotal] = useState(0)
- const [q, setQ] = useState("")
+ const [ownQ, setOwnQ] = useState("")
+ const controlled = search !== undefined
+ const q = controlled ? search : ownQ
+ const setQ = setOwnQ
  const [page, setPage] = useState(0)
  const [busy, setBusy] = useState(false)
  const [err, setErr] = useState<string | null>(null)
@@ -44,8 +53,11 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
       .finally(() => setBusy(false))
   }, [])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- q is handled by the debounced
-  // effect below; including it here would fire an extra unpaged fetch on every keystroke.
+  // `q` is handled by the debounced effect below; including it here would fire an extra
+  // unpaged fetch on every keystroke. The directive has to be the line IMMEDIATELY before
+  // the effect — with the second line of prose under it, it was landing on the comment and
+  // suppressing nothing, which is why the rule still fired.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
  useEffect(() => { const t = setTimeout(() => load(q, page * PAGE), 0); return () => clearTimeout(t) }, [load, page])
   // Search resets to the first page — staying on page 6 of a new query shows a slice of
   // results nobody asked for and reads as "no matches".
@@ -99,16 +111,29 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
  const pages = Math.max(1, Math.ceil(total / PAGE))
 
  return (
-    <div className="space-y-3 px-5 py-4">
+    /* NO PADDING OF ITS OWN when the parent drives it: it is mounted INSIDE the merged
+       tab's padded column, so its own px-5 pushed this grid 20px in and 40px narrower than
+       the one above it — cards 275px against 285px, on a different left edge. Two grids
+       that ALMOST line up is what tells you they are two grids. Standalone it still needs
+       the padding, so this switches rather than deletes. */
+    <div className={controlled ? "space-y-3 pt-1" : "space-y-3 px-5 py-4"}>
       <div className="flex flex-wrap items-center gap-2">
-        <SearchField
-          value={q}
-          onChange={setQ}
-          width="md"
-          placeholder={tl("supplierStylesPicker", "Search style, brand or number…")}
-        />
+        {!controlled && (
+          <SearchField
+            value={q}
+            onChange={setQ}
+            width="md"
+            placeholder={tl("supplierStylesPicker", "Search style, brand or number…")}
+          />
+        )}
         <span className="text-xs text-muted-foreground">
-          {total.toLocaleString()} styles synced
+          {/* Says what the number COUNTS. It used to read "5,690 styles synced" while the
+              pager beside it was narrowed by a search, because the server's count ignored
+              the term entirely (fixed in catalog.js). Now it moves with the search, so it
+              has to name which of the two it is. */}
+          {q
+            ? `${total.toLocaleString()} ${total === 1 ? tl("supplierStylesPicker", "style matches") : tl("supplierStylesPicker", "styles match")}`
+            : `${total.toLocaleString()} ${tl("supplierStylesPicker", "styles synced")}`}
         </span>
         {busy && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
         <div className="ml-auto flex items-center gap-1">
@@ -155,76 +180,80 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
           {q ? `No style matches “${q}”.` : tl("supplierStylesPicker", "No supplier styles are synced yet — run Sync all styles on the Suppliers page.")}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                <th className="w-8 px-2 py-2" />
-                <th className="px-2 py-2">{tl("supplierStylesPicker", "Style")}</th>
-                <th className="px-2 py-2">{tl("supplierStylesPicker", "Catalogue price")}</th>
-                {/* Our cost, staff-only. It sits here because the markup is judged against
- it — a percentage means nothing without the number it applies to. */}
-                <th className="px-2 py-2">{tl("supplierStylesPicker", "Costs us")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((st) => {
- return (
-                  <tr key={st.ref} className="border-b border-border/60 last:border-0">
-                    <td className="px-2 py-2">
-                      {/* THE TICK IS THE DECISION. It used to only mark a row for a bulk
- action you then had to press, so ticking a style and hitting
-                          "Create lookbook" produced a catalogue without it — the box looked
- like the answer and was only the question. Now it publishes on the
- spot, and unticking removes. Reversible, so an accidental click
- costs one more click. */}
-                      <input
- type="checkbox"
- checked={st.picked}
- disabled={busy}
- aria-label={`${st.picked ? tl("supplierStylesPicker", "Remove") : tl("supplierStylesPicker", "Add")} ${st.name || st.ref} ${st.picked ? "from" : "to"} the catalogue`}
- onChange={(e) => void toggle(st.ref, e.target.checked)}
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="flex items-start gap-3">
-                        <ProductThumb src={st.image} alt={st.name || st.ref} />
-                        <div className="min-w-0">
-                          <div className="max-w-[22rem] truncate font-medium">{st.name || st.ref}</div>
-                          <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-                            <span className="tabular-nums">{st.ref}</span>
-                            {st.brand && <span>{st.brand}</span>}
-                            {/* No "published" pill — the tick at the head of this row already
- says it, and this tab sits beside Our products, which no longer
- carries one either. */}
-                          </div>
-                          {/* Counts, not the full lists. A 40-colour style would otherwise
- own the row; the detail belongs on the printed catalogue. */}
-                          <div className="mt-0.5 text-2xs text-muted-foreground">
-                            {st.colors.length} colour{st.colors.length === 1 ? "" : "s"} · {st.sizes.length} size{st.sizes.length === 1 ? "" : "s"}
-                            {st.sizes.length > 0 && <> · {st.sizes.slice(0, 8).join(" ")}{st.sizes.length > 8 ? "…" : ""}</>}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <Input
- value={draft[st.ref] ?? (st.catalogPrice == null ? "" : String(st.catalogPrice))}
- onChange={(e) => setDraft((d) => ({ ...d, [st.ref]: e.target.value.replace(/[^\d.]/g, "") }))}
- onBlur={() => savePrice(st.ref)}
- onKeyDown={(e) => { if (e.key === "Enter") savePrice(st.ref) }}
- placeholder={tl("supplierStylesPicker", "set price")}
- inputMode="decimal"
- aria-label={`Catalogue price for ${st.name || st.ref}`}
- className="h-8 w-24 text-right text-xs tabular-nums"
-                      />
-                    </td>
-                    <td className="px-2 py-2 text-xs tabular-nums text-muted-foreground">{money(st.maxCost)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        /* THE SAME GRID AS OUR PRODUCTS, because they are the same catalogue. This was a
+           table beside a card grid on another tab, and the split was the only thing saying
+           these were two different things — they land in one PDF and one CSV. Four-up at
+           xl, matching catalog-view exactly so a row of ours and a row of these line up.
+
+           No badge on these: the "Ours" mark on the other cards is the whole signal, and
+           marking both sides would make the grid look like two kinds of thing again. */
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {rows.map((st) => {
+            const priceValue = draft[st.ref] ?? (st.catalogPrice == null ? "" : String(st.catalogPrice))
+            return (
+              <div
+                key={st.ref}
+                className={
+                  "flex flex-col overflow-hidden rounded-xl border bg-card transition-colors " +
+                  (st.picked ? "border-foreground ring-1 ring-foreground" : "border-border")
+                }
+              >
+                <div className="relative">
+                  <ProductThumb src={st.image} alt={st.name || st.ref} className="!h-auto !w-full aspect-[8/9] rounded-none border-0 p-3" />
+                  {/* THE TICK IS THE DECISION — it publishes on the spot and unticking
+                      removes. It marked a row for a bulk action you then had to press, so
+                      ticking a style and hitting "Create lookbook" produced a catalogue
+                      without it: the box looked like the answer and was only the question. */}
+                  <input
+                    type="checkbox"
+                    checked={st.picked}
+                    disabled={busy}
+                    aria-label={`${st.picked ? tl("supplierStylesPicker", "Remove") : tl("supplierStylesPicker", "Add")} ${st.name || st.ref} ${st.picked ? tl("supplierStylesPicker", "from the catalogue") : tl("supplierStylesPicker", "to the catalogue")}`}
+                    onChange={(e) => void toggle(st.ref, e.target.checked)}
+                    className="absolute left-2.5 top-2.5 size-5 cursor-pointer accent-foreground"
+                  />
+                </div>
+
+                <div className="min-w-0 px-3 pt-2.5">
+                  <div className="truncate text-sm font-medium" title={st.name || st.ref}>{st.name || st.ref}</div>
+                  <div className="mt-0.5 truncate text-2xs text-muted-foreground">
+                    <span className="tabular-nums">{st.ref}</span>
+                    {st.brand && <> · {st.brand}</>}
+                    {/* Counts, not the full lists — a 40-colour style would otherwise own
+                        the card. The detail belongs on the printed catalogue. */}
+                    {(st.colors.length > 0 || st.sizes.length > 0) && (
+                      <> · {st.colors.length} {st.colors.length === 1 ? tl("supplierStylesPicker", "colour") : tl("supplierStylesPicker", "colours")} · {st.sizes.length} {st.sizes.length === 1 ? tl("supplierStylesPicker", "size") : tl("supplierStylesPicker", "sizes")}</>
+                    )}
+                  </div>
+                </div>
+
+                {/* mt-auto so every card in a row ends on the same line however long its
+                    name wrapped — the same rule our own cards follow. */}
+                <div className="mt-auto border-t border-border">
+                  <div className="flex items-center gap-2 px-2.5 py-1.5">
+                    <span className="shrink-0 text-2xs uppercase tracking-wide text-muted-foreground">{tl("supplierStylesPicker", "Catalogue")}</span>
+                    <Input
+                      value={priceValue}
+                      onChange={(e) => setDraft((d) => ({ ...d, [st.ref]: e.target.value.replace(/[^\d.]/g, "") }))}
+                      onBlur={() => savePrice(st.ref)}
+                      onKeyDown={(e) => { if (e.key === "Enter") savePrice(st.ref) }}
+                      placeholder="0.00"
+                      inputMode="decimal"
+                      aria-label={`${tl("supplierStylesPicker", "Catalogue price for")} ${st.name || st.ref}`}
+                      className="ml-auto h-7 w-20 px-2 text-right text-sm tabular-nums"
+                    />
+                  </div>
+                  {/* Our cost, staff-only — this route is requireStaff and never reaches a
+                      seller. It sits under the price because the markup is judged against
+                      it: a percentage means nothing without the number it applies to. */}
+                  <div className="border-t border-border px-2.5 py-1.5">
+                    <span className="block truncate text-2xs uppercase tracking-wide text-muted-foreground">{tl("supplierStylesPicker", "Costs us")}</span>
+                    <span className="block text-sm tabular-nums text-muted-foreground">{money(st.maxCost) || "—"}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

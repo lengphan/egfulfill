@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, Warning, DownloadSimple, Percent, Tag } from "@phosphor-icons/react"
+import { CircleNotch, Warning, DownloadSimple, Percent } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
@@ -155,6 +155,18 @@ function CatalogCard({
           onChange={(e) => onToggle(e.target.checked)}
           className="absolute left-2.5 top-2.5 size-5 cursor-pointer accent-foreground"
         />
+        {/* OURS. The two sources share this grid now, and the difference between them is
+            real: a product we built carries our own SKU, our print methods and a product
+            page; a supplier style is published by reference and re-read from the sync. You
+            have to be able to tell them apart without reading the SKU.
+
+            Top-RIGHT because the tick already owns top-left, and ink-on-white rather than a
+            coloured chip — §4 reserves colour for status, and "where this came from" is not
+            a status. It is the only badge in the grid: the supplier cards carry nothing,
+            because the absence is unambiguous once one side is marked. */}
+        <span className="pointer-events-none absolute right-2.5 top-2.5 rounded-md bg-foreground px-1.5 py-0.5 text-2xs font-medium text-background">
+          {tl("catalog", "Ours")}
+        </span>
       </div>
 
       <div className="min-w-0 px-3 pt-2.5">
@@ -472,12 +484,19 @@ export function CatalogView() {
  other two where it would do nothing. */}
         <div className="mx-5 mt-4 flex flex-wrap items-center gap-2">
           <TabsList>
-            {/* TWO SOURCES, ONE CATALOGUE. Products we built carry our own SKU and print
- method; supplier styles are published by reference and read live from the
- sync. Both land in the same PDF and the same CSV — the tabs are about where
- a thing comes FROM, not about two separate catalogues. */}
-            <TabsTrigger value="mine">{tl("catalog", "Our products")}</TabsTrigger>
-            <TabsTrigger value="supplier">{tl("catalog", "Supplier styles")}</TabsTrigger>
+            {/* TWO SOURCES, ONE CATALOGUE — and now one tab, because that sentence was
+ already true and the tabs were arguing with it. Products we built carry our
+ own SKU and print method; supplier styles are published by reference and read
+ live from the sync. Both land in the same PDF and the same CSV, so splitting
+ them made you check two places to answer "is this in the catalogue".
+
+ What stays different is told by the "Ours" mark on a card, not by which tab
+ you happened to be standing on. The two halves still LOAD differently and
+ that is deliberate: ours are few and come down whole, while there are 5,690
+ supplier styles behind a server pager — pulling those into the browser to
+ filter them is the exact shape of the runaway loader in §2.8. So ours sit
+ first and the supplier stream pages underneath. */}
+            <TabsTrigger value="mine">{tl("catalog", "All products")}</TabsTrigger>
             {/* A partner's own workbook, filled from this same catalogue. It lives beside
  the lookbook and the CSV because they are three renderings of one picked
  set, not three features. */}
@@ -487,16 +506,18 @@ export function CatalogView() {
           {tab === "mine" && (
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{published} published</span>
+              {/* ONE field for the whole grid. Ours filter in the browser, supplier styles
+                  filter on the server — but that is an implementation detail of where the
+                  rows live, and nobody typing a style number should have to know it. */}
               <SearchField
                 value={q}
                 onChange={setQ}
                 width="sm"
-                placeholder={tl("catalog", "Search name or SKU…")}
+                placeholder={tl("catalog", "Search name, SKU or style…")}
               />
             </div>
           )}
         </div>
-        <TabsContent value="supplier"><SupplierStylesPicker onChanged={load} /></TabsContent>
         <TabsContent value="partners"><PartnerSheets /></TabsContent>
         <TabsContent value="history"><CatalogExportHistory onOpen={setReopenId} /></TabsContent>
         <TabsContent value="mine">
@@ -553,20 +574,27 @@ export function CatalogView() {
           <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
             <CircleNotch size={16} className="animate-spin" /> {tl("catalog", "Loading products…")}
           </div>
-        ) : shown.length === 0 ? (
+        ) : err ? (
           /* THREE OUTCOMES, NOT TWO. A failed load is not an empty catalogue, and the
              honesty rule turns on exactly this: if a thing cannot be READ versus does not
-             EXIST, say which. The icon changes too — a warning, not a tag. */
+             EXIST, say which. This branch is now ONLY the unreadable one — "empty" moved
+             below, because the region is no longer empty when our half has nothing in it:
+             the supplier styles are still there under it. */
           <EmptyState
-            icon={err ? Warning : Tag}
-            title={err ? tl("catalog", "Couldn't load the catalogue") : q ? tl("catalog", "Nothing matches that search") : tl("catalog", "No products yet")}
-            note={err
-              ? tl("catalog", "So this isn't empty — it's unknown. Try again in a moment.")
-              : q ? `${tl("catalog", "Nothing in the catalogue matches")} \u201c${q}\u201d.`
-              : tl("catalog", "Products you publish appear here.")}
+            icon={Warning}
+            title={tl("catalog", "Couldn't load the catalogue")}
+            note={tl("catalog", "So this isn't empty — it's unknown. Try again in a moment.")}
           />
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        ) : shown.length === 0 ? (
+          /* A LINE, NOT AN EMPTY STATE. An EmptyState is the four parts of a region that
+             has nothing in it, and this one does — forty supplier cards start immediately
+             underneath. Printing "No products yet" above them would be false. */
+          <p className="py-3 text-center text-sm text-muted-foreground">
+            {q
+              ? `${tl("catalog", "None of our own products match")} \u201c${q}\u201d.`
+              : tl("catalog", "Nothing of our own published yet — supplier styles are below.")}
+          </p>
+        ) : (          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {shown.map((p) => {
               const id = idOf(p)
               return (
@@ -587,6 +615,13 @@ export function CatalogView() {
             })}
           </div>
         )}
+
+        {/* The rest of the same catalogue. Mounted here rather than on a tab of its own so
+            ticking a supplier style and ticking one of ours are the same gesture in the same
+            list — and so the lookbook strip along the bottom fills from both without you
+            moving between tabs to do it. It carries its own pager because its half is the
+            one with 5,690 rows behind it. */}
+        <SupplierStylesPicker search={q} onChanged={load} />
       </div>
 
       {/**
