@@ -586,8 +586,23 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
       ["hero_image", "artwork_2", "artwork_3", "artwork_4", "artwork_5"].map((k) => [
         k,
         [
+          /**
+           * EVERY DESIGN, not the ones whose THUMB happens to be an http URL.
+           *
+           * This filtered on `/^https?:\/\//.test(d.thumb)` to avoid offering "a reference
+           * that resolves to nothing printable" — a sound intent aimed at the wrong field.
+           * A library thumb is a `data:` URI (all 44 on production are, and zero are http),
+           * and order-import.ts EXCLUDES data: from being an address on purpose, so the
+           * artwork never resolves through the thumb at all: `IMG-30` resolves to
+           * /api/design_library/art/<hash>, which is a different column.
+           *
+           * So the test dropped 100% of the library and the cell offered templates only —
+           * which is what it looked like: an "Artwork/Template" menu with no artwork in it.
+           * `content_hash` is what makes a design resolvable and all 44 have one; an entry
+           * without one cannot answer, so that is the guard now.
+           */
           ...images
-            .filter((d) => /^https?:\/\//i.test(String(d.thumb ?? "")))
+            .filter((d) => d.id != null && String(d.content_hash ?? "").trim() !== "")
             .map((d) => ({ value: `IMG-${d.id}`, label: `IMG-${d.id}${d.name ? ` · ${d.name}` : ""}` })),
           ...tpls,
         ],
