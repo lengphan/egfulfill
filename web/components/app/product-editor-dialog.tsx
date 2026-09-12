@@ -513,6 +513,19 @@ export function ProductEditorDialog({
    */
  const [methodOv, setMethodOv] = useState<Record<string, string>>({})
  const [sideOv, setSideOv] = useState("")
+  /**
+   * A PRICE PER PLACEMENT — the thing the engine could already do and nobody could type.
+   *
+   * pricing.js's sideAddOn reads `sidePrice` as a MAP before it reads it as a number, and has
+   * for a while: a back at $3.50 beside a sleeve at $1.50 prices correctly today. The only
+   * reason it was one flat box is that this dialog never offered anywhere to put the other
+   * numbers, so the capability was reachable only by editing jsonb by hand.
+   *
+   * Keyed by face, values as typed strings so a half-entered "3." does not become 3 on the
+   * keystroke. `sideOv` survives as the FALLBACK for faces with no number of their own,
+   * which is exactly the precedence sideAddOn applies.
+   */
+  const [sidePrices, setSidePrices] = useState<Record<string, string>>({})
  const [shipping, setShipping] = useState("")
   // Shipping physicals — weight (oz) + box (inches). Feed the label buy and the dim-weight
   // check that warns when a box would be billed on size instead of weight.
@@ -637,7 +650,17 @@ export function ProductEditorDialog({
  setBasePrice(p?.basePrice != null ? String(p.basePrice) : p?.base_price != null ? String(p.base_price) : "")
  setMethodOv(Object.fromEntries(Object.entries((p?.methodPrices ?? {}) as Record<string, unknown>)
       .filter(([, v]) => Number(v) > 0).map(([k, v]) => [k.toUpperCase(), String(v)])))
- setSideOv(Number((p as { sidePrice?: unknown })?.sidePrice) > 0 ? String((p as { sidePrice?: unknown }).sidePrice) : "")
+ /* sidePrice is EITHER a number (the flat "each additional side") or a map of per-face
+     rates — pricing.js accepts both and prefers the map. Read the same way, so a product
+     saved either way opens showing what it will actually charge. */
+ {
+ const sp = (p as { sidePrice?: unknown })?.sidePrice
+ const asMap = sp && typeof sp === "object" && !Array.isArray(sp) ? (sp as Record<string, unknown>) : null
+ setSideOv(!asMap && Number(sp) > 0 ? String(sp) : "")
+ setSidePrices(asMap
+ ? Object.fromEntries(Object.entries(asMap).filter(([, v]) => Number(v) > 0).map(([k, v]) => [String(k).toLowerCase(), String(v)]))
+      : {})
+  }
  setShipping(p?.shippingFee != null ? String(p.shippingFee) : p?.shipping_fee != null ? String(p.shipping_fee) : "")
  setWeightOz(p?.weightOz != null ? String(p.weightOz) : "")
  setBoxL(p?.boxL != null ? String(p.boxL) : "")
@@ -1160,7 +1183,16 @@ export function ProductEditorDialog({
  for (const [k, v] of Object.entries(methodOv)) { const n = Number(v); if (n > 0) out[k] = n }
  return Object.keys(out).length ? out : undefined
       })(),
- sidePrice: Number(sideOv) > 0 ? Number(sideOv) : undefined,
+ /* THE MAP WHEN THERE IS ONE, else the flat number — matching sideAddOn's own precedence
+     so what is saved is what is charged. A map with a single face in it is still a map: the
+     faces left out fall to fees.side_<face> and then to the platform flat rate, which is the
+     behaviour the "Each additional side" box describes. */
+ sidePrice: (() => {
+ const out: Record<string, number> = {}
+ for (const [k, v] of Object.entries(sidePrices)) { const n = Number(v); if (n > 0) out[k] = n }
+ if (Object.keys(out).length) return out
+ return Number(sideOv) > 0 ? Number(sideOv) : undefined
+    })(),
  weightOz: weightOz.trim() === "" ? undefined : Number(weightOz) || 0,
  boxL: boxL.trim() === "" ? undefined : Number(boxL) || 0,
  boxW: boxW.trim() === "" ? undefined : Number(boxW) || 0,
@@ -2202,56 +2234,28 @@ export function ProductEditorDialog({
               this blank does not have that face at all, so it disappears from the tiles
               below, from Placement on the import sheet and from the design maker's stage.
               Untouched, it follows the type and shows exactly what it always did. */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{tl("product", "Faces")}</span>
-              {sides.length > 0 && (
-                <button type="button" onClick={() => setSides([])}
-                  className="text-xs text-muted-foreground underline-offset-2 hover:underline">
-                  {tl("product", "Follow the type")}
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {ALL_SIDES.map((sd) => (
-                <label key={sd} className="flex items-center gap-1.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={shownSides.includes(sd)}
-                    onChange={(e) => {
-                      /* The first tick writes the WHOLE list, seeded from what is on screen
-                         — otherwise ticking one face would silently drop the other five the
-                         product was inheriting. From then on it is this product's own. */
-                      const base = sides.length ? sides : shownSides
-                      const next = e.target.checked ? [...base, sd] : base.filter((x) => x !== sd)
-                      setSides(ALL_SIDES.filter((x) => next.includes(x)))
-                    }}
-                    className="size-4 accent-primary"
-                  />
-                  <span className="capitalize">{tl("sides", sd)}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {shownSides.length > 0 && (
+          {(
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{tl("product", "Print sides")}</span>
-                <span className="text-xs text-muted-foreground">from {type} · override only if this blank differs</span>
+                {/* PLACEMENT, the word the import sheet and the order page both use. It was
+                    "Print sides" here and "Faces" in the block above — three names for one
+                    thing across three screens, and the tick for it lived in a separate list
+                    from the tile it governed. One grid now: tick it to offer it, set its
+                    picture, set what it costs. */}
+                <span className="text-sm font-medium">{tl("product", "Placement")}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">from {type}</span>
+                  {sides.length > 0 && (
+                    <button type="button" onClick={() => setSides([])}
+                      className="text-xs text-muted-foreground underline-offset-2 hover:underline">
+                      {tl("product", "Follow the type")}
+                    </button>
+                  )}
+                </div>
               </div>
-              {/* SAY WHICH WAY THE FALLBACK RUNS. Three ways to fill a side and one to empty
- it is not something a tile can express on its own, and the rule — the type's
- photo stands in whenever this product has nothing — is the reason clearing a
- side is safe rather than destructive. */}
-              <p className="text-xs text-muted-foreground">
-                Click a side to set where the print goes on it. Drop a photo on a side, or use the
- buttons in its corner to upload one or pick from this product&apos;s images. Anything you
- don&apos;t set falls back to the {type} photo from Settings › Platform, and clearing a
- side returns it to that.
-              </p>
               <div className="flex flex-wrap gap-2">
-                {shownSides.map((sd) => {
+                {ALL_SIDES.map((sd) => {
+ const offered = shownSides.includes(sd)
  const override = sideMockups[sd] || ""
  const inherited = typeMockupOf({ type } as CatalogProduct, sd)
  const shown = override || inherited
@@ -2270,7 +2274,12 @@ export function ProductEditorDialog({
  behaved differently for the same gesture. */
                     <div
  key={sd}
- className="group/side relative flex w-40 flex-col gap-1.5"
+ /* An unticked placement stays VISIBLE and quiet rather than vanishing. It was a
+                          checkbox list, so an unticked face simply was not drawn below — and
+                          "this blank has no sleeve" looked identical to "the sleeve tile
+                          failed to load". Faded, it is plainly a thing you can turn on. */
+ className={"group/side relative flex w-40 flex-col gap-1.5 transition-opacity "
+ + (offered ? "" : "opacity-45 hover:opacity-80")}
  onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
  onDrop={(e) => {
                         // stopPropagation, or the panel's own handler ALSO catches this and
@@ -2369,7 +2378,55 @@ export function ProductEditorDialog({
                           <X size={12} weight="bold" />
                         </button>
                       )}
-                      <span className="truncate text-xs font-medium capitalize">{sd}</span>
+                      {/* THE TICK AND THE PRICE LIVE ON THE TILE THEY GOVERN.
+                          The tick was a separate checkbox list headed "Faces", eight rows
+                          above the eight pictures it controlled — so turning a sleeve on
+                          meant finding it in one place and its photo in another. And a price
+                          per face did not exist here at all: one "Each additional side" box
+                          in another section, while pricing.js's sideAddOn has read a per-face
+                          map the whole time. Measured: back $3.50 beside sleeve $1.50 prices
+                          correctly today; only the typing was missing. */}
+                      <label className="flex items-center gap-1.5 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={offered}
+                          onChange={(e) => {
+                            /* The first tick writes the WHOLE list, seeded from what is on
+                               screen — otherwise ticking one face would silently drop the
+                               others this product was inheriting. From then on it is this
+                               product's own. */
+                            const base = sides.length ? sides : shownSides
+                            const next = e.target.checked ? [...base, sd] : base.filter((x) => x !== sd)
+                            setSides(ALL_SIDES.filter((x) => next.includes(x)))
+                          }}
+                          className="size-4 accent-primary"
+                        />
+                        <span className="truncate font-medium capitalize">{tl("sides", sd)}</span>
+                      </label>
+                      {/* Only where it can be charged. A price on a face this blank does not
+                          offer is a number that can never apply — pricing.js would never read
+                          it — so it is not a field, it is a question nobody asked. */}
+                      {offered && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="shrink-0 text-2xs text-muted-foreground">+</span>
+                          <Input
+                            value={sidePrices[sd] ?? ""}
+                            onChange={(e) => setSidePrices((m) => {
+                              const v = e.target.value.replace(/[^\d.]/g, "")
+                              const next = { ...m }
+                              if (v) next[sd] = v; else delete next[sd]
+                              return next
+                            })}
+                            inputMode="decimal"
+                            /* The fallback IS the placeholder, so an empty field reads as
+                               "this one charges the default" rather than "this one is free" —
+                               the same precedence sideAddOn applies. */
+                            placeholder={sideOv ? sideOv : tl("product", "default")}
+                            aria-label={`${tl("product", "Extra charge for the")} ${sd}`}
+                            className="h-7 px-2 text-right text-xs tabular-nums"
+                          />
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -2431,18 +2488,27 @@ export function ProductEditorDialog({
                   />
                 </label>
               ))}
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">{tl("product", "Each additional side")}</span>
-                <Input
-                  value={sideOv}
-                  onChange={(e) => setSideOv(e.target.value.replace(/[^0-9.]/g, ""))}
-                  placeholder={`$${(Number(fees?.method_side) || 0).toFixed(2)}`}
-                  inputMode="decimal"
-                  aria-label={tl("product", "Extra side charge for this product")}
-                  className="h-8 text-xs tabular-nums"
-                />
-              </label>
             </div>
+            {/* OUT OF THE METHOD GRID. It sat as a seventh cell beside DTG, Embroidery and
+                Appliqué, which made it read as another print method — it is not one. It is
+                the DEFAULT the Placement tiles fall back to: a face with its own number uses
+                that, a face without one uses this, and a product with neither uses Settings.
+                Its own row now, under the methods it is not a member of. */}
+            <label className="flex items-center gap-2 pt-1">
+              <span className="shrink-0 text-xs text-muted-foreground">{tl("product", "Each additional placement")}</span>
+              <Input
+                value={sideOv}
+                onChange={(e) => setSideOv(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder={`$${(Number(fees?.method_side) || 0).toFixed(2)}`}
+                inputMode="decimal"
+                aria-label={tl("product", "Extra placement charge for this product")}
+                className="h-8 w-24 text-right text-xs tabular-nums"
+              />
+              {/* WHAT IT DOES NOT COVER, in one clause — the tiles above can each carry
+                  their own price, and a number there beats this one. Said here because this
+                  is where somebody types a flat rate and assumes it is the whole story. */}
+              <span className="text-2xs text-muted-foreground">{tl("product", "used where a placement has no price of its own")}</span>
+            </label>
           </div>
 
           </>)}

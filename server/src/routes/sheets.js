@@ -105,6 +105,15 @@ const T_COLUMNS = [
    * It was headed 'Image ID' and documented as the listing photo until 2026-09-08; the
    * rename is in web/lib/order-import.ts with the reasoning. Both spellings still import.
    */
+  /* THE GARMENT BEFORE ITS PLACEMENTS — mirrors CSV_COLUMNS. These sat after the fifteen
+     placement columns, so saying what the thing IS meant scrolling past every position, and
+     Print Type decides whether the Machine File cells are usable at all.
+     `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a fixed
+     list. See LISTS below for how that is wired. */
+  { h: 'Quantity', g: 'product', duty: '', sample: '1' },
+  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG printing', opts: 'methods', dep: 'methods' },
+  { h: 'Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
+  { h: 'Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
   /**
    * FIVE POSITIONS, THREE CELLS EACH — and one row is one GARMENT.
    *
@@ -142,12 +151,6 @@ const T_COLUMNS = [
   { h: 'Placement 5', g: 'product', duty: '', sample: '', opts: 'sides' },
   { h: 'Artwork/Template 5', g: 'product', duty: '', sample: '' },
   { h: 'Machine File 5', g: 'product', duty: '', sample: '' },
-  { h: 'Quantity', g: 'product', duty: '', sample: '1' },
-  // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
-  // fixed list. See LISTS below for how that is wired.
-  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG printing', opts: 'methods', dep: 'methods' },
-  { h: 'Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
-  { h: 'Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
   { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },
   { h: 'Internal Notes', g: 'extras', duty: '', sample: 'Example row — safe to delete' },
 ];

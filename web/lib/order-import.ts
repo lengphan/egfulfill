@@ -115,6 +115,15 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * charge is counted from order_designs (pricing.js), so a row that names a single face
    * prices exactly as a front-only line does today.
    */
+  /* THE GARMENT BEFORE ITS PLACEMENTS. These four sat AFTER the fifteen placement columns,
+     so saying what the thing is meant scrolling past every position first — and Print Type
+     in particular decides whether the Machine File cells are usable at all (a stitch file
+     has no machine to run on a DTG line, which is why those cells grey out). Having the
+     column that governs them fifteen tracks to their right was backwards. */
+  { header: "Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
+  { header: "Print Type", key: "print_type", required: false, section: "product", help: "Embroidery, DTG printing, Appliqué … Defaults to DTG printing if blank." },
+  { header: "Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
+  { header: "Size", key: "item_size", required: false, section: "product", help: "Garment size." },
   /**
    * FIVE POSITIONS, THREE CELLS EACH — and one row is one GARMENT.
    *
@@ -153,10 +162,6 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Placement 5", key: "print_side_5", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 5 or more places." },
   { header: "Artwork/Template 5", key: "artwork_5", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
   { header: "Machine File 5", key: "machine_file_id_5", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
-  { header: "Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
-  { header: "Print Type", key: "print_type", required: false, section: "product", help: "Embroidery, DTG printing, Appliqué … Defaults to DTG printing if blank." },
-  { header: "Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
-  { header: "Size", key: "item_size", required: false, section: "product", help: "Garment size." },
   // ── EXTRAS ────────────────────────────────────────────────────────────────
   { header: "Store Name", key: "store_name", required: false, section: "extras", help: "Which shop the order came from." },
   { header: "Internal Notes", key: "internal_notes", required: false, section: "extras", help: "Private note for your team. Saved with the order." },

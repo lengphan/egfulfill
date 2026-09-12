@@ -1279,7 +1279,15 @@ export type CatalogProduct = {
   /** What ONE EXTRA printed face costs on this blank, overriding the platform's
    *  `method_side`. Above zero or absent — a stored 0 falls through to the platform rate,
    *  because sideAddOn in server/src/pricing.js takes an override only when it is `> 0`. */
-  sidePrice?: number
+  /**
+   * EITHER a flat rate for every extra face, OR a rate per face.
+   *
+   * pricing.js's sideAddOn has read both for a long while and prefers the map — a back at
+   * 3.50 beside a sleeve at 1.50 prices correctly. This said `number`, which is why the
+   * product dialog could only ever offer one box: the shape the engine accepts was narrower
+   * in the type than in the code, and the type is what anyone writing a UI reads.
+   */
+  sidePrice?: number | Record<string, number>
   // This product's own extra-item shipping, overriding the platform's ship_extra.
   additionalItemShipping?: number | null
   description?: string
@@ -1545,7 +1553,15 @@ export type PublicProduct = {
   /** What ONE EXTRA printed face costs on this blank, overriding the platform's
    *  `method_side`. Above zero or absent — a stored 0 falls through to the platform rate,
    *  because sideAddOn in server/src/pricing.js takes an override only when it is `> 0`. */
-  sidePrice?: number
+  /**
+   * EITHER a flat rate for every extra face, OR a rate per face.
+   *
+   * pricing.js's sideAddOn has read both for a long while and prefers the map — a back at
+   * 3.50 beside a sleeve at 1.50 prices correctly. This said `number`, which is why the
+   * product dialog could only ever offer one box: the shape the engine accepts was narrower
+   * in the type than in the code, and the type is what anyone writing a UI reads.
+   */
+  sidePrice?: number | Record<string, number>
   /**
    * THE FACES THIS BLANK PRINTS ON — resolved server-side from the product's own `sides`,
    * else its category's (mirrors sidesOf in lib/variant-resolve.ts). Keys, not labels:
