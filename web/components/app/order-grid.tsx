@@ -1344,7 +1344,15 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                           && c >= fillCols[0] && c <= fillCols[1] && !fillTo && (
                           <span
                             aria-hidden
-                            className={`pointer-events-none absolute inset-0 z-10 border-y border-brand/60 bg-brand/10${
+                            /* BLACK, THE SAME BLACK AS ONE SELECTED CELL. This drew the
+                               range in brand violet at 60% while a single focused cell gets a
+                               1px ring in `--ring` — which is byte-identical to `--foreground`
+                               here (both lab(5.46%)). So selecting ONE cell outlined it
+                               crisply and selecting FIVE outlined them in a tint half the
+                               contrast, which is backwards: the wider the selection, the more
+                               its edges matter. The fill stays light so the values inside
+                               stay readable. */
+                            className={`pointer-events-none absolute inset-0 z-10 border-y border-foreground bg-brand/10${
                               c === fillCols[0] ? " border-l" : ""}${c === fillCols[1] ? " border-r" : ""}`}
                           />
                         )}
