@@ -878,6 +878,15 @@ td[align="right"] {
    bg-transparent and their <td>s paint nothing — so the row's own ground is what shows
    through each box. See --grid-select for why this is not --accent. */
 .eg-row-selected { background: var(--grid-select); }
+
+/* A SELECTED BLOCK OF CELLS in the sheet. Plain CSS, not `bg-foreground/[0.06]`, because
+   that arbitrary opacity against a CSS-variable colour DID NOT COMPILE — the class landed on
+   the element and computed to rgba(0,0,0,0), so the block had its outline and no fill. Same
+   trap the marketing kit hit with bg-foreground/[0.07]; measure the computed value, never
+   assume the utility exists. Lighter than --grid-select because a cell block sits INSIDE a
+   row that may already be selected, and two neutrals of the same weight would not stack
+   legibly. */
+.eg-cell-selected { background: color-mix(in oklab, var(--foreground) 6%, transparent); }
 /* THE GUTTER, WIDENED. Content used to start 32px from the sidebar on a laptop and 48px on
  a large monitor — close enough to the chrome that the page read as one continuous slab,
  and the space that WAS there sat inside the cards rather than around them. A page needs

@@ -342,6 +342,27 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
   /** The CELL the pointer is over mid-drag — row and column, because the dot now drags in
    *  both axes. null when no drag is running. Drives the preview; the release writes it. */
   const [fillTo, setFillTo] = useState<{ r: number; c: number } | null>(null)
+  /**
+   * THE SELECTED RECTANGLE — one shape, whether you are holding a selection or dragging it
+   * out. It used to be two overlays that did not agree with each other: the selection drew a
+   * violet-tinted block, and a drag drew a SEPARATE dashed grey block that deliberately
+   * excluded the row you started from. So pulling the handle down produced two boxes of two
+   * shades with two outlines, when the gesture means one growing region.
+   *
+   * Now the drag simply extends r1/c1 and the same rectangle redraws bigger.
+   */
+  const selRect = fillFrom && fillCols
+    ? {
+        r0: fillFrom.r,
+        r1: fillTo ? Math.max(fillFrom.r, fillTo.r) : fillFrom.r,
+        c0: fillCols[0],
+        c1: fillTo ? Math.max(fillCols[1], fillTo.c) : fillCols[1],
+      }
+    : null
+  /** More than one cell — a single focused cell already has its own ring and needs no box. */
+  const selWide = !!selRect && (selRect.r1 > selRect.r0 || selRect.c1 > selRect.c0)
+  const inSel = (r: number, c: number) =>
+    !!selRect && r >= selRect.r0 && r <= selRect.r1 && c >= selRect.c0 && c <= selRect.c1
   /** Did this focus come from a pointer? A ref, not state — it is read inside the same
    *  gesture that sets it, and a re-render between mousedown and click would be a bug of its
    *  own. See the cell's onMouseDown / onClick. */
@@ -1278,7 +1299,14 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                             const byPointer = pointerSel.current
                             pointerSel.current = false
                             if (editing !== `${r}-${c}` && !byPointer) e.currentTarget.select()
-                            if (list?.length) openMenu(e.currentTarget, `${r}-${c}`, false)
+                            /* NOT WHILE A RANGE IS BEING MADE. Shift-clicking to extend a
+                               selection onto a dropdown column popped the list open over the
+                               sheet — the menu belongs to ONE cell you are about to type in,
+                               and a range is a block you are about to copy. `withShift` is the
+                               gesture that just happened; `selWide` catches a range that was
+                               already open. Typing still opens it (onChange, below), because
+                               that IS a single-cell edit. */
+                            if (list?.length && !withShift && !selWide) openMenu(e.currentTarget, `${r}-${c}`, false)
                           }}
                           onClick={(e) => {
                             const el = e.currentTarget
@@ -1325,7 +1353,14 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                           /* medium, not normal: a 14px value at 400 on a white sheet is
                              still the lightest thing on screen, and these are codes read
                              character by character. */
-                          className={"h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none focus:bg-accent focus:ring-1 focus:ring-ring" + (inert ? " text-muted-foreground/50" : "")}
+                          /* NO focus:bg-accent INSIDE A BLOCK. The focused cell paints its own
+                             grey, so a multi-cell selection showed one darker box sitting inside
+                             the outline — "another grey box inside" — because two backgrounds
+                             were describing the same state. The ring stays: on a single cell it
+                             IS the selection, and there is no block to conflict with. */
+                          className={"h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none focus:ring-1 focus:ring-ring"
+                            + (selWide && inSel(r, c) ? "" : " focus:bg-accent")
+                            + (inert ? " text-muted-foreground/50" : "")}
                         />
                         {/**
                           * THE SELECTION ITSELF. Shift-click extends the anchor sideways, and
@@ -1340,50 +1375,22 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                           * Same per-edge technique as the drag preview below, for the same
                           * reason: one rectangle around the range rather than a box per cell.
                           */}
-                        {fillCols && fillFrom?.r === r && fillCols[1] > fillCols[0]
-                          && c >= fillCols[0] && c <= fillCols[1] && !fillTo && (
+                        {selWide && inSel(r, c) && (
                           <span
                             aria-hidden
-                            /* BLACK, THE SAME BLACK AS ONE SELECTED CELL. This drew the
-                               range in brand violet at 60% while a single focused cell gets a
-                               1px ring in `--ring` — which is byte-identical to `--foreground`
-                               here (both lab(5.46%)). So selecting ONE cell outlined it
-                               crisply and selecting FIVE outlined them in a tint half the
-                               contrast, which is backwards: the wider the selection, the more
-                               its edges matter. The fill stays light so the values inside
-                               stay readable. */
-                            className={`pointer-events-none absolute inset-0 z-10 border-y border-foreground bg-brand/10${
-                              c === fillCols[0] ? " border-l" : ""}${c === fillCols[1] ? " border-r" : ""}`}
-                          />
-                        )}
-                        {/**
-                          * THE RANGE A RELEASE WOULD WRITE — a grey wash and ONE dashed
-                          * rectangle around it, which is what a sheet draws and therefore what
-                          * the gesture is read against.
-                          *
-                          * An overlay rather than classes on the <td>: the cell already owns
-                          * `border-b border-l border-border`, and a preview that fought those
-                          * would have to win on three properties per side and lose the cell's
-                          * own grid lines while it did. This paints on top and takes nothing
-                          * away — pointer-events-none, so it cannot swallow the drag it is
-                          * describing.
-                          *
-                          * The dashes are drawn PER EDGE so the range reads as one rectangle
-                          * rather than a column of separate boxes: left and right on every
-                          * covered cell, top only on the first, bottom only on the last. A
-                          * fill runs down a single column, so those four edges are the whole
-                          * outline.
-                          *
-                          * The SOURCE cell is deliberately outside it. It keeps focus and its
-                          * own accent while the drag runs, so what is highlighted is exactly
-                          * what is about to change — the row you started from is not.
-                          */}
-                        {fillFrom && fillTo && fillCols && !(r === fillFrom.r && c >= fillCols[0] && c <= fillCols[1])
-                          && r >= fillFrom.r && r <= fillTo.r && c >= fillCols[0] && c <= Math.max(fillCols[1], fillTo.c) && (
-                          <span
-                            aria-hidden
-                            className={`pointer-events-none absolute inset-0 z-10 border-x border-dashed border-muted-foreground/70 bg-foreground/5${
-                              r === fillFrom.r ? " border-t" : ""}${r === fillTo.r ? " border-b" : ""}`}
+                            /* ONE RECTANGLE, ONE SHADE, drawn per EDGE so the block reads as a
+                               single outline rather than a grid of boxes: left on the first
+                               column, right on the last, top on the first row, bottom on the
+                               last. The same overlay serves a held selection and a drag —
+                               dragging only grows r1/c1 and this redraws bigger, which is what
+                               "extend the box" means. It replaced a violet selection block and
+                               a SEPARATE dashed grey drag block that excluded the source row,
+                               so one gesture produced two shades and two outlines. */
+                            className={`eg-cell-selected pointer-events-none absolute inset-0 z-10${
+                              c === selRect!.c0 ? " border-l border-foreground" : ""}${
+                              c === selRect!.c1 ? " border-r border-foreground" : ""}${
+                              r === selRect!.r0 ? " border-t border-foreground" : ""}${
+                              r === selRect!.r1 ? " border-b border-foreground" : ""}`}
                           />
                         )}
                         {/* THE GRIP. Eight pixels in the cell's bottom-right corner, shown on
