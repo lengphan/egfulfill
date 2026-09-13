@@ -126,11 +126,38 @@ async function scan() {
    * receipts actually on screen removes the cap and the ambiguity, and it means we disclose
    * nothing about orders the seller is not already looking at.
    */
+  /*
+   * INJECTED ON DEMAND, NOT DECLARED AS A CONTENT SCRIPT.
+   *
+   * A declared content script is injected when the PAGE loads, and Chrome keeps the copy it
+   * already injected until the EXTENSION is reloaded. So "I reloaded the page" and "the new
+   * code is running" are different facts, and the gap between them looks exactly like a
+   * parser that does not work — which is precisely the hour this cost. Injecting here means
+   * the code that runs is always the code on disk, and there is no reload-the-tab step to
+   * forget.
+   *
+   * It also reads BETTER: nothing is present on an Etsy page until the moment the seller
+   * opens this popup and asks. Before that the extension is inert on every page.
+   */
   let res
   try {
-    res = await chrome.tabs.sendMessage(tab.id, { type: 'eg:scan', wanted: [] })
-  } catch {
-    return fail('Reload the Etsy tab and try again — the extension was installed after that page loaded.')
+    const target = { tabId: tab.id }
+    // Two calls, same isolated world: the first defines EG_PARSE, the second uses it.
+    await chrome.scripting.executeScript({ target, files: ['src/parse.js'] })
+    const [out] = await chrome.scripting.executeScript({
+      target,
+      func: () => {
+        try {
+          const p = globalThis.EG_PARSE
+          if (!p) return { ok: false, error: 'parser did not load' }
+          const { rows, stats } = p.extractOrders(document, [])
+          return { ok: true, rows, stats }
+        } catch (e) { return { ok: false, error: String((e && e.message) || e) } }
+      },
+    })
+    res = out && out.result
+  } catch (e) {
+    return fail(`Could not read that page: ${String((e && e.message) || e)}`)
   }
   if (!res || !res.ok) return fail((res && res.error) || 'Could not read that page.')
 
@@ -142,7 +169,7 @@ async function scan() {
     $('count').textContent = 'Nothing to send from this page'
     $('note').textContent = 'No orders found here. Open a page of your sold orders, or page through to older ones.'
     $('sync').disabled = true
-    $('stats').textContent = `${s.foundOnPage || 0} on page · 0 wanted · 0 usable`
+    $('stats').textContent = `${s.foundOnPage || 0} on page · 0 wanted · 0 usable · v${chrome.runtime.getManifest().version}`
     return
   }
 
@@ -170,7 +197,7 @@ async function scan() {
   /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
      broken selector hides for weeks. */
-  $('stats').textContent = `${s.foundOnPage || 0} on page · ${ROWS.length} wanted · ${s.usable || 0} usable${s.how ? ` · via ${s.how}` : ''}`
+  $('stats').textContent = `${s.foundOnPage || 0} on page · ${ROWS.length} wanted · ${s.usable || 0} usable${s.how ? ` · via ${s.how}` : ''} · v${chrome.runtime.getManifest().version}`
 }
 
 async function start() {
@@ -226,6 +253,8 @@ $('forget').addEventListener('click', async () => {
 })
 
 ;(async () => {
+  const v = chrome.runtime.getManifest().version
+  $('who').title = `build ${v}`
   const s = await chrome.storage.local.get(['token', 'who'])
   TOKEN = s.token || null
   $('who').textContent = s.who || ''
