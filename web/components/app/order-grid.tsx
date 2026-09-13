@@ -338,7 +338,10 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    */
   const [fillFrom, setFillFrom] = useState<{ r: number; c0: number; c1: number } | null>(null)
   /** The selected columns as an inclusive [lo, hi], or null. */
-  const fillCols = fillFrom ? [Math.min(fillFrom.c0, fillFrom.c1), Math.max(fillFrom.c0, fillFrom.c1)] as const : null
+  /* Memoised for the same reason selRect below is: it feeds a memo that feeds onKeyDown. */
+  const fillCols = useMemo(() => (fillFrom
+    ? [Math.min(fillFrom.c0, fillFrom.c1), Math.max(fillFrom.c0, fillFrom.c1)] as const
+    : null), [fillFrom])
   /** The CELL the pointer is over mid-drag — row and column, because the dot now drags in
    *  both axes. null when no drag is running. Drives the preview; the release writes it. */
   const [fillTo, setFillTo] = useState<{ r: number; c: number } | null>(null)
@@ -351,18 +354,20 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    *
    * Now the drag simply extends r1/c1 and the same rectangle redraws bigger.
    */
-  const selRect = fillFrom && fillCols
+  /* MEMOISED because onKeyDown depends on it: rebuilt every render, it would rebuild the
+     handler every render too, which is the thing useCallback is there to avoid. */
+  const selRect = useMemo(() => (fillFrom && fillCols
     ? {
         r0: fillFrom.r,
         r1: fillTo ? Math.max(fillFrom.r, fillTo.r) : fillFrom.r,
         c0: fillCols[0],
         c1: fillTo ? Math.max(fillCols[1], fillTo.c) : fillCols[1],
       }
-    : null
+    : null), [fillFrom, fillCols, fillTo])
   /** More than one cell — a single focused cell already has its own ring and needs no box. */
   const selWide = !!selRect && (selRect.r1 > selRect.r0 || selRect.c1 > selRect.c0)
-  const inSel = (r: number, c: number) =>
-    !!selRect && r >= selRect.r0 && r <= selRect.r1 && c >= selRect.c0 && c <= selRect.c1
+  const inSel = useCallback((r: number, c: number) =>
+    !!selRect && r >= selRect.r0 && r <= selRect.r1 && c >= selRect.c0 && c <= selRect.c1, [selRect])
   /** Did this focus come from a pointer? A ref, not state — it is read inside the same
    *  gesture that sets it, and a re-render between mousedown and click would be a bug of its
    *  own. See the cell's onMouseDown / onClick. */
@@ -793,6 +798,36 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * not a fixed width, so arithmetic off the start position drifts further from the truth the
    * further you drag.
    */
+  /**
+   * DOUBLE-CLICK THE HANDLE: fill down to where the data stops.
+   *
+   * The gesture every spreadsheet has, and the one that makes a 200-row paste survivable —
+   * you set the first row's Print Type and pull it the whole way without dragging past two
+   * screens of rows.
+   *
+   * WHERE IT STOPS is the question. Sheets uses the neighbouring column's run, and so does
+   * this: the last row that has ANY content outside the columns being filled. Using the
+   * filled columns themselves would stop at the anchor every time (they are empty below it,
+   * which is the whole reason you are filling them), and using rows.length would write into
+   * the blank rows the grid always keeps at the bottom — turning "fill down" into "make 40
+   * half-empty orders".
+   *
+   * No neighbour with content = nothing to fill against, so it does nothing rather than
+   * guessing.
+   */
+  const fillDown = useCallback((from: { r: number; c0: number; c1: number }) => {
+    const cLo = Math.min(from.c0, from.c1)
+    const cHi = Math.max(from.c0, from.c1)
+    let last = from.r
+    for (let i = from.r + 1; i < rows.length; i++) {
+      const hasNeighbour = rows[i].some((v, ci) => (ci < cLo || ci > cHi) && String(v ?? "").trim() !== "")
+      if (!hasNeighbour) break
+      last = i
+    }
+    if (last === from.r) return
+    fillRange(from, last, cHi)
+  }, [rows, fillRange])
+
   const startFill = useCallback((from: { r: number; c0: number; c1: number }) => (e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -890,7 +925,19 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
   }, [editing, writeRows])
 
   /** Arrow/Enter move between cells. A grid you cannot leave the mouse for is a form. */
-  const onKeyDown = useCallback((e: React.KeyboardEvent, r: number, c: number) => {
+  /**
+   * NOT a useCallback. It reads the live selection, and hand-memoising it made the React
+   * Compiler bail out entirely — "Existing memoization could not be preserved", which is a
+   * skipped compile for the whole component, not a lint nit. A plain function lets the
+   * compiler memoise it on its own terms, and identity does not matter here anyway: every
+   * cell already passes `onKeyDown={(e) => onKeyDown(e, r, c)}`, a fresh arrow per render.
+   *
+   * The stale-closure bug this replaced is worth naming: with deps [editing, undo, redo,
+   * setCell] the handler kept the selection it was BORN with — null — so Delete cleared one
+   * cell however many were highlighted. The block rendered correctly the whole time; only
+   * the key was reading an old world.
+   */
+  const onKeyDown = ((e: React.KeyboardEvent, r: number, c: number) => {
     const key = `${r}-${c}`
     const go = (dr: number, dc: number) => {
       e.preventDefault()
@@ -913,6 +960,30 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
        stay one — deleting a character is not "empty this box". */
     if (editing !== key && (e.key === "Delete" || e.key === "Backspace")) {
       e.preventDefault()
+      /**
+       * THE WHOLE BLOCK, not the one cell under the cursor.
+       *
+       * This was `setCell(r, c, "")` alone, so selecting twelve cells and pressing Delete
+       * emptied ONE — the selection machinery existed and the key ignored it. Clearing a
+       * pasted block meant a Delete per cell, which is the complaint the row-number cell's
+       * own comment already makes about eleven cells and eleven Deletes.
+       *
+       * ONE writeRows for the block, so it is ONE undo. Twelve setCell calls would have been
+       * twelve steps to walk back.
+       */
+      /* Containment tested INLINE against selRect rather than through inSel(), so this
+         callback depends on one memoised object instead of a function — the React Compiler
+         refuses to preserve the memo otherwise ("Existing memoization could not be
+         preserved"), and a skipped compile here is a handler rebuilt on every keystroke. */
+      if (selRect
+        && (selRect.r1 > selRect.r0 || selRect.c1 > selRect.c0)
+        && r >= selRect.r0 && r <= selRect.r1 && c >= selRect.c0 && c <= selRect.c1) {
+        const { r0, r1, c0, c1 } = selRect
+        setEditing(null); setMenu(null)
+        writeRows((p) => p.map((row, ri) =>
+          ri < r0 || ri > r1 ? row : row.map((v, ci) => (ci >= c0 && ci <= c1 ? "" : v))))
+        return
+      }
       setCell(r, c, "")
       return
     }
@@ -926,7 +997,11 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
     // Any character typed into a merely-selected cell starts editing it, so the next paste
     // lands in the cell rather than across the sheet.
     else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) setEditing(key)
-  }, [editing, undo, redo, setCell])
+    // selRect/selWide/inSel and writeRows are read INSIDE this callback, so they belong here.
+    // Without them the handler kept the selection it was created with — which on a fresh
+    // grid is `null`, so Delete fell through to clearing one cell no matter how many were
+    // highlighted. The block rendered correctly the whole time; only the key was stale.
+  })
 
   /**
    * MEASURED A FRAME LATE, ON PURPOSE.
@@ -996,11 +1071,32 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * The sheet never empties completely — the last row is replaced rather than removed,
    * because a grid with no rows offers nowhere to start typing.
    */
-  const removeRow = (r: number) => {
+  const removeRow = (r: number) => removeRows(r, r)
+
+  /**
+   * REMOVE A RANGE OF ROWS IN ONE ACT.
+   *
+   * The X removed exactly one row, so clearing nine pasted mistakes meant pressing it nine
+   * times — and each press shifted everything up, so the row under the cursor was a different
+   * row every time. Selecting them and pressing it once is the gesture a sheet already
+   * teaches, and the selection was already there.
+   *
+   * ONE writeRows, so the nine rows come back on ONE undo rather than nine.
+   *
+   * Delete still CLEARS a row selection rather than removing it — that distinction is this
+   * file's own and it is the safe default: the rows stay put, so nothing below shifts up
+   * under the cursor. Removing is the X, which is the destructive act and looks like one.
+   */
+  const removeRows = (lo: number, hi: number) => {
     setEditing(null)
     setMenu(null)
     setSel(null)
-    writeRows((p) => (p.length <= 1 ? [blankRow()] : p.filter((_, i) => i !== r)))
+    writeRows((p) => {
+      const kept = p.filter((_, i) => i < lo || i > hi)
+      // The sheet never empties completely — a grid with no rows offers nowhere to start
+      // typing, so the last one is replaced rather than removed.
+      return kept.length ? kept : [blankRow()]
+    })
   }
 
   /**
@@ -1401,7 +1497,8 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                             role="presentation"
                             aria-hidden
                             onPointerDown={startFill(fillFrom)}
-                            title={tl("grid", "Drag to copy — down, across, or both")}
+                            onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); fillDown(fillFrom) }}
+                            title={tl("grid", "Drag to copy — down, across, or both. Double-click to fill to the end.")}
                             className="absolute -bottom-[4px] -right-[4px] z-20 size-[9px] cursor-crosshair touch-none rounded-full bg-brand ring-2 ring-background"
                           />
                         )}
@@ -1411,9 +1508,18 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                   <td className="border-b border-l border-border text-center">
                     <button
                       type="button"
-                      onClick={() => removeRow(r)}
-                      title={tl("orderGrid", "Remove this row")}
-                      aria-label={`Remove row ${r + 1}`}
+                      /* REMOVES THE SELECTION when this row is part of one, and just this row
+                         otherwise. Pressing X nine times to clear nine pasted mistakes also
+                         re-shifted everything up on every press, so the row under the cursor
+                         was a different row each time. No new control for it: X already means
+                         "remove", and a selection already means "these". */
+                      onClick={() => (isSel && selRange ? removeRows(selRange[0], selRange[1]) : removeRow(r))}
+                      title={isSel && selRange && selRange[1] > selRange[0]
+                        ? `${tl("orderGrid", "Remove the")} ${selRange[1] - selRange[0] + 1} ${tl("orderGrid", "selected rows")}`
+                        : tl("orderGrid", "Remove this row")}
+                      aria-label={isSel && selRange && selRange[1] > selRange[0]
+                        ? `Remove ${selRange[1] - selRange[0] + 1} selected rows`
+                        : `Remove row ${r + 1}`}
                       className="px-1.5 py-1 text-muted-foreground transition-colors hover:text-destructive"
                     >
                       ×
