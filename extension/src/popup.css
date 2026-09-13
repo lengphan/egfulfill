@@ -1,0 +1,92 @@
+/* The app's own palette, converted once — mobile/lib/theme.ts is the source.
+   A popup is 320pt of chrome; it borrows the house colours rather than inventing a third
+   set, which is how the two halves of a product end up looking unrelated. */
+:root {
+  --canvas: #FBFAF7;
+  --surface: #FFFFFF;
+  --ink: #151B33;
+  --muted: #6C707D;      /* 4.73:1 on canvas */
+  --hue-deep: #505FDF;   /* white on it 5.19:1 */
+  --hue-mist: #ECEEFF;
+  --lime: #D9F26B;
+  --hairline: rgba(21, 27, 51, 0.10);
+  --alert: #C4302B;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 320px;
+  margin: 0;
+  padding: 16px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 14px/1.45 "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.mark { font-weight: 700; letter-spacing: -0.02em; }
+.who { font-size: 12px; color: var(--muted); }
+
+label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 10px 0 4px;
+}
+
+input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid #8E9099;   /* a control boundary clears 3:1 — WCAG 1.4.11 */
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+input:focus { outline: none; border-color: var(--hue-deep); border-width: 2px; }
+
+button {
+  width: 100%;
+  height: 42px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 999px;         /* a button is a pill here, same as the phone */
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.primary { background: var(--hue-deep); color: #fff; }
+.primary:disabled { background: var(--hue-mist); color: var(--muted); cursor: default; }
+.quiet { background: transparent; color: var(--ink); border: 1.5px solid var(--hairline); font-weight: 500; }
+.link {
+  width: auto; height: auto; margin: 0; padding: 0;
+  background: none; color: var(--muted);
+  font-size: 12px; font-weight: 500; text-decoration: underline;
+}
+
+/* The one figure on the screen, so it is the largest thing on it. */
+.count { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+/* One sentence, and only where there is nothing else to read. */
+.note { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+/* A refusal carries its reason — that is the answer, not a caption. */
+.err { margin: 12px 0 0; font-size: 13px; color: var(--alert); }
+
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+  font-size: 11px;
+  color: var(--muted);
+}

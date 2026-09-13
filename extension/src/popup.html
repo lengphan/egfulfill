@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EGFULFILL address sync</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <span class="mark">egful</span>
+    <span class="who" id="who"></span>
+  </header>
+
+  <!--
+    NO CREDENTIAL FIELDS, EVER. An extension that asks for a password teaches sellers to
+    type it into browser UI, which is the habit phishing relies on. Connect instead reads
+    the token the seller's own EGFULFILL tab already holds, from our own origin, when they
+    press this button. See popup.js.
+  -->
+  <section id="connect" hidden>
+    <p class="note">Sign in to EGFULFILL in this browser, then connect.</p>
+    <button id="link" class="primary">Connect to EGFULFILL</button>
+  </section>
+
+  <section id="main" hidden>
+    <p class="count" id="count">Checking…</p>
+    <p class="note" id="note"></p>
+    <button id="sync" class="primary" disabled>Sync addresses</button>
+    <button id="rescan" class="quiet">Rescan this page</button>
+  </section>
+
+  <p class="err" id="err" hidden></p>
+
+  <footer>
+    <span id="stats"></span>
+    <button id="forget" class="link" hidden>Disconnect</button>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

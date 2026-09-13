@@ -1715,6 +1715,42 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     return { updated, skipped, notFound, alreadyHad, missing: missing.slice(0, 20), rejected: rejected.slice(0, 20) };
   }
 
+  /**
+   * WHICH ORDERS ARE STILL MISSING A BUYER ADDRESS.
+   *
+   * Exists for the browser extension (extension/), which fills addresses from the seller's
+   * own Shop Manager page while the API entitlement is pending. The extension asks THIS
+   * first and then only looks at the receipts on the list, so it reads what it needs and
+   * nothing else — a client that had to guess would end up walking the whole order history.
+   *
+   * SELLER-SCOPED, exactly like applyAddressRows below it. A seller sees only their own
+   * receipt ids; staff see all. This returns ids and nothing else — no buyer name, no
+   * partial address, no money — because a list of what we are MISSING should not itself be
+   * a way to read what we have.
+   *
+   * Same blank test the Shippo backfill uses: four spellings of the street, because
+   * `orders.address` is jsonb and its writers disagree (see web/shared/order-address.ts).
+   */
+  app.get('/api/etsy/addresses/missing', { preHandler: requireAuth }, async (req) => {
+    const staff = isStaff(req.user);
+    const limit = Math.min(500, Math.max(1, Number((req.query || {}).limit) || 200));
+    const blank = `coalesce(address->>'street', address->>'line1', address->>'first_line', address->>'address1', '') = ''`;
+    // A shipped or closed order needs no address now — offering it would have the seller
+    // hunting down parcels that already left.
+    const open = `coalesce(factory_status,'') not in ('shipped','cancelled','refunded')`;
+    const rows = staff
+      ? (await q(`select id from orders where source='etsy' and ${open} and ${blank}
+                   order by created_at desc limit $1`, [limit])).rows
+      : (await q(`select id from orders where source='etsy' and seller_id=$1 and ${open} and ${blank}
+                   order by created_at desc limit $2`, [req.user.sub, limit])).rows;
+    // Hand back the RECEIPT id, which is what the seller's Etsy page shows — our own
+    // `etsy-<id>` prefix is an internal detail the extension should never have to know.
+    const receipts = rows
+      .map((r) => String(r.id).replace(/^etsy-/, ''))
+      .filter((x) => /^\d+$/.test(x));
+    return { receipts, count: receipts.length };
+  });
+
   app.post('/api/etsy/import-addresses', { preHandler: requireAuth }, async (req, reply) => {
     const rows = Array.isArray((req.body || {}).rows) ? req.body.rows : [];
     if (!rows.length) { reply.code(400); return { error: 'No rows to import.' }; }
