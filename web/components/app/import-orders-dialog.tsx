@@ -845,7 +845,20 @@ export function ImportOrdersDialog({
                 grey boxes on it and the eye read them as gaps rather than as regions.
                 §4: cards are white and separated by the border, and the grey stays outside
                 as the page. The border is unchanged; only the fill has gone. */}
-            <details className="rounded-xl border border-border" open>
+            {/**
+             * CLOSED, AND GONE ONCE THERE ARE ROWS.
+             *
+             * It opened by default, which was defensible at 21 chips and is not at 32: the
+             * placement columns tripled the list, so the first thing this dialog showed was
+             * two screens of field names and the three things you came to press — Sheet, File,
+             * Paste — sat under them.
+             *
+             * It is also a reference for FILLING a sheet, and nobody fills one here; they fill
+             * it in the editor and arrive holding a finished file. So once `records` exist it
+             * is not collapsed, it is removed — what belongs above a preview is the preview.
+             */}
+            {!records && (
+            <details className="rounded-xl border border-border">
               <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
                 {tl("import", "Columns —")} <span className="text-muted-foreground">{tl("import", "grouped the way you fill them")}</span>
               </summary>
@@ -899,6 +912,7 @@ export function ImportOrdersDialog({
                 </p>
               </div>
             </details>
+            )}
 
             <Tabs defaultValue="grid">
               {/* THREE WAYS IN, and the first one is OURS. "Sheet" used to mean a Google
