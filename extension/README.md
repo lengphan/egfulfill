@@ -20,8 +20,10 @@ orders fell outside the window" look the same.
 It **never asks for a password.** The seller signs in to `app.egful.store` normally; Connect
 reads the token their own browser already holds, from our own origin, once.
 
-Everything that leaves the browser leaves from the popup, behind a button. `content.js` has
-no network access at all — it answers one question and volunteers nothing.
+Everything that leaves the browser leaves from the popup, behind a button. The reader is
+INJECTED ON DEMAND rather than declared as a content script, so nothing of ours is present
+on an Etsy page until the moment you open the popup and ask — and the code that runs is
+always the code on disk, never a copy Chrome injected before the last reload.
 
 ## Install (unpacked, for testing)
 
@@ -36,6 +38,10 @@ no network access at all — it answers one question and volunteers nothing.
 3. Go to **Etsy → Shop Manager → Orders & Shipping** (`etsy.com/your/orders/sold`)
 4. Open the extension → it shows how many addresses on that page EGFULFILL is missing
 5. **Sync addresses**
+
+No need to reload the Etsy tab after updating the extension — the reader is injected when
+you open the popup, so it is always the current build. The footer prints that build (`v0.1.1`)
+so "did my change load" is a question you can answer by looking.
 
 Page through your orders and press Sync again on each page. Nothing is sent automatically.
 
