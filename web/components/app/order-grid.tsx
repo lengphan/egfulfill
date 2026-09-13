@@ -358,9 +358,14 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
      handler every render too, which is the thing useCallback is there to avoid. */
   const selRect = useMemo(() => (fillFrom && fillCols
     ? {
-        r0: fillFrom.r,
+        /* MIN/MAX ON BOTH AXES. This read `r0: fillFrom.r` and took a max for the far edge,
+           which is right for a fill HANDLE (it only ever drags away from its corner) and
+           wrong for a shift-click, which can land above or to the left of the anchor. The
+           fill handle is unaffected: dragging down and right still produces the same
+           rectangle, because the anchor is then the minimum anyway. */
+        r0: fillTo ? Math.min(fillFrom.r, fillTo.r) : fillFrom.r,
         r1: fillTo ? Math.max(fillFrom.r, fillTo.r) : fillFrom.r,
-        c0: fillCols[0],
+        c0: fillTo ? Math.min(fillCols[0], fillTo.c) : fillCols[0],
         c1: fillTo ? Math.max(fillCols[1], fillTo.c) : fillCols[1],
       }
     : null), [fillFrom, fillCols, fillTo])
@@ -409,6 +414,15 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * actually pressed.
    */
   const [menu, setMenu] = useState<{ key: string; left: number; top: number; width: number; typed: boolean } | null>(null)
+  /**
+   * THE RIGHT-CLICK MENU — separate state from `menu`, which is the column's value picker.
+   *
+   * They are different objects that happen to look alike: one offers the values a cell may
+   * hold, this one offers things to DO to a selection. Sharing one state would mean a
+   * right-click could leave a half-open value list behind, and every item in one would have
+   * to know about the other's shape.
+   */
+  const [ctx, setCtx] = useState<{ x: number; y: number; r: number; c: number } | null>(null)
   /** The popup's own node, so the close-on-scroll listener can tell the sheet scrolling
    *  (which must close it) from the LIST scrolling (which must not). */
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -924,6 +938,17 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
     })
   }, [editing, writeRows])
 
+  type Rect = { r0: number; r1: number; c0: number; c1: number }
+  /** A rectangle as the clipboard reads it: tabs across, newlines down. */
+  const blockText = (b: Rect) =>
+    rows.slice(b.r0, b.r1 + 1).map((row) => row.slice(b.c0, b.c1 + 1).join("\t")).join("\n")
+  /** Empty a rectangle in ONE history step — see the Delete handler, which does the same. */
+  const clearBlock = (b: Rect) => {
+    setEditing(null); setMenu(null)
+    writeRows((p) => p.map((row, ri) =>
+      ri < b.r0 || ri > b.r1 ? row : row.map((v, ci) => (ci >= b.c0 && ci <= b.c1 ? "" : v))))
+  }
+
   /** Arrow/Enter move between cells. A grid you cannot leave the mouse for is a form. */
   /**
    * NOT a useCallback. It reads the live selection, and hand-memoising it made the React
@@ -987,7 +1012,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
       setCell(r, c, "")
       return
     }
-    if (e.key === "Escape") { setEditing(null); return }
+    if (e.key === "Escape") { setEditing(null); setCtx(null); return }
     // Left/Right inside a value belong to the CARET, not to the grid — stepping columns
     // while someone is editing a street name is how a half-typed address ends up split.
     if (editing === key && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return
@@ -1045,7 +1070,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
     const close = (e?: Event) => {
       const t = e?.target as Node | null
       if (t && menuRef.current && (t === menuRef.current || menuRef.current.contains(t))) return
-      setMenu(null)
+      setMenu(null); setCtx(null)
     }
     window.addEventListener("scroll", close, true)
     window.addEventListener("resize", close)
@@ -1087,6 +1112,21 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * file's own and it is the safe default: the rows stay put, so nothing below shifts up
    * under the cursor. Removing is the X, which is the destructive act and looks like one.
    */
+  /**
+   * INSERT A BLANK ROW. `at` is where the new row lands, so "above" passes r and "below"
+   * passes r + 1 — the caller says which, and this does not have to know.
+   *
+   * The sheet is fixed-width, so a new row is blankRow() and nothing below has to be
+   * reshaped. `editing`/`menu` are keyed "row-col" and every coordinate at or after `at` has
+   * just moved down one, so both are dropped — the same reason removeRows drops them.
+   */
+  const insertRow = (at: number) => {
+    setEditing(null)
+    setMenu(null)
+    setSel(null)
+    writeRows((p) => [...p.slice(0, at), blankRow(), ...p.slice(at)])
+  }
+
   const removeRows = (lo: number, hi: number) => {
     setEditing(null)
     setMenu(null)
@@ -1391,7 +1431,20 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                                outlives the gesture that pressed it. */
                             const withShift = shiftRef.current
                             shiftRef.current = false
-                            setFillFrom((cur) => (withShift && cur && cur.r === r ? { ...cur, c1: c } : { r, c0: c, c1: c }))
+                            /**
+                             * SHIFT EXTENDS IN BOTH AXES NOW.
+                             *
+                             * It read `cur.r === r`, so a shift-click only widened the anchor
+                             * row's column range — you could select A1:D1 or (through the row
+                             * numbers) whole rows, but never A3:D7. The rectangle maths was
+                             * already there; the gesture simply refused to leave its row.
+                             *
+                             * The ANCHOR stays where the first click put it and the FOCUS
+                             * moves, which is what makes shift-clicking above or left of the
+                             * anchor work — selRect takes min/max of the pair.
+                             */
+                            if (withShift && fillFrom) setFillTo({ r, c })
+                            else { setFillFrom({ r, c0: c, c1: c }); setFillTo(null) }
                             const byPointer = pointerSel.current
                             pointerSel.current = false
                             if (editing !== `${r}-${c}` && !byPointer) e.currentTarget.select()
@@ -1420,7 +1473,45 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                             setCell(r, c, e.target.value)
                             if (list?.length) openMenu(e.currentTarget, `${r}-${c}`, true)
                           }}
+                          /**
+                           * COPY AND CUT A BLOCK, from the cell that has focus.
+                           *
+                           * Row-level copy already existed on the row NUMBER; a rectangle of
+                           * cells had none, so selecting A3:D7 and pressing ⌘C copied whatever
+                           * text happened to be selected inside one input. Tab-separated rows,
+                           * newline between — the shape every spreadsheet reads and the shape
+                           * onPaste below already parses.
+                           *
+                           * Only when a BLOCK is selected. A stray ⌘C in a single cell must
+                           * stay the ordinary "copy this text", or copying half a postcode
+                           * would silently put the whole sheet on the clipboard.
+                           */
+                          onCopy={(e) => {
+                            if (!selRect || (selRect.r1 === selRect.r0 && selRect.c1 === selRect.c0)) return
+                            e.preventDefault()
+                            e.clipboardData.setData("text/plain", blockText(selRect))
+                          }}
+                          /* CUT = copy, then clear — in ONE writeRows, so it is one undo and
+                             the clipboard can never end up holding text that was never removed
+                             (the copy is written first and only then the cells go). */
+                          onCut={(e) => {
+                            if (!selRect || (selRect.r1 === selRect.r0 && selRect.c1 === selRect.c0)) return
+                            e.preventDefault()
+                            e.clipboardData.setData("text/plain", blockText(selRect))
+                            clearBlock(selRect)
+                          }}
                           onPaste={(e) => onPaste(e, r, c)}
+                          /* RIGHT-CLICK ON A CELL. If the cell is outside the current block the
+                             block is dropped and this cell becomes the selection — right-
+                             clicking somewhere else and acting on what was selected elsewhere
+                             is the one behaviour a context menu must never have. */
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            setMenu(null)
+                            const inside = selRect && r >= selRect.r0 && r <= selRect.r1 && c >= selRect.c0 && c <= selRect.c1
+                            if (!inside) { setFillFrom({ r, c0: c, c1: c }); setFillTo(null) }
+                            setCtx({ x: e.clientX, y: e.clientY, r, c })
+                          }}
                           onKeyDown={(e) => onKeyDown(e, r, c)}
                           /* Double-click is the spreadsheet gesture for "let me into this
                              value". A single click only selects, so the next paste still
@@ -1613,6 +1704,66 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
               </div>
             )}
           </div>
+        )
+      })()}
+
+      {/**
+       * THE RIGHT-CLICK MENU. Fixed-position like the value picker above, and closed by the
+       * same gestures — a click anywhere, Escape, or anything that moves the cells under it.
+       *
+       * WHAT IS ON IT is only what a person cannot already do from the keyboard without
+       * knowing a shortcut. Cut/Copy/Clear are here because a menu is where people look for
+       * them; Paste is NOT, because reading the clipboard from a menu needs a permission
+       * prompt and ⌘V needs nothing.
+       */}
+      {ctx && (() => {
+        const b = selRect ?? { r0: ctx.r, r1: ctx.r, c0: ctx.c, c1: ctx.c }
+        const nRows = b.r1 - b.r0 + 1
+        const close = () => setCtx(null)
+        /* ITEMS AS DATA, not as a component defined during render. A component declared here
+           is a new type on every render, so React remounts it — §5 has a lint rule about
+           exactly this. These carry no state so nothing would visibly break, which is what
+           makes it the kind of thing that gets copied into something that does. */
+        const items: { label: string; run: () => void; danger?: boolean; rule?: boolean }[] = [
+          { label: tl("grid", "Copy"), run: () => { void navigator.clipboard?.writeText(blockText(b)) } },
+          { label: tl("grid", "Cut"), run: () => { void navigator.clipboard?.writeText(blockText(b)); clearBlock(b) } },
+          { label: tl("grid", "Clear contents"), run: () => clearBlock(b) },
+          { label: tl("grid", "Insert row above"), run: () => insertRow(b.r0), rule: true },
+          { label: tl("grid", "Insert row below"), run: () => insertRow(b.r1 + 1) },
+          { label: nRows > 1 ? `${tl("grid", "Remove")} ${nRows} ${tl("grid", "rows")}` : tl("grid", "Remove row"),
+            run: () => removeRows(b.r0, b.r1), danger: true },
+        ]
+        return (
+          <>
+            {/* A CLICK ANYWHERE CLOSES IT, including a right-click that opens it somewhere
+                else — so the backdrop is transparent and covers everything rather than the
+                menu listening for outside clicks and racing the next contextmenu event. */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={close}
+              onContextMenu={(e) => { e.preventDefault(); close() }}
+            />
+            <div
+              role="menu"
+              style={{ position: "fixed", left: ctx.x, top: ctx.y, minWidth: 190 }}
+              className="z-50 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+            >
+              {items.map((it) => (
+                <div key={it.label}>
+                  {it.rule && <div className="my-1 border-t border-border" />}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { it.run(); close() }}
+                    className={"block w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-accent "
+                      + (it.danger ? "text-destructive" : "")}
+                  >
+                    {it.label}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
         )
       })()}
 
