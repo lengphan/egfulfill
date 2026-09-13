@@ -11,8 +11,11 @@ this extension, no pagination, no crawl, no background worker and no timer — s
 fails if `fetch`, `XMLHttpRequest`, `sendBeacon` or a dynamic `import` ever appears in the
 reader.
 
-It asks EGFULFILL **which receipts are missing an address first**, then discards every
-address on the page that was not on that list. It sends what is needed and nothing else.
+It reads the page, then asks EGFULFILL **"of these receipts I can see, which do you need?"**
+and discards the rest. It sends what is needed and nothing else. The question is bounded by
+what is already on screen, so it can never become a way to survey orders the seller is not
+looking at — and there is no cap or ordering that could make "nothing to do" and "your
+orders fell outside the window" look the same.
 
 It **never asks for a password.** The seller signs in to `app.egful.store` normally; Connect
 reads the token their own browser already holds, from our own origin, once.
@@ -63,9 +66,11 @@ which already existed for the manual CSV upload and already enforces every rule 
 - validates state / ZIP / city and rejects anything malformed
 - audited as `etsy.import_addresses`
 
-`GET /api/etsy/addresses/missing` is the only addition, and it returns receipt IDs and
-nothing else — no buyer name, no partial address, no money. A list of what we are missing
-should not itself be a way to read what we have.
+`/api/etsy/addresses/missing` is the only addition. `POST` answers about a specific list of
+receipts (max 300, the form the extension uses); `GET` surveys recent ones. Both return
+receipt IDs and nothing else — no buyer name, no partial address, no money. A list of what
+we are missing should not itself be a way to read what we have. Both are seller-scoped:
+a seller is answered about their own orders, staff about all.
 
 ## Known limits
 

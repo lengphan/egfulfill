@@ -116,42 +116,67 @@ async function scan() {
     return
   }
 
+  /*
+   * READ THE PAGE FIRST, THEN ASK ABOUT WHAT IS ON IT.
+   *
+   * The first version asked EGFULFILL for "everything you are missing" and filtered the
+   * page against that. For a staff user that list spans every seller and is capped, so a
+   * shop's own orders could sit outside the window and the extension would report nothing
+   * to do — indistinguishable from everything being filled already. Asking about the
+   * receipts actually on screen removes the cap and the ambiguity, and it means we disclose
+   * nothing about orders the seller is not already looking at.
+   */
   let res
   try {
-    res = await chrome.tabs.sendMessage(tab.id, { type: 'eg:scan', wanted: WANTED })
+    res = await chrome.tabs.sendMessage(tab.id, { type: 'eg:scan', wanted: [] })
   } catch {
     return fail('Reload the Etsy tab and try again — the extension was installed after that page loaded.')
   }
   if (!res || !res.ok) return fail((res && res.error) || 'Could not read that page.')
 
-  ROWS = res.rows || []
+  const onPage = res.rows || []
   const s = res.stats || {}
+
+  if (!onPage.length) {
+    ROWS = []
+    $('count').textContent = 'Nothing to send from this page'
+    $('note').textContent = 'No orders found here. Open a page of your sold orders, or page through to older ones.'
+    $('sync').disabled = true
+    $('stats').textContent = `${s.foundOnPage || 0} on page · 0 wanted · 0 usable`
+    return
+  }
+
+  try {
+    const ask = await api('/api/etsy/addresses/missing', {
+      method: 'POST',
+      body: JSON.stringify({ receipts: onPage.map((r) => r.order_id) }),
+    })
+    WANTED = ask.receipts || []
+  } catch (e) {
+    return fail(e.message)
+  }
+
+  const keep = new Set(WANTED.map(String))
+  ROWS = onPage.filter((r) => keep.has(r.order_id))
+
   $('count').textContent = ROWS.length
     ? `${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'} ready to send`
     : 'Nothing to send from this page'
   $('note').textContent = ROWS.length
     ? ''
-    : s.foundOnPage
-      ? 'The orders on this page already have addresses in EGFULFILL.'
-      : 'No orders found here. Open a page of your sold orders, or page through to older ones.'
+    : 'The orders on this page already have addresses in EGFULFILL.'
   $('sync').disabled = !ROWS.length
 
-  /* SAY WHAT WAS SEEN, not just what survived. "20 on the page, 0 usable" is a bug report
-     that can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
+  /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
+     can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
      broken selector hides for weeks. */
-  $('stats').textContent = `${s.foundOnPage || 0} on page · ${s.matchedWanted || 0} wanted · ${s.usable || 0} usable${s.how ? ` · via ${s.how}` : ''}`
+  $('stats').textContent = `${s.foundOnPage || 0} on page · ${ROWS.length} wanted · ${s.usable || 0} usable${s.how ? ` · via ${s.how}` : ''}`
 }
 
 async function start() {
   fail('')
   render()
   if (!TOKEN) return
-  try {
-    const missing = await api('/api/etsy/addresses/missing?limit=500')
-    WANTED = missing.receipts || []
-  } catch (e) {
-    return fail(e.message)
-  }
   await scan()
 }
 

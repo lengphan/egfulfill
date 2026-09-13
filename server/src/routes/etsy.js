@@ -1731,24 +1731,77 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
    * Same blank test the Shippo backfill uses: four spellings of the street, because
    * `orders.address` is jsonb and its writers disagree (see web/shared/order-address.ts).
    */
-  app.get('/api/etsy/addresses/missing', { preHandler: requireAuth }, async (req) => {
-    const staff = isStaff(req.user);
-    const limit = Math.min(500, Math.max(1, Number((req.query || {}).limit) || 200));
+  /**
+   * WHICH OF THESE ORDERS IS STILL MISSING A BUYER ADDRESS.
+   *
+   * Exists for the browser extension (extension/), which fills addresses from the seller's
+   * own Shop Manager page while the API entitlement is pending.
+   *
+   * ASK ABOUT RECEIPTS YOU CAN ALREADY SEE. Post the ids visible on the page and this
+   * answers for exactly those. The first version took no body and returned "everything we
+   * are missing, newest 500 first", which is wrong in a way that is hard to spot: for a
+   * STAFF user that list spans every seller, so a shop's own orders could fall outside the
+   * window and the extension would report nothing to do. An empty answer then means "all
+   * filled" and "your orders are past the cap" identically, and there is no way to tell
+   * from the outside. Bounding the question by what is on the page removes the cap, the
+   * ordering and the ambiguity together.
+   *
+   * The no-body form is kept for a caller that genuinely wants a survey, and only then is
+   * the limit applied.
+   *
+   * SELLER-SCOPED, exactly like applyAddressRows below it: a seller is answered about their
+   * own orders only, staff about all. It returns receipt ids and NOTHING else — no buyer
+   * name, no partial address, no money — because a list of what we are missing must not
+   * become a way to read what we have.
+   *
+   * Same blank test the Shippo backfill uses: four spellings of the street, because
+   * `orders.address` is jsonb and its writers disagree (see web/shared/order-address.ts).
+   */
+  async function missingAddressReceipts(user, asked, limit) {
+    const staff = isStaff(user);
     const blank = `coalesce(address->>'street', address->>'line1', address->>'first_line', address->>'address1', '') = ''`;
     // A shipped or closed order needs no address now — offering it would have the seller
     // hunting down parcels that already left.
     const open = `coalesce(factory_status,'') not in ('shipped','cancelled','refunded')`;
-    const rows = staff
-      ? (await q(`select id from orders where source='etsy' and ${open} and ${blank}
-                   order by created_at desc limit $1`, [limit])).rows
-      : (await q(`select id from orders where source='etsy' and seller_id=$1 and ${open} and ${blank}
-                   order by created_at desc limit $2`, [req.user.sub, limit])).rows;
+
+    let rows;
+    if (asked && asked.length) {
+      // Cast explicitly: node-pg sends a text[] and `id` is text, but an unannotated array
+      // parameter is the kind of thing that works until the column type changes.
+      const ids = asked.map((r) => 'etsy-' + r);
+      rows = staff
+        ? (await q(`select id from orders where source='etsy' and id = any($1::text[]) and ${open} and ${blank}`, [ids])).rows
+        : (await q(`select id from orders where source='etsy' and seller_id=$1 and id = any($2::text[]) and ${open} and ${blank}`, [user.sub, ids])).rows;
+    } else {
+      rows = staff
+        ? (await q(`select id from orders where source='etsy' and ${open} and ${blank}
+                     order by created_at desc limit $1`, [limit])).rows
+        : (await q(`select id from orders where source='etsy' and seller_id=$1 and ${open} and ${blank}
+                     order by created_at desc limit $2`, [user.sub, limit])).rows;
+    }
+
     // Hand back the RECEIPT id, which is what the seller's Etsy page shows — our own
     // `etsy-<id>` prefix is an internal detail the extension should never have to know.
     const receipts = rows
       .map((r) => String(r.id).replace(/^etsy-/, ''))
       .filter((x) => /^\d+$/.test(x));
     return { receipts, count: receipts.length };
+  }
+
+  app.get('/api/etsy/addresses/missing', { preHandler: requireAuth }, async (req) => {
+    const limit = Math.min(500, Math.max(1, Number((req.query || {}).limit) || 200));
+    return missingAddressReceipts(req.user, null, limit);
+  });
+
+  app.post('/api/etsy/addresses/missing', { preHandler: requireAuth }, async (req) => {
+    const body = req.body || {};
+    // Bounded so a client cannot turn this into a full-table probe one page at a time.
+    const asked = (Array.isArray(body.receipts) ? body.receipts : [])
+      .map((r) => String(r).replace(/[^0-9]/g, ''))
+      .filter(Boolean)
+      .slice(0, 300);
+    const limit = Math.min(500, Math.max(1, Number(body.limit) || 200));
+    return missingAddressReceipts(req.user, asked, limit);
   });
 
   app.post('/api/etsy/import-addresses', { preHandler: requireAuth }, async (req, reply) => {
