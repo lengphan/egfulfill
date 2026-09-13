@@ -3,7 +3,8 @@
 import { useLabelT } from "@/lib/i18n"
 import { Fragment, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
-import { numOf, platformOf, shipAddressOf, sellerLabelOf } from "@/lib/order-format"
+import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines } from "@/lib/order-format"
+import { CopyButton } from "@/components/app/copy-button"
 import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
@@ -2137,8 +2138,18 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
               ) : (addr.line1 || addr.city) ? (
-                <div className="flex items-start gap-2 border-t border-border pt-3 text-muted-foreground">
-                  <MapPin size={15} className="mt-0.5 shrink-0" />
+                /*
+                 * AN ADDRESS IS A VALUE, NOT A CAPTION (§4).
+                 *
+                 * This whole block was `text-muted-foreground` — the street, the city and
+                 * the ZIP all set in the colour reserved for labels nobody re-reads. It is
+                 * the opposite of true: this is the one thing on the page a person reads
+                 * digit by digit, copies, and transcribes onto a parcel. It is inked now,
+                 * and the ICON is what went muted, because the pin is decoration and the
+                 * address is the content.
+                 */
+                <div className="flex items-start gap-2 border-t border-border pt-3">
+                  <MapPin size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
                     {/* ONLY WHEN IT DIFFERS. `cust.name` is who bought it and `addr.name`
                         is who receives it — genuinely different fields, and on a gift order
@@ -2157,15 +2168,47 @@ export default function OrderDetailPage() {
                         label being bought. Same wording as the board's panel. */}
                     {addr.masked && <div className="select-none tracking-widest">••••••••••</div>}
                     {streetMissing && <div className="text-destructive">No street address</div>}
-                    <div>{[addr.city, addr.state, addr.zip].filter(Boolean).join(", ")}</div>
-                    {addr.country && <div>{addr.country}</div>}
+                    {/* CITY, ST ZIP — a comma after the city only. Joining all three with
+                        commas produced "Anchorage, AK, 99515-2719", which is not how an
+                        address is written anywhere, and this is read against a printed
+                        label where the difference is obvious. */}
+                    <div>
+                      {[addr.city, addr.state].filter(Boolean).join(", ")}
+                      {addr.zip ? ` ${addr.zip}` : ""}
+                    </div>
+                    {addr.country && <div className="text-muted-foreground">{addr.country}</div>}
+                    {/*
+                      * WHERE IT CAME FROM, said out loud.
+                      *
+                      * There are now four ways an address arrives — the marketplace sync,
+                      * Shippo's own Etsy connection, the CSV/extension import, and somebody
+                      * typing it — and until this line the screen looked identical for all
+                      * of them. "Which of these do I trust" is a real question on a card
+                      * whose whole job is telling you where to send a parcel, and
+                      * addressSourceLabel already answered it for the boards.
+                      */}
+                    <div className="mt-1.5 text-2xs text-muted-foreground">{addressSourceLabel(order)}</div>
                   </div>
-                  {addrEditable && (
-                    <Button size="sm" variant="ghost" className="-my-1 shrink-0"
-                      onClick={() => { setAddrDraft(addrFields); setAddrErr(null); setEditAddr(true) }}>
-                      Edit
-                    </Button>
-                  )}
+                  {/* Top-aligned, not centred. `-my-1` on a control beside a four-line
+                      block put Edit level with the middle of the address, which is why it
+                      looked unattached to anything. */}
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {/* Copy the whole thing, in the order it goes on a label — the reason
+                        anyone reads this card is to put it somewhere else. */}
+                    {!addr.masked && !streetMissing && (
+                      <CopyButton
+                        value={addressLines(order).join("\n")}
+                        label={tl("orders", "Copy address")}
+                        copiedLabel={tl("orders", "Copied")}
+                      />
+                    )}
+                    {addrEditable && (
+                      <Button size="sm" variant="ghost" className="shrink-0"
+                        onClick={() => { setAddrDraft(addrFields); setAddrErr(null); setEditAddr(true) }}>
+                        Edit
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ) : addrEditable ? (
                 /* No address at all. One line and one way out — the four parts, minus the
