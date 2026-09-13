@@ -26,6 +26,7 @@ import {
   dutyOf,
   columnBands,
   type ImportRecord,
+  looksLikeTemplate,
 } from "@/lib/order-import"
 import { createOrder, getOrders, getTemplates, getCatalogProducts, getDesignLibrary, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile, type LibraryDesign } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
@@ -267,12 +268,50 @@ export function ImportOrdersDialog({
    * A row with no hash falls back to the thumb, which behaves exactly as it did before —
    * badly, but not worse — rather than resolving to nothing at all.
    */
+  /**
+   * DOES THIS SHEET NAME A TEMPLATE ANYWHERE?
+   *
+   * It asked `r.template_id`, and THERE IS NO TEMPLATE ID COLUMN ANY MORE — a template is
+   * typed into Artwork/Template N beside its placement, which lands on `hero_image` and
+   * `artwork_2..5`. So this was always false, templates were never fetched, applyTemplates
+   * never ran, and a TPL- reference did nothing at all. Exactly the shape of the machine-file
+   * lookup bug on the same screen: a gate still watching the column the value moved out of.
+   *
+   * `template_id` stays in the list because COL_ALIASES still maps a legacy header to it.
+   */
+  const TEMPLATE_CELLS = ["template_id", "hero_image", "artwork_2", "artwork_3", "artwork_4", "artwork_5"] as const
+  const templateRefsOn = useCallback((r: Record<string, unknown>) =>
+    TEMPLATE_CELLS.map((k) => String(r[k] ?? "").trim()).filter((v) => looksLikeTemplate(v)), [])
+
   const resolveArtwork = useCallback(
     (ref: string) => {
       const id = String(ref).replace(/^IMG-/i, "")
       const hit = (library ?? []).find((d) => String(d.id) === id)
       if (!hit) return ""
       return hit.content_hash ? `/api/design_library/art/${hit.content_hash}` : String(hit.thumb ?? "")
+    },
+    [library],
+  )
+  /**
+   * WHAT THE DESIGN IS CALLED — separate from where it lives, because only the address was
+   * ever resolved.
+   *
+   * `IMG-30` came through with its picture and no name, so the line's Files panel read
+   * "Untitled artwork" for a design the seller had deliberately named in their library. The
+   * name is right there on the same row; nothing had to be fetched, it was simply never
+   * asked for. A template keeps naming itself "Template TPL-12" as it did.
+   */
+  const artworkNameFor = useCallback(
+    (src: string) => {
+      /* MATCHED ON THE ADDRESS, not on the cell. By the time a face reaches the poster it
+         carries the RESOLVED url and not the `IMG-30` that produced it — and the url ends in
+         the design's content_hash, which is unique per design. So the name is recoverable
+         without threading a new field through the parser and every caller of it. A URL the
+         seller typed themselves matches nothing here and stays unnamed, correctly. */
+      const m = /\/api\/design_library\/art\/([^/?#]+)/.exec(String(src || ""))
+      if (!m) return ""
+      const hit = (library ?? []).find((d) => String(d.content_hash ?? "") === m[1])
+      return String(hit?.name ?? "").trim()
     },
     [library],
   )
@@ -318,7 +357,7 @@ export function ImportOrdersDialog({
     }
     // Only now do we know whether templates matter. Fetching them up front would pull
     // every composite (base64 images) for the majority of imports that name none.
-    if (records.some((r) => String(r.template_id || "").trim())) {
+    if (records.some((r) => templateRefsOn(r as unknown as Record<string, unknown>).length)) {
       setTemplatesFailed(false)
       getTemplates()
         .then((rows) => setTemplates((rows ?? []).map((t) => {
@@ -457,7 +496,8 @@ export function ImportOrdersDialog({
 
   const templateOutcome = useMemo(() => {
     if (!records || !templates) return null
-    const typed = records.filter((r) => r._valid && String(r.template_id || "").trim()).length
+    // COUNTED PER TEMPLATE, not per row — one row can name five.
+    const typed = records.reduce((n, r) => n + (r._valid ? templateRefsOn(r as unknown as Record<string, unknown>).length : 0), 0)
     if (!typed) return null
     const r = applyTemplates(groupToOrders(records, resolveArtwork), templates)
     return { typed, applied: r.applied, unmatched: r.unmatched, ambiguous: r.ambiguous }
@@ -715,7 +755,12 @@ export function ImportOrdersDialog({
                   sku: it.sku || it.name,
                   side: f.side || "front",
                   data: f.artwork,
-                  name: it.templateId ? `Template ${it.templateId}` : undefined,
+                  /* The LIBRARY's name when the cell named a design, the template's when it
+                     named a template, and undefined only when neither can say — which is the
+                     one case "Untitled artwork" is honest about. */
+                  name: it.templateId
+                    ? `Template ${it.templateId}`
+                    : (artworkNameFor(String(f.artwork ?? "")) || undefined),
                   pos: (f.pos ?? undefined) as DesignPos | undefined,
                 }).catch(() => {})
               }
