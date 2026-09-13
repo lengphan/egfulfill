@@ -1445,6 +1445,8 @@ const vi: Dict = {
   "orders.Start": "Bắt đầu",
   "orders.Sending…": "Đang gửi…",
   "orders.Copying…": "Đang sao chép…",
+  "orders.Copy address": "Sao chép địa chỉ",
+  "orders.Copied": "Đã sao chép",
   "orders.Stock:": "Tồn kho:",
   "orders.Threads:": "Chỉ:",
   "orders.No variant chosen": "Chưa chọn phiên bản",
