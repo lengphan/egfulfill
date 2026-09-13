@@ -74,11 +74,12 @@ a seller is answered about their own orders, staff about all.
 
 ## Known limits
 
-- **The selectors are unverified against a real Etsy page.** There is no logged-in Shop
-  Manager session on the machine this was written on. The address *parsing* is tested
-  (`node tools/check-extension-parse.mjs`); which DOM nodes to read it from is a best guess
-  behind a three-strategy fallback, and will likely need one round of correction. The footer
-  stats are what make that correction a bug report instead of a silent zero.
+- **The selectors came from a live page (2026-09-13) and are tested against it**
+  (`node tools/check-extension-parse.mjs`), but Etsy can change their markup without notice.
+  The footer stats are what make that break visible: `0 on page` with orders on screen means
+  `src/parse.js` needs new selectors, and it reads as a bug report rather than a silent zero.
+  Addresses are already in the DOM even though the Ship-to panel renders COLLAPSED — nothing
+  needs expanding, and nothing is ever clicked.
 - **US addresses only.** The text fallback anchors on a `City, ST ZIP` line, and the server
   rejects a non-two-letter state and a non-5-digit ZIP. An international order will show as
   found-but-unusable rather than being sent wrong.

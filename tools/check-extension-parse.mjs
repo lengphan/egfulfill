@@ -2,9 +2,11 @@
 /**
  * THE EXTENSION PARSER GATE.
  *
- * `extension/src/parse.js` is the one file that knows what Etsy's page looks like, and it is
- * the one file nobody can verify from here — there is no logged-in Shop Manager session on
- * this machine, so the SELECTORS are a best guess until someone runs it against a real page.
+ * `extension/src/parse.js` is the one file that knows what Etsy's page looks like. Its
+ * primary strategy is now written against markup CAPTURED FROM A LIVE Shop Manager page
+ * (2026-09-13), and the cases below reproduce that markup exactly — `div.address` holding
+ * `span.first-line`, `.city`, `.state`, `.zip`, with the receipt id on an `order_id=` link
+ * some levels above. What still cannot be checked from here is whether Etsy CHANGES it.
  *
  * What CAN be verified is everything around them, and that is most of the risk: the address
  * text parser, the receipt-id extraction, the `wanted` filter that keeps us from sending
@@ -40,6 +42,7 @@ if (typeof extractOrders !== 'function') {
 
 function el({ text = '', attrs = {}, href = null, children = [] }) {
   const node = {
+    _tag: attrs._tag || 'div',
     textContent: text,
     innerText: text,
     getAttribute: (k) => (k === 'href' ? href : (attrs[k] ?? null)),
@@ -56,12 +59,73 @@ function el({ text = '', attrs = {}, href = null, children = [] }) {
   return node
 }
 
+/** The flat document used by the JSON and text-fallback cases. */
 function doc({ scripts = [], cards = [] }) {
   return {
     querySelectorAll: (sel) => {
       if (sel === 'script') return scripts.map((s) => ({ textContent: s }))
+      if (sel === '.address') return []
       if (sel.includes('data-order-id')) return cards
       throw new Error(`fake document has no rule for selector: ${sel}`)
+    },
+  }
+}
+
+/**
+ * A NODE TREE with class lookup and parent links — enough to exercise fromAddressBlocks,
+ * which is the strategy that matters now that the real markup is known.
+ */
+function node(tag, cls, text, kids = [], href = null) {
+  const n = {
+    _tag: tag, _cls: cls, _kids: kids, parentElement: null, href,
+    get textContent() { return text || n._kids.map((k) => k.textContent).join(' ') },
+    get innerText() { return n.textContent },
+    getAttribute: (k) => (k === 'href' ? href : k === 'class' ? cls : null),
+    attributes: [{ name: 'class', value: cls || '' }],
+    _all(pred, out = []) {
+      for (const k of n._kids) { if (pred(k)) out.push(k); k._all && k._all(pred, out) }
+      return out
+    },
+    querySelectorAll(sel) {
+      const want = sel.replace(/^[.#]/, '')
+      if (sel.startsWith('.')) return n._all((k) => (k._cls || '').split(/\s+/).includes(want))
+      if (sel.includes('a[href*="order_id="]')) return n._all((k) => k._tag === 'a' && /order_id=/.test(k.href || ''))
+      return []
+    },
+    querySelector(sel) { return n.querySelectorAll(sel)[0] || null },
+  }
+  for (const k of kids) k.parentElement = n
+  return n
+}
+
+/** Etsy's real address block, as pasted from a live Shop Manager page. */
+function addressBlock(name, street, city, state, zip, street2 = '') {
+  const kids = [
+    node('span', 'name', name),
+    node('span', 'first-line', street),
+    ...(street2 ? [node('span', 'second-line', street2)] : []),
+    node('span', 'city', city),
+    node('span', 'state', state),
+    node('span', 'zip', zip),
+    node('span', 'country-name', 'United States'),
+    node('span', 'phone', '805 4529793'),
+  ]
+  return node('div', 'address break-word fs-mask', null, [node('p', null, null, kids)])
+}
+
+/** One order row: the address block plus the link its receipt id comes from. */
+function orderRow(receipt, addr) {
+  return node('div', 'col-group col-flush', null, [
+    node('a', null, `#${receipt}`, [], `/your/orders/sold?order_id=${receipt}`),
+    node('div', 'wrap', null, [addr]),
+  ])
+}
+
+function docOf(root) {
+  return {
+    querySelectorAll: (sel) => {
+      if (sel === 'script') return []
+      return root.querySelectorAll(sel)
     },
   }
 }
@@ -167,5 +231,45 @@ console.log('\nNO NETWORK — the reader must never fetch')
   }
 }
 
-console.log(bad ? `\n${bad} failure(s).` : '\nParser holds. NOTE: selectors are still unverified against a real Etsy page.')
+console.log('\nREAL ETSY MARKUP — span.first-line and friends')
+{
+  const page = docOf(node('div', 'list', null, [
+    orderRow('4172259915', addressBlock('Nicole Barry', '11522 Discovery Heights Cir', 'Anchorage', 'AK', '99515-2719')),
+  ]))
+  const { rows, stats } = extractOrders(page, [])
+  check('reads the block', rows.length, 1)
+  check('order id from the LINK, not text', rows[0] && rows[0].order_id, '4172259915')
+  check('street', rows[0] && rows[0].street, '11522 Discovery Heights Cir')
+  check('city', rows[0] && rows[0].city, 'Anchorage')
+  check('state', rows[0] && rows[0].state, 'AK')
+  check('zip keeps the +4', rows[0] && rows[0].zip, '99515-2719')
+  check('name', rows[0] && rows[0].name, 'Nicole Barry')
+  check('country normalised to a code', rows[0] && rows[0].country, 'US')
+  check('strategy reported', stats.how, 'address-block')
+}
+
+console.log('\nTWO ORDERS — an address must never land on its neighbour')
+{
+  const page = docOf(node('div', 'list', null, [
+    orderRow('4172259915', addressBlock('Nicole Barry', '11522 Discovery Heights Cir', 'Anchorage', 'AK', '99515-2719')),
+    orderRow('4172003959', addressBlock('Shana Adrah', '125 Dowdy Ct', 'Bellport', 'NY', '11713')),
+  ]))
+  const { rows } = extractOrders(page, [])
+  const byId = Object.fromEntries(rows.map((r) => [r.order_id, r.street]))
+  check('both read', rows.length, 2)
+  check('first keeps its own street', byId['4172259915'], '11522 Discovery Heights Cir')
+  check('second keeps its own street', byId['4172003959'], '125 Dowdy Ct')
+}
+
+console.log('\nAPT — second-line is carried through')
+{
+  const page = docOf(node('div', 'list', null, [
+    orderRow('4171990173', addressBlock('Dana W', '1940 Lavender Way', 'Anchorage', 'AK', '99515', 'Apt 2B')),
+  ]))
+  const { rows } = extractOrders(page, [])
+  check('street is the road', rows[0] && rows[0].street, '1940 Lavender Way')
+  check('street2 is the apt', rows[0] && rows[0].street2, 'Apt 2B')
+}
+
+console.log(bad ? `\n${bad} failure(s).` : '\nParser holds, against markup captured from a live Etsy page.')
 process.exit(bad ? 1 : 0)

@@ -66,6 +66,81 @@ function isUsable(r) {
   return true
 }
 
+/* ── 0. Etsy's own address block — verified against a real Shop Manager page ── */
+
+/**
+ * THE REAL MARKUP, and it is better than anything guessed:
+ *
+ *   <div class="address break-word fs-mask">
+ *     <p><span class="name">Nicole Barry</span><br>
+ *        <span class="first-line">11522 Discovery Heights Cir</span><br>
+ *        <span class="city">Anchorage</span>, <span class="state">AK</span> <span class="zip">99515-2719</span><br>
+ *        <span class="country-name">United States</span><br>
+ *        <span class="phone">805 4529793</span></p>
+ *   </div>
+ *
+ * Every field has a semantic class, so there is nothing to infer — no regex over a text
+ * blob, no guessing which line is the street. This is now the FIRST strategy and the one
+ * that should always win; the text ladder below stays only as a fallback for a future
+ * redesign.
+ *
+ * IT IS ALREADY IN THE DOM. The Ship-to panel renders collapsed, not absent — 15 address
+ * blocks were present on a page where none were visible. Nothing has to be expanded, and
+ * nothing has to be clicked, which is what keeps this a reader.
+ *
+ * WHY THE ORDER ID IS NEVER READ FROM TEXT. `textContent` has no separators between
+ * elements, so "#4172259915" followed by "1 item" concatenates into "#41722599151" — a
+ * plausible-looking id that belongs to no order. Writing an address against it would put a
+ * buyer's street on the wrong row, or silently nowhere. The id comes from the `order_id=`
+ * LINK only.
+ */
+function fromAddressBlocks(doc) {
+  const out = []
+  for (const box of doc.querySelectorAll('.address')) {
+    const pick = (cls) => {
+      const e = box.querySelector('.' + cls)
+      return e ? clean(e.textContent) : ''
+    }
+    const street = pick('first-line')
+    if (!street) continue
+
+    /*
+     * FIND THE ORDER THIS ADDRESS BELONGS TO, and refuse if it is ambiguous.
+     *
+     * Walking up until an `order_id=` link appears is not enough on its own: a list
+     * container holds every order's link, so the first ancestor that matches could hand
+     * back a neighbour's id and put this buyer's street on somebody else's parcel. So the
+     * ancestor is only accepted while it still contains exactly ONE address block — ours.
+     * The moment a level holds two, we have climbed past the order and we stop.
+     */
+    let id = ''
+    let n = box.parentElement
+    for (let up = 0; up < 15 && n; up++, n = n.parentElement) {
+      if (n.querySelectorAll('.address').length > 1) break
+      const a = n.querySelector('a[href*="order_id="]')
+      if (a) {
+        const m = String(a.getAttribute('href') || '').match(/order_id=(\d{6,})/)
+        if (m) { id = m[1]; break }
+      }
+    }
+    if (!id) continue
+
+    out.push(row(id, {
+      name: pick('name'),
+      street,
+      street2: pick('second-line'),
+      city: pick('city'),
+      state: pick('state'),
+      zip: pick('zip'),
+      /* Etsy prints the country in full. The server stores whatever it is given, but every
+         other writer of this column uses a code, and a column with both "US" and "United
+         States" in it is one nobody can group by. */
+      country: /united states/i.test(pick('country-name')) ? 'US' : pick('country-name'),
+    }, 'address-block'))
+  }
+  return out
+}
+
 /* ── 1. embedded JSON ──────────────────────────────────────────────────────── */
 
 /** Walk any parsed JSON looking for objects that carry both a receipt id and a street. */
@@ -186,10 +261,11 @@ function fromCards(doc) {
     // address it finds to whichever id it happened to match first.
     if (card.querySelectorAll('[data-order-id], [data-receipt-id]').length > 1) continue
 
+    /* textContent, NOT innerText. The Ship-to panel renders collapsed, and innerText omits
+       hidden elements — which is exactly why this fallback returned nothing on a page that
+       had fifteen addresses sitting in the DOM. */
     const block = card.querySelector('address')
-    const a = block
-      ? addressFromText(block.innerText || block.textContent)
-      : addressFromText(card.innerText || card.textContent)
+    const a = addressFromText(block ? block.textContent : card.textContent)
     if (!a) continue
     seen.add(id)
     out.push(row(id, a, block ? 'address-block' : 'text'))
@@ -208,9 +284,11 @@ function fromCards(doc) {
  */
 function extractOrders(doc, wanted) {
   const byId = new Map()
-  // Lowest confidence first so a better strategy overwrites it.
+  // Lowest confidence first so a better strategy overwrites it. The address block is last
+  // because it is the only one verified against a real page.
   for (const r of fromCards(doc)) byId.set(r.order_id, r)
   for (const r of fromEmbeddedJson(doc)) byId.set(r.order_id, r)
+  for (const r of fromAddressBlocks(doc)) byId.set(r.order_id, r)
 
   let rows = [...byId.values()].filter((r) => r.order_id)
   const found = rows.length
