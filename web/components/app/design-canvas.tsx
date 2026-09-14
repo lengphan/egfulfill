@@ -1785,6 +1785,11 @@ export function DesignCanvasDialog({
    * "sent" a property of the face rather than of the work.
    */
  const [sentSides, setSentSides] = useState<Record<string, string>>({})
+  /** WHY A SEND DID NOT HAPPEN, beside the button that tried. It used to set the dialog's
+   *  shared `err`, which renders far below in the body — so a failed send left the button
+   *  enabled with its message off where the eye was not, and the control read as doing
+   *  nothing at all. A refusal belongs where the press was. */
+ const [sendErr, setSendErr] = useState<string | null>(null)
  const going = sendable.filter((r) => !skip[r.side] && sentSides[r.side] !== r.art.data)
 
   /**
@@ -1801,7 +1806,7 @@ export function DesignCanvasDialog({
    */
  const sendSelected = async () => {
  if (!going.length) return
- setSending(true); setErr(null)
+ setSending(true); setErr(null); setSendErr(null)
  try {
  for (const row of going) {
  const card = await createDesignCard({
@@ -1826,7 +1831,7 @@ export function DesignCanvasDialog({
  const cards = await getOrderDesignCards(orderId).catch(() => null)
  if (cards) setBoardCard(cardForLine(cards, { line_id: item.line_id, sku: item.sku }) ?? null)
     } catch (e) {
- setErr(e instanceof Error ? e.message : "Couldn't send to the design board.")
+ setSendErr(e instanceof Error && e.message ? e.message : "Couldn't send to the design board.")
     } finally { setSending(false) }
   }
 
@@ -3861,6 +3866,8 @@ export function DesignCanvasDialog({
                     fact twice, and it made the button grow and shrink as faces were ticked. */}
                 {sending ? tl("canvas", "Sending…") : !going.length ? tl("canvas", "Sent") : tl("canvas", "Send to Board")}
               </Button>
+              {/* Under the button, not in the dialog body — see the note on sendErr. */}
+              {sendErr && <div className="mt-2 text-sm text-destructive">{sendErr}</div>}
             </div>
           )}
           <div className="flex flex-col gap-2">
