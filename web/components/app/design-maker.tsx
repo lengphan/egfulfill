@@ -13,6 +13,7 @@ import { useLightbox } from "@/components/app/image-lightbox"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, uploadSellerImage, type CatalogProduct, type ProductTemplate } from "@/lib/api"
 import { trimTransparent } from "@/lib/image-trim"
+import { offerable } from "@/lib/product-status"
 import { canvasReadableSrc } from "@/lib/thread-match"
 // The tile is shared with the order dialog — it takes props only, so it was always shared
 // code that happened to live in this one screen's file.
@@ -271,7 +272,10 @@ export function DesignMaker() {
    * the common case, not a catalogue.
    */
  const starters = useMemo(
-    () => catalogRows.filter((p) => !!mockupOf(p)).slice(0, 4),
+    /* Offerable only: a retired blank must not be one of the four things this panel
+       suggests making. The full catalogRows stays unfiltered behind it, because that is
+       what resolves ?product= for a design somebody is reopening. */
+    () => offerable(catalogRows).filter((p) => !!mockupOf(p)).slice(0, 4),
     [catalogRows],
   )
   // Minted on FIRST save, not during render (an impure call there is unstable across

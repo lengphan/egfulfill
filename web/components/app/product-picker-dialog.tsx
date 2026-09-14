@@ -7,6 +7,7 @@ import { Package } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SearchField } from "@/components/app/search-field"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { offerable } from "@/lib/product-status"
 import { BlankOutline, hasBlankOutline } from "@/components/app/blank-outline"
 import { sizesOf, methodsOf } from "@/lib/variant-resolve"
 
@@ -104,7 +105,11 @@ export function ProductPickerDialog({
     if (!open) return
     let alive = true
     getCatalogProducts()
-      .then((rows) => alive && setProducts(rows && rows.length ? rows : DEMO))
+      /* ARCHIVED IS NOT OFFERED. Retiring a product has to stop it being chosen again
+         without making it unresolvable — see lib/product-status.ts. Filtered at the LIST,
+         never at the lookup: an order that already names an archived blank still prices,
+         still draws its photo, and still ships. */
+      .then((rows) => alive && setProducts(rows && rows.length ? offerable(rows) : DEMO))
       .catch(() => alive && setProducts(DEMO))
     return () => {
       alive = false

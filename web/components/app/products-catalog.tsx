@@ -4,7 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Plus, Package, Sparkle, PenNib, PencilSimple, Trash, Warning, Tag } from "@phosphor-icons/react"
+import { Plus, Package, Sparkle, PenNib, PencilSimple, Archive, ArrowCounterClockwise, DotsThree, Warning, Tag } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { TabBar } from "@/components/app/tab-bar"
@@ -12,6 +12,8 @@ import { SearchField } from "@/components/app/search-field"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { BrandSplitDialog } from "@/components/app/brand-split-dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { isArchived } from "@/lib/product-status"
 import { planBrandSplit } from "@/lib/brand-split"
 import { nextEgSku } from "@/lib/sku"
 import { usePaged, Pagination } from "@/components/app/pagination"
@@ -206,7 +208,23 @@ export function ProductsCatalog() {
  const list = products ?? []
  return persist(list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [p, ...list])
   }
- const deleteProduct = (id: CatalogProduct["id"]) => persist((products ?? []).filter((x) => x.id !== id))
+  /**
+   * RETIRED, NOT REMOVED (owner, 2026-09-14).
+   *
+   * This was `persist(products.filter(x => x.id !== id))` behind a 28px trash icon four
+   * pixels from Edit, with no confirmation: one misclick dropped a product out of the
+   * catalogue permanently. And "permanently" was worse than it looked — quoteOrder prices an
+   * order by looking its blank up in this catalogue, so deleting a product leaves every
+   * finished order that used it unpriceable, and the row is gone from the only place that
+   * could put it back.
+   *
+   * Archiving does the job that was actually wanted: the server's status ladder already
+   * treats Archived as staff-only, so it leaves the public site and every seller's catalogue
+   * the moment it is set — and lib/product-status.ts takes it out of the pickers, so nobody
+   * puts it on a new order. Everything that already names it still resolves.
+   */
+ const setProductStatus = (p: CatalogProduct, status: string) =>
+    persist((products ?? []).map((x) => (x.id === p.id ? { ...x, status } : x)))
 
   /** How many products still carry their make on the front of the name. Counted here so the
    *  button can say the number and stay away when there is nothing to do. */
@@ -452,20 +470,51 @@ export function ProductsCatalog() {
                 {/* image / placeholder */}
                 <div className="relative aspect-square overflow-hidden bg-white">
                   {/* Card actions — Design (everyone) + Edit/Delete (staff). */}
-                  <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
- onClick={(e) => { e.stopPropagation(); e.preventDefault(); router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`) }}
- title={tl("products", "Design this product")}
- className="flex size-7 items-center justify-center rounded-full bg-foreground/[0.08] text-foreground shadow hover:bg-primary/90"
-                    >
-                      <PenNib size={13} weight="bold" />
-                    </button>
-                    {isStaff && (
-                      <>
-                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditing(p); setEditorOpen(true) }} title={tl("products", "Edit")} className="flex size-7 items-center justify-center rounded-full bg-background text-foreground shadow hover:bg-accent"><PencilSimple size={13} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); deleteProduct(p.id) }} title={tl("products", "Delete")} className="flex size-7 items-center justify-center rounded-full bg-background text-muted-foreground shadow hover:text-alert"><Trash size={13} /></button>
-                      </>
-                    )}
+                  {/*
+                    * ONE TARGET, NOT THREE (owner, 2026-09-14: "too small too close to each other very
+                    * easy to misclick").
+                    *
+                    * Three 28px circles four pixels apart, on a photo, with Delete adjacent to Edit — and
+                    * the glyphs were a pen-nib and a pencil, two similar squiggles at 13px. A menu is one
+                    * 28px target with nothing to misclick BETWEEN, and its items carry words instead of
+                    * shapes you have to decode. `rounded-md` because a control is not round: §4 keeps
+                    * fully-round for count badges and avatars.
+                    */}
+                  <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        aria-label={tl("products", "Actions for this product")}
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault() }}
+                        className="grid size-7 place-items-center rounded-md bg-background text-foreground shadow transition-colors hover:bg-accent"
+                      >
+                        <DotsThree size={16} weight="bold" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-44">
+                        <DropdownMenuItem
+                          className="gap-2 text-xs"
+                          onClick={() => router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`)}
+                        >
+                          <PenNib size={14} /> {tl("products", "Design this product")}
+                        </DropdownMenuItem>
+                        {isStaff && (
+                          <DropdownMenuItem className="gap-2 text-xs" onClick={() => { setEditing(p); setEditorOpen(true) }}>
+                            <PencilSimple size={14} /> {tl("products", "Edit")}
+                          </DropdownMenuItem>
+                        )}
+                        {isStaff && (isArchived(p)
+                          ? (
+                            <DropdownMenuItem className="gap-2 text-xs" onClick={() => setProductStatus(p, "Active")}>
+                              <ArrowCounterClockwise size={14} /> {tl("products", "Restore to Active")}
+                            </DropdownMenuItem>
+                          ) : (
+                            /* Destructive in tone but not in effect — it is reversible by the item above,
+                               which is exactly why it can sit in a menu without a confirmation. */
+                            <DropdownMenuItem variant="destructive" className="gap-2 text-xs" onClick={() => setProductStatus(p, "Archived")}>
+                              <Archive size={14} /> {tl("products", "Archive")}
+                            </DropdownMenuItem>
+                          ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   {img ? (
                     /**
