@@ -91,7 +91,23 @@ type Opt = string | { value: string; label: string }
 const optValue = (o: Opt) => (typeof o === "string" ? o : o.value)
 const optLabel = (o: Opt) => (typeof o === "string" ? o : o.label)
 
+/**
+ * 1–20, AS A PICKER, on a column that is typed far more often than any other.
+ *
+ * Quantity is the one cell where the value is almost always a small number and almost
+ * always the same small number, so a list costs nothing and saves a keystroke on every
+ * line. 20 rather than 10 because a wholesale row goes past ten regularly and past twenty
+ * rarely — and past twenty the list stops helping anyway, which is the point below.
+ *
+ * IT DOES NOT RESTRICT THE CELL. Every cell here is an <input> and the menu is a suggestion
+ * list, not a <select>: type 250 and it takes 250, exactly as the colour and size columns
+ * behave. A quantity column that could only offer what it had guessed would be worse than
+ * no list at all.
+ */
+const QTY_OPTIONS = Array.from({ length: 20 }, (_, i) => String(i + 1))
+
 const FIXED_OPTIONS: Record<string, string[]> = {
+  item_quantity: QTY_OPTIONS,
   item_size: ITEM_SIZES,
   ship_state: US_STATES,
   print_type: COLUMN_OPTIONS.print_type ?? [],
@@ -907,8 +923,25 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
       window.removeEventListener("pointermove", move)
       window.removeEventListener("pointerup", up)
       const n = cellUnder(ev.clientX, ev.clientY)
-      setFillTo(null)
-      if (n && n.r >= from.r && n.c >= cHi && (n.r > from.r || n.c > cHi)) fillRange(from, n.r, n.c)
+      const dragged = !!n && n.r >= from.r && n.c >= cHi && (n.r > from.r || n.c > cHi)
+      /*
+       * THE FILLED BLOCK STAYS SELECTED, until something else is clicked.
+       *
+       * This cleared `fillTo` on release, which collapsed the rectangle back to the single
+       * anchor row the instant the pointer came up — so the thing you had just written
+       * stopped being selected at the exact moment you might want to copy it, clear it,
+       * or drag it further. Every sheet leaves the range live after a fill; that is what
+       * makes "fill, then keep going" one gesture instead of two.
+       *
+       * `fillTo` feeds nothing but selRect, so leaving it set means precisely "the
+       * selection is this rectangle" and nothing else changes behaviour. Both places that
+       * move the anchor already clear it, so the next click still resets cleanly.
+       *
+       * A MIS-GRAB STILL COLLAPSES: press and release without moving and there was no
+       * range, so the selection returns to the cell you were on.
+       */
+      if (dragged) { fillRange(from, n!.r, n!.c); setFillTo(n) }
+      else setFillTo(null)
     }
     window.addEventListener("pointermove", move)
     window.addEventListener("pointerup", up)
