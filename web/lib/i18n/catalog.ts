@@ -1393,6 +1393,7 @@ const vi: Dict = {
   "stores.Sync now": "Đồng bộ ngay",
   "stores.Syncing…": "Đang đồng bộ…",
   "stores.Cancel": "Huỷ",
+  "stores.Paused": "Tạm dừng",
   "stores.Coming soon": "Sắp có",
   "stores.Current": "Hiện tại",
   "stores.Recommended": "Nên chọn",
