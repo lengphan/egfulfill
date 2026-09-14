@@ -26,13 +26,14 @@ body {
 
 header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: center;
+  gap: 7px;
   margin-bottom: 14px;
 }
+.logo { display: block; border-radius: 5px; flex: none; }
 .mark { font-weight: 700; letter-spacing: -0.02em; }
-.who { font-size: 12px; color: var(--muted); }
+/* Pushed to the right edge by the mark, so the name and the logo stay one object. */
+.who { margin-left: auto; font-size: 12px; color: var(--muted); }
 
 label {
   display: block;

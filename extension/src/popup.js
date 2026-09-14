@@ -105,6 +105,30 @@ async function api(path, init) {
 
 /* ── the page ──────────────────────────────────────────────────────────────── */
 
+/**
+ * THE FOOTER IS A BUG REPORT, AND IT HAS TO FIT ON ONE LINE.
+ *
+ * It read `20 on page · 5 wanted · 5 usable · via json · v0.1.1` — five facts in a 288px
+ * strip, so it wrapped and the build number, the thing you look at to answer "did my change
+ * load", was the half that fell off the end.
+ *
+ * The one failure this line exists to make visible is a BROKEN SELECTOR on a page full of
+ * orders, so `seen` stays, always, and stays first. The rest earns its place: `unreadable`
+ * is the gap between what was found and what validated, and it is silent when there is no
+ * gap, which is every healthy page. The strategy prints as a bare word — `via` was four
+ * characters explaining a word that explains itself.
+ */
+function statsLine(s, toSend) {
+  const found = s.foundOnPage || 0
+  const bits = [`${found} seen`]
+  if (found) bits.push(`${toSend} to send`)
+  const bad = found - (s.usable || 0)
+  if (bad > 0) bits.push(`${bad} unreadable`)
+  if (s.how) bits.push(s.how)
+  bits.push(`v${chrome.runtime.getManifest().version}`)
+  return bits.join(' · ')
+}
+
 async function scan() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab || !/^https:\/\/www\.etsy\.com\/your\/orders/.test(tab.url || '')) {
@@ -167,9 +191,15 @@ async function scan() {
   if (!onPage.length) {
     ROWS = []
     $('count').textContent = 'Nothing to send from this page'
-    $('note').textContent = 'No orders found here. Open a page of your sold orders, or page through to older ones.'
+    /* FOUND-BUT-UNREADABLE IS NOT AN EMPTY PAGE, and this said "no orders found here" for
+       both — while the footer beside it reported `20 seen · 20 unreadable`, so the two
+       halves of the same panel disagreed. §4: if a thing can't be READ versus doesn't
+       EXIST, say which. */
+    $('note').textContent = (s.foundOnPage || 0) > 0
+      ? 'Orders are on this page but none of their addresses could be read — usually a non-US address, or one missing a street or city. Nothing was sent.'
+      : 'No orders found here. Open a page of your sold orders, or page through to older ones.'
     $('sync').disabled = true
-    $('stats').textContent = `${s.foundOnPage || 0} on page · 0 wanted · 0 usable · v${chrome.runtime.getManifest().version}`
+    $('stats').textContent = statsLine(s, 0)
     return
   }
 
@@ -197,7 +227,7 @@ async function scan() {
   /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
      broken selector hides for weeks. */
-  $('stats').textContent = `${s.foundOnPage || 0} on page · ${ROWS.length} wanted · ${s.usable || 0} usable${s.how ? ` · via ${s.how}` : ''} · v${chrome.runtime.getManifest().version}`
+  $('stats').textContent = statsLine(s, ROWS.length)
 }
 
 async function start() {

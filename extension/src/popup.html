@@ -2,12 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>EGFULFILL address sync</title>
+<title>EGFULFILL</title>
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <header>
-    <span class="mark">egful</span>
+    <!-- The app's own mark, the same file the PWA and the phone use. An extension with no
+         icon is a grey puzzle piece in the toolbar, which is indistinguishable from every
+         other unbranded extension a seller has installed. `alt` is empty on purpose: the
+         word beside it already names us, and a screen reader should not hear it twice. -->
+    <img class="logo" src="../icons/icon-48.png" alt="" width="18" height="18">
+    <span class="mark">EGFULFILL</span>
     <span class="who" id="who"></span>
   </header>
 
