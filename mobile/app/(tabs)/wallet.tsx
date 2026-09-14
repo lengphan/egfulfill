@@ -211,7 +211,11 @@ export default function Wallet() {
                   {new Date(item.created_at).toLocaleDateString()}
                 </Text>
               </View>
-              <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.ink }}>
+              {/* MONEY IN IS A DIFFERENT COLOUR FROM MONEY OUT. Both were ink, so the only
+                  thing separating a top-up from a charge was a sign one glyph wide, on the
+                  screen whose whole job is which way the money went. Green for arriving,
+                  which is what the web's ledger already does — 5.41:1 on this page. */}
+              <Text style={{ fontSize: 15, fontFamily: F.bold, color: d > 0 ? C.success : C.ink }}>
                 {d < 0 ? "−" : "+"}{money(Math.abs(d))}
               </Text>
             </View>
