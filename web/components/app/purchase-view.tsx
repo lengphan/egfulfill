@@ -412,10 +412,21 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  setPos((prev) => (prev ?? []).map((p) => (p.num === po.num ? { ...p, items } : p)))
  savePurchaseOrder({ ...po, items }).catch(() => {})
   }
- const setLineQty = (po: PurchaseOrder, sku: string, qty: number) =>
- patchPO(po, po.items.map((l) => (l.sku === sku ? { ...l, qty } : l)))
- const removeLine = (po: PurchaseOrder, sku: string) =>
- patchPO(po, po.items.filter((l) => l.sku !== sku))
+ /**
+  * A LINE IS A SKU **AND** A VARIANT, everywhere. 10 White/XL and 2 Black/S are two lines
+  * of one sku, which is the entire reason `lineKey` exists — and these two took a bare
+  * `sku`, so they hit every variant at once.
+  *
+  * That was not cosmetic. saveForLater called removeLine(po, l): it stripped every
+  * variant of that sku off the draft and then parked only the one you pressed, so the
+  * others were destroyed rather than saved. Taking the LINE makes the mistake unspellable.
+  */
+ const lineKey = (l: { sku?: string | null; variant?: string | null }) =>
+    `${String(l.sku ?? "").trim().toUpperCase()}|${String(l.variant ?? "").trim().toLowerCase()}`
+ const setLineQty = (po: PurchaseOrder, line: POLine, qty: number) =>
+ patchPO(po, po.items.map((l) => (lineKey(l) === lineKey(line) ? { ...l, qty } : l)))
+ const removeLine = (po: PurchaseOrder, line: POLine) =>
+ patchPO(po, po.items.filter((l) => lineKey(l) !== lineKey(line)))
 
   /** What a line is still waiting on, in the unit it was ORDERED in. */
  const owedOn = (l: POLine) => Math.max(0, (Number(l.qty) || 0) - (Number(l.received) || 0))
@@ -484,7 +495,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   }
   /** Pull a line OUT of the draft but keep it — the common "not this order, next one" case. */
  const saveForLater = (po: PurchaseOrder, l: POLine) => {
- removeLine(po, l.sku)
+ removeLine(po, l)
  if (saved.some((s) => lineKey(s) === lineKey(l))) return   // already parked, same sku AND variant
  putSaved([...saved, { ...l, supplier: po.supplier ?? null, savedAt: new Date().toISOString() }])
   }
@@ -496,7 +507,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  patchPO(target, hit
       ? target.items.map((x) => (lineKey(x) === lineKey(l) ? { ...x, qty: num(x.qty) + num(l.qty) } : x))
  : [...target.items, { sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty) || 1, price: l.price }])
- putSaved(saved.filter((s) => s.sku !== l.sku))
+ putSaved(saved.filter((s) => lineKey(s) !== lineKey(l)))
   }
   /** Merge lines into an existing set, combining quantities on a repeated sku. Pure, so
    * the "add items" path and the reorder path can't drift apart. */
@@ -517,8 +528,6 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * Trimmed and case-folded because "Black / 2XL" and "black / 2xl" are one variant typed
    * by two people, and treating them as two would split a line that should merge.
    */
- const lineKey = (l: { sku?: string | null; variant?: string | null }) =>
-    `${String(l.sku ?? "").trim().toUpperCase()}|${String(l.variant ?? "").trim().toLowerCase()}`
 
  const mergeLines = (existing: POLine[], add: POLine[]): POLine[] => {
  const next = existing.map((l) => ({ ...l }))
@@ -1053,8 +1062,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   // flight. Counting anything else makes the badge a claim you can't verify on screen.
  const activeCount = saved.length + placed.length
 
- const setSavedQty = (sku: string, qty: number) =>
- putSaved(saved.map((l) => (l.sku === sku ? { ...l, qty } : l)))
+ /* The LINE, not its sku — same reason as removeLine above: a sku alone retunes every
+     variant of it at once. */
+ const setSavedQty = (line: { sku?: string | null; variant?: string | null }, qty: number) =>
+ putSaved(saved.map((x) => (lineKey(x) === lineKey(line) ? { ...x, qty } : x)))
 
   /**
    * Place every group — one purchase order per supplier, in one action.
@@ -1995,7 +2006,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  setSplit(next)
  const sum = stock[l.sku].warehouses
                                           .reduce((a, x) => a + Number(next[`${l.sku}:${x.abbr}`] || 0), 0)
- if (sum > 0) setSavedQty(l.sku, sum)
+ if (sum > 0) setSavedQty(l, sum)
                                       }}
  placeholder="0"
  inputMode="numeric"
@@ -2021,7 +2032,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
                             <Input
  value={String(num(l.qty) || "")}
- onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+ onChange={(e) => setSavedQty(l, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
  placeholder="0"
  inputMode="numeric"
  aria-label={`Quantity to order from Otto for ${l.sku}`}
@@ -2035,7 +2046,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         ) : (
                           <Input
  value={String(num(l.qty))}
- onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+ onChange={(e) => setSavedQty(l, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
  inputMode="numeric" className="h-8 w-20 text-center text-sm tabular-nums"
  aria-label={`Quantity of ${l.sku}`}
                           />
@@ -2065,7 +2076,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           </span>
                         )
                       })()}
-                      <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))}
+                      <button onClick={() => putSaved(saved.filter((s) => lineKey(s) !== lineKey(l)))}
  className="self-center text-muted-foreground hover:text-alert" title={tl("purchase", "Drop — not ordering this")}>
                         <Trash size={14} />
                       </button>
@@ -2075,8 +2086,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                      {g.api === "ss" && stock[l.sku] && (
                        <StockSplitWarning
  qty={num(l.qty)} stock={stock[l.sku]} transit={transit} now={now || Date.now()}
- onReduce={(q) => setSavedQty(l.sku, q)}
- onSaveForLater={() => putSaved(saved.filter((x) => x.sku !== l.sku))}
+ onReduce={(q) => setSavedQty(l, q)}
+ onSaveForLater={() => putSaved(saved.filter((x) => lineKey(x) !== lineKey(l)))}
                        />
                      )}
                     </div>
