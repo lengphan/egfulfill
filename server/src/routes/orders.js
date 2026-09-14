@@ -1690,7 +1690,12 @@ export function ordersRoutes(app, requireAuth) {
   }
 
   app.get('/api/orders/:id', { preHandler: requireAuth }, async (req, reply) => {
-    const agg = `coalesce(json_agg(i.* order by i.id) filter (where i.id is not null), '[]') as items`;
+/* BY WHEN THE LINE WAS ADDED. `id` is gen_random_uuid(), so ordering by it is ordering
+       by a random number: an item added to an order landed wherever its uuid happened to sort,
+       and a line added last routinely became Item 1. created_at is the fact the numbering is
+       claiming; id stays as the tiebreak so the order is still total for rows written in the
+       same tick. */
+        const agg = `coalesce(json_agg(i.* order by i.created_at, i.id) filter (where i.id is not null), '[]') as items`;
     // Have the blanks for this order gone to a supplier? It is what decides whether an
     // admin may still correct a variant — see the item-setup route.
     const placedPO = `exists (
@@ -1876,7 +1881,7 @@ export function ordersRoutes(app, requireAuth) {
           -- img / img_ref: see the note above the query.
           'img',     case when i.img like 'data:%' then null else i.img end,
           'img_ref', case when i.img like 'data:%' then '/api/order_items/' || i.id::text || '/img' else null end
-        ) order by i.id) filter (where i.id is not null), '[]'::jsonb) as items`;
+        ) order by i.created_at, i.id) filter (where i.id is not null), '[]'::jsonb) as items`;
     // Does this order have a machine file (a .pes/.emb) already? The Design readiness tag
     // flips to "done" on one, but the full file list is only fetched when a row is expanded
     // — so on a collapsed row the tag couldn't tell, and an order with an uploaded .emb read
@@ -2572,7 +2577,7 @@ export function ordersRoutes(app, requireAuth) {
     const ITEM_COLS = 'line_id, sku, name, qty, color, size, variant, print_type, blank, unit_price, unit_cost, ship_fee';
     let itemsBefore = null;
     if (wantsItems) {
-      itemsBefore = await q(`select ${ITEM_COLS} from order_items where order_id=$1 order by id`, [req.params.id])
+      itemsBefore = await q(`select ${ITEM_COLS} from order_items where order_id=$1 order by created_at, id`, [req.params.id])
         .then((r) => lineSnap(r.rows)).catch(() => null);
     }
     if (wantsItems) {
