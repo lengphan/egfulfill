@@ -1864,7 +1864,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                   /* The strip used to fall silent when nothing was priced — the absence of a
                      figure read as "no figure fits here", not as "we do not have one". */
                   <span className="ml-1 font-medium text-hold">
-                    · {unpricedLines}{tl("purchase", " unpriced")}
+                    · {tl("purchase", "{n} unpriced").replace("{n}", String(unpricedLines))}
                   </span>
                 )}
               </span>
@@ -2112,7 +2112,14 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           <dd className="shrink-0 tabular-nums">
                             {g.total > 0 ? usd(g.total) : <span className="text-muted-foreground">—</span>}
                             {g.unpriced > 0 && g.total > 0 && (
-                              <span className="ml-1 text-2xs font-normal text-hold">{tl("purchase", "+")}{g.unpriced}{tl("purchase", " unpriced")}</span>
+                              /* ONE WHOLE STRING, not "+" and " unpriced" concatenated around a
+                                 number. `tl` has no interpolation, so a sentence split across
+                                 calls leaves a translator three fragments with no way to see
+                                 the order they go in — and Vietnamese does not put them in
+                                 that order anyway. */
+                              <span className="ml-1 text-2xs font-normal text-hold">
+                                {tl("purchase", "+{n} unpriced").replace("{n}", String(g.unpriced))}
+                              </span>
                             )}
                           </dd>
                         </div>
@@ -2153,7 +2160,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                     <p className="text-2xs font-medium text-hold">
                       {unpricedLines === 1
                         ? tl("purchase", "1 line has no price — it is not in the supplier catalogue we synced, so this total is not what you will be billed.")
-                        : `${unpricedLines}${tl("purchase", " lines have no price — they are not in the supplier catalogue we synced, so this total is not what you will be billed.")}`}
+                        : tl("purchase", "{n} lines have no price — they are not in the supplier catalogue we synced, so this total is not what you will be billed.").replace("{n}", String(unpricedLines))}
                     </p>
                   ) : (
                     <p className="text-2xs text-muted-foreground">
