@@ -47,6 +47,20 @@ const fmtDT2 = (s?: string | null) => { if (!s) return "—"; const d = new Date
  * belong to. Staff only, and read-only — approving still happens in the queue above, because
  * a list you can act on from two places is one that gets acted on twice.
  */
+/* The word says what happened to the money; the tone says whether it is finished. Not a
+   filled pill on every row — these are four states of one fact, and only two need reading
+   twice (§4).
+   AT MODULE SCOPE because the transaction history asks the same question: a top-up that
+   never reached the ledger is merged into that table, and a second copy of these four words
+   is how the two tabs start disagreeing about what `abandoned` is called. */
+const TOPUP_TONE: Record<string, string> = {
+  received: STATUS_TONE.settled, pending: STATUS_TONE.live,
+  rejected: STATUS_TONE.attention, abandoned: STATUS_TONE.settled,
+}
+const TOPUP_WORD: Record<string, string> = {
+  received: "Credited", pending: "Awaiting review", rejected: "Rejected", abandoned: "Not paid",
+}
+
 function TopupHistory() {
   const tl = useLabelT()
  const fmtDT = useDateFormat()
@@ -55,16 +69,8 @@ function TopupHistory() {
  const t = setTimeout(() => { getTopups().then((r) => setRows(r ?? [])).catch(() => setRows([])) }, 0)
  return () => clearTimeout(t)
   }, [])
-  /* The word says what happened to the money; the tone says whether it is finished. Not a
-     filled pill on every row — these are four states of one fact, and only two need reading
-     twice (§4). */
- const TONE: Record<string, string> = {
- received: STATUS_TONE.settled, pending: STATUS_TONE.live,
- rejected: STATUS_TONE.attention, abandoned: STATUS_TONE.settled,
-  }
- const WORD: Record<string, string> = {
- received: "Credited", pending: "Awaiting review", rejected: "Rejected", abandoned: "Not paid",
-  }
+ const TONE = TOPUP_TONE
+ const WORD = TOPUP_WORD
  return (
     /* `gap-0 p-0`, matching the Transaction history card beside it. A bare Card carries
        py-5, and a table is edge-to-edge content — so the default left a 20px band of card
@@ -412,7 +418,12 @@ function txMeta(type: string, delta: number): { label: string; tone: string } {
  const EM = CATEGORY_TONE, MUT = CATEGORY_TONE, AM = CATEGORY_TONE
  if (t === "order-charge-in") return { label: "Revenue", tone: EM }
  if (t === "order-charge-out" || t === "charge") return { label: "Order", tone: MUT }
- if (t === "topup") return { label: "Deposit", tone: EM }
+ /* "Top-up", not "Deposit". The same money is read in three places — this ledger row, the
+     Top-ups tab, and the requests merged into the history below — and it wore two different
+     words depending on which one you were looking at. The pill is the category, so it says
+     what KIND of movement this is, and a credited top-up and a pending one are the same
+     kind. What separates them is the description, which carries the state. */
+ if (t === "topup") return { label: "Top-up", tone: EM }
  if (t.startsWith("order-refund")) return { label: "Refund", tone: EM }
  if (t === "blanks-cost") return { label: "Blanks", tone: AM }
  if (t === "label-cost") return { label: "Postage", tone: AM }
@@ -457,6 +468,7 @@ function txMeta(type: string, delta: number): { label: string; tone: string } {
 function txLabelKeys(tl: (ns: string, s: string) => string) {
  return {
     Revenue: tl("wallet", "Revenue"), Order: tl("wallet", "Order"), Deposit: tl("wallet", "Deposit"),
+    "Top-up": tl("wallet", "Top-up"),
     Refund: tl("wallet", "Refund"), Blanks: tl("wallet", "Blanks"), Postage: tl("wallet", "Postage"),
     Design: tl("wallet", "Design"), Dispatch: tl("wallet", "Dispatch"), Sample: tl("wallet", "Sample"),
     AI: tl("wallet", "AI"), Payout: tl("wallet", "Payout"), Income: tl("wallet", "Income"),
@@ -467,7 +479,7 @@ function txLabelKeys(tl: (ns: string, s: string) => string) {
 
 type Row = {
  id: string
-  /** Sort key for merging non-ledger entries (rejected top-ups) into the history. */
+  /** Sort key for merging non-ledger entries (top-up requests) into the history. */
  at?: number
  date: string
  desc: string
@@ -480,6 +492,11 @@ type Row = {
  label: string
  tone: string
  rejected?: boolean
+  /** Listed here, but it did not move THIS balance — a top-up awaiting review, or one that
+   * credited a seller and is being read on the factory ledger. The amount is shown unsigned
+   * and both balance columns print "—": inventing a running balance for money that did not
+   * pass through this account is what stops the column reconciling. */
+ noMovement?: boolean
   /** Marked as not-real-money. Still listed — you cannot unmark what you cannot see — but
    * struck through and excluded from every total. */
  isTest?: boolean
@@ -646,44 +663,82 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  const [pending, setPending] = useState<TopupRequest[]>([])
   /* Which row is being cleared, so its own button greys rather than the whole list. */
  const [dismissing, setDismissing] = useState<string | null>(null)
-  // Kept so the attempt is still on the record — a rejected top-up never touches the
-  // ledger, so without this it would disappear from the app entirely once it left the
-  // banner, and "I definitely tried to pay" would have nothing behind it.
- const [rejected, setRejected] = useState<TopupRequest[]>([])
+  /* EVERY top-up, whatever became of it — the history below merges the ones the ledger
+     does not carry. It was `rejected` alone, kept so a refused attempt was still on the
+     record; the same argument applies to one that is still awaiting review, and on the
+     FACTORY ledger to a credited one, which lands in a seller's wallet and so never appears
+     in this account's rows at all. That is why the tab beside this one existed. */
+ const [topups, setTopups] = useState<TopupRequest[]>([])
+
+  // Admin and warehouse share the FACTORY wallet, which is a pure internal ledger — there
+  // is nothing to withdraw from it and no bank/card account to link, so those controls are
+  // hidden for them. Sellers keep Withdraw, which now opens the payout flow.
+   const isFactoryWallet = getUser()?.role === "admin"
+  // DECLARED HERE, ABOVE THE HISTORY that reads it — it used to sit further down, beside
+  // the controls it gates. The merged top-up rows name their seller only on the factory
+  // ledger, so the history needs it first.
 
   /**
-   * History = the ledger, plus rejected top-up ATTEMPTS.
+   * HISTORY = THE LEDGER, PLUS EVERY TOP-UP THE LEDGER DOES NOT CARRY.
    *
-   * A rejected top-up never credits the wallet, so it has no ledger row — it existed
-   * only in the banner above, and filtering it out of there would have erased it from
-   * the app completely. It belongs in the record: someone who paid and was refused
-   * needs to see that the attempt was seen and declined.
+   * It used to merge REJECTED attempts only, so that a refused payment was still on the
+   * record rather than vanishing when it left the banner. The same argument covers the rest
+   * of them, and there were two whole states this table could not show:
    *
-   * Its amount is shown for reference but carries NO balance movement, and the running
-   * balance column repeats the balance of the row before it — inventing a balance for a
-   * transaction that never happened would make the column stop reconciling.
+   *   pending    — asked for, no decision yet, so no ledger row exists
+   *   received   — credited the SELLER's wallet. On the FACTORY ledger that is a different
+   *                account, so it has never appeared in these rows at all. That is what the
+   *                Top-ups tab was for, and why reading this table felt incomplete.
+   *
+   * A credited top-up read on the seller's OWN wallet is already a ledger row, so merging it
+   * again would print it twice. The dedupe is the ledger's own ref: confirm writes the
+   * wallet_ledger row with `ref` = the top-up id (that is what makes it idempotent), so a
+   * request whose id is already a ref in this account's rows is one this table has.
+   *
+   * NONE OF THE MERGED ROWS MOVE THE BALANCE, whatever their state — either the money has
+   * not moved yet, or it moved through an account this ledger is not. So they carry
+   * `noMovement`: the amount is unsigned and both balance columns print "—", exactly as the
+   * rejected rows already did, and the running balance keeps reconciling.
+   *
+   * THE PILL IS THE CATEGORY, NOT THE STATE. Every one of them says "Top-up" in the plain
+   * CATEGORY_TONE the rest of the column uses; the state is a word in the description, from
+   * the same TOPUP_WORD the Top-ups tab reads. The rejected rows used to carry an `alert`
+   * tone here, which is a status colour in a column that this file's own note says is about
+   * what KIND of row it is, never what state it is in.
    */
  const histRows = useMemo(() => {
  const base = view?.rows ?? []
- if (!rejected.length) return base
- const extra: Row[] = rejected.map((r) => ({
- id: `rejected-${r.id}`,
- date: fmtDate(r.created_at, { month: "short", day: "2-digit" }),
- desc: `Top-up declined${r.method ? ` · ${r.method}` : ""}`,
+ if (!topups.length) return base
+    // Ledger refs, so a top-up this account already booked is not listed a second time.
+ const booked = new Set(base.map((r) => r.refFull || r.ref).filter(Boolean))
+ const extra: Row[] = topups.filter((r) => !booked.has(String(r.id))).map((r) => ({
+ id: `topup-${r.id}`,
+      /* WHEN IT WAS DECIDED, else when it was asked for — the same pair the Top-ups tab
+         shows, so a row does not sit at a different date in the two places. */
+ date: fmtDate(r.confirmed_at || r.created_at, { month: "short", day: "2-digit" }),
+      /* The state, then WHOSE it was. The seller is only worth a line on the factory
+         ledger: on a seller's own wallet every row is theirs, and naming them on each one
+         is a column of the same words. */
+ desc: [tl("wallet", TOPUP_WORD[r.status] ?? r.status),
+ isFactoryWallet ? (r.seller_name || r.seller_email || null) : null]
+        .filter(Boolean).join(" · "),
  ref: r.ref || "",
+ refFull: r.ref || "",
  method: r.method || "—",
- label: tl("wallet", "Declined"),
- tone: "bg-alert/12 text-alert",
- rejected: true,
+ label: "Top-up",
+ tone: CATEGORY_TONE,
+ rejected: r.status === "rejected",
+ noMovement: true,
  amount: Number(r.amount_usd) || 0,
- balance: NaN,          // no movement — rendered as "—" rather than a made-up figure
- at: new Date(r.created_at).getTime(),
+ balance: NaN,          // no movement in THIS ledger — rendered as "—", never a made-up figure
+ at: new Date(r.confirmed_at || r.created_at).getTime(),
     }))
+ if (!extra.length) return base
     // Sort by REAL timestamp. An earlier version keyed ledger rows off their index,
-    // which always outranked a genuine date and pinned every rejected attempt to the
+    // which always outranked a genuine date and pinned every merged row to the
     // bottom regardless of when it happened.
  return [...base, ...extra].sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
-  }, [view?.rows, rejected])
+  }, [view?.rows, topups, fmtDate, tl, isFactoryWallet])
 
   /**
    * NARROWING THE LEDGER.
@@ -729,6 +784,12 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
 
  const shownRows = useMemo(() => histRows.filter((r) => {
  if (txType && r.label !== txType) return false
+ /* A ROW THAT MOVED NOTHING IS NEITHER. "Money in" used to match a rejected attempt,
+    because its amount is stored positive — so filtering for money that arrived listed a
+    payment that was refused. Now that pending and credited-elsewhere top-ups are merged
+    too, that would have been three states of not-arrived answering a question about
+    arrival. */
+ if (txDir && r.noMovement) return false
  if (txDir === "in" && !(r.amount > 0)) return false
  if (txDir === "out" && !(r.amount < 0)) return false
  if (txAcct === "__none" && r.cashAccount) return false
@@ -742,10 +803,6 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  const [payoutOpen, setPayoutOpen] = useState(false)
   // The row a staff/seller clicked to inspect — full detail for an audit/check-up.
  const [detail, setDetail] = useState<Row | null>(null)
-  // Admin and warehouse share the FACTORY wallet, which is a pure internal ledger — there
-  // is nothing to withdraw from it and no bank/card account to link, so those controls are
-  // hidden for them. Sellers keep Withdraw, which now opens the payout flow.
-   const isFactoryWallet = getUser()?.role === "admin"
 
  /* Dismiss, never delete — the ref stays live and a late payment still credits. The row
      is dropped locally as well as refetched, so it goes on the click rather than on the
@@ -795,9 +852,9 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
          * rubbish. It is the one thing on this page they can still act on.
          */
  setPending(all.filter((r) => r.status === "pending" || r.status === "abandoned"))
- setRejected(all.filter((r) => r.status === "rejected"))
+ setTopups(all)
       })
-      .catch(() => setPending([]))
+      .catch(() => { setPending([]); setTopups([]) })
   }, [isFactoryWallet])
  useEffect(() => {
  const id = setTimeout(() => {
@@ -953,8 +1010,8 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <Badge className={detail.tone} variant="secondary">{tl("wallet", detail.label)}</Badge>
-                <span className={"text-lg font-semibold tabular-nums " + (detail.rejected ? "text-muted-foreground line-through" : detail.amount >= 0 ? "text-success" : "text-foreground")}>
-                  {usd(detail.amount, !detail.rejected)}
+                <span className={"text-lg font-semibold tabular-nums " + (detail.rejected ? "text-muted-foreground line-through" : detail.noMovement ? "text-foreground" : detail.amount >= 0 ? "text-success" : "text-foreground")}>
+                  {usd(detail.amount, !detail.rejected && !detail.noMovement)}
                 </span>
               </div>
               <dl className="divide-y divide-border rounded-lg border border-border text-sm">
@@ -1224,7 +1281,14 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  stopPropagation throughout, because the row itself opens a dialog.
                           Marked money is excluded from the balance and every total, and the
  row stays put so the decision can be undone. */}
-                      {isAdmin && !t.rejected ? (
+                      {/* NOT ON A ROW THAT IS NOT A LEDGER ROW. This select attributes an
+                          entry to a cash account, or marks it a test — both are writes
+                          against a `wallet_ledger` id, and a merged top-up's id is
+                          `topup-<request id>`, which is not one. It was guarded on
+                          `!t.rejected` alone, which was enough while rejected attempts were
+                          the only merged rows; a pending or credited-elsewhere top-up would
+                          have offered a control that posts an id the ledger has never seen. */}
+                      {isAdmin && !t.rejected && !t.noMovement ? (
                         <select
  value={t.cashAccount ?? ""}
  disabled={markingId === t.id}
@@ -1264,12 +1328,16 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                       "text-right font-semibold tabular-nums " +
                       (t.rejected
                         ? "text-muted-foreground line-through"
+                        /* Not green. Success green on this column means "this balance went
+                           up", and a top-up awaiting review or credited to a seller's wallet
+                           did not move this one. Plain ink, unsigned. */
+                        : t.noMovement ? "text-foreground"
  : t.amount >= 0 ? "text-success" : "text-foreground")
                     }
                   >
                     {/* No +/- on a declined attempt: the sign says which way money moved,
  and it did not move. Struck-through, unsigned, no balance. */}
-                    {usd(t.amount, !t.rejected)}
+                    {usd(t.amount, !t.rejected && !t.noMovement)}
                   </TableCell>
                   {/* Balance before this entry = balance after − the amount it moved. Both
  dashes for a declined attempt, which never moved money. */}
@@ -1295,8 +1363,10 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             <TabsList>
               <TabsTrigger value="transactions">{tl("wallet", "Transaction history")}</TabsTrigger>
               <TabsTrigger value="partners">{tl("wallet", "Partner history")}</TabsTrigger>
-              {/* Beside the ledger, not inside it: a top-up credits the SELLER's ledger, so it
-                  never appears in this one and had nowhere else to be read. */}
+              {/* THE HISTORY CARRIES THESE NOW — every top-up the ledger does not book is
+                  merged into it, so the first tab is the whole account. This one stays
+                  because it answers a narrower question with columns that table has no room
+                  for: seller, method, reference and status, each in its own column. */}
               <TabsTrigger value="topups">{tl("wallet", "Top-ups")}</TabsTrigger>
             </TabsList>
             {exportBtn}
