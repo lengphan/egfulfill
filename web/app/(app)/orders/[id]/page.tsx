@@ -911,6 +911,74 @@ export default function OrderDetailPage() {
    * fees); after, the ledger's itemised parts and any refund. Two copies of either list is
    * how the two views come to disagree about what an order cost.
    */
+  /**
+   * WHICH FACES ADDED MONEY TO A LINE — ONE FUNCTION, BOTH BRANCHES.
+   *
+   * These rows existed only on the QUOTE (added 2026-09-10: "the summary table right now
+   * doesn't show extra surface cost of which item"). The moment an order is charged this
+   * card switches to `chargedRows`, which maps ledger entries and has no per-face detail —
+   * so the explanation disappeared exactly when a seller is most likely to go looking for
+   * it. Measured on a real order: two lines printing front+left and front+back, $3.00 each,
+   * both genuinely billed inside the frozen unit cost, and nothing on the charged card able
+   * to say so. Base cost simply read $88.69.
+   *
+   * AFTER THE CHARGE THE ROWS COME WITH A CONDITION, and it is the whole reason this is not
+   * just `quoteRows`' block moved somewhere shared. `sideParts` is priced off the artwork
+   * that is on the garment NOW, and a face added after submit deliberately does not re-price
+   * a paid order (see priceLines). So on a charged order the breakdown is only allowed to
+   * name faces when what it describes is what was billed: `sideFeeCharged` is the side money
+   * actually inside the frozen cost, and the two have to agree.
+   *
+   * They don't always, and that case gets a row of its own rather than silence — "the
+   * artwork changed after this was charged" is the answer to the question, and §4 forbids
+   * rendering "cannot say" and "nothing here" the same way.
+   */
+ const sideRowsFor = (l: NonNullable<OrderQuote["lines"]>[number], i: number, charged: boolean) => {
+ const parts = l.sideParts?.parts ?? []
+ if (!parts.length) return []
+ const qty = Number(l.qty) || 1
+    /* BY LINE ID, which is the only thing that identifies one line.
+       This matched on SKU and fell through to a bare "Item": sku is null on a manual line,
+       so the lookup never hit — and on an order with two lines of the same SKU it would have
+       hit the WRONG one, which is the sibling bug CLAUDE.md §5 describes. sku stays as the
+       fallback for rows written before line_id existed. */
+ const n = items.findIndex((x) =>
+      (l.line_id && x.line_id === l.line_id)
+      || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+ const who = n > 0 ? `Item ${n}` : (l.name || l.sku || "Item")
+ if (charged) {
+ const paid = l.sideFeeCharged
+      // The catalogue could not give a base cost, so there is nothing to subtract and
+      // nothing we can honestly say about this line's faces.
+ if (paid == null) return []
+ if (Math.abs(paid - (Number(l.sideFee) || 0)) > 0.005) {
+        return [(
+          <div key={`side-${i}-moved`} className="flex justify-between">
+            <dt className="pl-3 text-muted-foreground">
+              {who}
+              <span className="opacity-70"> · {tl("orders", "extra faces")}</span>
+              <div className="text-2xs leading-snug opacity-70">
+                {tl("orders", "The artwork changed after this was charged — this is what was billed.")}
+              </div>
+            </dt>
+            <dd className="tabular-nums text-muted-foreground">{usd(paid * qty)}</dd>
+          </div>
+        )]
+      }
+    }
+ return parts.map((p, j) => (
+      <div key={`side-${i}-${j}`} className="flex justify-between">
+        <dt className="pl-3 text-muted-foreground">
+          {who}
+          <span className="opacity-70">
+            {" · "}<span className="capitalize">{tl("sides", p.face)}</span>
+            {qty > 1 ? ` × ${qty}` : ""}
+          </span>
+        </dt>
+        <dd className="tabular-nums text-muted-foreground">{usd(p.amount * qty)}</dd>
+      </div>
+    ))
+  }
  const quoteRows = quote ? (
     <>
                     {/* BASE COST, the same word the product editor uses for this number —
@@ -950,33 +1018,7 @@ export default function OrderDetailPage() {
                         answer it from the card. The per-face figures come off the quote
                         (`sideParts`, computed by the same function as `sideFee`), so the
                         breakdown can never disagree with the charge. */}
-                    {(quote.lines ?? []).flatMap((l, i) => {
-                      const parts = l.sideParts?.parts ?? []
-                      if (!parts.length) return []
-                      const qty = Number(l.qty) || 1
-                      /* BY LINE ID, which is the only thing that identifies one line.
-                         This matched on SKU and fell through to a bare "Item": sku is null on
-                         a manual line, so the lookup never hit — and on an order with two
-                         lines of the same SKU it would have hit the WRONG one, which is the
-                         sibling bug CLAUDE.md §5 describes. sku stays as the fallback for
-                         rows written before line_id existed. */
-                      const n = items.findIndex((x) =>
-                        (l.line_id && x.line_id === l.line_id)
-                        || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
-                      const who = n > 0 ? `Item ${n}` : (l.name || l.sku || "Item")
-                      return parts.map((p, j) => (
-                        <div key={`side-${i}-${j}`} className="flex justify-between">
-                          <dt className="pl-3 text-muted-foreground">
-                            {who}
-                            <span className="opacity-70">
-                              {" · "}<span className="capitalize">{tl("sides", p.face)}</span>
-                              {qty > 1 ? ` × ${qty}` : ""}
-                            </span>
-                          </dt>
-                          <dd className="tabular-nums text-muted-foreground">{usd(p.amount * qty)}</dd>
-                        </div>
-                      ))
-                    })}
+                    {(quote.lines ?? []).flatMap((l, i) => sideRowsFor(l, i, false))}
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">
                         Shipping
@@ -1314,6 +1356,15 @@ export default function OrderDetailPage() {
                           <dd className="tabular-nums text-success">−{usd(refundByPart.onLine.get(i) ?? 0)}</dd>
                         </div>
                       )}
+                      {/* WHICH FACES ARE INSIDE THIS NUMBER. The goods line is one figure and
+                          the per-side charge is part of it — unitCostOf returns base + method
+                          + sides as a single unit cost — so a two-sided line raised the amount
+                          with nothing on the charged card able to say why. The quote has said
+                          which faces since 2026-09-10 and this branch never did, so the
+                          explanation vanished at the exact moment the money became real.
+                          Same function as the quote's, and only under the goods: a design fee
+                          or a postage charge has no faces. */}
+                      {l.part === "product" && (quote?.lines ?? []).flatMap((ql, qi) => sideRowsFor(ql, qi, true))}
                       </Fragment>
                       )
                     ))}

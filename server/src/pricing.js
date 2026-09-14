@@ -878,6 +878,23 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                  /* The COUNT stays on the line for every reader that has one, and the NAMES
                     ride beside it so a breakdown can say which face cost what. */
                  sides, faces, sideFee: money(sideAddOn(faces, fees, (srow && srow.data) || null)),
+                 /**
+                  * WHAT THE EXTRA FACES ACTUALLY CONTRIBUTED TO THE PRICE THIS LINE CARRIES,
+                  * as against what they would cost if it were quoted today.
+                  *
+                  * `sideFee` above is computed from the artwork that is on the garment NOW.
+                  * On a FROZEN line that is not necessarily what was billed: `cost` came from
+                  * the stored unit_cost, and the note at the top of this loop is explicit that
+                  * a face added after submit must not re-price a paid order. So the two can
+                  * legitimately disagree, and a summary reading `sideFee` after the charge
+                  * would name a face the seller was never charged for.
+                  *
+                  * unitCostOf is base + method + sides, so whatever the frozen cost carries
+                  * over base+method IS the side money, exactly. Null when the catalogue cannot
+                  * give us a base — "we cannot tell" is not "nothing", and §4 forbids drawing
+                  * them the same.
+                  */
+                 sideFeeCharged: parts.base == null ? null : money(cost - parts.base - (parts.method || 0)),
                  /* WHICH face cost what, so the summary can name them instead of saying
                     "2 sides" and leaving the reader to guess which one carried the money. */
                  sideParts: sideBreakdown(faces, fees, (srow && srow.data) || null),
