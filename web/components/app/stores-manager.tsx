@@ -64,8 +64,28 @@ function useFmtDate() {
 // normalise the INK instead of the file: ~28-30px of mark for the single-line wordmarks,
 // more for Amazon to cancel its padding, more again for TikTok so the word under its icon
 // stays legible. Re-measure before changing one; don't eyeball it.
-const CHANNELS: { key: string; name: string; live: boolean; soon?: string; markH: number }[] = [
-  { key: "etsy", name: "Etsy", live: true, markH: 32 },
+const CHANNELS: { key: string; name: string; live: boolean; soon?: string; why?: string; markH: number }[] = [
+  /**
+   * ETSY IS WITHDRAWN, TEMPORARILY, AND IT IS NOT "not built" — that is the whole reason it
+   * carries its own label instead of the default "Coming soon".
+   *
+   * The connector works. What does not work yet is the ORDER it produces: Etsy's app-tier
+   * PII gate strips the buyer's street and ZIP from what their API returns us, so a shop
+   * connected today imports orders nobody can ship, and the seller finds that out one order
+   * at a time. The browser extension is the answer — it reads the address off the seller's
+   * own Shop Manager page, which Etsy does show them — and it is not rolled out yet.
+   * Offering Connect before it is, is offering a broken shop.
+   *
+   * TO PUT IT BACK: `live: true`, and drop `soon`/`why`. One line, and nothing else in this
+   * file or the server knows about it.
+   *
+   * IT DOES NOT TOUCH ANY CONNECTED SHOP (§2.6). `live` drives this card's button and the
+   * two count tiles at the top, nothing else. Shops already connected keep their row above,
+   * keep syncing, and keep their Disconnect button; this only stops NEW connections.
+   */
+  { key: "etsy", name: "Etsy", live: false, soon: "Paused",
+    why: "Etsy connect is paused while we finish the address extension — their API withholds the buyer's street, so orders would arrive unshippable.",
+    markH: 32 },
   { key: "tiktok", name: "TikTok Shop", live: true, markH: 46 },
   { key: "shopify", name: "Shopify", live: true, markH: 28 },
   { key: "woocommerce", name: "WooCommerce", live: false, markH: 27 },
@@ -570,8 +590,19 @@ export function StoresManager() {
                   {busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect") ? tl("stores", "Connecting…") : tl("stores", "Connect")}
                 </Button>
               ) : (
-                <span className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-dashed border-border px-3 text-center text-xs font-medium text-muted-foreground">
-                  {ch.soon ?? tl("stores", "Coming soon")}
+                /* A REFUSAL CARRIES ITS REASON (§4). "Coming soon" on a channel that was
+                   working yesterday is the kind of thing a seller asks support about, so the
+                   pill takes a `title` when the channel has one. The pill itself stays one
+                   short word — it sits in a 5-unit-wide card and the sentence does not fit. */
+                <span
+                  title={ch.why}
+                  className={"mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-dashed border-border px-3 text-center text-xs font-medium text-muted-foreground" + (ch.why ? " cursor-help" : "")}
+                >
+                  {/* BOTH LITERALS, not `tl("stores", ch.soon)`. A variable key works at
+                      runtime but the i18n scanner cannot see it, so the string silently never
+                      gets a Vietnamese entry AND the gate reports 100% — the worst of both.
+                      Spelling both out keeps them extractable. */}
+                  {ch.soon === "Paused" ? tl("stores", "Paused") : tl("stores", "Coming soon")}
                 </span>
               )}
             </motion.div>
