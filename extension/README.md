@@ -40,14 +40,14 @@ always the code on disk, never a copy Chrome injected before the last reload.
 5. **Sync addresses**
 
 No need to reload the Etsy tab after updating the extension — the reader is injected when
-you open the popup, so it is always the current build. The footer prints that build (`v0.1.2`)
+you open the popup, so it is always the current build. The footer prints that build (`v0.1.3`)
 so "did my change load" is a question you can answer by looking.
 
 Page through your orders and press Sync again on each page. Nothing is sent automatically.
 
 ## Reading the footer
 
-A healthy page reads `20 seen · 5 to send · json · v0.1.2`, and it is the first thing to look
+A healthy page reads `20 seen · 5 to send · json · v0.1.3`, and it is the first thing to look
 at when something seems wrong. Every part but `seen` and the build is conditional — a fact
 appears only when it has something to say:
 

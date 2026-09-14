@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "EGFULFILL",
-  "version": "0.1.2",
+  "name": "egful",
+  "version": "0.1.3",
   "description": "Send buyer addresses from your own Etsy Shop Manager page to EGFULFILL, so your orders can be labelled.",
   "permissions": [
     "storage",
@@ -27,6 +27,6 @@
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     },
-    "default_title": "EGFULFILL — Etsy address sync"
+    "default_title": "egful — Etsy address sync"
   }
 }
