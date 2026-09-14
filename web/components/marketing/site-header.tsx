@@ -38,6 +38,7 @@ const nav = [
  * transparent version wrong in the first place — and the buttons keep one look throughout.
  */
 import { Wordmark } from "@/components/marketing/wordmark"
+import { GUTTER } from "@/components/marketing/ploy/rhythm"
 
 export function SiteHeader() {
   /**
@@ -72,8 +73,14 @@ export function SiteHeader() {
   return (
     /* FIXED, NOT IN FLOW — the capsule has to travel over the coloured blocks for the trick
        below to mean anything, and the home page's hero starts at the top of the viewport. */
-    <header className="fixed inset-x-0 top-0 z-50 px-6 py-4 md:px-8">
-      <div className="flex items-center justify-between gap-4">
+    <header className="fixed inset-x-0 top-0 z-50 py-4">
+      {/* THE SAME 1480px CONTAINER AS EVERY BAND. The header stays edge-to-edge — it is
+          `fixed inset-x-0` and its ground is transparent — but its CONTENTS sit in the page's
+          container, so the mark and the buttons land on the same left and right edges as the
+          blocks underneath them. Without this the capsule floated at the far left of a 2,560px
+          screen while the page it belonged to was centred 565px in, and the two halves of the
+          header were further apart than anything they sat above. */}
+      <div className={`${GUTTER} flex items-center justify-between gap-4`}>
         {/* THE CAPSULE, and it is the whole header idea.
             The bar itself is transparent and never changes at any scroll position. The menu
             sits in a fully-round capsule painted the SAME colour as the page ground, so it is

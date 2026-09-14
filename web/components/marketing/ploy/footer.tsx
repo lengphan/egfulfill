@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { motion } from "motion/react"
 import { reveal, rise } from "./motion"
+import { GUTTER } from "./rhythm"
 import { Wordmark } from "@/components/marketing/wordmark"
 
 /**
@@ -63,7 +64,11 @@ const COLUMNS: { head: string; items: [string, string][] }[] = [
 
 export function PloyFooter() {
   return (
-    <footer className="px-6 pb-8 md:px-8">
+    /* GUTTER, not a hand-rolled `px-6 md:px-8`. This was a private copy of that token from
+       before it carried a width cap, so when the cap landed the footer was the one band still
+       growing with the window — 2,500px wide under a 1,416px page. §5: import the shared
+       thing, do not re-type it. */
+    <footer className={`${GUTTER} pb-8`}>
       <motion.div
         {...rise(0)}
         className="overflow-hidden rounded-[32px] bg-ploy-slate px-8 pt-10 text-ploy-ground md:px-14"
