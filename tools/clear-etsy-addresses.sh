@@ -8,6 +8,7 @@
 #                                                 #   is a count; longer is a receipt id)
 #   tools/clear-etsy-addresses.sh 3456789012 --yes    # clear this receipt, by its number
 #   tools/clear-etsy-addresses.sh --seller you@shop.com 3 --yes
+#   tools/clear-etsy-addresses.sh --include-shippo 1 --yes  # one the sync will refill
 #   tools/clear-etsy-addresses.sh --restore address-backup-2026-09-14T10-40-00Z.json
 #
 # WHY THIS EXISTS: `POST /api/etsy/import-addresses` NEVER overwrites an address that is
@@ -29,6 +30,7 @@ set -euo pipefail
 N=3
 APPLY=0
 FULL=0
+INCL_SHIPPO=0
 SELLER=""
 RESTORE=""
 RECEIPTS=()
@@ -38,6 +40,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --yes|-y)   APPLY=1 ;;
     --full)     FULL=1 ;;
+    --include-shippo) INCL_SHIPPO=1 ;;
     --seller)   SELLER="${2:-}"; shift ;;
     --restore)  RESTORE="${2:-}"; shift ;;
     -h|--help)  sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -104,6 +107,21 @@ STREET="coalesce(address->>'street', address->>'line1', address->>'first_line', 
 OPEN="coalesce(factory_status,'') not in ('shipped','cancelled','refunded')"
 
 WHERE="source='etsy' and $OPEN and $STREET <> ''"
+# ── AND NOT ONE SHIPPO CAN PUT STRAIGHT BACK ────────────────────────────
+#
+# The Etsy sync runs every five minutes and ENDS by calling fillBlankAddressesFromShippo
+# (etsy.js, the last thing syncConnection does). Shippo’s Etsy app is not on the
+# restricted tier, so any blank it can fill, it fills. Clear a Shippo-sourced address and
+# it is back, byte for byte, before you have finished reloading Shop Manager.
+#
+# That is exactly what happened on 2026-09-14: three receipts cleared at 03:49, all three
+# carrying "source": "shippo", all three refilled by the next sync — and the extension then
+# correctly reported nothing to send, which read as the extension being broken.
+#
+# So the default is orders Shippo cannot supply, which are the ones the extension exists
+# for in the first place. --include-shippo clears one anyway and warns what will happen.
+SHIPPO_SRC="coalesce(address->>'source','') = 'shippo'"
+if [ "$INCL_SHIPPO" != "1" ]; then WHERE="$WHERE and not ($SHIPPO_SRC)"; fi
 if [ ${#RECEIPTS[@]} -gt 0 ]; then
   ids=$(printf "'etsy-%s'," "${RECEIPTS[@]}"); ids="${ids%,}"
   WHERE="$WHERE and id in ($ids)"
@@ -118,6 +136,11 @@ fi
 ids=$(db -Atq -c "select id from orders where $WHERE $LIMIT")
 if [ -z "$ids" ]; then
   echo "Nothing to clear — no open Etsy order matched (already blank, shipped, or wrong seller)."
+  if [ "$INCL_SHIPPO" != "1" ]; then
+    n=$(db -Atq -c "select count(*) from orders where source='etsy' and $OPEN and $STREET <> '' and $SHIPPO_SRC")
+    [ "${n:-0}" -gt 0 ] && echo "($n carry a Shippo-sourced address, which the 5-minute sync would refill."
+    [ "${n:-0}" -gt 0 ] && echo " --include-shippo clears one anyway.)"
+  fi
   exit 0
 fi
 list=$(printf "'%s'," $ids); list="${list%,}"
@@ -146,6 +169,8 @@ db -Atq -c "select coalesce(jsonb_agg(jsonb_build_object('id', id, 'address', ad
 [ -s "$backup" ] || { echo "Backup is empty — refusing to clear anything." >&2; exit 1; }
 echo "Backed up to $backup"
 
+# Asked before the UPDATE: --full nulls the column, and the provenance goes with it.
+back=$(db -Atq -c "select count(*) from orders where id in ($list) and $SHIPPO_SRC" 2>/dev/null || echo 0)
 if [ "$FULL" = "1" ]; then
   SET="address = null"
 else
@@ -159,6 +184,10 @@ cleared=$(db -Atq -c "update orders set $SET where id in ($list) returning id")
 count=$(printf '%s\n' "$cleared" | grep -c . || true)
 
 echo "Cleared $count order(s)."
+if [ "${back:-0}" -gt 0 ]; then
+  echo "WARNING: $back of these had a Shippo-sourced address. The Etsy sync refills those"
+  echo "within five minutes — test the extension now, or it will look like it found nothing."
+fi
 echo "Receipts the extension should now offer:"
 printf '%s\n' $cleared | sed 's/^etsy-//'
 echo
