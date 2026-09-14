@@ -988,20 +988,35 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     }), [unitPrice])
 
  const toOrderGroups = useMemo(() => {
- const g = new Map<string, { key: string; api: "ss" | "otto" | null; supplier: string | null; lines: SavedPOLine[]; total: number }>()
+ const g = new Map<string, { key: string; api: "ss" | "otto" | null; supplier: string | null; lines: SavedPOLine[]; total: number; unpriced: number }>()
  for (const l of saved) {
  const r = supByS[l.sku] ?? { api: null, supplier: l.supplier ?? null }
  const key = r.api ?? `manual:${r.supplier ?? l.supplier ?? "unassigned"}`
- if (!g.has(key)) g.set(key, { key, api: r.api, supplier: r.supplier ?? l.supplier ?? null, lines: [], total: 0 })
+ if (!g.has(key)) g.set(key, { key, api: r.api, supplier: r.supplier ?? l.supplier ?? null, lines: [], total: 0, unpriced: 0 })
  const grp = g.get(key)!
  grp.lines.push(l)
       // The same figure the LINE shows. A total that silently counts an unpriced line as
       // zero disagrees with the rows above it, and the row is the one people check.
- grp.total += unitPrice(l).unit * num(l.qty)
+ const { unit } = unitPrice(l)
+ if (unit) grp.total += unit * num(l.qty)
+      // COUNTED, NOT ADDED AS ZERO. `unitPrice` returns 0 for "no figure anywhere" — a line
+      // drafted from a low-stock check, or one whose sku never resolved to a supplier row.
+      // The line itself renders that honestly as "—", but the TOTAL used to add the zero and
+      // then print it as $0.00, which is the one reading that is definitely wrong: it is not
+      // free, it is unknown. Owner, looking at a four-unit cart reading $0.00: "im about to
+      // purchase without seeing any prices."
+      //
+      // This is the rule the Shipping row beside it already follows — "A DASH, NOT 'FREE'
+      // and not a number" — applied to goods, which is where money actually is.
+ else grp.unpriced += 1
     }
  return [...g.values()]
   }, [saved, supByS, unitPrice])
  const toOrderTotal = toOrderGroups.reduce((s, g) => s + g.total, 0)
+  /** How many cart lines carry no figure at all. Drives every "—" and every caveat below:
+   *  one number, so the panel, the header strip and the button cannot disagree. */
+ const unpricedLines = toOrderGroups.reduce((n, g) => n + g.unpriced, 0)
+ const anyPriced = toOrderGroups.some((g) => g.total > 0)
   /** Split by what this screen can actually send. Otto is in `handGroups` by rule, not by
    * accident — see NO_AUTO_ORDER. */
  const autoGroups = toOrderGroups.filter((g) => placeable(g.api))
@@ -1845,6 +1860,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
                 {saved.reduce((s, l) => s + num(l.qty), 0)} units{toOrderTotal > 0 ? ` · ${usd(toOrderTotal)}` : ""}
+                {unpricedLines > 0 && (
+                  /* The strip used to fall silent when nothing was priced — the absence of a
+                     figure read as "no figure fits here", not as "we do not have one". */
+                  <span className="ml-1 font-medium text-hold">
+                    · {unpricedLines}{tl("purchase", " unpriced")}
+                  </span>
+                )}
               </span>
               <Button size="sm" variant="outline" onClick={() => setAddTo(POOL)}>
                 {tl("purchase", "Add items")}
@@ -2085,7 +2107,14 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                             {g.supplier ?? tl("purchase", "Unassigned")}
                             <span className="ml-1 text-2xs">· {units} {units === 1 ? "unit" : "units"}</span>
                           </dt>
-                          <dd className="shrink-0 tabular-nums">{usd(g.total)}</dd>
+                          {/* "—" WHEN THERE IS NO FIGURE, never $0.00. A group whose lines
+                              all failed to resolve to a supplier price is unknown, not free. */}
+                          <dd className="shrink-0 tabular-nums">
+                            {g.total > 0 ? usd(g.total) : <span className="text-muted-foreground">—</span>}
+                            {g.unpriced > 0 && g.total > 0 && (
+                              <span className="ml-1 text-2xs font-normal text-hold">{tl("purchase", "+")}{g.unpriced}{tl("purchase", " unpriced")}</span>
+                            )}
+                          </dd>
                         </div>
                       )
                     })}
@@ -2093,7 +2122,9 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
 
                   <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 font-medium">
                     <dt>{tl("purchase", "Goods")}</dt>
-                    <dd className="tabular-nums">{usd(toOrderTotal)}</dd>
+                    <dd className="tabular-nums">
+                      {anyPriced ? usd(toOrderTotal) : <span className="text-muted-foreground">—</span>}
+                    </dd>
                   </div>
 
                   {/* ONE LINE, like every other line in this column. The panel is a column of
@@ -2110,11 +2141,25 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
 
                   <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 text-base font-semibold">
                     <dt>{tl("purchase", "Total so far")}</dt>
-                    <dd className="tabular-nums">{usd(toOrderTotal)}</dd>
+                    <dd className="tabular-nums">
+                      {anyPriced ? usd(toOrderTotal) : <span className="text-muted-foreground">—</span>}
+                    </dd>
                   </div>
-                  <p className="text-2xs text-muted-foreground">
-                    {tl("purchase", "Goods only. Freight and any tax are added by the supplier at placement.")}
-                  </p>
+                  {/* THE REFUSAL CARRIES ITS REASON (§4), and it replaces the caveat rather
+                      than stacking under it — two sentences of small print is how the one
+                      that matters gets skipped. A cart you cannot price is the state worth
+                      reading; freight-added-later is the state worth reading otherwise. */}
+                  {unpricedLines > 0 ? (
+                    <p className="text-2xs font-medium text-hold">
+                      {unpricedLines === 1
+                        ? tl("purchase", "1 line has no price — it is not in the supplier catalogue we synced, so this total is not what you will be billed.")
+                        : `${unpricedLines}${tl("purchase", " lines have no price — they are not in the supplier catalogue we synced, so this total is not what you will be billed.")}`}
+                    </p>
+                  ) : (
+                    <p className="text-2xs text-muted-foreground">
+                      {tl("purchase", "Goods only. Freight and any tax are added by the supplier at placement.")}
+                    </p>
+                  )}
                 </>
               )}
             </SectionCard>
