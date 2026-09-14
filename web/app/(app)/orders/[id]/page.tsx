@@ -2544,14 +2544,24 @@ export default function OrderDetailPage() {
  anyone commits to one. From the quote, which is the same settings the charge
  reads — a number typed here would be a second opinion about the price. */
  sideFee={quote?.fees?.method_side ?? null}
-                /* THE PER-FACE RATES, straight off the same quote the summary is built from.
-                   Built here rather than inside the canvas so there is one reader of
-                   `fees` — a second copy is how the rail and the price come to disagree. */
-                sideFees={ALL_SIDES.reduce<Record<string, number>>((m, f) => {
-                  const v = Number((quote?.fees as Record<string, unknown> | undefined)?.[`side_${f}`])
-                  if (v > 0) m[f] = v
-                  return m
-                }, {})}
+                /*
+                 * THE RATES FOR *THIS LINE'S* BLANK, resolved server-side.
+                 *
+                 * This read `quote.fees.side_<face>` — the PLATFORM per-face keys — and
+                 * nothing else. A product carrying its own `sidePrice` map, which outranks
+                 * both platform tiers, was invisible here: every tile printed the flat
+                 * `method_side` while the charge used the map. On a duffel priced
+                 * {back:4, left:5} against a $3 flat, the rail said +$3.00 on all six faces
+                 * and the summary then charged $4 and $5 — the rail's own note calls that
+                 * out as worse than showing nothing.
+                 *
+                 * `sideRates` is the same resolver the charge uses, per line, so the number
+                 * on the tile is the number on the invoice. Matched by line_id, because two
+                 * lines of one order can be two different blanks.
+                 */
+                sideFees={(quote?.lines ?? []).find((l) =>
+                  (l.line_id && l.line_id === (customize.line_id ?? null))
+                  || (!l.line_id && !!l.sku && l.sku === customize.sku))?.sideRates ?? {}}
  catalog={catalog}
         />
       )}

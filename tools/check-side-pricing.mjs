@@ -18,7 +18,7 @@
  *
  * Run: node tools/check-side-pricing.mjs
  */
-import { sideAddOn, sideBreakdown } from "../server/src/pricing.js"
+import { sideAddOn, sideBreakdown, sideRates } from "../server/src/pricing.js"
 
 /** The rates from the engine's own note: two per-face overrides and a flat fallback. */
 const FEES = { method_side: 2, side_back: 3.5, side_sleeve: 1.5 }
@@ -74,6 +74,23 @@ console.log("\nTHE BREAKDOWN NAMES EVERY CHARGE")
   check("included face is named", b.included, "front")
   check("one part per charged face", b.parts.map((p) => p.face), ["back", "sleeve"])
   check("each part carries its own amount", b.parts.map((p) => p.amount), [3.5, 1.5])
+}
+
+console.log("\nTHE PICKER QUOTES WHAT THE CHARGE WILL USE")
+{
+  /* The designer's face rail prints a price on a tile BEFORE anyone prints there, so it has
+     to resolve rates the same way. It used to read the platform keys only, so a product with
+     its own map showed the flat rate on every face and the summary then charged something
+     else -- the one thing the rail's own note forbids. */
+  const prod = { sidePrice: { back: 4, left: 5, front: 3 } }
+  const rates = sideRates(FEES, prod)
+  check("a product's map reaches the rail", [rates.back, rates.left], [4, 5])
+  check("a platform per-face rate still shows", rates.sleeve, 1.5)
+  check("everything else falls to the flat", rates.hood, 2)
+  /* And the tile agrees with the invoice: charging back+front+left must equal the rail's
+     own numbers for the two that are not included. */
+  check("rail figures sum to the charge",
+    sideAddOn(["back", "front", "left"], FEES, prod), rates.back + rates.left)
 }
 
 /* ---- the invariant: an explanation may never disagree with the charge ----------------- */

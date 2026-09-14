@@ -46,6 +46,9 @@ export function ChatPeek() {
   const [threads, setThreads] = useState<SupportThread[]>([])
   const [open, setOpen] = useState(false)
   const [msgs, setMsgs] = useState<ChatEntry[] | null>(null)
+  /** WHY it could not be read, when that is what happened. Null on a thread that simply
+   *  has no messages yet — a different answer, and the one the panel used to give for both. */
+  const [msgsErr, setMsgsErr] = useState<string | null>(null)
   const [reduced, setReduced] = useState(false)
 
   useEffect(() => {
@@ -110,12 +113,15 @@ export function ChatPeek() {
   useEffect(() => {
     if (!open || !top?.order_id) return
     let alive = true
-    setMsgs(null)
+    setMsgs(null); setMsgsErr(null)
     getOrderMessages(top.order_id)
       /* Thirty, not six. Six was chosen when the panel could not scroll, so it was a cap
          standing in for a scrollbar; with one, the only reason to cut is the payload. */
       .then((rows) => { if (alive) setMsgs(rows.slice(-30)) })
-      .catch(() => { if (alive) setMsgs([]) })
+      /* THE FAILURE IS RECORDED, not folded into an empty list. Setting msgs to [] made a
+         thread that could not be READ indistinguishable from one with nothing IN it, and
+         §4 forbids exactly that: if a thing can't be read versus doesn't exist, say which. */
+      .catch((e) => { if (alive) { setMsgs([]); setMsgsErr(e instanceof Error && e.message ? e.message : "Couldn’t load this conversation.") } })
     return () => { alive = false }
   }, [open, top?.order_id])
 
@@ -204,8 +210,12 @@ export function ChatPeek() {
             >
               {msgs === null ? (
                 <ActivityIndicator color={"#FFFFFF"} />
+              ) : msgsErr ? (
+                /* A refusal carries its reason — that IS the answer (§4). With a deadline on
+                   every request this is now reachable at all: it used to spin for ever. */
+                <Text style={{ color: "#FFFFFF", opacity: 0.7, fontSize: 13 }}>{msgsErr}</Text>
               ) : msgs.length === 0 ? (
-                <Text style={{ color: "#FFFFFF", opacity: 0.7, fontSize: 13 }}>Couldn’t load this conversation.</Text>
+                <Text style={{ color: "#FFFFFF", opacity: 0.7, fontSize: 13 }}>No messages yet.</Text>
               ) : (
                 msgs.map((m) => (
                   <View

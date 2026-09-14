@@ -1028,7 +1028,16 @@ export function DesignCanvasDialog({
    * still right for a blank nobody has configured; it is only wrong while the question is
    * still in flight, and this is the difference between those two.
    */
- const facesKnown = typesLoaded || !!offeredSides(product)
+  /* TWO inputs arrive late, not one. The first version of this gate waited for the type map
+     and nothing else — but `catalog` is an optional prop that lands separately, so the
+     moment the types resolved `facesKnown` went true while `product` was STILL null, and
+     the padded guess rendered exactly as before. A null product means "no blank picked" or
+     "the catalogue has not arrived", and those want opposite answers; the catalogue being
+     present is what tells them apart. */
+ const catalogReady = Array.isArray(catalog) && catalog.length > 0
+ const facesKnown = product
+    ? (typesLoaded || !!offeredSides(product))
+    : (catalogReady && typesLoaded)
  const faces = useMemo(() => {
  const f = mockupFaces(product, liveItem.color)
  const base = f.length ? f : (liveItem.img ? [{ side: "front", url: liveItem.img }] : [])
@@ -2743,6 +2752,11 @@ export function DesignCanvasDialog({
           * one costs) and add the one they could not: what is actually on each.
           */}
         <div className="flex w-full items-start gap-3">
+          {/* THE COLUMN IS RESERVED while the answer is in flight. Simply hiding the rail
+              until it is known trades a changing list for a moving stage — the canvas slides
+              68px sideways the moment the tiles appear, which is the same flicker in a
+              different place. An empty track of the same width holds the layout still. */}
+          {!facesKnown && <div className="w-[68px] shrink-0" aria-hidden />}
           {facesKnown && faces.length > 1 && (
             <div className="flex w-[68px] shrink-0 flex-col gap-1.5" role="tablist" aria-label="Printed faces">
               {faces.map((f, i) => {
