@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "egful",
-  "version": "0.1.5",
-  "description": "Send buyer addresses from your own Etsy Shop Manager page to EGFULFILL, so your orders can be labelled.",
+  "version": "0.1.6",
+  "description": "Send buyer addresses from your own Etsy Shop Manager page to egful, so your orders can be labelled.",
   "permissions": [
     "storage",
     "tabs",

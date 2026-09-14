@@ -1,6 +1,6 @@
-# EGFULFILL — Etsy address sync (Chrome)
+# egful — Etsy address sync (Chrome)
 
-Fills buyer addresses on orders EGFULFILL already has, from the seller's own Etsy Shop
+Fills buyer addresses on orders egful already has, from the seller's own Etsy Shop
 Manager page, while the Etsy API address entitlement is pending.
 
 ## What it does, and what it deliberately does not
@@ -11,7 +11,7 @@ this extension, no pagination, no crawl, no background worker and no timer — s
 fails if `fetch`, `XMLHttpRequest`, `sendBeacon` or a dynamic `import` ever appears in the
 reader.
 
-It reads the page, then asks EGFULFILL **"of these receipts I can see, which do you need?"**
+It reads the page, then asks egful **"of these receipts I can see, which do you need?"**
 and discards the rest. It sends what is needed and nothing else. The question is bounded by
 what is already on screen, so it can never become a way to survey orders the seller is not
 looking at — and there is no cap or ordering that could make "nothing to do" and "your
@@ -34,27 +34,32 @@ always the code on disk, never a copy Chrome injected before the last reload.
 ## Use it
 
 1. Sign in at **app.egful.store** in the same browser
-2. Open the extension → **Connect to EGFULFILL**
+2. Open the extension → **Connect to egful**
 3. Go to **Etsy → Shop Manager → Orders & Shipping** (`etsy.com/your/orders/sold`)
-4. Open the extension → it shows how many addresses on that page EGFULFILL is missing
-5. **Sync addresses**
+4. Open the extension → it shows how many addresses on that page egful is missing
+5. **Send addresses** — press **Show the 5** first if you want to read what is about to go
 
 No need to reload the Etsy tab after updating the extension — the reader is injected when
-you open the popup, so it is always the current build. The footer prints that build (`v0.1.5`)
+you open the popup, so it is always the current build. The footer prints that build (`v0.1.6`)
 so "did my change load" is a question you can answer by looking.
 
-Page through your orders and press Sync again on each page. Nothing is sent automatically.
+Page through your orders and press **Send addresses** again on each page. Nothing is sent
+automatically.
+
+**What is about to be sent** is one press away: *Show the 5* lists the name and address of
+every row in the request. It is built from what is already in memory for that request, it
+is never written anywhere, and it is gone when the popup closes.
 
 ## Reading the footer
 
-The footer's resting state is just the build (`v0.1.5`) — the one thing the panel above
+The footer's resting state is just the build (`v0.1.6`) — the one thing the panel above
 cannot say for itself, and the thing that answers "did my change load".
 
 It only speaks up when there is something to act on:
 
 | What you see | What it means |
 |---|---|
-| `v0.1.5` alone | Nothing to report. What is on the page, the panel above already said in words |
+| `v0.1.6` alone | Nothing to report. What is on the page, the panel above already said in words |
 | `2 of 20 couldn't be read` | Found on the page but failed validation — non-US, or missing a street or city. Nothing is sent wrong |
 
 **Hover it for the full reading**: `20 found on this page · 5 to send · read via json`. That
@@ -101,7 +106,7 @@ a seller is answered about their own orders, staff about all.
   a deliberate starting point, not an oversight.
 - **Nothing about a buyer is kept here.** The popup holds the rows it parsed in memory for as
   long as it is open and forgets them when it closes; `chrome.storage.local` holds a token and
-  a display name, never an address. What was synced is read in EGFULFILL, which is the system
+  a display name, never an address. What was synced is read in egful, which is the system
   of record and the thing with an audit log.
 - `/extension` is in the Caddyfile's `@hidden` list, so this source is not served from
   `egful.store`. Anything new at the repo root is public by default (CLAUDE.md §2.5) — if

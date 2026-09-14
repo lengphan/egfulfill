@@ -20,6 +20,7 @@ const show = (el, on) => { el.hidden = !on }
 let TOKEN = null
 let WANTED = []          // receipt ids OUR server says are missing an address
 let ROWS = []            // what the current page can actually supply
+let OPEN_PEEK = false    // is the "what will be sent" list open? Dies with the popup.
 
 function fail(msg) {
   const el = $('err')
@@ -32,7 +33,7 @@ function fail(msg) {
 /**
  * READ THE SELLER'S OWN TOKEN FROM THE SELLER'S OWN TAB.
  *
- * No password is ever typed into this extension. The seller signs in to EGFULFILL the
+ * No password is ever typed into this extension. The seller signs in to egful the
  * normal way and presses Connect; this reads the session their browser is already holding,
  * from our own origin, once, and keeps it in extension storage.
  *
@@ -68,11 +69,11 @@ async function connect() {
     })
     got = res && res.result
   } catch (e) {
-    return fail('Could not read your EGFULFILL session. Open app.egful.store, sign in, then press Connect again.')
+    return fail('Could not read your egful session. Open app.egful.store, sign in, then press Connect again.')
   }
 
   if (!got || !got.token) {
-    return fail('You are not signed in to EGFULFILL in this browser. Sign in there first, then press Connect.')
+    return fail('You are not signed in to egful in this browser. Sign in there first, then press Connect.')
   }
 
   let name = ''
@@ -97,9 +98,9 @@ async function api(path, init) {
     await chrome.storage.local.remove(['token', 'who'])
     TOKEN = null
     render()
-    throw new Error('Your EGFULFILL session expired. Press Connect again.')
+    throw new Error('Your egful session expired. Press Connect again.')
   }
-  if (!r.ok) throw new Error(`EGFULFILL said ${r.status}`)
+  if (!r.ok) throw new Error(`egful didn’t answer (${r.status})`)
   return r.json()
 }
 
@@ -146,14 +147,68 @@ function statsTitle(s, toSend) {
   return bits.join(' \u00b7 ')
 }
 
+/**
+ * ONE PLACE DECIDES WHAT THE PANEL SAYS, and it is short on purpose.
+ *
+ * The wording used to be assembled at four call sites, each adding its own sentence — so
+ * the panel explained the page, explained the explanation, and then printed a strategy name
+ * in the footer. A line, at most one button, and at most one sentence under it: past that,
+ * every extra word is read on every visit forever.
+ *
+ * `button` names which of the two is shown, or none. A disabled button invites a press,
+ * and this panel spends most of its life with nothing to press.
+ */
+function paint({ line, note = '', button = null, peek = 0 }) {
+  $('count').textContent = line
+  $('note').textContent = note
+  show($('note'), !!note)
+  show($('sync'), button === 'sync')
+  show($('open'), button === 'open')
+  show($('peek'), peek > 0)
+  if (peek > 0) {
+    $('peek').textContent = OPEN_PEEK ? 'Hide' : `Show the ${peek}`
+    show($('rows'), OPEN_PEEK)
+  } else {
+    OPEN_PEEK = false
+    show($('rows'), false)
+  }
+}
+
+/**
+ * WHAT IS ABOUT TO BE SENT, ON REQUEST — and never written anywhere.
+ *
+ * These are the rows already parsed into memory for the request, so drawing them costs no
+ * storage and discloses nothing new: they are on the Etsy page behind this panel. The list
+ * is built on each open and dies with the popup. Collapsed by default, because a buyer's
+ * home address on a factory floor is an over-the-shoulder problem, not a UI one.
+ */
+function drawRows() {
+  const ul = $('rows')
+  ul.textContent = ''
+  for (const r of ROWS) {
+    const li = document.createElement('li')
+    const nm = document.createElement('div')
+    nm.className = 'nm'
+    nm.textContent = r.name || `Order ${r.order_id}`
+    const ad = document.createElement('div')
+    ad.className = 'ad'
+    const line = [r.street, r.street2, [r.city, r.state].filter(Boolean).join(' '), r.zip]
+      .filter(Boolean).join(', ')
+    ad.textContent = line
+    ad.title = line                       // the full thing for the one that is truncated
+    li.append(nm, ad)
+    ul.appendChild(li)
+  }
+}
+
 async function scan() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab || !/^https:\/\/www\.etsy\.com\/your\/orders/.test(tab.url || '')) {
     ROWS = []
-    $('count').textContent = 'Open your Etsy orders page'
-    $('note').textContent = 'Shop Manager → Orders & Shipping. This reads what is on that page; it never fetches anything from Etsy.'
-    $('sync').disabled = true
-    $('stats').textContent = ''
+    paint({ line: 'Not your orders page', note: 'Shop Manager → Orders & Shipping.', button: 'open' })
+    /* The build still shows. It is the answer to "is my change loaded", and that question
+       gets asked most often on the page where nothing else is happening. */
+    $('stats').textContent = `v${chrome.runtime.getManifest().version}`
     $('stats').title = ''
     return
   }
@@ -161,7 +216,7 @@ async function scan() {
   /*
    * READ THE PAGE FIRST, THEN ASK ABOUT WHAT IS ON IT.
    *
-   * The first version asked EGFULFILL for "everything you are missing" and filtered the
+   * The first version asked egful for "everything you are missing" and filtered the
    * page against that. For a staff user that list spans every seller and is capped, so a
    * shop's own orders could sit outside the window and the extension would report nothing
    * to do — indistinguishable from everything being filled already. Asking about the
@@ -208,15 +263,11 @@ async function scan() {
 
   if (!onPage.length) {
     ROWS = []
-    $('count').textContent = 'Nothing to send from this page'
     /* FOUND-BUT-UNREADABLE IS NOT AN EMPTY PAGE, and this said "no orders found here" for
-       both — while the footer beside it reported `20 seen · 20 unreadable`, so the two
-       halves of the same panel disagreed. §4: if a thing can't be READ versus doesn't
-       EXIST, say which. */
-    $('note').textContent = (s.foundOnPage || 0) > 0
-      ? 'Orders are on this page but none of their addresses could be read — usually a non-US address, or one missing a street or city. Nothing was sent.'
-      : 'No orders found here. Open a page of your sold orders, or page through to older ones.'
-    $('sync').disabled = true
+       both. §4: if a thing can't be READ versus doesn't EXIST, say which. */
+    paint((s.foundOnPage || 0) > 0
+      ? { line: 'No addresses could be read here', note: 'Usually non-US, or missing a street.' }
+      : { line: 'No orders on this page', note: 'Open your sold orders, or page back.' })
     $('stats').textContent = statsLine(s, 0)
     $('stats').title = statsTitle(s, 0)
     return
@@ -235,13 +286,11 @@ async function scan() {
   const keep = new Set(WANTED.map(String))
   ROWS = onPage.filter((r) => keep.has(r.order_id))
 
-  $('count').textContent = ROWS.length
-    ? `${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'} ready to send`
-    : 'Nothing to send from this page'
-  $('note').textContent = ROWS.length
-    ? ''
-    : 'The orders on this page already have addresses in EGFULFILL.'
-  $('sync').disabled = !ROWS.length
+  drawRows()
+  paint(ROWS.length
+    ? { line: `${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'} to send`,
+        button: 'sync', peek: ROWS.length }
+    : { line: 'This page is done', note: 'Page back for older orders.' })
 
   /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
@@ -267,20 +316,19 @@ async function sync() {
     const rows = ROWS.map(({ order_id, name, street, street2, city, state, zip, country }) =>
       ({ order_id, name, street, street2, city, state, zip, country }))
     const res = await api('/api/etsy/import-addresses', { method: 'POST', body: JSON.stringify({ rows }) })
-    $('count').textContent = `${res.updated} filled`
-    const rest = []
-    if (res.alreadyHad) rest.push(`${res.alreadyHad} already had one`)
-    if (res.notFound) rest.push(`${res.notFound} not in EGFULFILL`)
-    if (res.skipped) rest.push(`${res.skipped} skipped`)
-    $('note').textContent = rest.join(' · ')
     // What was just filled is no longer wanted, so a second press cannot double-send.
     WANTED = WANTED.filter((id) => !rows.some((r) => r.order_id === id))
     ROWS = []
+    const rest = []
+    if (res.alreadyHad) rest.push(`${res.alreadyHad} already had one`)
+    if (res.notFound) rest.push(`${res.notFound} not in egful yet`)
+    if (res.skipped) rest.push(`${res.skipped} skipped`)
+    paint({ line: `${res.updated} sent`, note: rest.join(' · ') })
   } catch (e) {
     fail(e.message)
   } finally {
-    $('sync').textContent = 'Sync addresses'
-    $('sync').disabled = !ROWS.length
+    $('sync').textContent = 'Send addresses'
+    $('sync').disabled = false
   }
 }
 
@@ -288,6 +336,7 @@ function render() {
   show($('connect'), !TOKEN)
   show($('main'), !!TOKEN)
   show($('forget'), !!TOKEN)
+  show($('rescan'), !!TOKEN)
 }
 
 /* ── wiring ────────────────────────────────────────────────────────────────── */
@@ -295,6 +344,19 @@ function render() {
 $('link').addEventListener('click', connect)
 $('sync').addEventListener('click', sync)
 $('rescan').addEventListener('click', start)
+/* A CLICK, which is the whole point: the seller is taken to their own Shop Manager and the
+   page loads because they asked for it. Nothing here ever navigates on its own. */
+$('open').addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  const url = 'https://www.etsy.com/your/orders/sold'
+  if (tab) await chrome.tabs.update(tab.id, { url })
+  else await chrome.tabs.create({ url })
+  window.close()
+})
+$('peek').addEventListener('click', () => {
+  OPEN_PEEK = !OPEN_PEEK
+  paint({ line: $('count').textContent, note: $('note').textContent, button: 'sync', peek: ROWS.length })
+})
 $('forget').addEventListener('click', async () => {
   await chrome.storage.local.remove(['token', 'who'])
   TOKEN = null

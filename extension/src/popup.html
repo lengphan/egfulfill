@@ -19,25 +19,36 @@
   <!--
     NO CREDENTIAL FIELDS, EVER. An extension that asks for a password teaches sellers to
     type it into browser UI, which is the habit phishing relies on. Connect instead reads
-    the token the seller's own EGFULFILL tab already holds, from our own origin, when they
+    the token the seller's own egful tab already holds, from our own origin, when they
     press this button. See popup.js.
   -->
   <section id="connect" hidden>
-    <p class="note">Sign in to EGFULFILL in this browser, then connect.</p>
-    <button id="link" class="primary">Connect to EGFULFILL</button>
+    <p class="note">Sign in to egful, then connect.</p>
+    <button id="link" class="primary">Connect to egful</button>
   </section>
 
+  <!--
+    ONE STATE, ONE ACTION.
+    The line says what is true; at most one button says what to do about it. Both buttons
+    are hidden by default and exactly one is shown per state — a disabled button invites a
+    press, and this panel spends most of its life in a state with nothing to press.
+  -->
   <section id="main" hidden>
     <p class="count" id="count">Checking…</p>
     <p class="note" id="note"></p>
-    <button id="sync" class="primary" disabled>Sync addresses</button>
-    <button id="rescan" class="quiet">Rescan this page</button>
+    <button id="sync" class="primary" hidden>Send addresses</button>
+    <button id="open" class="primary" hidden>Open Shop Manager</button>
+    <!-- Collapsed, and only present when there is something to send. See popup.css. -->
+    <button id="peek" class="peek" hidden></button>
+    <ul id="rows" class="rows" hidden></ul>
   </section>
 
   <p class="err" id="err" hidden></p>
 
+  <!-- Rescan lives here, beside the build number: it is what you press when something looks
+       wrong, not the thing you came to do. As a full-width button it was as loud as Send. -->
   <footer>
-    <span id="stats"></span>
+    <span class="foot-left"><span id="stats"></span><button id="rescan" class="link" hidden>Rescan</button></span>
     <button id="forget" class="link" hidden>Disconnect</button>
   </footer>
 

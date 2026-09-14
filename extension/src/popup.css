@@ -35,25 +35,6 @@ header {
 /* Pushed to the right edge by the mark, so the name and the logo stay one object. */
 .who { margin-left: auto; font-size: 12px; color: var(--muted); }
 
-label {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-  margin: 10px 0 4px;
-}
-
-input {
-  width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  border: 1.5px solid #8E9099;   /* a control boundary clears 3:1 — WCAG 1.4.11 */
-  border-radius: 12px;
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-}
-input:focus { outline: none; border-color: var(--hue-deep); border-width: 2px; }
-
 button {
   width: 100%;
   height: 42px;
@@ -65,12 +46,10 @@ button {
   cursor: pointer;
 }
 .primary { background: var(--hue-deep); color: #fff; }
-.primary:disabled { background: var(--hue-mist); color: var(--muted); cursor: default; }
-.quiet { background: transparent; color: var(--ink); border: 1.5px solid var(--hairline); font-weight: 500; }
 .link {
   width: auto; height: auto; margin: 0; padding: 0;
   background: none; color: var(--muted);
-  font-size: 12px; font-weight: 500; text-decoration: underline;
+  font-size: 11px; font-weight: 500; text-decoration: underline;
 }
 
 /* The one figure on the screen, so it is the largest thing on it. */
@@ -79,6 +58,31 @@ button {
 .note { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
 /* A refusal carries its reason — that is the answer, not a caption. */
 .err { margin: 12px 0 0; font-size: 13px; color: var(--alert); }
+
+/*
+  WHAT IS ABOUT TO BE SENT — folded away, and never written down.
+  These rows are the ones already parsed into memory for the request; showing them costs no
+  storage and discloses nothing new (they are on the Etsy page behind this panel). Collapsed
+  by default because a factory floor is an over-the-shoulder place and this is a buyer's
+  home address. The list dies with the popup.
+*/
+.peek {
+  width: auto; height: auto; margin: 10px 0 0; padding: 0;
+  background: none; color: var(--hue-deep);
+  font-size: 12px; font-weight: 600; text-decoration: underline;
+}
+.rows {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  max-height: 168px; overflow-y: auto;
+  border-top: 1px solid var(--hairline);
+}
+.rows li { padding: 7px 0; border-bottom: 1px solid var(--hairline); }
+.rows .nm { font-size: 12px; font-weight: 600; }
+/* One line each: a wrapped address turns five rows into a wall and hides how many there are. */
+.rows .ad {
+  font-size: 12px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 footer {
   display: flex;
@@ -89,5 +93,7 @@ footer {
   padding-top: 10px;
   border-top: 1px solid var(--hairline);
   font-size: 11px;
+  line-height: 1.35;
   color: var(--muted);
 }
+.foot-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
