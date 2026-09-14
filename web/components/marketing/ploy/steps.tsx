@@ -2,8 +2,9 @@
 
 import { useMemo, useRef } from "react"
 import { motion, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
-import { reveal, rise } from "./motion"
+import { reveal } from "./motion"
 import { Num } from "./num"
+import { Band } from "./band"
 import { GUTTER, STACK } from "./rhythm"
 import { displayWord } from "./step-word"
 import type { Stat, Step } from "@/lib/site-content"
@@ -223,7 +224,7 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
           with hero.tsx still exists, it is just on the other axis — the note on `Lead` carries
           the measured edges, and the note in hero.tsx points at it. Change the garment's width
           or its `top` and that cap is what has to move, not a pad down here. */}
-      <motion.div {...rise(0)} className="ploy-acid-bloom relative overflow-hidden rounded-[32px] pb-16 pt-10 md:pb-16 md:pt-10">
+      <Band className="ploy-acid-bloom relative overflow-hidden rounded-[32px] pb-16 pt-10 md:pb-16 md:pt-10">
         {/* NO MARQUEE HERE. A strip of marketplace names scrolling across the top of this
             block was the prototype's device for filling the band under the hero — but the
             names are already a claim the page makes in words, and a second, moving copy of
@@ -318,7 +319,7 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
           </div>
 
         </div>
-      </motion.div>
+      </Band>
       {/* NO OBJECT ON THIS EDGE.
           Five bands each carried one hovering at a corner, all doing the same thing, none of
           them tied to anything — which is what makes an object read as random rather than

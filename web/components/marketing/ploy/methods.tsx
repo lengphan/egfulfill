@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react"
 import Image from "next/image"
 import { motion } from "motion/react"
-import { HOVER, reveal, rise } from "./motion"
+import { HOVER, reveal } from "./motion"
+import { Band } from "./band"
 import { GUTTER, SECTION } from "./rhythm"
 
 /**
@@ -59,7 +60,7 @@ export function PloyMethods() {
      sequence; this is not in one. */
   return (
     <section id="methods" className={`relative ${GUTTER} ${SECTION}`}>
-      <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-sky py-16 md:py-20">
+      <Band className="overflow-hidden rounded-[32px] bg-ploy-sky py-16 md:py-20">
         <div className="px-8 md:px-14">
           <h2 className="ploy-display text-[clamp(2.5rem,6.5vw,5.5rem)]">
             <motion.span {...reveal(0)} className="block">
@@ -131,7 +132,7 @@ export function PloyMethods() {
             </motion.article>
           ))}
         </div>
-      </motion.div>
+      </Band>
       {/* `drop` is 56, not 0: this block ends in a card rail rather than in padding, and at 0
           the upper half of the star reached back up onto the last card's copy. */}
       {/* NO OBJECT ON THIS EDGE.
