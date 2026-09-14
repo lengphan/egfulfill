@@ -2856,7 +2856,12 @@ export type OrderDesign = { sku?: string; line_id?: string | null; kind?: string
    * one order can come off two different recipes. It survives to the factory, so "what else
    * have we cut from this one" is an index lookup rather than a perceptual guess.
    */
-  template_id?: string | null }
+  template_id?: string | null
+  /** `1042` — the design's NUMBER, rendered as DSN-1042 by designLabel(). Joined from
+   *  design_ids on the art hash by the designs route. It is what a person refers to a
+   *  picture BY: most artwork carries no name, and the filename it arrived under names a
+   *  moment rather than a design. */
+  design_no?: number | null }
 
 /**
  * Index designs so both keys resolve. A line-keyed row is stored under its line_id AND

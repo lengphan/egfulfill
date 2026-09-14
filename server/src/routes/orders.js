@@ -4365,7 +4365,17 @@ export function ordersRoutes(app, requireAuth) {
     // SIGNED CROSS-ORIGIN link instead — which expires, taints the canvas so the thread
     // matcher reports "couldn't open this image to read its colours", and is the string the
     // client hands back on the next save.
-    const r = await q(`select sku, line_id, kind, coalesce(side,'front') as side, data, storage_key, art_hash, name, pos, template_id from order_designs where order_id=$1`, [req.params.id]);
+    /* THE DESIGN NUMBER COMES WITH THE ROW — DSN-1042, joined on the art hash the same way
+       the order list joins it. The save RESPONSE has always carried it, so the face you had
+       just saved could be named and every other face on the line could not; the designer's
+       Files list then printed one real reference and, beside it, whatever filename the image
+       happened to arrive under. Same `design_ids` join as the list query above, so both
+       screens name a picture identically. */
+    const r = await q(`select d.sku, d.line_id, d.kind, coalesce(d.side,'front') as side, d.data, d.storage_key,
+                              d.art_hash, d.name, d.pos, d.template_id, di.design_no
+                         from order_designs d
+                         left join design_ids di on di.art_hash = d.art_hash
+                        where d.order_id=$1`, [req.params.id]);
     // Minted per read, not stored: a signed URL expires, so a persisted one would go
     // stale. Returned through `data` because that's what every client already renders
     // (an <img src> takes a URL or a data-URL either way).

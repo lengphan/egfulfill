@@ -20,6 +20,7 @@ import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-pic
 import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
+import { designLabel } from "@/lib/design-id"
 import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
 import { printZoneOf, printSizeOf, outsideZone } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
@@ -1082,7 +1083,19 @@ export function DesignCanvasDialog({
    * Keyed by side name, seeded from the server on open. `null` for a face means "nothing on
    * it", which is different from "not loaded yet" — the latter is `faceArt === null`.
    */
- type FaceArt = { data: string; pos: Pos; name: string | null }
+ /** `no` is the design NUMBER — DSN-1042. Carried per face because that is the only thing
+  *  that identifies a picture: most artwork has no name, and the filename it arrived under
+  *  ("Screenshot 2026-08-24 at 10.14.42") names a moment rather than a design. */
+ type FaceArt = { data: string; pos: Pos; name: string | null; no?: number | null }
+  /**
+   * THE DESIGN'S OWN NUMBER — DSN-1042.
+   *
+   * Seeded from the line (the order list carries it) and refreshed from whatever a save
+   * hands back, because a replaced image is different artwork and therefore a different
+   * number. Shown so a design can be referred to at all: most carry no name, and "the
+   * octopus one" is not something you can type into a search box.
+   */
+ const [designNo, setDesignNo] = useState<number | null>(item.design_no ?? null)
  const [faceArt, setFaceArt] = useState<Record<string, FaceArt | null> | null>(null)
   /** What the SERVER holds for each face, so Save only sends what actually changed. */
  const [savedFaces, setSavedFaces] = useState<Record<string, { data: string; pos: Pos }>>({})
@@ -1090,9 +1103,9 @@ export function DesignCanvasDialog({
  const stashCurrentFace = useCallback(() => {
  setFaceArt((prev) => ({
       ...(prev ?? {}),
- [sideName]: designUrl ? { data: designUrl, pos, name: designName } : null,
+ [sideName]: designUrl ? { data: designUrl, pos, name: designName, no: designNo } : null,
     }))
-  }, [sideName, designUrl, pos, designName])
+  }, [sideName, designUrl, pos, designName, designNo])
   /** Move to a face: put this one away, bring that one out. */
  const goToSide = (i: number) => {
  if (i === side) return
@@ -1541,15 +1554,6 @@ export function DesignCanvasDialog({
    * without being read during render, which the refs lint rule forbids — and rightly, a
    * ref read while rendering is a value React can't promise is current.
    */
-  /**
-   * THE DESIGN'S OWN NUMBER — DSN-1042.
-   *
-   * Seeded from the line (the order list carries it) and refreshed from whatever a save
-   * hands back, because a replaced image is different artwork and therefore a different
-   * number. Shown so a design can be referred to at all: most carry no name, and "the
-   * octopus one" is not something you can type into a search box.
-   */
- const [designNo, setDesignNo] = useState<number | null>(item.design_no ?? null)
  const [artAtOpen] = useState<string>(initialDesign ?? "")
   /**
    * LOAD EVERY FACE, once, on open.
@@ -1571,7 +1575,7 @@ export function DesignCanvasDialog({
  const seeded: Record<string, FaceArt | null> = {}
  for (const [sd, d] of Object.entries(mine)) {
  const src = designSrc(d.data)
- seeded[sd] = src ? { data: src, pos: d.pos ? { x: d.pos.x, y: d.pos.y, w: d.pos.w, r: d.pos.r ?? 0 } : DEFAULT_POS, name: d.name ?? null } : null
+ seeded[sd] = src ? { data: src, pos: d.pos ? { x: d.pos.x, y: d.pos.y, w: d.pos.w, r: d.pos.r ?? 0 } : DEFAULT_POS, name: d.name ?? null, no: d.design_no ?? null } : null
           }
  setFaceArt(seeded)
  const conf: Record<string, { data: string; pos: Pos }> = {}
@@ -2416,6 +2420,11 @@ export function DesignCanvasDialog({
         // The number the save minted (or reused, if these exact bytes have been seen
         // before). Taken from the face on screen — that is the one the rail is describing.
  if (sd === sideName && r.design_no != null) setDesignNo(r.design_no)
+        /* EVERY face keeps the number its save returned, not only the one on screen. The
+           line above has always kept the current face's, which is what the rail shows; the
+           others had theirs thrown away, so the Files list could name one row and not the
+           rest. */
+ if (r.design_no != null && pending[sd]) pending[sd] = { ...pending[sd]!, no: r.design_no }
       }
  setSavedFaces(done)
  setFaceArt(pending)
@@ -3414,13 +3423,43 @@ export function DesignCanvasDialog({
                 <div key={r.side} className="mb-1">
                   <FileRow
                     file={{
-                      name: (here ? designName || fileNameFrom(designUrl) : r.art.name) || "Untitled artwork",
+                      /*
+                       * THE DESIGN NUMBER IS THE NAME — DSN-1042.
+                       *
+                       * This printed the filename the image arrived under, falling back to
+                       * "Untitled artwork". Neither identifies anything: most artwork has no
+                       * name at all, and "Screenshot 2026-08-24 at 10.14.42" names the
+                       * moment somebody pressed a key. Two orders printing the SAME picture
+                       * showed two unrelated strings.
+                       *
+                       * `designNo` already existed for exactly this — its own declaration
+                       * says it is there "so a design can be referred to at all: most carry
+                       * no name, and 'the octopus one' is not something you can type into a
+                       * search box" — and it was rendered nowhere. The same number is on the
+                       * board card and in the search index (designSearchTerms), so DSN-1042
+                       * here and DSN-1042 there are the same picture.
+                       *
+                       * The filename is not lost: it moves to the note, where it is a useful
+                       * hint and not the row's identity. Artwork with no number yet is
+                       * unsaved, and the note already says so.
+                       */
+                      name: designLabel(here ? designNo : r.art.no)
+                        || (here ? designName || fileNameFrom(designUrl) : r.art.name)
+                        || "Untitled artwork",
                       size: here ? designSize : undefined,
                       thumb: r.art.data,
                       status: here && saving ? "uploading" : "done",
                       /* THE FACE FIRST, because that is the fact this row was missing.
                          "Front · Not saved yet" answers both questions a glance has. */
-                      note: [tl("sides", r.side), unsaved ? "Not saved yet" : null].filter(Boolean).join(" · "),
+                      note: [
+                        tl("sides", r.side),
+                        unsaved ? "Not saved yet" : null,
+                        /* The human filename, once the number has taken the headline — a
+                           hint about which file this was, not the thing that identifies it. */
+                        designLabel(here ? designNo : r.art.no)
+                          ? (here ? designName || fileNameFrom(designUrl) : r.art.name) || null
+                          : null,
+                      ].filter(Boolean).join(" · "),
                       onRemove: () => void removeArtwork(r.side),
                     }}
                   />
