@@ -266,8 +266,8 @@ async function scan() {
     /* FOUND-BUT-UNREADABLE IS NOT AN EMPTY PAGE, and this said "no orders found here" for
        both. §4: if a thing can't be READ versus doesn't EXIST, say which. */
     paint((s.foundOnPage || 0) > 0
-      ? { line: 'No addresses could be read here', note: 'Usually non-US, or missing a street.' }
-      : { line: 'No orders on this page', note: 'Open your sold orders, or page back.' })
+      ? { line: 'None could be read', note: 'Usually non-US, or missing a street.' }
+      : { line: 'No orders here', note: 'Open your sold orders, or page back.' })
     $('stats').textContent = statsLine(s, 0)
     $('stats').title = statsTitle(s, 0)
     return
@@ -290,7 +290,7 @@ async function scan() {
   paint(ROWS.length
     ? { line: `${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'} to send`,
         button: 'sync', peek: ROWS.length }
-    : { line: 'This page is done', note: 'Page back for older orders.' })
+    : { line: 'All have addresses', note: 'Page back for older orders.' })
 
   /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
