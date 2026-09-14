@@ -206,6 +206,19 @@ export function ImportOrdersDialog({
   const [records, setRecords] = useState<ImportRecord[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  /**
+   * WHICH COLUMN THE READER ASKED ABOUT.
+   *
+   * The help was on `title` with `cursor-help`, so the pill promised an explanation with the
+   * pointer and then delivered it through the slowest, least reliable channel a browser has:
+   * a native tooltip that waits a second, dies on the smallest movement, cannot be read at
+   * 250 characters, and never appears on a touch screen at all. The question mark was the
+   * only part that arrived.
+   *
+   * One slot under the bands, one column at a time. A press is a press on any device, the
+   * text gets the panel's full width to wrap in, and nothing moves except the slot.
+   */
+  const [helpFor, setHelpFor] = useState<string | null>(null)
   const [paste, setPaste] = useState("")
   const [notice, setNotice] = useState<string | null>(null)
   // Header row shown for manual copying when the clipboard write did not happen.
@@ -885,11 +898,14 @@ export function ImportOrdersDialog({
                       {CSV_COLUMNS.slice(band.start, band.start + band.count).map((c) => {
                         const duty = dutyOf(c)
                         return (
-                          <span
+                          <button
                             key={c.header}
-                            title={`${DUTY_LABEL[duty]} — ${c.help}`}
+                            type="button"
+                            aria-pressed={helpFor === c.header}
+                            onClick={() => setHelpFor((h) => (h === c.header ? null : c.header))}
                             className={
-                              "inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs " +
+                              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition-colors " +
+                              (helpFor === c.header ? "ring-2 ring-primary/40 " : "") +
                               (duty === "required"
                                 ? "border-primary/40 bg-primary/10 font-medium text-primary"
                                 // A softer form of the required treatment — dashed outline,
@@ -907,18 +923,43 @@ export function ImportOrdersDialog({
                             {duty === "required" && <span className="text-destructive">*</span>}
                             {duty === "assigned" && <span className="opacity-70">~</span>}
                             {duty === "oneOf" && <span className="opacity-70">†</span>}
-                          </span>
+                          </button>
                         )
                       })}
                     </div>
                   </div>
                 ))}
+                {/*
+                  * THE ANSWER, IN ONE PLACE, AT FULL WIDTH.
+                  *
+                  * Its empty state is the only instruction on this panel, which is what makes
+                  * the pills discoverable without a sentence under every one of the 32: there
+                  * is nothing else to read here, so one line is allowed to say what to do.
+                  */}
+                <div className="min-h-[3.25rem] rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+                  {(() => {
+                    const c = CSV_COLUMNS.find((x) => x.header === helpFor)
+                    if (!c) return (
+                      <span className="text-muted-foreground">
+                        {tl("import", "Press a column to see what goes in it.")}
+                      </span>
+                    )
+                    const duty = dutyOf(c)
+                    return (
+                      <>
+                        <span className="font-medium">{c.header}</span>
+                        <span className="text-muted-foreground"> · {DUTY_LABEL[duty]}</span>
+                        <div className="mt-0.5 text-muted-foreground">{c.help}</div>
+                      </>
+                    )
+                  })()}
+                </div>
                 <p className="text-2xs text-muted-foreground">
                   <span className="font-medium text-primary">{tl("import", "Blue *")}</span> = required on every row.
                   <span className="ml-1 font-medium text-primary">{tl("import", "Dashed")}</span> = fill it, or we assign one.
                   Everything else is optional and can be completed after import.{" "}
                   <b>{tl("import", "Order Number")}</b> is what groups lines — give every line of one order the same
-                  number, or each line imports as a separate order. Hover any column for what it does.
+                  number, or each line imports as a separate order.
                 </p>
               </div>
             </details>
