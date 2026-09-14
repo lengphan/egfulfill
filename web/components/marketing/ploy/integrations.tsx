@@ -1,9 +1,8 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
-import { HOVER, pop, reveal, rise } from "./motion"
+import { HOVER, reveal, rise } from "./motion"
 import { GUTTER, SECTION, TOP } from "./rhythm"
 
 /**
@@ -43,12 +42,12 @@ export function PloyIntegrations({ headline, accent, lead }: { headline: string;
       <section className={`${GUTTER} ${TOP}`}>
         <h1 className="ploy-display text-[clamp(2.4rem,6vw,5rem)]">
           <motion.span {...reveal(0)} className="block">{headline}</motion.span>
-          <motion.span {...reveal(0.1)} className="flex items-center gap-3">
-            <span>{accent}</span>
-            <motion.span {...pop(0.25)} className="inline-block">
-              <Image src="/ploy/obj-cloud.webp" alt="" width={160} height={104} unoptimized className="h-[0.62em] w-auto" />
-            </motion.span>
-          </motion.span>
+          {/* NO OBJECT IN THE HEADLINE. A glossy 3D cloud sat at the end of this line, set to the
+   cap height so it read as a piece of the sentence. Five surfaces carried one of these
+   renders and none of them were about printing a garment — which is the opposite of what
+   "Phantom renders, we photograph" asks of every picture on this site. They are all gone
+   (2026-09-14, owner). The line is the line. */}
+          <motion.span {...reveal(0.1)} className="block">{accent}</motion.span>
         </h1>
         <motion.p {...reveal(0.2)} className="mt-6 max-w-xl text-[17px] leading-relaxed text-ploy-ink/70">
           {lead}

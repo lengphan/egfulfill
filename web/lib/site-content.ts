@@ -326,11 +326,22 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
          lines under a title that had already made the point, so the section was four
          paragraphs where it needed four labels — and a numbered ladder is scanned, not read.
          What survives is the fact the title cannot carry: which shops, what gets set, where
-         the sale arrives, what happens to the parcel. */
-      { n: "01", word: "Connect", title: "Plug in the shop you already run.", body: "Etsy, Shopify or TikTok Shop. Every order lands in one queue." },
-      { n: "02", word: "Design", title: "Upload once, place once.", body: "Placement, print files and thread colours — set once, reused after." },
-      { n: "03", word: "Publish", title: "List from here, or keep listing there.", body: "Push listings from EGFUL or keep your own. The sale arrives either way." },
-      { n: "04", word: "Ship", title: "We make it, check it, send it.", body: "Made on our machines, checked, shipped. Tracking goes back to your shop." },
+         the sale arrives, what happens to the parcel.
+
+         CUT AGAIN, 2026-09-14, same reason from the same person. Each body was still two
+         sentences and each still wrapped to two lines on the home page, which is what made
+         that section read uneven: a row whose copy wraps is a taller row, and a taller row
+         moved the display word beside it. One CLAUSE each now, and they are measured against
+         the home layout — a line that fits on one line cannot push anything.
+
+         BOTH FIELDS STILL EXIST, and the two surfaces use different amounts of them: the
+         home page renders the word and the body (the title repeated the word), /how-it-works
+         renders all three because a whole band per step has room for the sentence. Deleting
+         `title` outright would have taken the copy off the page that uses it well. */
+      { n: "01", word: "Connect", title: "Plug in the shop you already run.", body: "Etsy, Shopify or TikTok Shop, in one queue." },
+      { n: "02", word: "Design", title: "Upload once, place once.", body: "Placement, print files and thread colours, set once." },
+      { n: "03", word: "Publish", title: "List from here, or keep listing there.", body: "Push listings from EGFUL, or keep your own." },
+      { n: "04", word: "Ship", title: "We make it, check it, send it.", body: "Printed, checked, shipped. Tracking goes back." },
     ],
   },
   /**
@@ -476,7 +487,15 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
    * object to point at rather than three boxes of prose.
    */
   howPage: {
-    title: "Three steps.",
+    /* COUNT-FREE, for the same reason the home page's steps heading is (see that note): a
+       heading that counts the thing under it goes wrong the next time someone adds a step,
+       and this one already had. The page renders `content.steps.items` — the SAME four the
+       home page shows, Connect · Design · Publish · Ship — under a title that said three.
+
+       CHANGING THIS DEFAULT DOES NOT FIX THE LIVE PAGE. "Three steps." is also stored in the
+       database, and a stored value wins; it needs one edit in Settings › Site content. The
+       default is corrected so the trap is not reset the next time the field is cleared. */
+    title: "From sold to shipped.",
     accent: "Then it runs.",
     sub: "Connect, upload, submit. Everything after that happens without you opening a shipping screen.",
     /* Empty is deliberate — the page draws its plate until someone sets a picture. */
