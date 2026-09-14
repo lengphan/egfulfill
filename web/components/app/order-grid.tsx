@@ -91,7 +91,23 @@ type Opt = string | { value: string; label: string }
 const optValue = (o: Opt) => (typeof o === "string" ? o : o.value)
 const optLabel = (o: Opt) => (typeof o === "string" ? o : o.label)
 
+/**
+ * 1–20, AS A PICKER, on a column that is typed far more often than any other.
+ *
+ * Quantity is the one cell where the value is almost always a small number and almost
+ * always the same small number, so a list costs nothing and saves a keystroke on every
+ * line. 20 rather than 10 because a wholesale row goes past ten regularly and past twenty
+ * rarely — and past twenty the list stops helping anyway, which is the point below.
+ *
+ * IT DOES NOT RESTRICT THE CELL. Every cell here is an <input> and the menu is a suggestion
+ * list, not a <select>: type 250 and it takes 250, exactly as the colour and size columns
+ * behave. A quantity column that could only offer what it had guessed would be worse than
+ * no list at all.
+ */
+const QTY_OPTIONS = Array.from({ length: 20 }, (_, i) => String(i + 1))
+
 const FIXED_OPTIONS: Record<string, string[]> = {
+  item_quantity: QTY_OPTIONS,
   item_size: ITEM_SIZES,
   ship_state: US_STATES,
   print_type: COLUMN_OPTIONS.print_type ?? [],
