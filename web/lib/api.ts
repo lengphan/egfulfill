@@ -2980,6 +2980,12 @@ export type OrderQuote = {
      *  figures for the same reason methodFee is: a line quoting more than its base has to
      *  be able to say which surcharge did it. */
     sides?: number; sideFee?: number
+    /** What the extra faces actually contributed to the price THIS LINE CARRIES — which on a
+     *  charged order is not always `sideFee`. `sideFee` is priced off the artwork that is on
+     *  the garment now; a frozen line's cost is what was billed, and a face added after
+     *  submit deliberately does not re-price it. Null when the catalogue cannot give a base
+     *  cost to subtract, which is "we cannot tell", never "nothing". */
+    sideFeeCharged?: number | null
     /** WHICH face cost what, so a breakdown can name them instead of reporting "2 sides" and
      *  leaving the reader to work out which one carried the money. `included` is the face in
      *  the base cost — named, because "why is the front not listed" is otherwise unanswerable
