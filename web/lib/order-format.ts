@@ -6,7 +6,30 @@
 
 import { type OrderRow, type OrderItem } from "@/lib/api"
 
-export const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+/**
+ * MONEY, AND THE SIGN GOES BEFORE THE SYMBOL.
+ *
+ * This used to be `` `$${n.toLocaleString(...)}` ``, which renders a negative as `$-20.50`
+ * — the dollar sign, then the minus, then the digits. No accounting surface writes it that
+ * way, and it showed up on the single row it matters most on: Gross margin, the one figure
+ * on an order that tells you whether the job lost money. Every deduction ABOVE it read
+ * `−$39.00` correctly, because those call sites prepend the sign by hand to a positive
+ * amount — so the loss row was the only one in the column formatted differently from its
+ * neighbours, which is exactly where the eye is least forgiving.
+ *
+ * U+2212 MINUS SIGN, not a hyphen, matching the six call sites that already prepend one.
+ * At `tabular-nums` a hyphen sits high and short against the digits; the minus is drawn to
+ * the same width and height as the figures beside it, which is the whole reason a column of
+ * money lines up.
+ *
+ * A VALUE THAT ROUNDS TO ZERO CARRIES NO SIGN. −0.004 formats as `0.00`, and `−$0.00` is a
+ * number that does not exist — it reads as a rounding bug on a screen about money.
+ */
+export const usd = (n: number) => {
+  const v = Number(n) || 0
+  const digits = Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return `${v < 0 && digits !== "0.00" ? "\u2212" : ""}$${digits}`
+}
 
 /**
  * Un-escape marketplace text so a HUMAN reads what the BUYER typed.
