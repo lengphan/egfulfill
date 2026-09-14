@@ -2,7 +2,8 @@
 
 import { useRef } from "react"
 import { motion, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
-import { reveal, rise } from "./motion"
+import { reveal } from "./motion"
+import { Band } from "./band"
 import { GUTTER, SECTION } from "./rhythm"
 import type { Testimonial } from "@/lib/site-content"
 
@@ -61,7 +62,7 @@ export function PloyReviews({ heading, items }: { heading: string; items: Testim
 
   return (
     <section ref={ref} className={`${GUTTER} ${SECTION}`}>
-      <motion.div {...rise(0)} className="relative overflow-hidden rounded-[32px] bg-ploy-peri px-8 py-16 md:px-14 md:py-20">
+      <Band className="relative overflow-hidden rounded-[32px] bg-ploy-peri px-8 py-16 md:px-14 md:py-20">
         {/* NO OBJECT BESIDE THE HEADING. A cluster of glossy lime cubes sat opposite it,
             meaning nothing and cropped by the block's own top edge. See the note in
             integrations.tsx: every 3D render on this site went on 2026-09-14. */}
@@ -76,7 +77,7 @@ export function PloyReviews({ heading, items }: { heading: string; items: Testim
             <Card key={t.quote} t={t} i={i} progress={progress} />
           ))}
         </div>
-      </motion.div>
+      </Band>
     </section>
   )
 }
