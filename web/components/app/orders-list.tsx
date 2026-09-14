@@ -27,14 +27,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { cachedOrders, streamOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
+import { cachedOrders, streamOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign, getOrderQuote, type OrderQuote } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
+import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, sideRatesFor } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
@@ -225,6 +225,34 @@ export function OrdersList() {
   // The mini designer, opened from an item row — same surface the factory boards use, so
   // a seller edits artwork where the item is rather than navigating to the order first.
  const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
+ /**
+  * THE RATES FOR THE LINE BEING DESIGNED.
+  *
+  * The designer's face rail prices each face before anyone prints there, and it was fed
+  * rates on the order page only -- so the same window quoted +$4.00 a face when opened
+  * from an order and nothing at all when opened from here. One fetch, when the dialog
+  * opens, rather than a quote per row: this list draws hundreds of orders and only ever
+  * designs one at a time.
+  *
+  * The condition is a CLICK (`editing`), and the fetch writes different state, so this is
+  * not the shape CLAUDE.md 2.8 warns about -- it cannot re-satisfy itself.
+  */
+ const [editQuote, setEditQuote] = useState<OrderQuote | null>(null)
+ useEffect(() => {
+   let alive = true
+   /* DEFERRED, because react-hooks/set-state-in-effect forbids a synchronous setState
+      here and CLAUDE.md 5 names setTimeout(fn, 0) as the pattern the app pages use. */
+   const t = setTimeout(() => {
+     if (!alive) return
+     if (!editing) { setEditQuote(null); return }
+     getOrderQuote(editing.order.id)
+       .then((q) => { if (alive) setEditQuote(q) })
+       /* No rates is a rail with no prices on it, which is what it did before. A quote
+          that will not load must not stop somebody placing artwork. */
+       .catch(() => { if (alive) setEditQuote(null) })
+   }, 0)
+   return () => { alive = false; clearTimeout(t) }
+ }, [editing])
   /**
    * THE LINE AS IT IS NOW. `editing` is a snapshot taken on click, and the design window now
    * carries the variant picker — so picking a blank inside it saved, refreshed the board, and
@@ -637,6 +665,7 @@ export function OrdersList() {
  onOpenChange={(v) => { if (!v) setEditing(null) }}
  orderId={editing.order.id}
  orderLabel={numOf(editing.order)}
+              sideFees={sideRatesFor(editQuote, editing.item)}
  item={editingLive?.item ?? editing.item}
  initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
  initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}

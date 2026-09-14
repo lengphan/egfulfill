@@ -374,3 +374,30 @@ export function orderReadiness(o: OrderRow, opts?: { missingArtwork?: boolean })
     { id: "scanned", label: "Scanned", met: scanned, blocked: "awaiting scan", detail: scanned ? "Scanned" : "Waiting on the scan" },
   ]
 }
+
+/**
+ * THE PER-FACE RATES FOR ONE LINE of a quote.
+ *
+ * The designer's face rail prints "+$4.00" on a tile before anyone commits to printing
+ * there, and it is opened from THREE places — the order page, the staff hub and the seller
+ * list. Only the first was passing rates, so the same window quoted prices on one route and
+ * nothing on the other two.
+ *
+ * Matched by `line_id`, which is line identity: two lines of one order can be two different
+ * blanks with two different rates, and `sku` is null on a manual line and shared by
+ * identical-SKU siblings (CLAUDE.md §5). sku stays as the fallback for rows written before
+ * line_id existed.
+ *
+ * The rates themselves are resolved server-side by the same function that computes the
+ * charge (sideRates in server/src/pricing.js), so the tile cannot quote a price the invoice
+ * will not use.
+ */
+export function sideRatesFor(
+  quote: { lines?: { line_id?: string | null; sku?: string | null; sideRates?: Record<string, number> }[] } | null | undefined,
+  item: { line_id?: string | null; sku?: string | null },
+): Record<string, number> {
+  const hit = (quote?.lines ?? []).find((l) =>
+    (l.line_id && l.line_id === (item.line_id ?? null))
+    || (!l.line_id && !!l.sku && l.sku === item.sku))
+  return hit?.sideRates ?? {}
+}
