@@ -2975,6 +2975,12 @@ export type OrderQuote = {
      *  figures for the same reason methodFee is: a line quoting more than its base has to
      *  be able to say which surcharge did it. */
     sides?: number; sideFee?: number
+    /** WHICH face cost what, so a breakdown can name them instead of reporting "2 sides" and
+     *  leaving the reader to work out which one carried the money. `included` is the face in
+     *  the base cost — named, because "why is the front not listed" is otherwise unanswerable
+     *  from a list of the others. Computed by the same function as `sideFee` (sideBreakdown
+     *  in server/src/pricing.js), so the explanation cannot disagree with the charge. */
+    sideParts?: { included: string | null; parts: { face: string; amount: number }[] }
     supplierCost?: number | null }[]
   /** Lines with no price, and WHY — the reasons need different people to act.
    *  `no-blank`: nothing named, the seller picks one. `unknown-blank`: a blank IS named and
