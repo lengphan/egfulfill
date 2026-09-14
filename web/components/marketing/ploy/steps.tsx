@@ -73,32 +73,22 @@ function Lead({ lines }: { lines: string[] }) {
   }, [lines])
   const total = paras.reduce((n, p) => n + p.length, 0)
   return (
-    <div ref={ref} className="mt-8 max-w-2xl md:mt-10 md:max-w-[46rem]">
-      {/* THE SPACE THE GARMENT OCCUPIES, AS A FLOAT — the paragraph wraps around the hoodie
-          instead of starting underneath it.
-
-          The block used to clear the overhang with `pt-[26svh]` on the card: a quarter of the
-          viewport of bare acid above the first word. The garment covers only the RIGHT of that
-          band, so what it actually produced was a large empty rectangle on the left with an
-          object floating beside it — which is the "tons of blank space" this section was
-          reported for, and the third time the same answer had been tried (30rem, then 18rem,
-          then the pad).
-
-          Capping the whole column to the sleeve's x was the next wrong answer and is recorded
-          so it is not retried: at 1280 the usable width is 541px, which turned two paragraphs
-          into a seven-line wall with its own void beside the lower half. The column is only
-          narrow where the garment IS — a float is the one thing in CSS that says exactly that,
-          and it needs no measurement per width because the text finds its own edge.
-
-          THE TWO NUMBERS. Width 13rem is taken from the WORST case, 1280, where the sleeve's
-          left edge (629px) leaves 195px of this 736px column covered; at 1440 and 1920 it
-          reserves a little more than the garment needs, which costs two words on three lines
-          and cannot collide. Height is in svh because the overhang is: the hang is 28–32% of a
-          hero card measured in svh, which measures 205px at 900 and 250px at 1080 — 23svh
-          either way — less the 40px this block already sits below the card's top edge. A pixel
-          height would clear at one window and land on the sleeve at the next.
-          `md:` only: below it the garment is full-width and the hero does not overhang. */}
-      <div aria-hidden className="float-right hidden h-[20svh] w-[13rem] md:block" />
+    /* THE SLEEVE, AS A FLOAT — the paragraph is narrow only where the garment is.
+       This column is the left half of the block and the hoodie hangs over the right half, so
+       it looked as though there was nothing to clear. There is, at the NARROW end: the two
+       columns divide at 50% of the band, and the sleeve's left edge is a fraction of the
+       VIEWPORT, and at 1280 that fraction is 38% — the garment reaches 108px INTO this
+       column. It eases off as the window grows (17px of clearance at 1440, 71px at 1600 and
+       above, where the band's cap holds the card still while the garment keeps moving out).
+       MEASURED OVER A FULL CYCLE, not at one instant, and that is the part worth keeping:
+       the render drifts 28px and rotates 3° on two loops of different length, so its left
+       edge travels ~25px and a reading taken at one moment is a reading of one frame. Sampled
+       every 200ms for twelve seconds, the worst overlap is the 108px above.
+       9rem covers it with room, and only for the height of the overhang — 20svh, because the
+       hang is 28–32% of a hero card measured in svh and a pixel height clears it at one
+       window and lands on the sleeve at the next. Below `md` the hero does not overhang. */
+    <div ref={ref} className="mt-8 max-w-2xl md:mt-0 md:max-w-none">
+      <div aria-hidden className="float-right hidden h-[20svh] w-[9rem] md:block" />
       {paras.map((ws, i) => (
         <p
           key={i}
@@ -156,7 +146,7 @@ function StepRow({ i, total, step, progress }: { i: number; total: number; step:
   return (
     <motion.li
       style={{ opacity }}
-      className="grid grid-cols-[44px_minmax(0,1fr)] items-baseline gap-x-6 gap-y-3 border-b border-ploy-ink/12 py-6 last:border-b-0 md:grid-cols-[44px_auto_minmax(0,1fr)] md:gap-x-10 md:py-7"
+      className="grid grid-cols-[44px_minmax(0,1fr)] items-baseline gap-x-6 gap-y-2 border-b border-ploy-ink/12 py-6 last:border-b-0 md:gap-x-8 md:py-7"
     >
       {/* The numeral is what puts this circle on the row's baseline — `items-baseline` reads
           the text inside it, not the box, which is why the ring needs no offset of its own at
@@ -173,24 +163,22 @@ function StepRow({ i, total, step, progress }: { i: number; total: number; step:
       <h3 className="ploy-display text-[clamp(2.25rem,4.6vw,4rem)] leading-[0.85] text-ploy-ink">
         {displayWord(step)}
       </h3>
-      {/* FLUSH RIGHT, AGAINST THE CARD'S EDGE — and this is what the row was reported for.
-          The line used to be left-aligned in a `1fr` track under a `max-w-[32rem]` cap, and
-          the copy is one clause: measured at 1440 it drew 512px of a 885px track and left
-          373px — a third of the card — with no ink in it, on every row, top to bottom. That
-          is the blank. Nothing was missing from the section; the section simply stopped a
-          third of the way short of its own edge.
-          Right-aligning it anchors the row to BOTH edges, so the space between the word and
-          the line is a gap the eye crosses rather than a margin it falls off. The hairline
-          under each row is the other half of it: a rule that runs the full width is what
-          makes the space between two anchored things read as measured rather than as unused.
-          The word track is `auto` now, not `minmax(8rem,15rem)` — a fixed track under a word
-          whose length is editable content either clipped SHIP\'s neighbours or padded them. */}
+      {/* UNDER THE WORD, and the same at every width.
+          It was flush RIGHT against the card edge for one revision, to put ink on both ends
+          of a row that was leaving a third of the card empty. That fixed the emptiness and
+          bought a worse one: a word at the far left and a clause at the far right are two
+          things at the extremes of 1400px with nothing between them, and the eye reads the
+          span rather than the pair — "very scattered, feels unfinished". A rule under each
+          row cannot hold together what the copy itself has stopped doing.
+          The row is a PAIR now: the step's name and the sentence that explains it, stacked in
+          one column, which is what it already was on a phone. The width is solved where it
+          actually lives — see the note on the two columns below.*/}
       {/* `col-start-2` ON EVERY WIDTH, not `col-span-2`. Spanning both columns put the line
           under the NODE column too — and the pipe runs down that column, so on a phone the
           rule drew straight through the sentence. Starting it in the word's column instead
           means the pipe has the first 44px to itself at every width, which is the whole
           reason the node column is fixed. */}
-      <p className="col-start-2 max-w-[32rem] text-[17px] leading-snug text-ploy-ink/70 md:col-start-3 md:ml-auto md:text-right md:text-[19px]">
+      <p className="col-start-2 max-w-[32rem] text-[17px] leading-snug text-ploy-ink/70 md:text-[18px]">
         {step.body}
       </p>
     </motion.li>
@@ -242,7 +230,18 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
             them above the section's own headline competed with it. The block opens on its
             title now. */}
 
-        <div className="px-8 md:px-14">
+        {/* TWO COLUMNS, and this is what finally uses the width.
+            A ladder of four one-word steps cannot fill a 1416px band. It was tried flush left
+            (a third of the card empty) and then anchored to both edges (scattered), and both
+            are the same mistake: asking four short rows to span a page. Nothing was wrong
+            with the rows — they were in a column three times too wide for them.
+            So the block holds TWO things side by side. The argument reads down the left, the
+            ladder down the right, each about 600px: a measure a paragraph wants, and one a
+            step row is full at. The card gets shorter for it too.
+            It also retires the float that cleared the garment. The hoodie hangs RIGHT, which
+            is the ladder's column now, so the clearance is a pad on that column alone and the
+            paragraph starts at the top of the card, where nothing was ever in its way. */}
+        <div className="px-8 md:grid md:grid-cols-2 md:gap-x-16 md:px-14">
           {/* NO DISPLAY HEADLINE HERE (owner, 2026-09-09: "no bold — it's just a paragraph").
               A bold line above a paragraph is two openings competing, and weight wins every
               time: the eye took the headline and skipped the argument underneath it, which is
@@ -252,27 +251,26 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
 
           {/* The heading OPENS the paragraph rather than sitting over it, so the stored
               content still renders and the section still says what it is — in one voice. */}
+          {/* THE SPACE GOES BETWEEN THE TWO BLOCKS, NOT AFTER THEM.
+              The left column holds less than the right — a paragraph and four figures against
+              four steps — so `items-start` left it ending a third of the way up the card with
+              the rest of its height empty, which is the same trailing hole in a narrower
+              shape. Stretched to the row and pushed apart, the argument sits at the top and
+              its proof at the bottom, level with the last step: the gap is now interior,
+              bounded by ink at both ends, which is a composition rather than a remainder. */}
+          <div className="flex flex-col">
           <Lead lines={[[...heading, lead[0]].filter(Boolean).join(" "), ...lead.slice(1)]} />
 
-          <div className="relative mt-12 md:mt-14">
-            {/* THE PIPE. Base rule in pale ink; the fill scales down from the top with scroll.
-                It sits in the node column, which is now the FIRST column at a flat 44px at
-                every width — so this is `left-[21px]` and nothing else. It used to be
-                `left-[calc((100%-44px-5rem)/2.1+2.5rem+21px)]`, a formula reconstructing the
-                middle of a three-column grid from the outside; it had to be re-derived by
-                hand every time a gap or a track changed, and 2.1 is not a number anyone can
-                justify. Putting the node column first makes the rule a constant. */}
-            <div className="absolute bottom-0 left-[21px] top-0 w-0.5 bg-ploy-ink/15">
-              <motion.div style={{ scaleY: progress }} className="h-full w-full origin-top bg-ploy-ink" />
-            </div>
-            <ol ref={list}>
-              {steps.map((s, i) => (
-                <StepRow key={s.n || i} i={i} total={steps.length} step={s} progress={progress} />
-              ))}
-            </ol>
-          </div>
-
-          <motion.div {...reveal(0.3)} className="mt-12 grid grid-cols-2 gap-8 md:grid-cols-4">
+          {/* THE PROOF SITS UNDER THE ARGUMENT, not in a band at the foot of the card.
+              Four figures across the bottom were a third row in a two-column block, and they
+              left the left column empty from the end of the paragraph to the end of the
+              section — which is the same hole this layout was built to close, moved one
+              column over. Here they give the left column its full height and they read as
+              what they are: the evidence for the sentence directly above them.
+              TWO UP, not four. Four figures in a 600px column is 150px each, and "99.4%" at
+              72px does not fit in 150px — it is a 2×2 in half the width, which is also how
+              they are drawn on a phone. */}
+          <motion.div {...reveal(0.3)} className="mt-12 grid grid-cols-2 gap-x-8 gap-y-10 md:mt-auto md:pt-14">
             {stats.map((f) => {
               /* `value` is stored as free TEXT — "$0", "24h", "3", "99.4%" — because an admin
                  types it in Settings › Site content. So the figure is split rather than
@@ -295,6 +293,30 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
               )
             })}
           </motion.div>
+          </div>
+
+          {/* THE CLEARANCE LIVES HERE NOW — this column is the one the hoodie hangs into.
+              In svh because the overhang is: 28–32% of a hero card measured in svh, which is
+              205px at a 900px window and 250px at 1080. A pixel pad clears it at one window
+              and lands on the first step at the next. */}
+          <div className="relative mt-12 md:mt-0 md:pt-[22svh]">
+            {/* THE PIPE. Base rule in pale ink; the fill scales down from the top with scroll.
+                It sits in the node column, which is now the FIRST column at a flat 44px at
+                every width — so this is `left-[21px]` and nothing else. It used to be
+                `left-[calc((100%-44px-5rem)/2.1+2.5rem+21px)]`, a formula reconstructing the
+                middle of a three-column grid from the outside; it had to be re-derived by
+                hand every time a gap or a track changed, and 2.1 is not a number anyone can
+                justify. Putting the node column first makes the rule a constant. */}
+            <div className="absolute bottom-0 left-[21px] top-0 w-0.5 bg-ploy-ink/15">
+              <motion.div style={{ scaleY: progress }} className="h-full w-full origin-top bg-ploy-ink" />
+            </div>
+            <ol ref={list}>
+              {steps.map((s, i) => (
+                <StepRow key={s.n || i} i={i} total={steps.length} step={s} progress={progress} />
+              ))}
+            </ol>
+          </div>
+
         </div>
       </motion.div>
       {/* NO OBJECT ON THIS EDGE.
