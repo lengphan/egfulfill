@@ -65,27 +65,7 @@ function useFmtDate() {
 // more for Amazon to cancel its padding, more again for TikTok so the word under its icon
 // stays legible. Re-measure before changing one; don't eyeball it.
 const CHANNELS: { key: string; name: string; live: boolean; soon?: string; why?: string; markH: number }[] = [
-  /**
-   * ETSY IS WITHDRAWN, TEMPORARILY, AND IT IS NOT "not built" — that is the whole reason it
-   * carries its own label instead of the default "Coming soon".
-   *
-   * The connector works. What does not work yet is the ORDER it produces: Etsy's app-tier
-   * PII gate strips the buyer's street and ZIP from what their API returns us, so a shop
-   * connected today imports orders nobody can ship, and the seller finds that out one order
-   * at a time. The browser extension is the answer — it reads the address off the seller's
-   * own Shop Manager page, which Etsy does show them — and it is not rolled out yet.
-   * Offering Connect before it is, is offering a broken shop.
-   *
-   * TO PUT IT BACK: `live: true`, and drop `soon`/`why`. One line, and nothing else in this
-   * file or the server knows about it.
-   *
-   * IT DOES NOT TOUCH ANY CONNECTED SHOP (§2.6). `live` drives this card's button and the
-   * two count tiles at the top, nothing else. Shops already connected keep their row above,
-   * keep syncing, and keep their Disconnect button; this only stops NEW connections.
-   */
-  { key: "etsy", name: "Etsy", live: false, soon: "Paused",
-    why: "Etsy connect is paused while we finish the address extension — their API withholds the buyer's street, so orders would arrive unshippable.",
-    markH: 32 },
+  { key: "etsy", name: "Etsy", live: true, markH: 32 },
   { key: "tiktok", name: "TikTok Shop", live: true, markH: 46 },
   { key: "shopify", name: "Shopify", live: true, markH: 28 },
   { key: "woocommerce", name: "WooCommerce", live: false, markH: 27 },
@@ -594,6 +574,11 @@ export function StoresManager() {
                    working yesterday is the kind of thing a seller asks support about, so the
                    pill takes a `title` when the channel has one. The pill itself stays one
                    short word — it sits in a 5-unit-wide card and the sentence does not fit. */
+                /* `why` fills the tooltip when a channel has a reason worth giving; `soon`
+                   overrides the label. Both are unused right now — Woo, Amazon and Walmart
+                   are plainly unbuilt and "Coming soon" says so — and both are kept because
+                   the next channel withdrawn for a REASON should say the reason (§4) rather
+                   than borrow the label for never-built. */
                 <span
                   title={ch.why}
                   className={"mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-dashed border-border px-3 text-center text-xs font-medium text-muted-foreground" + (ch.why ? " cursor-help" : "")}
@@ -633,6 +618,26 @@ export function StoresManager() {
                 Opens the <span className="font-medium text-foreground">{tiktokRegion === "us" ? "US" : "global"}</span> TikTok Shop
  login. If your shop is {tiktokRegion === "us" ? tl("stores", "not US") : "US"} and it can&apos;t find your account, the
  server&apos;s <code className="tabular-nums">TIKTOK_REGION</code> is set to the wrong region.
+              </div>
+            )}
+            {/* WHAT ETSY WILL NOT SEND US, said BEFORE the shop is connected rather than
+                discovered one unshippable order at a time.
+
+                Etsy withholds the buyer's street and ZIP from an app on the restricted tier,
+                so orders import complete in every respect except the one that gets a parcel
+                moving. That is not a defect the seller can fix by reconnecting, and without
+                this sentence the obvious reading of a blank address is that WE lost it.
+
+                THE CARD WAS BRIEFLY MARKED "Paused" INSTEAD. That was the wrong lever: the
+                extension fills addresses on orders that ALREADY EXIST — it never creates one
+                — so closing Connect does not send anyone to the extension, it just means no
+                Etsy orders at all. The connection is what brings the order in and what
+                pushes tracking back; the extension patches the single field Etsy withholds.
+                Both are needed, so the honest move is to connect and say this. */}
+            {pending === "etsy" && (
+              <div className="mt-3 rounded-lg border border-hold/40 bg-hold/5 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{tl("stores", "Buyer addresses arrive separately.")}</span>{" "}
+                {tl("stores", "Etsy does not release the street and postcode to our app, so orders import without them and cannot be shipped until they are filled in. Our browser extension reads them from your own Etsy orders page. Everything else — items, sizes, artwork, tracking back to Etsy — works from this connection.")}
               </div>
             )}
             {/* Already-synced shops: say the rule ONCE, up here, rather than repeating it on
