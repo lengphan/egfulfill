@@ -1448,7 +1448,6 @@ const vi: Dict = {
   // renders; these are the hub's own words.
   "orders.position": "vị trí in",
   "orders.positions": "vị trí in",
-  "orders.extra faces": "mặt in thêm",
   "orders.The artwork changed after this was charged — this is what was billed.": "Thiết kế đã thay đổi sau khi thu tiền — đây là số đã tính.",
   "orders.deactivated": "đã vô hiệu hoá",
   "orders.deleted account": "tài khoản đã xoá",

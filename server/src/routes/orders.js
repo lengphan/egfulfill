@@ -1199,6 +1199,23 @@ export function ordersRoutes(app, requireAuth) {
    * would put megabytes back into the list the img_ref split took them out of.
    */
   q('alter table order_items add column if not exists mockups jsonb').catch(() => {});
+  /**
+   * WHAT THE FROZEN PRICE IS MADE OF, stamped at charge time beside unit_cost itself.
+   *
+   * `unit_cost` is base + print method + one row per EXTRA printed face, added together into
+   * a single number — so once an order is charged, WHICH faces were billed is not recorded
+   * anywhere. The seller's quote can name them because it recomputes from the artwork that is
+   * on the garment now; the charged view cannot, because artwork added after submit
+   * deliberately does not re-price a paid order. Measured on FF-ombao6-mu0ytlyc-4txl9: $3.00
+   * of side money on each of two lines, and no way to say which face either one paid for.
+   * The summary had to fall back to a row reading "extra faces", which is the vague answer
+   * this column exists to stop giving.
+   *
+   * `{ base, method, included, sides: [{face, amount}] }` — the same shape sideBreakdown
+   * returns, so the client reads one thing whether the line is quoted or charged.
+   * freezeQuote is the only writer, and only at the moment of charge.
+   */
+  q('alter table order_items add column if not exists cost_parts jsonb').catch(() => {});
   q('alter table order_items add column if not exists design_tier text').catch(() => {});
   q('alter table order_items add column if not exists design_tier_at timestamptz').catch(() => {});
   q('alter table order_items add column if not exists design_tier_by text').catch(() => {});

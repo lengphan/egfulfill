@@ -1007,7 +1007,12 @@ export default function OrderDetailPage() {
                title={tl("orders", "The artwork changed after this was charged — this is what was billed.")}>
             <dt className="pl-3 text-muted-foreground">
               {who}
-              <span className="opacity-70"> · {tl("orders", "extra faces")}</span>
+              {/* "POSITIONS" — the word the item rows on this same screen already use ("2
+                  positions · Front · Left"), not "extra faces" (owner). It is only reached
+                  when the faces cannot be named, which from now on means a line charged
+                  before freezeQuote began stamping its split: the stamp is what lets every
+                  other charged line name the face exactly, as the quote does. */}
+              <span className="opacity-70"> · {tl("orders", "positions")}</span>
             </dt>
             <dd className="tabular-nums text-muted-foreground">{usd(paid * qty)}</dd>
           </div>
