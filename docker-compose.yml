@@ -219,6 +219,29 @@ services:
       # (Vercel caps a proxied body at ~4.5MB) and for the 60MB JSON route. So the host pulls
       # it over SFTP and the container reads it off this mount instead.
       SANMAR_DATA_DIR: ${SANMAR_DATA_DIR:-/data/sanmar}
+      # SanMar SOAP — live inventory and pricing, and (gated) purchase orders.
+      #
+      # THESE WERE MISSING ENTIRELY and only SANMAR_DATA_DIR above was here, so SanMar was in
+      # exactly the trap this file warns about twice already (see Otto and TIKTOK_REGION): a
+      # line in .env does NOTHING on its own, because compose forwards env BY NAME. Anyone
+      # adding the credentials would have seen them ignored with no error.
+      #
+      # The three credentials are also on the app_secrets allow-list, so Settings ›
+      # Integrations is the better place to put them — that survives a rebuild inside the
+      # nightly dump, which .env does not. These lines exist so an .env override still works
+      # and so the names are visible here rather than only in the code.
+      SANMAR_CUSTOMER_NUMBER: ${SANMAR_CUSTOMER_NUMBER:-}
+      SANMAR_USERNAME: ${SANMAR_USERNAME:-}
+      SANMAR_PASSWORD: ${SANMAR_PASSWORD:-}
+      # EMPTY default on purpose — sanmar.js owns the production host. Point this at
+      # test-ws.sanmar.com to use the SEPARATE test-environment credentials SanMar issue for
+      # PO onboarding; their test env has its own account, not a mode flag on the live one.
+      SANMAR_API_BASE: ${SANMAR_API_BASE:-}
+      # 1 = submitPO actually reaches SanMar. Unset, /api/sanmar/order returns the assembled
+      # payload as a dry run and creates nothing. NOT settable from Settings — the app_secrets
+      # allow-list deliberately carries no *_ORDER_LIVE gate, so spending money always takes a
+      # deploy and an SSH session, not a form. Same class of switch as SS_ORDER_LIVE.
+      SANMAR_ORDER_LIVE: ${SANMAR_ORDER_LIVE:-}
     volumes:
       # Read-only, and deliberately OUTSIDE the repo: the repo root is Caddy's webroot
       # (./:/srv:ro below) and @hidden is an exclusion list, so a catalog dropped in the repo
