@@ -861,21 +861,28 @@ export default function OrderDetailPage() {
         </div>
       )}
       {/*
-        * NOTHING RECORDED IS NOT THE SAME AS NOTHING ESTIMATED.
+        * NOT YET SPENT, AS A ROW — not as a sentence.
         *
-        * This asked `ourTotal === 0`, and ourTotal includes the BLANKS ESTIMATE — a figure
-        * off the quote, not money that has moved. So the one line explaining that no postage
-        * has been bought and no partner work booked was suppressed by an estimate, on exactly
-        * the orders where it is most needed: the card showed a single deduction and no way to
-        * tell "nothing else has been spent" from "nothing else is coming".
+        * This was a paragraph explaining that no postage had been bought and no partner work
+        * booked. A line of prose under a column of figures is the wrong shape for the answer:
+        * you are reading a list of costs, and the honest reading of "postage" on an order
+        * nobody has bought a label for is a cost of nothing.
         *
-        * It asks about RECORDED costs now, so an estimate no longer hides the fact that the
-        * real ones have not happened.
+        * $0.00 rather than a dash, and it is literally true: zero has been spent on it so
+        * far. The row appears only while the real one is absent, and is replaced the moment
+        * money is actually booked — so the column never carries both.
         */}
-      {costLines.length === 0 && !legacyPostage && (
-        <p className="text-xs text-muted-foreground">
-          Nothing has been spent on this order yet — no postage bought, no partner work booked.
-        </p>
+      {!costLines.some((l) => l.type === "label-cost") && !legacyPostage && (
+        <div className="flex justify-between text-sm">
+          <dt className="text-muted-foreground">Postage</dt>
+          <dd className="tabular-nums text-muted-foreground">{usd(0)}</dd>
+        </div>
+      )}
+      {!costLines.some((l) => l.type === "expedite-cost" || l.type === "design-partner-cost") && (
+        <div className="flex justify-between text-sm">
+          <dt className="text-muted-foreground">Partner fee</dt>
+          <dd className="tabular-nums text-muted-foreground">{usd(0)}</dd>
+        </div>
       )}
     </>
   )
