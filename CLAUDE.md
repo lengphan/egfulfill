@@ -682,6 +682,27 @@ hole. Team members resolve to `owner_id` via `effectiveSeller`.
   - 833–896 of the 4,081 styles are discontinued; browse hides them unless `?discontinued=1`.
 - **Payments** — `stripe.js`, `paypal.js`, `vietqr.js`, `topups.js`. **VietQR:** the top-up modal must render the **virtual-account `qrCode`** from `POST /api/vietqr/create-payment`. A locally built EMVCo QR is never synced back, so the poll never matches and money lands untracked. There is exactly one QR.
 - **Channels** — `etsy.js` (OAuth PKCE), `shopify.js`, `tiktok.js`, Google Sign-In. Null Etsy buyer addresses are Etsy's app-tier PII gate, **not** our bug.
+- **NEVER SCRAPE. THE API IS HOW AN ORDER ARRIVES, AND CONNECTING IS NOT OPTIONAL** (owner,
+  2026-09-14). An order comes from the channel's API, through a shop the seller connected.
+  A reader may fill in **only what that API refuses to give us**, never anything it would
+  have given us anyway, and never a field it gave us already.
+  - `extension/` is the one reader and the whole shape of it: it reads a page the seller
+    opened, makes **zero** requests to Etsy — no fetch, no pagination, no crawl, no worker,
+    no timer, asserted by `tools/check-extension-parse.mjs` — asks us *"of the receipts I can
+    see, which do you need?"*, and sends back **one field**. That is the ceiling, not a
+    starting point.
+  - **Replacing the sync with a scrape was costed and rejected.** Four things break, and the
+    first on its own is disqualifying: `line_id` is Etsy's `transaction_id` (`et-<id>`) and an
+    invented one already let overlapping syncs duplicate whole orders (`ef2bf637`, 18 orders
+    over-counted); the customer's uploaded artwork arrives as a URL inside `variations` and IS
+    the job on a POD order; `sku` is a listing field, not page text; and tracking cannot go
+    back without the connection's token (`etsy.js:844`). Status, cancellations and refunds
+    would only ever be as fresh as the last time someone had the tab open.
+  - So **the connection is not a convenience to design around.** Pausing Connect to push
+    sellers at the extension was tried on 2026-09-14 and reverted the same day: the extension
+    only ever UPDATEs orders that already exist (`applyAddressRows` never INSERTs), so no
+    connection means no orders at all. The warning about what Etsy withholds belongs in the
+    pre-connect dialog, which is where it now lives.
 
 ### Auth
 Sign-in accepts an **email or a username**. Usernames exclude `@`, which is what keeps

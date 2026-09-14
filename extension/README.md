@@ -3,6 +3,23 @@
 Fills buyer addresses on orders egful already has, from the seller's own Etsy Shop
 Manager page, while the Etsy API address entitlement is pending.
 
+## The rule this extension exists under
+
+**Never scrape. Fill in only what the API will not give us. The shop still has to be
+connected.** (Owner, 2026-09-14.)
+
+Orders arrive through Etsy's API, from a shop the seller connected. This extension adds
+**one field** that the API refuses to hand over — the buyer's street and postcode, withheld
+from apps on the restricted tier. It does not import orders, it cannot create one, and it
+must never grow into something that does.
+
+Making it read whole orders was costed and rejected: `line_id` is Etsy's own
+`transaction_id` and an invented one has already caused duplicate orders; the customer's
+uploaded artwork is a URL inside the transaction's variations, which is the actual job on a
+print-on-demand order; `sku` is a listing field rather than page text; and tracking cannot
+be pushed back without the connection's token. A scrape would also only be as current as the
+last time somebody had the tab open.
+
 ## What it does, and what it deliberately does not
 
 It **reads a page the seller opened themselves**. There is no `fetch` to Etsy anywhere in
