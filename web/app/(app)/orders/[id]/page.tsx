@@ -670,6 +670,14 @@ export default function OrderDetailPage() {
  /* A PLAIN FUNCTION, not useCallback. This sits below an early return, and a hook after
      one is called on some renders and not others — the "rendered more hooks than during the
      previous render" crash. It is read during render and memoising it buys nothing. */
+  /** THE BLANK'S SKU, not its name. `blank` on a line holds "name/sku/id" — whichever the
+   *  importer happened to write — so it is a marketing title as often as a code, and a
+   *  75-character garment name in a money column pushes the figure onto a second row.
+   *  resolveProduct is the canonical matcher (CLAUDE.md §5); the raw value is the fallback
+   *  for a blank that resolves to nothing. */
+ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
+    (l.blank ? resolveProduct({ blank: l.blank } as never, catalog)?.sku : null) || l.blank || null
+
  const feeCovers = (f: OrderDesignFee): number[] =>
     (f.lines?.length ? f.lines : [{ line_id: f.line_id, sku: f.sku }])
       .map((l) => items.findIndex((x) => (l.line_id && x.line_id === l.line_id) || (!l.line_id && !!l.sku && x.sku === l.sku)))
@@ -853,15 +861,15 @@ export default function OrderDetailPage() {
         const n = items.findIndex((x) =>
           (l.line_id && x.line_id === l.line_id)
           || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
-        const who = n > 0 ? `Item ${n}` : (l.blank || l.sku || "Item")
+        const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.sku || "Item")
         return (
           <div key={`cost-${i}`} className="flex justify-between text-sm">
             <dt className="min-w-0 truncate text-muted-foreground">
               {who}
-              {l.blank && <span className="text-muted-foreground/70"> · {l.blank}</span>}
+              {blankSkuOf(l) && <span className="text-muted-foreground/70"> · {blankSkuOf(l)}</span>}
               {qty > 1 && <span className="text-muted-foreground/70"> × {qty}</span>}
             </dt>
-            <dd className="tabular-nums">−{usd(cost * qty)}</dd>
+            <dd className="shrink-0 tabular-nums">−{usd(cost * qty)}</dd>
           </div>
         )
       })}
@@ -874,7 +882,7 @@ export default function OrderDetailPage() {
           const n = items.findIndex((x) =>
             (l.line_id && x.line_id === l.line_id)
             || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
-          return n > 0 ? `Item ${n}` : (l.blank || l.sku || "?")
+          return n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.sku || "?")
         })
         return (
           <div className="flex justify-between text-sm">
@@ -1047,7 +1055,7 @@ export default function OrderDetailPage() {
                       const n = items.findIndex((x) =>
                         (l.line_id && x.line_id === l.line_id)
                         || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
-                      const who = n > 0 ? `Item ${n}` : (l.blank || l.name || l.sku || "Item")
+                      const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.name || l.sku || "Item")
                       /* A single-part line needs no breakdown — a heading and one row under it
                          restating the same figure is the repetition, not a clarification. */
                       const split = method > 0.005 || parts.length > 0
@@ -1056,16 +1064,28 @@ export default function OrderDetailPage() {
                           <div className="flex justify-between">
                             <dt className="min-w-0 truncate font-medium">
                               {who}
-                              {l.blank && <span className="font-normal text-muted-foreground"> · {l.blank}</span>}
+                              {blankSkuOf(l) && <span className="font-normal text-muted-foreground"> · {blankSkuOf(l)}</span>}
                               {qty > 1 && <span className="font-normal text-muted-foreground/70"> × {qty}</span>}
                             </dt>
-                            <dd className="tabular-nums">{usd((Number(l.unitCost) || 0) * qty)}</dd>
+                            <dd className="shrink-0 tabular-nums">{usd((Number(l.unitCost) || 0) * qty)}</dd>
                           </div>
                           {split && (
                             <>
+                              {/* NAMED AFTER THE FACE IT INCLUDES. "Blank" was the garment on
+                                  its own, which is not what the figure is: one printed face is
+                                  inside the base cost, and calling the row Blank left the
+                                  reader to work out why a three-face line lists only two
+                                  surcharges. sideParts.included already knows which face that
+                                  is, so the list reads as every face, with the first one
+                                  marked as already paid for. */}
                               <div className="flex justify-between">
-                                <dt className="pl-3 text-muted-foreground">Blank</dt>
-                                <dd className="tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
+                                <dt className="pl-3 text-muted-foreground">
+                                  {l.sideParts?.included
+                                    ? <><span className="capitalize">{tl("sides", l.sideParts.included)}</span>
+                                        <span className="text-muted-foreground/70"> · included</span></>
+                                    : "Blank"}
+                                </dt>
+                                <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
                               </div>
                               {method > 0.005 && (
                                 <div className="flex justify-between">
