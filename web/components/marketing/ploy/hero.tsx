@@ -12,27 +12,32 @@ import { HOVER, enter, line } from "./motion"
  * A single garment, enormous, cropped by the viewport, with the headline set across it.
  * Nothing else competes: one silhouette, one block of type. The garment drags and drifts.
  *
- * `overflow-clip` ON BOTH AXES, and the second axis is the fix.
+ * THE GARMENT HANGS OVER THE ACID BLOCK, and the hang is BOUNDED. The owner wants the
+ * overlap ("keep the hoodie on top of the lime card as well"); what it may not do is land on
+ * the words.
  *
- * `overflow-hidden` is what must not be used — on one axis it forces the other to `auto`,
- * which put a horizontal scrollbar on the whole page and shifted every section left. `clip`
- * cuts without that.
+ * `overflow-x-clip`, never `overflow-hidden` — on one axis `hidden` forces the other to
+ * `auto`, which put a horizontal scrollbar on the whole page and shifted every section left.
+ * `clip` cuts the sideways bleed and leaves the vertical overhang alone.
  *
- * IT USED TO BE `overflow-x-clip`, so the garment hung past the bottom into the block below
- * on purpose — and landed on that block's opening paragraph. Measured against it: 43% of the
- * paragraph covered at 1440, 65% at 1280, 77% at 1024, while the comment in steps.tsx said
- * the type column there "is clear ground because the garment hangs right." It is clear ground
- * only above about 1700px, which is the width it was looked at.
+ * WHY THE HEIGHTS CAME DOWN (132/152/178 → 122/126/130). The hang is `top% + height% − 100%`
+ * of the hero card, so at 178% it ran to 80% of the card — about 550px in a 900px window, and
+ * that is what buried the acid block's opening paragraph: 43% of it covered at 1440, 65% at
+ * 1280, 77% at 1024, while the comment in steps.tsx claimed the column there "is clear ground
+ * because the garment hangs right." It is clear ground only above about 1700px.
  *
- * THE GARMENT KEEPS EVERYTHING ELSE. It is still the full-height object cropped by the
- * viewport, still draggable, still drifting — clipping the vertical bleed takes none of that
- * away. What it costs is the overhang, and the overhang was never the point: the hero's own
- * bottom edge is where the acid block begins, so the cut lands on a colour change and the
- * garment reads as passing BEHIND the next section rather than as being sliced.
+ * At these heights the hang is 28–32% of the card — a firm overlap nobody can miss — and
+ * steps.tsx opens its content below exactly that. THE TWO NUMBERS ARE A PAIR, and the note
+ * there says so: raise one without the other and the garment is back on the paragraph.
  *
- * Sizing it to fit instead would have been the other answer and it is the worse one: a height
- * that clears the paragraph is a number that has to be right at every viewport, and it was
- * already wrong at three of the four measured here. A clip is right at all of them.
+ * IT IS PROPORTIONAL ON BOTH SIDES ON PURPOSE. The hang is a percentage of a card measured in
+ * svh, so it grows with a tall window; a fixed pixel pad in the block below would clear it at
+ * 900px and fail at 1200. The clearance has to scale the way the overhang scales.
+ *
+ * MOVING IT UP INSTEAD DOES NOT WORK, recorded so it is not retried: keeping 178% and pulling
+ * `top` negative to shorten the hang cuts the same distance off the TOP of the render, and
+ * the top of this render is the hood. A garment with no hood is a different picture. The
+ * height is the only end of this that is free.
  */
 export function PloyHero({
   headline,
@@ -71,7 +76,7 @@ export function PloyHero({
     : "clamp(1.9rem,4.4vw,4.4rem)"
 
   return (
-    <section className="relative z-10 overflow-clip">
+    <section className="relative z-10 overflow-x-clip">
       <div ref={pen} className="ploy-hero-card relative flex min-h-[100svh] flex-col justify-end md:min-h-[76svh]">
         {/* IT SCALES WITH THE VIEWPORT, IN STEPS. It used to go straight from a phone size to
             `md:h-[178%]`, so every width from 768px to about 1200px got the full desktop
@@ -83,6 +88,18 @@ export function PloyHero({
             the type is bottom-aligned and the upper half is empty by design — the garment is
             what fills it. Lower down it did the opposite: left the top blank and sat behind
             the sub and both CTAs. */}
+        {/* THE GARMENT IS POSITIONED AGAINST THE PAGE'S CONTAINER, NOT THE VIEWPORT.
+            Its offsets are percentages of whatever box it sits in. When that box was the
+            viewport, capping the bands at 1480px broke the pairing: at 1440 the garment hung
+            over the acid card as intended, and at 2560 it sat 570px to the RIGHT of that
+            card, over bare ground, related to nothing. The hero itself stays full-bleed — the
+            ground runs edge to edge — but the object inside it now shares the same centred
+            1480px box as every band below, so `xl:right-[2%]` means the same distance from
+            the acid card's right edge at every width.
+
+            `pointer-events-none` here and `auto` on the child: this box spans the whole hero
+            and would otherwise swallow clicks on the headline's links. */}
+        <div className="pointer-events-none absolute bottom-0 left-1/2 top-0 z-0 w-full max-w-[1480px] -translate-x-1/2">
         <motion.div
           drag
           dragConstraints={pen}
@@ -93,7 +110,7 @@ export function PloyHero({
           initial={{ opacity: 0, scale: 0.86, y: 40 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ opacity: { duration: 0.9 }, scale: { duration: 1.1, ease: [0.22, 0.68, 0, 1] } }}
-          className="absolute right-[-24%] top-[1%] z-0 w-[104vw] cursor-grab touch-none select-none md:right-[-6%] md:top-[6%] md:h-[132%] md:w-auto md:max-w-none lg:right-[-1%] lg:top-[4%] lg:h-[152%] xl:right-[2%] xl:top-[2%] xl:h-[178%]"
+          className="pointer-events-auto absolute right-[-24%] top-[1%] z-0 w-[104vw] cursor-grab touch-none select-none md:right-[-6%] md:top-[6%] md:h-[122%] md:w-auto md:max-w-none lg:right-[-1%] lg:top-[4%] lg:h-[126%] xl:right-[2%] xl:top-[2%] xl:h-[130%]"
         >
           {/* The idle float is its OWN element, under the entrance. Two animations owning
               `scale` and `y` on one node fight and the object never appears (§4). */}
@@ -145,11 +162,22 @@ export function PloyHero({
             />
           </motion.div>
         </motion.div>
+        </div>
 
         {/* The type column is CAPPED, so it stops where the garment starts instead of running
             under it. Without a ceiling the sub and the buttons kept their own width while the
             hoodie grew toward them. */}
-        <div className="pointer-events-none relative z-10 flex w-full max-w-[42rem] flex-col px-6 pb-8 pt-28 md:max-w-[46rem] md:px-[5.5rem] md:pb-14 md:pt-36 lg:max-w-[54rem] xl:max-w-none">
+        {/* THE TYPE SITS IN THE PAGE'S CONTAINER TOO — `mx-auto max-w-[1480px]`, the same box
+            as the garment beside it and every band below. It was pinned to the viewport's left
+            edge, so once the bands were capped the headline started 88px from the screen while
+            the acid card below it started 565px in: the hero and the page it opens were half a
+            screen out of line at 2560.
+
+            Its OWN inset stays 5.5rem against the bands' 2rem. That gap is deliberate and
+            predates this — a hero is indented further than the blocks under it — and it is
+            preserved exactly because both are now measured from the same container edge
+            rather than from two different things. */}
+        <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[42rem] flex-col px-6 pb-8 pt-28 md:max-w-[46rem] md:px-[5.5rem] md:pb-14 md:pt-36 lg:max-w-[54rem] xl:max-w-[1480px]">
           <h1 className="ploy-display text-ploy-ink" style={{ fontSize: size }}>
             {lines.map((l, i) => (
               <motion.span key={l} {...line(i)} className="block whitespace-nowrap">

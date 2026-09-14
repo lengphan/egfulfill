@@ -47,5 +47,23 @@ export const TOP = "pt-20 md:pt-24"
    product detail page, which are not built from these components and would never have picked
    up a token defined here. Measured before the move: -28px to 192px across twelve routes. */
 
-/** The horizontal gutter every band shares, so a block edge never moves between pages. */
-export const GUTTER = "px-6 md:px-8"
+/**
+ * The horizontal gutter every band shares, so a block edge never moves between pages — AND
+ * the page's one width cap.
+ *
+ * IT WAS `px-6 md:px-8` AND NOTHING ELSE, so there was no container on this site at all: 27
+ * section sites, every one of them growing with the window forever. On a 2560px monitor that
+ * puts a 600px column of type at the far LEFT edge of a 2560px band with 1,900px of empty
+ * ground beside it — which is what "a lot of pages are full width, very difficult to read"
+ * is. The paragraphs were never the problem; most of them carry their own `max-w-*` and
+ * measured 56–102 characters a line even at 2560. The BAND around them was the problem.
+ *
+ * 1480px, because the whole design was drawn at 1440. Below that the cap never binds and
+ * nothing moves; at and above it every band settles at 1416px of content — within a few
+ * pixels of what 1440 already gives — so a wide monitor sees the design it was composed at,
+ * centred, rather than a stretched copy of it.
+ *
+ * THE HERO IS NOT IN HERE, deliberately. It does not use GUTTER: the garment is meant to
+ * bleed off the right edge of the VIEWPORT, so capping it would strand it mid-page.
+ */
+export const GUTTER = "mx-auto w-full max-w-[1480px] px-6 md:px-8"

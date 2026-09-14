@@ -112,11 +112,22 @@ export function PloyIntegrations({ headline, accent, lead }: { headline: string;
           assuming: every other API in this category sells label buying, and ours deliberately
           does not. Better said once here than discovered at integration time. */}
       <section className={`${GUTTER} ${SECTION}`}>
-        <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-slate px-8 py-14 text-ploy-ground md:px-14 md:py-16">
+        {/* TWO COLUMNS, because one left-aligned column did not fill this plate.
+            Measured: the ink reached 51% of the band's width and the right half was bare
+            slate — a 700px hole on a 1,416px page, which is the "layout seems undone" shape
+            (a band that leaves a hole, not a spacing problem). The heading takes the left
+            track and everything you read takes the right, which is this site's own grammar:
+            /how-it-works is four bands split exactly this way.
+
+            It splits at `md` only. Below that the plate is narrow enough that one column IS
+            the full width, and a two-track grid there would just make both tracks too thin
+            to set 48px display type in. */}
+        <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-slate px-8 py-14 text-ploy-ground md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-x-14 md:px-14 md:py-16">
           <h2 className="ploy-display max-w-[18ch] text-[clamp(1.7rem,3.8vw,3rem)]">
             <motion.span {...reveal(0)} className="block">Eight endpoints, and one we do not sell.</motion.span>
           </h2>
-          <motion.p {...reveal(0.1)} className="mt-5 max-w-2xl text-[16px] leading-relaxed text-ploy-ground/70">
+          <div>
+          <motion.p {...reveal(0.1)} className="mt-5 max-w-2xl text-[16px] leading-relaxed text-ploy-ground/70 md:mt-0">
             Quote a basket, create the order, read its status and tracking, cancel it, check the
             wallet. That is the whole surface — small on purpose, because everything the factory
             does after an order exists is our job rather than something you orchestrate.
@@ -139,6 +150,7 @@ export function PloyIntegrations({ headline, accent, lead }: { headline: string;
               </Link>
             </motion.div>
           </motion.div>
+          </div>
         </motion.div>
       </section>
 

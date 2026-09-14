@@ -185,7 +185,22 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
 
   return (
     <section id="steps" className={`relative ${GUTTER} ${STACK}`}>
-      <motion.div {...rise(0)} className="ploy-acid-bloom relative overflow-hidden rounded-[32px] pb-20 pt-10 md:pb-24 md:pt-14">
+      {/* THE TOP PAD CLEARS THE HERO'S GARMENT, and it is HALF OF A PAIR.
+          The hoodie hangs over this card on purpose (owner: "keep the hoodie on top of the
+          lime card as well"), 28–32% of the hero card past its own bottom edge. This pad is
+          the other half: the block's first words start below that. Change one and you must
+          change the other — see the note in hero.tsx, which carries the arithmetic.
+
+          IN svh, NOT PIXELS. The overhang is a percentage of a card measured in svh, so it
+          grows with a tall window. A fixed pixel pad clears it at 900px and fails at 1200 —
+          which is the whole class of bug this replaces, where a number was right at the one
+          viewport somebody looked at.
+
+          The space does not read as empty, and that is the point of putting the garment in
+          it: it was 30rem and then 18rem of BARE acid once before, which is what made this
+          block read half-finished and got the padding removed entirely — and removing it is
+          what put the garment on the paragraph. */}
+      <motion.div {...rise(0)} className="ploy-acid-bloom relative overflow-hidden rounded-[32px] pb-20 pt-10 md:pb-24 md:pt-[26svh]">
         {/* NO MARQUEE HERE. A strip of marketplace names scrolling across the top of this
             block was the prototype's device for filling the band under the hero — but the
             names are already a claim the page makes in words, and a second, moving copy of
