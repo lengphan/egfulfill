@@ -40,28 +40,34 @@ always the code on disk, never a copy Chrome injected before the last reload.
 5. **Sync addresses**
 
 No need to reload the Etsy tab after updating the extension — the reader is injected when
-you open the popup, so it is always the current build. The footer prints that build (`v0.1.4`)
+you open the popup, so it is always the current build. The footer prints that build (`v0.1.5`)
 so "did my change load" is a question you can answer by looking.
 
 Page through your orders and press Sync again on each page. Nothing is sent automatically.
 
 ## Reading the footer
 
-A healthy page reads `20 seen · 5 to send · json · v0.1.4`, and it is the first thing to look
-at when something seems wrong. Every part but `seen` and the build is conditional — a fact
-appears only when it has something to say:
+The footer's resting state is just the build (`v0.1.5`) — the one thing the panel above
+cannot say for itself, and the thing that answers "did my change load".
+
+It only speaks up when there is something to act on:
 
 | What you see | What it means |
 |---|---|
-| `0 seen` on a page full of orders | Etsy changed their markup — `src/parse.js` needs new selectors |
-| `20 seen · 0 to send` | EGFULFILL already has addresses for these orders |
-| `20 seen · 0 to send · 20 unreadable` | Found, but failed validation (non-US, missing city) — nothing is sent wrong |
-| `json` | Read from Etsy's own page data — the most reliable strategy |
-| `text` | Read from rendered text — works, but more fragile |
+| `v0.1.5` alone | Nothing to report. What is on the page, the panel above already said in words |
+| `2 of 20 couldn't be read` | Found on the page but failed validation — non-US, or missing a street or city. Nothing is sent wrong |
 
-`unreadable` is the gap between what was found and what validated, so it is absent on a page
-with no gap. A bare `0` with no context is exactly the failure this reporting exists to
-prevent: a broken selector and an empty page look identical otherwise.
+**Hover it for the full reading**: `20 found on this page · 5 to send · read via json`. That
+is where the counts live now. They used to be printed on the face of the panel — `1 seen ·
+0 to send · address-block · v0.1.4` under a panel that had already said "Nothing to send
+from this page", which restated in jargon what the two lines above said in words. And
+`address-block` is the name of a parsing STRATEGY: it means something to whoever edits
+`src/parse.js` and nothing to the person pressing Sync.
+
+**Diagnosing a broken selector**: a page full of orders reading as empty is the failure to
+watch for, and it looks identical to a genuinely empty page. The panel says "No orders found
+here"; the hover says `0 found on this page`. If you see that on a page of sold orders,
+`src/parse.js` needs new selectors.
 
 ## The server side
 
@@ -84,7 +90,7 @@ a seller is answered about their own orders, staff about all.
 
 - **The selectors came from a live page (2026-09-13) and are tested against it**
   (`node tools/check-extension-parse.mjs`), but Etsy can change their markup without notice.
-  The footer stats are what make that break visible: `0 seen` with orders on screen means
+  The footer hover is what makes that break visible: `0 found` with orders on screen means
   `src/parse.js` needs new selectors, and it reads as a bug report rather than a silent zero.
   Addresses are already in the DOM even though the Ship-to panel renders COLLAPSED — nothing
   needs expanding, and nothing is ever clicked.

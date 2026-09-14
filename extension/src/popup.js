@@ -106,27 +106,44 @@ async function api(path, init) {
 /* ── the page ──────────────────────────────────────────────────────────────── */
 
 /**
- * THE FOOTER IS A BUG REPORT, AND IT HAS TO FIT ON ONE LINE.
+ * THE FOOTER SAYS THE BUILD, AND SPEAKS UP ONLY WHEN SOMETHING IS WRONG.
  *
- * It read `20 on page · 5 wanted · 5 usable · via json · v0.1.1` — five facts in a 288px
- * strip, so it wrapped and the build number, the thing you look at to answer "did my change
- * load", was the half that fell off the end.
+ * It read `1 seen · 0 to send · address-block · v0.1.4` under a panel that had already said
+ * "Nothing to send from this page — the orders on this page already have addresses". Four
+ * facts in the factory's own vocabulary, restating in jargon what the two lines above said
+ * in words, on a page where nothing was wrong. `address-block` in particular is the name of
+ * a PARSING STRATEGY: it means something to whoever edits parse.js and nothing at all to
+ * the person pressing Sync.
  *
- * The one failure this line exists to make visible is a BROKEN SELECTOR on a page full of
- * orders, so `seen` stays, always, and stays first. The rest earns its place: `unreadable`
- * is the gap between what was found and what validated, and it is silent when there is no
- * gap, which is every healthy page. The strategy prints as a bare word — `via` was four
- * characters explaining a word that explains itself.
+ * So the resting state is the build number, which is the one thing the panel cannot say for
+ * itself and the thing you look at to answer "did my change load". The counts have not gone
+ * anywhere: they are the element's `title`, a hover away, and they come back into the line
+ * itself for the one case that is actionable — addresses found on the page that could not be
+ * read, which is a real answer to "why didn't it pick up that order".
+ *
+ * A page that reads ZERO is left to the panel above, which says "No orders found here" and
+ * tells you where to look. That is the one reading a broken selector shares with an empty
+ * page — and the hover, which says `0 found`, is where that gets diagnosed.
  */
 function statsLine(s, toSend) {
   const found = s.foundOnPage || 0
-  const bits = [`${found} seen`]
-  if (found) bits.push(`${toSend} to send`)
+  const bad = found - (s.usable || 0)
+  const ver = `v${chrome.runtime.getManifest().version}`
+  /* Short enough to sit on one line beside Disconnect \u2014 spelling out "addresses" pushed it
+     to two, and the panel above is already about addresses. The hover has the long form. */
+  if (found && bad > 0) return `${bad} of ${found} couldn\u2019t be read \u00b7 ${ver}`
+  return ver
+}
+
+/* The full reading, for whoever is looking for it. Kept off the face of the panel and on
+   the element, so the detail survives without being read aloud on every healthy page. */
+function statsTitle(s, toSend) {
+  const found = s.foundOnPage || 0
+  const bits = [`${found} found on this page`, `${toSend} to send`]
   const bad = found - (s.usable || 0)
   if (bad > 0) bits.push(`${bad} unreadable`)
-  if (s.how) bits.push(s.how)
-  bits.push(`v${chrome.runtime.getManifest().version}`)
-  return bits.join(' · ')
+  if (s.how) bits.push(`read via ${s.how}`)
+  return bits.join(' \u00b7 ')
 }
 
 async function scan() {
@@ -137,6 +154,7 @@ async function scan() {
     $('note').textContent = 'Shop Manager → Orders & Shipping. This reads what is on that page; it never fetches anything from Etsy.'
     $('sync').disabled = true
     $('stats').textContent = ''
+    $('stats').title = ''
     return
   }
 
@@ -200,6 +218,7 @@ async function scan() {
       : 'No orders found here. Open a page of your sold orders, or page through to older ones.'
     $('sync').disabled = true
     $('stats').textContent = statsLine(s, 0)
+    $('stats').title = statsTitle(s, 0)
     return
   }
 
@@ -228,6 +247,7 @@ async function scan() {
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
      broken selector hides for weeks. */
   $('stats').textContent = statsLine(s, ROWS.length)
+  $('stats').title = statsTitle(s, ROWS.length)
 }
 
 async function start() {
