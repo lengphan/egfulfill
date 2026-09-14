@@ -111,5 +111,31 @@ for (let mask = 1; mask < 1 << FACES.length; mask++) {
 }
 console.log(`  ${bad ? "" : "ok  "}${combos} face combinations × rate sets, charge === sum(parts)`)
 
+/* ---- every tier has somewhere to be SET ------------------------------------------------
+ * The engine's own note used to claim the per-face rates "can only be set by writing fee
+ * keys directly". That was true once and quietly stopped being true, and it was quoted back
+ * as fact twice — an owner set a rate in SQL that the UI had a field for. A comment about
+ * what is MISSING rots silently, because nothing fails when the gap is filled. This asserts
+ * the editors exist, so the claim in pricing.js is checkable rather than remembered.
+ */
+console.log("\nEVERY TIER HAS AN EDITOR")
+{
+  const { readFileSync } = await import("node:fs")
+  const { join, dirname } = await import("node:path")
+  const { fileURLToPath } = await import("node:url")
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..")
+  const settings = readFileSync(join(root, "web/components/app/settings-view.tsx"), "utf8")
+
+  check("Settings writes the flat rate", /setBand\("method_side"/.test(settings), true)
+  check("Settings writes a rate per face", /setBand\(`side_\$\{face\}`/.test(settings), true)
+
+  /* The product's own map is the highest tier, so it needs an editor too — the Placement
+     grid on the blank itself. */
+  const anySidePrice = ["web/components/app/product-editor-dialog.tsx", "web/components/app/products-catalog.tsx"]
+    .map((f) => { try { return readFileSync(join(root, f), "utf8") } catch { return "" } })
+    .some((src) => /sidePrice/.test(src))
+  check("the product editor writes sidePrice", anySidePrice, true)
+}
+
 console.log(bad ? `\n${bad} failure(s).` : "\nSide pricing holds, and every breakdown sums to its charge.")
 process.exit(bad ? 1 : 0)
