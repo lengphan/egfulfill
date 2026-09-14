@@ -368,9 +368,19 @@ function costPartsOf(row, item, fees) {
  * side_sleeve $1.50 — front alone $15.00, front+back $18.50, front+sleeve $16.50,
  * front+back+sleeve $20.00, and a face with no override falling to the $2.00 flat at $17.00.
  *
- * WHAT IS ACTUALLY MISSING is the editor: Settings and the product dialog expose one "Each
- * additional side" box, so the per-face rates can only be set by writing fee keys directly.
- * That is a UI gap, not an engine one — do not "add" what is already here.
+ * ALL THREE TIERS HAVE AN EDITOR, and this comment used to say the opposite. It read "what
+ * is actually missing is the editor… the per-face rates can only be set by writing fee keys
+ * directly", which was true when written and has not been for a while:
+ *
+ *   Settings › Pricing   "Each additional side" writes method_side, and the grid of eight
+ *                        faces beneath it writes side_<face>. Each face box shows the flat
+ *                        figure as a greyed placeholder, so an empty one reads as "this rate".
+ *   Product › Placement  the per-face boxes on the blank itself write d.sidePrice.
+ *
+ * It cost real time: the stale line was quoted back twice as "you can only do this in SQL",
+ * and an owner set a rate by hand that the UI had a field for. A comment describing what is
+ * MISSING is the kind that rots silently — nothing fails when the gap is filled — so if a
+ * tier ever does lose its editor, say which and date it.
  */
 /**
  * WHAT ONE FACE COSTS — the three tiers, in one place.
