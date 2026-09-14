@@ -37,13 +37,13 @@ always the code on disk, never a copy Chrome injected before the last reload.
 2. Open the extension → **Connect to egful**
 3. Go to **Etsy → Shop Manager → Orders & Shipping** (`etsy.com/your/orders/sold`)
 4. Open the extension → it shows how many addresses on that page egful is missing
-5. **Send addresses** — press **Show the 5** first if you want to read what is about to go
+5. **Sync to egful** — press **Show the 5** first if you want to read what is about to go
 
 No need to reload the Etsy tab after updating the extension — the reader is injected when
-you open the popup, so it is always the current build. The footer prints that build (`v0.1.6`)
+you open the popup, so it is always the current build. The footer prints that build (`v0.1.7`)
 so "did my change load" is a question you can answer by looking.
 
-Page through your orders and press **Send addresses** again on each page. Nothing is sent
+Page through your orders and press **Sync to egful** again on each page. Nothing is sent
 automatically.
 
 **What is about to be sent** is one press away: *Show the 5* lists the name and address of
@@ -52,14 +52,14 @@ is never written anywhere, and it is gone when the popup closes.
 
 ## Reading the footer
 
-The footer's resting state is just the build (`v0.1.6`) — the one thing the panel above
+The footer's resting state is just the build (`v0.1.7`) — the one thing the panel above
 cannot say for itself, and the thing that answers "did my change load".
 
 It only speaks up when there is something to act on:
 
 | What you see | What it means |
 |---|---|
-| `v0.1.6` alone | Nothing to report. What is on the page, the panel above already said in words |
+| `v0.1.7` alone | Nothing to report. What is on the page, the panel above already said in words |
 | `2 of 20 couldn't be read` | Found on the page but failed validation — non-US, or missing a street or city. Nothing is sent wrong |
 
 **Hover it for the full reading**: `20 found on this page · 5 to send · read via json`. That

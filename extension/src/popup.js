@@ -288,7 +288,7 @@ async function scan() {
 
   drawRows()
   paint(ROWS.length
-    ? { line: `${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'} to send`,
+    ? { line: `${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'} to sync`,
         button: 'sync', peek: ROWS.length }
     : { line: 'All have addresses', note: 'Page back for older orders.' })
 
@@ -309,7 +309,7 @@ async function start() {
 async function sync() {
   if (!ROWS.length) return
   $('sync').disabled = true
-  $('sync').textContent = 'Sending…'
+  $('sync').textContent = 'Syncing…'
   try {
     /* Send only the fields the endpoint reads. `_how` is a diagnostic this side and has no
        business in a request body. */
@@ -323,11 +323,11 @@ async function sync() {
     if (res.alreadyHad) rest.push(`${res.alreadyHad} already had one`)
     if (res.notFound) rest.push(`${res.notFound} not in egful yet`)
     if (res.skipped) rest.push(`${res.skipped} skipped`)
-    paint({ line: `${res.updated} sent`, note: rest.join(' · ') })
+    paint({ line: `${res.updated} synced`, note: rest.join(' · ') })
   } catch (e) {
     fail(e.message)
   } finally {
-    $('sync').textContent = 'Send addresses'
+    $('sync').textContent = 'Sync to egful'
     $('sync').disabled = false
   }
 }
