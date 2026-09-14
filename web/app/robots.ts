@@ -18,6 +18,11 @@ import { SITE_URL } from "@/lib/site-url"
  * Keep in step with the directories in `app/(app)/` and `app/(boards)/`.
  */
 const PRIVATE = [
+  /* app/lab — prototypes and crop checks, not pages anyone is sent to. It was NOT listed,
+     although /lab/band's own header says "noindex": a comment is not a directive, and the
+     drafts under /lab are exactly the kind of half-finished page that should never be the
+     first result for the product's own name. */
+  "/lab",
   // app/(app) — the seller shell
   "/chat",
   "/dashboard",
