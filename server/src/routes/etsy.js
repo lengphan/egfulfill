@@ -173,6 +173,85 @@ async function listingImage(conn, listingId, imageId, cache) {
   return url;
 }
 
+/**
+ * FILL THE IMAGE CACHE FOR A WHOLE PAGE OF RECEIPTS IN ONE CALL.
+ *
+ * `listingImage` above costs one or two Etsy calls PER LINE ITEM on a first import. Etsy's
+ * quota is 10/second and 10,000/day, and a 100-receipt page can easily carry 150 lines — so
+ * the images alone could outweigh the receipt fetch that produced them by two orders of
+ * magnitude.
+ *
+ * `/listings/batch` takes up to 100 listing ids and `includes=Images` returns their images
+ * inline, so a page costs at most a couple of calls instead of hundreds. The endpoint is not
+ * new to us: `shopListings` already uses exactly this shape.
+ *
+ * IT ONLY FETCHES WHAT WOULD OTHERWISE BE FETCHED. Both `listingImage` call sites are
+ * guarded — the first import of an order, or an existing item still missing its picture — so
+ * priming every page blindly would spend a call to save none on a sync where nothing is new.
+ * One grouped query answers "which of these receipts already has a picture on every line",
+ * and only the rest are looked up.
+ *
+ * FAILURE IS FREE. Anything that goes wrong here leaves the cache empty and `listingImage`
+ * does what it did before, one call at a time. This is an optimisation and it must never be
+ * the reason a sync fails.
+ *
+ * Returns what it did, so a caller can log it rather than guess.
+ */
+async function primeImageCache(conn, receipts, cache) {
+  const out = { calls: 0, listings: 0, skipped: 0 };
+  if (!cache || !Array.isArray(receipts) || !receipts.length) return out;
+
+  // Orders whose every line already carries an image need nothing. `bool_and` over the page
+  // in one query rather than a lookup per receipt.
+  let done = new Set();
+  try {
+    const ids = receipts.map((rc) => 'etsy-' + rc.receipt_id);
+    const have = await q(
+      `select order_id, bool_and(img is not null and img <> '') as all_imgs
+         from order_items where order_id = any($1::text[]) group by order_id`, [ids]);
+    done = new Set(have.rows.filter((r) => r.all_imgs).map((r) => String(r.order_id)));
+  } catch (e) { /* fall through: prime for everything rather than nothing */ }
+  out.skipped = done.size;
+
+  // Every listing referenced by a receipt that still needs one, minus what the cache holds.
+  const want = new Set();
+  for (const rc of receipts) {
+    if (done.has('etsy-' + rc.receipt_id)) continue;
+    for (const tr of (rc.transactions || [])) {
+      const id = tr && tr.listing_id;
+      if (!id) continue;
+      const key = String(id) + (tr.listing_image_id ? (':' + tr.listing_image_id) : '');
+      if (!Object.prototype.hasOwnProperty.call(cache, key)) want.add(String(id));
+    }
+  }
+  if (!want.size) return out;
+
+  const all = [...want];
+  for (let i = 0; i < all.length; i += 100) {
+    const chunk = all.slice(i, i + 100);
+    try {
+      const d = await etsyGet(conn, `/listings/batch?listing_ids=${chunk.join(',')}&includes=Images`);
+      out.calls += 1;
+      for (const l of (d.results || [])) {
+        const lid = String(l.listing_id || '');
+        if (!lid) continue;
+        const images = Array.isArray(l.images) ? l.images : [];
+        // BOTH KEY SHAPES, because `listingImage` keys on the transaction's image id when it
+        // has one and on the listing alone when it does not. Priming only the bare id would
+        // leave every line that names an image still making its own call.
+        const first = imgUrlOf(images[0]);
+        if (first) cache[lid] = first;
+        for (const im of images) {
+          const iid = im && im.listing_image_id;
+          if (iid) cache[lid + ':' + iid] = imgUrlOf(im);
+        }
+        out.listings += 1;
+      }
+    } catch (e) { /* leave the cache alone; listingImage falls back per item */ }
+  }
+  return out;
+}
+
 // Is this connection owned by factory STAFF (admin/operator/…) or by a SELLER? This
 // drives factory_order: a seller's OWN shop yields seller-owned orders
 // (factory_order=false, seller-managed until pushed, then the normal pipeline); the
@@ -478,6 +557,10 @@ async function syncConnection(conn, opts = {}) {
     for (let offset = 0; offset < 1000; offset += 100) {
       const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions${qs}`);
       const results = r.results || [];
+      // One batched image lookup for the whole page, before the per-receipt loop that would
+      // otherwise fetch them one line at a time. See primeImageCache — it is guarded, it is
+      // best-effort, and a failure here costs nothing but the old behaviour.
+      await primeImageCache(conn, results, imgCache);
       for (const rc of results) {
         if ((await importReceipt(conn, rc, connectedSec, imgCache, isFactory)) === 'skipped') skipped++; else orders++;
       }
@@ -1236,6 +1319,54 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     return r.rows;
   });
 
+  /**
+   * HAS THIS SELLER REGISTERED US AS A PRODUCTION PARTNER?
+   *
+   * This is the question behind the one Etsy risk that costs a SELLER their shop rather than
+   * costing us our API access. Etsy requires a seller who uses a production partner to
+   * register it and declare it on the listing; `who_made` is the declaration, and ours
+   * defaults to 'i_did' (owner, 2026-08-09, because 'someone_else' coincided with Etsy
+   * rejecting new drafts — see the note at that constant, and do not flip it here).
+   *
+   * That default is only safe while nobody can tell whether it is true. Etsy exposes the
+   * answer — `getShopProductionPartners`, scope `shops_r`, which every connected shop already
+   * granted us — and we have never asked. So the risk was unmeasurable rather than absent.
+   *
+   * This route only READS. It changes no listing and writes nothing. What it buys is the
+   * ability for the publish form to say "you have not registered a production partner, and
+   * Etsy expects one for made-for-you goods" BEFORE a listing goes up, instead of a seller
+   * discovering it from a suspension notice.
+   *
+   * Seller-scoped through connectionFor: a seller sees their own shop, staff see the factory
+   * shop. Not `requireStaff` — the seller is the person whose shop is at risk.
+   */
+  app.get('/api/etsy/production-partners', { preHandler: requireAuth }, async (req, reply) => {
+    const conn = await connectionFor(req.user);
+    if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+    try {
+      const d = await etsyGet(conn, `/shops/${conn.shop_id}/production-partners`);
+      const list = (d.results || []).map((p) => ({
+        id: p.production_partner_id,
+        name: p.partner_name || null,
+        location: p.location || null,
+      })).filter((p) => p.id);
+      return {
+        shop_id: conn.shop_id,
+        count: list.length,
+        partners: list,
+        // The reading, not just the rows — a caller should not have to know Etsy's rules to
+        // know whether this shop is exposed.
+        registered: list.length > 0,
+      };
+    } catch (e) {
+      // A shop that has never opened the production-partner form answers 404 here, and that
+      // is a real answer — "none registered" — not a failure. Anything else is reported.
+      const msg = String((e && e.message) || e);
+      if (/404/.test(msg)) return { shop_id: conn.shop_id, count: 0, partners: [], registered: false };
+      reply.code(400); return { error: msg };
+    }
+  });
+
   // Diagnostic: list the connected shop's shipping profiles (so we can see if one
   // exists + its id, and whether reading them is a scope problem).
   app.get('/api/etsy/shipping-profiles', { preHandler: requireStaff }, async (req, reply) => {
@@ -1976,6 +2107,22 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       });
       if (readinessId) form.append('readiness_state_id', String(readinessId));
       if (returnPolicyId) form.append('return_policy_id', String(returnPolicyId));
+      /**
+       * THE DECLARATION, WHEN THE SELLER HAS ACTUALLY MADE ONE.
+       *
+       * `who_made: 'someone_else'` on its own names no one. Etsy's own field for who that
+       * someone is, is `production_partner_ids`, and it takes the ids from
+       * GET /api/etsy/production-partners above. Sending it is what turns the declaration
+       * from a word into a registration Etsy can check.
+       *
+       * ONLY WHEN SENT. Nothing is inferred and nothing is defaulted: a caller that says
+       * nothing publishes exactly as it did before. Etsy rejects ids that do not belong to
+       * the shop, so these are filtered to digits and left for Etsy to validate rather than
+       * guessed at here.
+       */
+      const partnerIds = (Array.isArray(b.production_partner_ids) ? b.production_partner_ids : [])
+        .map((x) => String(x).replace(/[^0-9]/g, '')).filter(Boolean);
+      for (const pid of partnerIds) form.append('production_partner_ids[]', pid);
       // Tags. The client has always SENT these; this route used to ignore them, so every
       // tag a seller picked was silently dropped. Etsy's rules are strict and it rejects
       // the whole listing on a bad one, so sanitize rather than pass through: max 13, max
