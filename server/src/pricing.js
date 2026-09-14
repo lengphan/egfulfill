@@ -815,7 +815,12 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
     // split is a fact about the product and the technique, and showing it is the only way
     // a $13.50 blank quoting $18.50 stops looking like two different prices.
     const parts = srow ? costPartsOf(srow, it, fees) : { base: null, method: 0 };
-    lines.push({ id: it.id, sku: it.sku, name: it.name, qty, size: it.size, blank: it.blank,
+    /* LINE IDENTITY, not the row id. `id` is the order_items primary key and the CLIENT's
+       OrderItem does not carry it, so a caller matching a quote line back to the item on
+       screen had only `sku` to go on — which is null on a manual line, and shared by
+       identical-SKU siblings, which CLAUDE.md §5 names as the bug: "two lines of the same
+       SKU are different jobs; keying on sku alone flips every sibling at once". */
+    lines.push({ id: it.id, line_id: it.line_id ?? null, sku: it.sku, name: it.name, qty, size: it.size, blank: it.blank,
                  unitCost: money(cost), shipFee: money(ship), extraFee: money(extra),
                  baseCost: parts.base == null ? null : money(parts.base),
                  methodFee: money(parts.method || 0),
