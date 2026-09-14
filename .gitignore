@@ -64,3 +64,6 @@ images/*.emb
 images/*.EMB
 images/SS-Activewear-logo.png
 images/otto-updatedlogo_0.png
+
+# Build output — the packed extension zip (tools/pack-extension.sh)
+dist/

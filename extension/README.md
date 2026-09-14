@@ -112,6 +112,70 @@ a seller is answered about their own orders, staff about all.
   `egful.store`. Anything new at the repo root is public by default (CLAUDE.md §2.5) — if
   you ever want to offer a packaged `.zip` for download, that has to be a deliberate path.
 
+## Putting it on the Chrome Web Store
+
+Unpacked loading is fine for us and impossible for a seller: Chrome blocks a `.crx` installed
+from anywhere but the store, so the store is the only way this reaches someone else's browser.
+
+```bash
+tools/pack-extension.sh          # -> dist/egful-extension-<version>.zip
+```
+
+`manifest.json` must sit at the ROOT of the zip. Finder's "Compress" puts it one level down
+and the upload is refused with "manifest file is missing or unreadable", which reads like a
+broken file rather than a wrong directory. The script also checks the manifest parses and that
+every icon it promises is actually in the package. `dist/` is gitignored and in the Caddyfile's
+`@hidden` — a zip at the repo root would otherwise be downloadable from egful.store (§2.5).
+
+**Once, before the first upload:** register at
+[chrome.google.com/webstore/devconsole](https://chrome.google.com/webstore/devconsole) and pay
+the one-time $5 developer fee. A Google account you will still control in two years — the
+listing cannot be moved between accounts afterwards.
+
+**Distribution: UNLISTED.** Anyone with the link can install it; nobody can find it by
+searching. Public puts "reads your Etsy orders page" in a searchable index next to our name,
+which is a conversation with Etsy we have no reason to start. Private (trusted testers) is
+tighter still but needs every seller's Google account listed by hand.
+
+**The listing asks for, and this is most of the work:**
+
+| Field | What to put |
+|---|---|
+| Name | egful — Etsy address sync |
+| Summary (132 chars) | Fills buyer addresses onto the egful orders you already have, from your own Etsy Shop Manager page. |
+| Category | Workflow & Planning |
+| Icon | `extension/icons/icon-128.png` |
+| Screenshot | `dist/store-screenshot-1280x800.png` (1280×800; at least one is required) |
+| Privacy policy | `https://egful.store/privacy.html` — REQUIRED, because it handles personal data |
+
+**The privacy tab is where a listing gets rejected.** Every permission needs a justification in
+the reviewer's terms, and vague ones bounce:
+
+- **storage** — keeps the seller's own egful session token so they connect once instead of on
+  every page.
+- **tabs** — reads the active tab's URL to tell whether it is the seller's Shop Manager orders
+  page, and finds their already-open egful tab when connecting.
+- **scripting** — injects the reader into that page, on demand, when the seller opens the popup
+  and presses a button. It is injected rather than declared so nothing of ours is present on
+  any page until asked.
+- **host: www.etsy.com/your/orders/\*** — the seller's own sold-orders page, the only page read.
+- **host: app.egful.store / api.egful.store** — our own app: reads the session the seller
+  already holds, and posts the addresses.
+
+Data disclosure: tick **personally identifiable information** (name, address) and
+**authentication information**, then all three certifications — the data is not sold, is not
+used for anything but the single purpose, and is not used for creditworthiness. Single purpose,
+stated plainly: *fills buyer addresses onto the seller's existing egful orders, from the
+seller's own Etsy Shop Manager page.*
+
+No remote code — `parse.js` ships in the package and nothing is fetched and executed. Say so if
+asked; it is the question that slows a review down most.
+
+**Review** takes anything from a few hours to a few days, and a listing touching a third-party
+site's pages gets read by a human. **The store refuses a version it has seen before**, so bump
+`extension/manifest.json` on every upload — that number is also what the popup footer prints,
+which is how you tell what a seller is actually running.
+
 ## Terms
 
 Etsy's Terms of Use prohibit automated access to their web UI. This reads a page a human
