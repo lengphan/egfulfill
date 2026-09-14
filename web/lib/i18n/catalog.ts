@@ -3980,10 +3980,12 @@ const vi: Dict = {
   "product.Extra charge for the": "Phụ phí cho vị trí",
   "products.All statuses": "Tất cả trạng thái",
   "products.Status": "Trạng thái",
-  "products.Live on site": "Đang hiển thị trên web",
-  "products.Not showing on site": "Chưa hiển thị trên web",
+  /* The status filter speaks the product's own vocabulary now, so these mirror the
+     "product.*" values the editor writes — same field, same words, one translation. */
+  "products.Sellers only": "Chỉ người bán",
+  "products.Staff only": "Chỉ nhân viên",
   "products.Draft": "Nháp",
-  "products.Internal only": "Chỉ nội bộ",
+  "products.Archived": "Đã lưu trữ",
   "products.Show them": "Xem những sản phẩm này",
   "catalog.All products": "Tất cả sản phẩm",
   "catalog.None of our own products match": "Không có sản phẩm nào của chúng ta khớp với",
@@ -4933,8 +4935,12 @@ const vi: Dict = {
   "photoStudio.Close-up detail": "Cận cảnh chi tiết",
   "products.On the site": "Trên trang web",
   "products.No price": "Chưa có giá",
-  "products.Active": "Đang hoạt động",
-  "products.Active · no price": "Đang hoạt động · chưa có giá",
+  /* "Đang bán", matching `product.Active` above — the editor writes the value, so the badge
+     and the filter that read it back have to say what the editor said. These were "Đang
+     hoạt động", which is the same two-vocabularies-for-one-field split the English had, one
+     language further down and invisible to anyone reading the English. */
+  "products.Active": "Đang bán",
+  "products.Active · no price": "Đang bán · chưa có giá",
   "purchasing.All suppliers": "Tất cả nhà cung cấp",
   "purchasing.Favorites": "Yêu thích",
   "purchasing.Cart": "Giỏ hàng",

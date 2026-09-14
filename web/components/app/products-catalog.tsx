@@ -138,21 +138,38 @@ export function ProductsCatalog() {
  const [query, setQuery] = useState("")
  const [cat, setCat] = useState<string>("All")
   /**
-   * THE STATUS FILTER, and its vocabulary is the one the TILES ALREADY COUNT.
+   * THE STATUS FILTER, IN THE WORDS THE EDITOR WRITES AND THE CARD SHOWS.
    *
-   * The page had a Category bar and nothing for status, while the banner above it says "2
-   * Active products are not showing on the site" — a sentence naming a set you then had to
-   * find by eye. These ARE those sets, so the count and the filter can never describe
-   * different things:
+   * It offered a vocabulary of its own — "Live on site" / "Not showing on site" / "Internal
+   * only" — describing the marketing site rather than the product. That is the SAME mistake
+   * `publicStateOf` was written to fix one control to the left: the badge on the card used
+   * to say "On the site" / "Not on the site" and was changed to say Active / Sellers only /
+   * Staff only, because a chip and a dropdown naming one field in two vocabularies leave you
+   * unable to predict either from the other. The badge was fixed, and then this filter was
+   * added in the vocabulary the badge had just abandoned — so the screen went straight back
+   * to having two. Owner: "status for products here are not similar to product status we
+   * currently have".
    *
-   *   live      Active AND priced — what the public catalogue actually renders
-   *   stranded  Active but no price, so the public route drops it. The banner's own set.
-   *   draft     not published
-   *   internal  "Sellers only" / "Staff only" — deliberately not on the site
+   * Every option is now a label the card prints verbatim:
    *
-   * NOT the raw `status` string. A plain "Active" option would report products the site is
-   * not showing, which is the exact drift the stranded count exists to catch — offering it
-   * would put that drift back on screen as a choice.
+   *   Active             Active AND priced — exactly when the badge reads "Active"
+   *   Active · no price  Active but the public route drops it: the banner's own set, in the
+   *                      badge's own words. Kept separate from Active, which is what keeps
+   *                      the drift the stranded count exists to catch off the happy option.
+   *   Sellers only       as stored
+   *   Staff only         as stored
+   *   Draft              as stored
+   *   Archived           as stored
+   *
+   * TWO DEFECTS BEYOND THE WORDS, both found by writing them out.
+   *
+   * ARCHIVED WAS INVISIBLE. There was no option for it, and the "draft" predicate was
+   * `!isActive && !isInternal` — true for Archived — so archived products were silently
+   * returned under Draft and neither set could be asked for alone.
+   *
+   * "INTERNAL ONLY" MERGED TWO STATUSES AND MISNAMED ONE. It matched "Sellers only" OR
+   * "Staff only", so the two could not be told apart; and a Sellers-only product is not
+   * internal at all — sellers are the customers. Two options now, named as stored.
    */
   const [status, setStatus] = useState<string>("")
  const [isStaff, setIsStaff] = useState(false)
@@ -228,13 +245,17 @@ export function ProductsCatalog() {
  if (cat !== "All" && p.type !== cat) return false
  if (status) {
         const raw = (p.status ?? "Active").trim().toLowerCase()
-        const isInternal = raw === "sellers only" || raw === "staff only"
-        const isActive = raw === "active"
         const priced = publicPriceOf(p) !== null
-        if (status === "live" && !(isActive && priced)) return false
-        if (status === "stranded" && !(isActive && !priced)) return false
-        if (status === "draft" && (isActive || isInternal)) return false
-        if (status === "internal" && !isInternal) return false
+        // Each arm matches ONE stored status, so no product answers to two options and none
+        // falls through to an option that was never about it — which is what put Archived
+        // under Draft. Active is the one split, by price, because that split is exactly what
+        // the card's own badge already shows.
+        if (status === "active" && !(raw === "active" && priced)) return false
+        if (status === "unpriced" && !(raw === "active" && !priced)) return false
+        if (status === "sellers" && raw !== "sellers only") return false
+        if (status === "staff" && raw !== "staff only") return false
+        if (status === "draft" && raw !== "draft") return false
+        if (status === "archived" && raw !== "archived") return false
       }
  if (!query) return true
       // The supplier's code is searchable too — it is how a blank is referred to on a spec
@@ -327,7 +348,7 @@ export function ProductsCatalog() {
                 LOOKING at, and §4 keeps a filled control for the thing a screen is for. */}
             <button
               type="button"
-              onClick={() => { setStatus("stranded"); setCat("All"); setQuery("") }}
+              onClick={() => { setStatus("unpriced"); setCat("All"); setQuery("") }}
               className="font-medium underline underline-offset-2 hover:no-underline"
             >
               {tl("products", "Show them")}
@@ -351,17 +372,19 @@ export function ProductsCatalog() {
               category is one of a handful of known values you switch between; status is a
               FACET you set and leave, and filter-menu.tsx exists precisely so every page
               stops rolling its own (§4 — grep for the primitive). It also names the current
-              STATE rather than the facet, so the trigger reads "Not showing on site" and you
+              STATE rather than the facet, so the trigger reads "Active · no price" and you
               never have to open it to find out what you are looking at. */}
           <FilterMenu
             label={tl("products", "Status")}
             anyLabel={tl("products", "All statuses")}
             value={status}
             options={[
-              { value: "live", label: tl("products", "Live on site") },
-              { value: "stranded", label: tl("products", "Not showing on site") },
+              { value: "active", label: tl("products", "Active") },
+              { value: "unpriced", label: tl("products", "Active · no price") },
+              { value: "sellers", label: tl("products", "Sellers only") },
+              { value: "staff", label: tl("products", "Staff only") },
               { value: "draft", label: tl("products", "Draft") },
-              { value: "internal", label: tl("products", "Internal only") },
+              { value: "archived", label: tl("products", "Archived") },
             ]}
             onPick={setStatus}
           />
