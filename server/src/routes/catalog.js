@@ -70,7 +70,16 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     // supplierSku goes with the cost: both name who makes this and what they charge, and
     // both are stripped on the way OUT rather than at each call site, so a new consumer
     // can't reintroduce the leak.
-    const { productCost, product_cost, supplierSku, supplier_sku, ...rest } = data;
+    //
+    // `supplier` BELONGS IN THIS LIST AND WAS NOT IN IT. It holds the name itself — "S&S
+    // Activewear", "Otto Cap", "SanMar" — which is the plainest possible form of the thing
+    // §2.9 withholds, and it was riding out on /api/catalog_products to every signed-in
+    // seller. The editor that writes it says in its own comment that it is "staff-only,
+    // published nowhere (§2.9)"; nothing enforced that. §2.9's point is exactly this case:
+    // supplierSku is the OBSCURE leak everyone remembers to plug, and the field actually
+    // called `supplier` is the obvious one nobody checked. Staff are unaffected — the list
+    // route hands staff the unstripped row and only maps sellers through here.
+    const { productCost, product_cost, supplierSku, supplier_sku, supplier, ...rest } = data;
     if (Array.isArray(rest.sizePrices)) {
       rest.sizePrices = rest.sizePrices.map((t) => {
         if (!t || typeof t !== 'object') return t;

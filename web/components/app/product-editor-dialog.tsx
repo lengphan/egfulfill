@@ -1327,8 +1327,14 @@ export function ProductEditorDialog({
             are. `spacing="none"` keeps the bar's own -mb-px, so its rule and the body meet
             on one line instead of two; px-6 on the nav itself rather than a wrapper, so the
             rule still spans the full width while the first tab lines up with the fields. */}
+        {/* NOT `size="sm"`. The primitive's own note says what small means: "a tight bar gets
+            tighter padding, a smaller gap and a smaller icon — more of them in the same
+            rail". That is a filter strip. This is four tabs that are the ONLY way into four
+            panels of a dialog, and measured they use 33% of a 1024px bar — there is no
+            crowding here to relieve, so `sm` was buying a 16px gap to solve a problem this
+            rail does not have, and four labels sat bunched in its left third with the words
+            nearly touching. Default density: gap-5 and pb-2. */}
         <TabBar
-          size="sm"
           spacing="none"
           className="px-6"
           items={TABS}
