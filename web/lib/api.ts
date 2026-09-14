@@ -2965,6 +2965,10 @@ export type OrderQuote = {
    *  seller's copy of the quote (it names our margin, and across orders our supplier's
    *  price list), so it is absent rather than zero on a seller's request. */
   lines: { id: string
+    /** THE BLANK this line resolves to — what we actually cut and buy, as against `sku`,
+     *  which is the seller's marketplace listing. Sent by priceLines and undeclared here
+     *  until the Summary needed to name which garments a blanks figure covers. */
+    blank?: string | null
     /** LINE IDENTITY — what matches this priced line back to the item on screen. `id` is the
      *  order_items row id and OrderItem does not carry it; `sku` is null on a manual line and
      *  shared by identical-SKU siblings. This is the only field that identifies one line. */

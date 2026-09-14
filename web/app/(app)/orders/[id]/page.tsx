@@ -835,10 +835,16 @@ export default function OrderDetailPage() {
         <div className="flex justify-between text-sm">
           <dt className="text-muted-foreground">
             Blanks
-            {/* A partial figure says so rather than reading as the total. */}
-            {quote?.supplierKnown != null && quote?.lines && quote.supplierKnown < quote.lines.length && (
-              <span className="text-muted-foreground/70"> · estimate · {quote.supplierKnown} of {quote.lines.length} lines</span>
-            )}
+            {/* WHICH BLANKS, by sku. "1 of 2 lines" said how much of the figure was known and
+                not what it was FOR, so a partial total named nothing you could go and look
+                up. The skus are what the row is about, and the ones with no supplier cost
+                are the ones missing from it. */}
+            {(() => {
+              const priced = (quote?.lines ?? []).filter((l) => l.supplierCost != null && l.blank)
+              const skus = [...new Set(priced.map((l) => String(l.blank)))]
+              if (!skus.length) return null
+              return <span className="text-muted-foreground/70"> · {skus.join(", ")}</span>
+            })()}
           </dt>
           <dd className="tabular-nums">−{usd(blanksEstimate)}</dd>
         </div>
