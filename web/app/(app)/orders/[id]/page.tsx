@@ -952,14 +952,20 @@ export default function OrderDetailPage() {
       // nothing we can honestly say about this line's faces.
  if (paid == null) return []
  if (Math.abs(paid - (Number(l.sideFee) || 0)) > 0.005) {
+        /* THE REASON IS A `title`, NOT A SUBTITLE (§4, and the owner: "too long of
+           description"). It shipped as a two-line sentence under the label, which in a
+           380px column wrapped to three and put more prose on this card than the whole
+           rest of the summary carries — to qualify a figure that is already correct.
+           The row says what it is and the amount says what was billed; both are true with
+           no sentence attached. The nuance a reader might want — that the garment has
+           faces this charge predates — is one hover away, which is where §4 puts the
+           explanation of something already on screen. */
         return [(
-          <div key={`side-${i}-moved`} className="flex justify-between">
+          <div key={`side-${i}-moved`} className="flex justify-between"
+               title={tl("orders", "The artwork changed after this was charged — this is what was billed.")}>
             <dt className="pl-3 text-muted-foreground">
               {who}
               <span className="opacity-70"> · {tl("orders", "extra faces")}</span>
-              <div className="text-2xs leading-snug opacity-70">
-                {tl("orders", "The artwork changed after this was charged — this is what was billed.")}
-              </div>
             </dt>
             <dd className="tabular-nums text-muted-foreground">{usd(paid * qty)}</dd>
           </div>
