@@ -1296,7 +1296,19 @@ export function ProductEditorDialog({
       {/* Wider than it was (2xl → 4xl) so the two-column layout below has somewhere to go.
           The dialog was ~770px and scrolled regardless; the images were the thing being
  squeezed for a width that wasn't buying anything. */}
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+      {/* WIDER THAN THE REST, because of ONE tab.
+          896px (`4xl`) is comfortable on Details, Photos and Shipping and cramped on Sizes &
+          pricing, which is a nine-column grid — `3rem 1fr 1fr 1fr 1fr 4.5rem 5rem 4.5rem
+          1.5rem`. Its fixed tracks and gaps take 360px, so at 896 the four money columns got
+          114px each: a header reading "Product cost ($)" is already 99 of that, and a
+          four-figure price with its focus ring has no slack left.
+
+          1024 (`5xl`) puts those columns at 146px, a third more, and the base
+          `max-w-[calc(100%-2rem)]` on DialogContent still caps it on a narrow window, so
+          nothing has to be re-checked at small sizes. One width for all four panels on
+          purpose — a dialog that resizes as you change tab moves the buttons under the
+          cursor. */}
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
         <DialogHeader className="border-b border-border px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
             {/* THE PRODUCT, not the verb. "Edit product" was the only thing this said
