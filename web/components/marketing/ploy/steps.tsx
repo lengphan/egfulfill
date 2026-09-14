@@ -77,7 +77,11 @@ function Lead({ lines }: { lines: string[] }) {
       {paras.map((ws, i) => (
         <p
           key={i}
-          className={(i === 0 ? "" : "mt-7 ") + "text-[clamp(1.7rem,3.5vw,2.7rem)] leading-[1.2] tracking-[-0.015em] text-ploy-ink"}
+          /* SMALLER THAN IT WAS (was clamp(1.7rem,3.5vw,2.7rem), i.e. 43px at 1440). At that
+             size two paragraphs filled a screen on their own and the steps below — the thing
+             this section is actually for — started a scroll away. It is the section's lead,
+             not a second hero. */
+          className={(i === 0 ? "" : "mt-5 ") + "text-[clamp(1.35rem,2.5vw,2rem)] leading-[1.25] tracking-[-0.015em] text-ploy-ink"}
         >
           {ws.map(({ w, i: n }) => {
             /* A BAND WIDER THAN THE STEP. At 1/total each the words would light strictly one
@@ -94,10 +98,30 @@ function Lead({ lines }: { lines: string[] }) {
   )
 }
 
+/**
+ * ONE STEP: a numeral, the word, and ONE line.
+ *
+ * IT USED TO CARRY THREE PIECES OF TYPE — the word at 108px, a sentence title at 22px, and a
+ * body at 16px — and the first two said the same thing ("CONNECT" / "Plug in the shop you
+ * already run."). One of them had to go, and it is the title: the word is the step's name and
+ * repeating it in a full sentence underneath is the section reading itself aloud. The title
+ * still renders on /how-it-works, which has a whole band per step and room for it.
+ *
+ * BASELINE, NOT CENTRE, and this is the actual bug the row was reported for. The word, the
+ * node and the text block were each `self-center`, so the row centred three boxes of
+ * DIFFERENT heights against each other — and the moment one line wrapped, its block grew and
+ * the 108px word beside it slid. Measured at 1440 the word sat 17px below its line on three
+ * rows and 3px on the fourth, purely because SHIP's copy ran to two lines. A reader does not
+ * see 14px as a wrap; they see a column that is crooked.
+ *
+ * `items-baseline` cannot do that. Every cell sits on ONE line, the numeral inside the node
+ * puts the circle on it too, and a line that wraps grows DOWNWARD from a baseline that has
+ * already been set. There is no number to tune and nothing to re-tune when the copy changes.
+ */
 function StepRow({ i, total, step, progress }: { i: number; total: number; step: Step; progress: MotionValue<number> }) {
-  // The node sits at the row's vertical centre, so it lights when the fill passes
-  // (i + 0.5) / total of the pipe.
-  const at = (i + 0.5) / total
+  // The node sits on the row's first baseline now, so it lights when the fill reaches the
+  // TOP of the row rather than its middle.
+  const at = (i + 0.28) / total
   const lit = useTransform(progress, [at - 0.04, at], [0, 1])
   // Opaque when unlit, so the pipe never shows through the ring.
   const bg = useTransform(lit, [0, 1], ["var(--color-ploy-acid)", "var(--color-ploy-ink)"])
@@ -107,24 +131,32 @@ function StepRow({ i, total, step, progress }: { i: number; total: number; step:
   return (
     <motion.li
       style={{ opacity }}
-      className="grid grid-cols-[44px_1fr] gap-x-5 gap-y-3 py-7 md:grid-cols-[1fr_44px_1.1fr] md:gap-x-10 md:py-9"
+      className="grid grid-cols-[44px_minmax(0,1fr)] items-baseline gap-x-6 gap-y-4 py-8 md:grid-cols-[44px_minmax(8rem,15rem)_minmax(0,1fr)] md:gap-x-10 md:py-10"
     >
+      {/* The numeral is what puts this circle on the row's baseline — `items-baseline` reads
+          the text inside it, not the box, which is why the ring needs no offset of its own at
+          any type size. */}
       <motion.span
         style={{ backgroundColor: bg, color: fg }}
-        className="relative z-10 flex h-11 w-11 items-center justify-center self-center rounded-full border-2 border-ploy-ink text-[13px] font-semibold tabular-nums md:order-2"
+        className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full border-2 border-ploy-ink text-[13px] font-semibold tabular-nums"
       >
         {step.n || String(i + 1).padStart(2, "0")}
       </motion.span>
-      <h3 className="ploy-display self-center text-[clamp(3rem,8vw,6.75rem)] text-ploy-ink md:order-1">
+      {/* SMALLER THAN IT WAS. At 108px against a 16px line the row jumped 6.75x with nothing
+          between, which is what reads as "the font size is off" — the word was not big, the
+          gap was. 64px to 18px is one step, and the word is still the loudest thing here. */}
+      <h3 className="ploy-display text-[clamp(2.25rem,4.6vw,4rem)] leading-[0.85] text-ploy-ink">
         {displayWord(step)}
       </h3>
-      <div className="col-span-2 max-w-[34rem] md:order-3 md:col-span-1 md:self-center">
-        {/* NOT BOLD. The word beside it is already display-scale — CONNECT, DESIGN, PUBLISH —
-            so a semibold line under it was a second thing shouting in a row that had already
-            said which step this is. Weight was doing the work size and position already do. */}
-        <p className="text-[22px] leading-tight">{step.title}</p>
-        <p className="mt-3 text-[16px] leading-relaxed text-ploy-ink/65">{step.body}</p>
-      </div>
+      {/* ONE LINE, in one register. No title above it: see the note on this component. */}
+      {/* `col-start-2` ON EVERY WIDTH, not `col-span-2`. Spanning both columns put the line
+          under the NODE column too — and the pipe runs down that column, so on a phone the
+          rule drew straight through the sentence. Starting it in the word's column instead
+          means the pipe has the first 44px to itself at every width, which is the whole
+          reason the node column is fixed. */}
+      <p className="col-start-2 max-w-[32rem] text-[17px] leading-snug text-ploy-ink/70 md:col-start-3 md:text-[18px]">
+        {step.body}
+      </p>
     </motion.li>
   )
 }
@@ -186,8 +218,13 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
 
           <div className="relative mt-14 md:mt-16">
             {/* THE PIPE. Base rule in pale ink; the fill scales down from the top with scroll.
-                It sits in the node column: 22px in on phones, in the middle gutter from md. */}
-            <div className="absolute bottom-0 left-[21px] top-0 w-0.5 bg-ploy-ink/15 md:left-[calc((100%-44px-5rem)/2.1+2.5rem+21px)]">
+                It sits in the node column, which is now the FIRST column at a flat 44px at
+                every width — so this is `left-[21px]` and nothing else. It used to be
+                `left-[calc((100%-44px-5rem)/2.1+2.5rem+21px)]`, a formula reconstructing the
+                middle of a three-column grid from the outside; it had to be re-derived by
+                hand every time a gap or a track changed, and 2.1 is not a number anyone can
+                justify. Putting the node column first makes the rule a constant. */}
+            <div className="absolute bottom-0 left-[21px] top-0 w-0.5 bg-ploy-ink/15">
               <motion.div style={{ scaleY: progress }} className="h-full w-full origin-top bg-ploy-ink" />
             </div>
             <ol ref={list}>

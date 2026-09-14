@@ -1,9 +1,8 @@
 "use client"
 
 import { useRef } from "react"
-import Image from "next/image"
 import { motion, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
-import { pop, reveal, rise } from "./motion"
+import { reveal, rise } from "./motion"
 import { GUTTER, SECTION } from "./rhythm"
 import type { Testimonial } from "@/lib/site-content"
 
@@ -63,16 +62,14 @@ export function PloyReviews({ heading, items }: { heading: string; items: Testim
   return (
     <section ref={ref} className={`${GUTTER} ${SECTION}`}>
       <motion.div {...rise(0)} className="relative overflow-hidden rounded-[32px] bg-ploy-peri px-8 py-16 md:px-14 md:py-20">
-        <div className="flex items-start justify-between gap-6">
-          <h2 className="ploy-display max-w-[14ch] text-[clamp(2.25rem,5.5vw,4.5rem)] text-ploy-ink">
-            <motion.span {...reveal(0)} className="block">
-              {heading}
-            </motion.span>
-          </h2>
-          <motion.span {...pop(0.2)} className="hidden shrink-0 md:block">
-            <Image src="/ploy/obj-green.webp" alt="" width={200} height={204} unoptimized className="h-auto w-[clamp(90px,9vw,150px)]" />
+        {/* NO OBJECT BESIDE THE HEADING. A cluster of glossy lime cubes sat opposite it,
+            meaning nothing and cropped by the block's own top edge. See the note in
+            integrations.tsx: every 3D render on this site went on 2026-09-14. */}
+        <h2 className="ploy-display max-w-[14ch] text-[clamp(2.25rem,5.5vw,4.5rem)] text-ploy-ink">
+          <motion.span {...reveal(0)} className="block">
+            {heading}
           </motion.span>
-        </div>
+        </h2>
 
         <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {items.map((t, i) => (

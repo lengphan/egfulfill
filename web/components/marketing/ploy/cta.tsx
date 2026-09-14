@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation"
 import { motion } from "motion/react"
 import { line, reveal, rise } from "./motion"
-import { PloyDrop } from "./drop"
 import { GUTTER, SECTION } from "./rhythm"
 
 /**
@@ -28,16 +27,25 @@ export function PloyCta({ heading, subhead, button }: { heading: string[]; subhe
     : "clamp(2rem,5.2vw,5rem)"
 
   return (
-    /* `relative` so the heaps can anchor to this section's own corners, and `overflow-hidden`
-       so a piece thrown hard cannot widen the page. The content below keeps z-10, so objects
-       pass BEHIND the headline as they fall and never rest on a word. */
-    /* NO `overflow` AT ALL, so nothing is ever cut. The mountains rise past this section's
-       top edge on purpose, and any clipping — hidden OR clip — sliced their summits and
-       their base in a straight line, which is the one thing a pile of objects must not have.
-       Nothing needs clipping either: every piece is held inside its own container's width
-       (see the x clamp in drop.tsx), so none of them can widen the page. */
+    /* NO HEAPS. This section closed under two mountains of ~300 generated 3D objects —
+       stars, clouds, chrome blobs and lime cubes — rising either side of the sign-up card.
+       They were the largest instance of the same problem as the star and the cloud in the
+       page headlines: a great deal of picture that says nothing about making a garment, on
+       the one screen where the only job is to get an email address. Removed with the rest of
+       the renders (2026-09-14, owner), along with drop.tsx and its unreferenced preview.
+
+       The card closes the page on its own. If this band ever wants a picture again it should
+       be the thing the page is selling — a photographed garment, like every other picture
+       here — not terrain. */
     <section className={`relative ${GUTTER} ${SECTION}`}>
-      <div className="relative z-10 flex flex-col items-center text-center">
+      {/* THE AIR IS THIS BAND'S OWN, not a change to the rhythm.
+          SECTION is 20px because it is the gutter between two enormous saturated FILLS, and
+          that reasoning holds (see rhythm.ts). This band is not a fill — it is type on the
+          bare page ground — so it gets none of the internal padding every other band gets
+          from its own card, and 20px below a pricing card left the headline sitting on its
+          edge. The heaps used to hide that; with them gone it is visible. Padding here, not a
+          third rhythm token, because the need belongs to this band and not to the gap. */}
+      <div className="relative z-10 flex flex-col items-center pt-16 text-center md:pt-24">
         <h2 className="ploy-display max-w-[16ch]" style={{ fontSize: size }}>
           {heading.map((l, i) => (
             <motion.span key={l} {...line(i)} className="block">
@@ -84,9 +92,6 @@ export function PloyCta({ heading, subhead, button }: { heading: string[]; subhe
           </p>
         </motion.form>
       </div>
-
-      {/* Two heaps, filling the margins either side of the sign-up card. */}
-      <PloyDrop />
     </section>
   )
 }

@@ -77,7 +77,7 @@ export function PloyHome({ content }: { content: SiteContent }) {
  * one is a paragraph nobody finishes.
  */
 const LEAD = [
-  "Finding a printer you can trust is the hard part. Most sellers try a few before one of them ships on time — and by then the reviews have already happened.",
+  "Finding a printer you can trust is the hard part.",
   "We make everything ourselves, in one factory. One queue, one standard, and the tracking back on your listing without you opening a shipping screen.",
 ]
 

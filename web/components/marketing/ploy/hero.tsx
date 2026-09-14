@@ -1,22 +1,38 @@
 "use client"
 
-import { useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, enter, line } from "./motion"
 
 /**
- * ONE OBJECT, ONE WORD.
+ * ONE GARMENT, ONE WORD — and the garment is PHOTOGRAPHED.
  *
- * A single garment, enormous, cropped by the viewport, with the headline set across it.
- * Nothing else competes: one silhouette, one block of type. The garment drags and drifts.
+ * IT WAS A 3D RENDER: an inflated vinyl hoodie, hue-rotated from pink to the site's
+ * periwinkle, dragged and drifting. Two things were wrong with it and only one was visual.
  *
- * `overflow-x-clip`, NOT `overflow-hidden`. The garment is meant to bleed off the right edge
- * AND hang past the bottom into the block below. `overflow-hidden` on one axis forces the
- * other to `auto`, which put a horizontal scrollbar on the whole page — and a page you can
- * scroll sideways shifts every section left. `clip` cuts the sideways bleed without that, so
- * the vertical overhang survives.
+ * THE VISUAL ONE. "Phantom renders, we photograph" is this site's identity — everything that
+ * sells the factory sells it by showing the real thing, which is why the method cards are
+ * close-ups of actual DTG and actual chenille and why /how-it-works is four photographs. A
+ * glossy plastic balloon of a hoodie is the single loudest way to say the opposite, and it
+ * was the FIRST thing on the page.
+ *
+ * THE MEASURED ONE. It hung past its own section by design (`xl:h-[178%]`) and landed on the
+ * paragraph below. Measured against the steps section's opening paragraph, the render covered
+ * 43% of it at 1440, 65% at 1280 and 77% at 1024 — the copy was simply unreadable at every
+ * common laptop width, while the comment beside it said the type column "is clear ground
+ * because the garment hangs right." It is clear ground only above about 1700px, which is
+ * where it was looked at.
+ *
+ * SO THE OBJECT IS NOW HELD BY ITS SECTION. The photograph bleeds off the right edge and to
+ * the bottom of the hero, and the hero CLIPS it — `overflow-clip` on both axes rather than
+ * `overflow-x-clip`. That is the fix rather than a smaller height, because a height is a
+ * number that has to be right at every width and a clip is right at all of them. Nothing
+ * below this section can be reached by anything in it.
+ *
+ * NO DRAG AND NO FLOAT. Both were properties of an object that hovered; a photograph set into
+ * the page is not hovering, and a rectangle that tilts 3 degrees reads as a mistake rather
+ * than as life. The entrance stays.
  */
 export function PloyHero({
   headline,
@@ -31,7 +47,6 @@ export function PloyHero({
   ctaPrimary: string
   ctaSecondary: string
 }) {
-  const pen = useRef<HTMLDivElement>(null)
   const lines = [headline, accent].filter(Boolean)
 
   /**
@@ -55,79 +70,55 @@ export function PloyHero({
     : "clamp(1.9rem,4.4vw,4.4rem)"
 
   return (
-    <section className="relative z-10 overflow-x-clip">
-      <div ref={pen} className="ploy-hero-card relative flex min-h-[100svh] flex-col justify-end md:min-h-[76svh]">
-        {/* IT SCALES WITH THE VIEWPORT, IN STEPS. It used to go straight from a phone size to
-            `md:h-[178%]`, so every width from 768px to about 1200px got the full desktop
-            garment on a two-thirds-width page — sitting on the headline, the sub and both
-            buttons at once. The height ramps 132 → 152 → 178 and the object walks in from the
-            right edge as the room appears.
+    /* `overflow-clip` on BOTH axes. The photograph bleeds off the right edge and past the
+       bottom of its own frame, and this is what stops the overhang reaching the section
+       below — see the note at the top of this file for the measurements that made it
+       necessary. `clip` rather than `hidden` because `hidden` on one axis forces the other to
+       `auto`, which put a horizontal scrollbar on the whole page and shifted every section
+       left. */
+    <section className="relative z-10 overflow-clip">
+      <div className="ploy-hero-card relative flex min-h-[100svh] flex-col justify-end md:min-h-[76svh]">
+        {/* THE PHOTOGRAPH. It scales with the viewport in the same three steps the render
+            did — the object walks in from the right as the room appears — but it is anchored
+            to the BOTTOM of the card rather than the top, so the crop that goes off-screen is
+            always the same crop (the model's legs) instead of the head at one width and the
+            shoulders at another.
 
-            ON A PHONE IT SITS AT THE TOP, not down the middle. The card is `justify-end`, so
-            the type is bottom-aligned and the upper half is empty by design — the garment is
-            what fills it. Lower down it did the opposite: left the top blank and sat behind
-            the sub and both CTAs. */}
+            ON A PHONE it fills the upper half: the card is `justify-end`, so the type is
+            bottom-aligned and the space above it is the picture's. */}
         <motion.div
-          drag
-          dragConstraints={pen}
-          dragElastic={0.14}
-          dragMomentum
-          dragTransition={{ power: 0.5, timeConstant: 240, bounceStiffness: 220, bounceDamping: 24 }}
-          whileDrag={{ scale: 1.02, cursor: "grabbing" }}
-          initial={{ opacity: 0, scale: 0.86, y: 40 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.94 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={{ opacity: { duration: 0.9 }, scale: { duration: 1.1, ease: [0.22, 0.68, 0, 1] } }}
-          className="absolute right-[-24%] top-[1%] z-0 w-[104vw] cursor-grab touch-none select-none md:right-[-6%] md:top-[6%] md:h-[132%] md:w-auto md:max-w-none lg:right-[-1%] lg:top-[4%] lg:h-[152%] xl:right-[2%] xl:top-[2%] xl:h-[178%]"
+          /* A SOFT LEFT EDGE, and it is the reason the headline can still be set across the
+             picture. A photograph is a RECTANGLE where the render was a silhouette, so the
+             panel's left edge arrived as a hard vertical seam — and at 1440 it fell through
+             the middle of the word MAKE, with the M on the page ground and AKE on the
+             photograph. A line of type crossing a soft edge reads as one line on a picture; a
+             line crossing a hard one reads as two halves of a line that do not match.
+
+             A mask rather than a gradient overlay, because an overlay would have to be the
+             page's exact ground colour and this page's ground moves with the skin. */
+          style={{
+            maskImage: "linear-gradient(to right, transparent 0%, #000 22%)",
+            WebkitMaskImage: "linear-gradient(to right, transparent 0%, #000 22%)",
+          }}
+          className="pointer-events-none absolute bottom-0 right-0 top-0 z-0 w-[104vw] select-none md:w-[62%] lg:w-[58%] xl:w-[54%]"
         >
-          {/* The idle float is its OWN element, under the entrance. Two animations owning
-              `scale` and `y` on one node fight and the object never appears (§4). */}
-          <motion.div
-            /**
-             * A LIVELIER FLOAT (owner's call). It was 14px over 9 seconds, which on a garment
-             * this size is about one percent of its height — slow enough that the eye reads
-             * the hero as static and only notices the drift if it stares.
-             *
-             * 28px over 6.5s, and the tilt doubled to 3deg. Still eased at both ends, so it
-             * is a drift rather than a bob: what makes an idle float look mechanical is a
-             * constant speed and a hard turnaround, not the distance travelled.
-             *
-             * THE TWO TRACKS RUN ON DIFFERENT CLOCKS. Rotation takes 8.3s against the rise's
-             * 6.5, so the pair only lines up every ~54 seconds instead of repeating a
-             * recognisable loop every cycle — the same reasoning as the band objects in
-             * globals.css, where a shared period was what made four objects look like one
-             * mechanism.
-             */
-            animate={{ y: [0, -28, 0], rotate: [0, 3, 0] }}
-            transition={{
-              y: { duration: 6.5, repeat: Infinity, ease: "easeInOut", delay: 1 },
-              rotate: { duration: 8.3, repeat: Infinity, ease: "easeInOut", delay: 1 },
-            }}
-            /* THE SOURCE RENDER IS PINK. The filter is what makes it the site's periwinkle,
-               and it is here rather than baked into the file so the one asset can be
-               re-tinted if the palette moves — the same reason no colour on this page is a
-               literal. Measured against the render, not guessed: -62deg lands the hue on
-               #C0C4FF, and the saturate/brightness pair keeps the vinyl highlights from
-               going chalky once the hue moves. */
-            style={{ filter: "hue-rotate(-62deg) saturate(1.35) brightness(1.04)" }}
-            className="pointer-events-none h-full w-full drop-shadow-[0_60px_70px_rgba(33,33,33,0.22)]"
-          >
-            {/* `unoptimized` — and it is a QUALITY decision, not a performance one.
-                These cut-outs are smooth-gradient 3D renders, the content webp handles worst.
-                They are already encoded here at q93 and already sized for their largest slot,
-                so letting next/image re-encode them at its q75 default was a SECOND lossy pass
-                on top of the first, and the banding showed. Photographs (the method cards)
-                keep the optimiser, because they tolerate it and they are the heavy ones. */}
-            <Image
-              src="/ploy/obj-hoodie.webp"
-              alt="An inflated periwinkle hoodie"
-              width={900}
-              height={1232}
-              priority
-              unoptimized
-              draggable={false}
-              className="h-auto w-full md:h-full md:w-auto md:max-w-none"
-            />
-          </motion.div>
+          {/* NO `unoptimized` HERE. That flag was a QUALITY decision for the render — a
+              smooth-gradient 3D cut-out is what webp handles worst, and next/image's q75
+              default was a second lossy pass that banded it. A photograph is the opposite
+              case: it tolerates the optimiser and it is the heavy asset, so it keeps it,
+              exactly as the method cards do. */}
+          <Image
+            src="/ploy/blank/hoodie.webp"
+            alt="A cream blank hoodie worn against a periwinkle backdrop"
+            width={960}
+            height={1200}
+            priority
+            draggable={false}
+            className="h-full w-full object-cover object-[55%_28%]"
+          />
         </motion.div>
 
         {/* The type column is CAPPED, so it stops where the garment starts instead of running
