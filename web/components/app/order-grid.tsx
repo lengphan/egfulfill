@@ -429,6 +429,42 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
   const gridRef = useRef<HTMLDivElement | null>(null)
 
   /**
+   * UNDO / REDO BELONG TO THE SHEET, not to whichever box has focus.
+   *
+   * They were bound to the CELL's onKeyDown, which works only while a cell <input> is
+   * focused. Select a row by its number, shift-select a range, or finish a drag-fill — focus
+   * is then on a `td` or on nothing, no handler sees the key, and the browser does nothing
+   * with it. The only way to undo was to click OUT of the grid first, which is exactly
+   * backwards: the moment you most want to undo is right after the edit you are still
+   * standing on.
+   *
+   * On the WINDOW, gated to when the grid is involved, so it catches every one of those
+   * states. It still takes the key off the browser: every cell is its own <input>, so native
+   * undo applies to that one box and stops — press it after a paste that filled four rows
+   * and a single cell steps back. Ctrl+Y as well, which is what a Windows hand reaches for.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      const k = e.key
+      if (k !== "z" && k !== "Z" && k !== "y" && k !== "Y") return
+      const grid = gridRef.current
+      if (!grid) return
+      /* "Is this sheet the thing being used" — the event's own target, or, when focus has
+         been dropped entirely (after a fill drag), whatever still holds it. */
+      const t = e.target as Node | null
+      const inGrid = (t && grid.contains(t))
+        || (document.activeElement instanceof Node && grid.contains(document.activeElement))
+      if (!inGrid) return
+      e.preventDefault()
+      setEditing(null)
+      if (k === "y" || k === "Y" || e.shiftKey) redo(); else undo()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [undo, redo])
+
+  /**
    * ── DRAG A SEPARATOR, MOVE A COLUMN OR A ROW ──────────────────────────────────────────
    *
    * 21 columns share one width rule (`widthFor`), so every address column is as wide as the
@@ -842,11 +878,17 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
     fillRange(from, last, cHi)
   }, [rows, fillRange])
 
-  const startFill = useCallback((from: { r: number; c0: number; c1: number }) => (e: React.PointerEvent) => {
+  const startFill = useCallback((
+    from: { r: number; c0: number; c1: number },
+    /* The corner the grip is actually on — the far edge of the current selection. Without
+       it the drag opened at the ANCHOR, so grabbing the handle on a three-row selection
+       snapped it back to one row before the pointer had moved. */
+    origin?: { r: number; c: number },
+  ) => (e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
     const cHi = Math.max(from.c0, from.c1)
-    setFillTo({ r: from.r, c: cHi })
+    setFillTo({ r: Math.max(from.r, origin?.r ?? from.r), c: Math.max(cHi, origin?.c ?? cHi) })
     const cellUnder = (x: number, y: number): { r: number; c: number } | null => {
       const el = document.elementFromPoint(x, y) as HTMLElement | null
       const cell = el?.closest<HTMLElement>("[data-cell]")
@@ -970,17 +1012,9 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
       const sel = gridRef.current?.querySelector<HTMLElement>(`[data-cell="${r + dr}-${c + dc}"]`)
       sel?.focus()
     }
-    /* UNDO / REDO, and they have to be caught HERE. Every cell is its own <input>, so the
-       browser's native undo applies to the box you are in and stops there — press it after
-       a paste that filled four rows and one cell steps back. Cmd/Ctrl+Z and its shifted
-       twin (plus Ctrl+Y, which is what a Windows hand reaches for) belong to the SHEET. */
-    if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z" || e.key === "y" || e.key === "Y")) {
-      e.preventDefault()
-      const isRedo = e.key === "y" || e.key === "Y" || e.shiftKey
-      setEditing(null)
-      if (isRedo) redo(); else undo()
-      return
-    }
+    /* UNDO / REDO are NOT here any more — see the sheet-wide listener near gridRef. They
+       belong to the sheet rather than to whichever box happens to hold focus, and binding
+       them per cell meant they died the moment a selection did not have one. */
     /* DELETE CLEARS A SELECTED CELL, whole. Inside an edit it is the ordinary key and must
        stay one — deleting a character is not "empty this box". */
     if (editing !== key && (e.key === "Delete" || e.key === "Backspace")) {
@@ -1545,8 +1579,14 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                              the outline — "another grey box inside" — because two backgrounds
                              were describing the same state. The ring stays: on a single cell it
                              IS the selection, and there is no block to conflict with. */
-                          className={"h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none focus:ring-1 focus:ring-ring"
-                            + (selWide && inSel(r, c) ? "" : " focus:bg-accent")
+                          /* THE FOCUS RING IS THE SINGLE-CELL SELECTION, so inside a RANGE
+                             it is a second outline saying the same thing — a small box in
+                             the corner of a block that already has one border. Only the
+                             tint was being suppressed here; the ring stayed, which is the
+                             box. Both go now, and the range's own rectangle is the only
+                             thing drawn. */
+                          className={"h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none"
+                            + (selWide && inSel(r, c) ? "" : " focus:ring-1 focus:ring-ring focus:bg-accent")
                             + (inert ? " text-muted-foreground/50" : "")}
                         />
                         {/**
@@ -1583,11 +1623,17 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                         {/* THE GRIP. Eight pixels in the cell's bottom-right corner, shown on
                             the focused cell and on hover. `touch-none` because a pointer drag
                             on a touch screen would otherwise scroll the sheet instead. */}
-                        {fillFrom?.r === r && fillCols?.[1] === c && editing !== `${r}-${c}` && (
+                        {/* AT THE BOTTOM-RIGHT OF THE SELECTION, not of the anchor cell.
+                            This read `fillFrom.r`, which is the cell the selection STARTED
+                            from — so extending a range downward left the grip on the top
+                            row, floating against the middle of the block's right edge. A
+                            sheet puts it on the far corner of whatever is selected, because
+                            that is the corner you pull. */}
+                        {selRect && r === selRect.r1 && c === selRect.c1 && fillFrom && editing !== `${r}-${c}` && (
                           <span
                             role="presentation"
                             aria-hidden
-                            onPointerDown={startFill(fillFrom)}
+                            onPointerDown={startFill(fillFrom, { r: selRect.r1, c: selRect.c1 })}
                             onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); fillDown(fillFrom) }}
                             title={tl("grid", "Drag to copy — down, across, or both. Double-click to fill to the end.")}
                             className="absolute -bottom-[4px] -right-[4px] z-20 size-[9px] cursor-crosshair touch-none rounded-full bg-brand ring-2 ring-background"
