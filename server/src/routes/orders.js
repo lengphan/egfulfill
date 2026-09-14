@@ -539,6 +539,59 @@ async function autoPushDesigns(orderId, lineId, sku) {
  * else may satisfy this check. Left as it was rather than resolved in passing — this fix is
  * about the KEY, and loosening what counts is a separate decision.
  */
+/**
+ * A RETIRED PRODUCT CANNOT BE PUT ON AN ORDER — and this gate is as narrow as it is on
+ * purpose, because the obvious version of it breaks two things that must not break.
+ *
+ * Archiving is how a product leaves the catalogue (web/lib/product-status.ts). The client
+ * stops OFFERING one, which handles the honest case; this handles the rest — an old tab, a
+ * copied payload, a sheet naming a sku somebody retired last week, the API.
+ *
+ * NOT REFUSED, both deliberate:
+ *
+ *   A LINE THE ORDER ALREADY HAS. replaceItems rewrites every row, so an order that
+ *   already carries a retired blank sends it back on any edit — a changed address, a
+ *   quantity, a note. Refusing that would make the order uneditable forever, which is a
+ *   worse outcome than the thing being guarded, and it would arrive as a refusal about a
+ *   product the person never touched.
+ *
+ *   ANYTHING A MARKETPLACE SYNC WRITES. etsy.js/shopify.js/tiktok.js insert into
+ *   order_items directly and never come through here, which is what makes this route safe
+ *   to gate at all: an order somebody has already bought must land whatever we have since
+ *   done to our catalogue (CLAUDE.md §2.6).
+ *
+ * Resolution goes through matchProduct — the same function that prices the line — so the
+ * gate can never disagree with the quote about which product a line names.
+ */
+export async function retiredLines(orderId, items) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) return [];
+  const prev = await q('select sku, line_id from order_items where order_id=$1', [orderId])
+    .then((r) => r.rows).catch(() => []);
+  const had = new Set();
+  for (const r of prev) {
+    if (r.line_id) had.add('L:' + String(r.line_id));
+    if (r.sku != null) had.add('S:' + String(r.sku));
+  }
+  const fresh = rows.filter((it) => {
+    if (it.line_id && had.has('L:' + String(it.line_id))) return false;
+    if (it.sku != null && had.has('S:' + String(it.sku))) return false;
+    return true;
+  });
+  if (!fresh.length) return [];
+  const idx = await catalogIndex({ withImages: false }).catch(() => null);
+  if (!idx) return [];                 // no catalogue read, no opinion — never block on a failed lookup
+  const names = [];
+  for (const it of fresh) {
+    const row = matchProduct(idx, it);
+    const d = (row && row.data) || {};
+    if (String(d.status || '').trim().toLowerCase() !== 'archived') continue;
+    const name = d.name || row.sku || it.blank || it.sku || 'a product';
+    if (!names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
 export async function missingArtwork(orderId) {
   const items = await q('select sku, line_id, name, print_type from order_items where order_id=$1', [orderId]).then((r) => r.rows);
   const rows = await q('select sku, line_id from order_designs where order_id=$1', [orderId])
@@ -2092,7 +2145,14 @@ export function ordersRoutes(app, requireAuth) {
        o.labelOnly === true]
     );
     const isNew = !!(up.rows[0] && up.rows[0].inserted);
-    if (Array.isArray(o.items)) await replaceItems(o.id, o.items);
+    if (Array.isArray(o.items)) {
+      const retired = await retiredLines(o.id, o.items);
+      if (retired.length) {
+        reply.code(409);
+        return { error: `${retired.join(', ')} ${retired.length === 1 ? 'has' : 'have'} been archived and can't be added to an order. Restore ${retired.length === 1 ? 'it' : 'them'} in Products, or pick another blank.`, retired };
+      }
+      await replaceItems(o.id, o.items);
+    }
     audit(req, 'order.saved', { entityType: 'order', entityId: o.id, after: { status: o.status, total: o.total, customer: (o.customer && o.customer.name) || null } });
     // Cache-invalidation ping only — NO id/sku in the payload. Broadcasts reach every
     // connected client, so anything identifying here would disclose one seller's order
@@ -2515,7 +2575,14 @@ export function ordersRoutes(app, requireAuth) {
       itemsBefore = await q(`select ${ITEM_COLS} from order_items where order_id=$1 order by id`, [req.params.id])
         .then((r) => lineSnap(r.rows)).catch(() => null);
     }
-    if (wantsItems) await replaceItems(req.params.id, body.items);
+    if (wantsItems) {
+      const retired = await retiredLines(req.params.id, body.items);
+      if (retired.length) {
+        reply.code(409);
+        return { error: `${retired.join(', ')} ${retired.length === 1 ? 'has' : 'have'} been archived and can't be added to an order. Restore ${retired.length === 1 ? 'it' : 'them'} in Products, or pick another blank.`, retired };
+      }
+      await replaceItems(req.params.id, body.items);
+    }
     let itemsAfter = null;
     if (wantsItems) {
       itemsAfter = await q(`select ${ITEM_COLS} from order_items where order_id=$1 order by id`, [req.params.id])
