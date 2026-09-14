@@ -1885,8 +1885,16 @@ export default function OrderDetailPage() {
                           VariantStrip: a settled line and an editable one describe the same
                           thing, so they must not be two different shapes. */}
                       <div className="w-full basis-full">
+                        {/* THE QUOTE HAS TO BE REFETCHED TOO. This called reloadOne alone, which reloads the
+                            ORDER — so picking a different blank updated the row and left Summary
+                            quoting the old one: Base cost, the per-face additions and the Blanks
+                            estimate all still describing the garment you just replaced. Every other
+                            path that changes what a line IS already bumps this nonce (the designer's
+                            onSaved does); the variant picker is the one that did not, and it is the
+                            control most likely to change the price. */}
                         {canEditVariants ? (
-                          <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reloadOne} />
+                          <VariantPicker orderId={String(id)} item={it} catalog={catalog}
+                            onSaved={() => { reloadOne(); setQuoteNonce((n) => n + 1) }} />
                         ) : (
                           <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked />
                         )}
