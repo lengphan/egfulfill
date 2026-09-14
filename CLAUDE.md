@@ -731,7 +731,22 @@ Screenshots go in `screenshots/` (gitignored, and `@hidden` in Caddy).
 
 State these plainly rather than implying otherwise:
 
-- **Supplier ordering** (S&S / Otto) — wired end to end, double-gated off, payloads unvalidated, and the UI sends only `{sku, qty}` (no address, PO number, shipping or payment method).
+- **Supplier ordering — NOTHING PLACES A REAL ORDER TODAY.** Re-checked 2026-09-14 against
+  the code and the live `.env`; the three are at different stages and it matters which:
+
+  | | server route | UI wired | `*_ORDER_LIVE` on the VPS | creds |
+  |---|---|---|---|---|
+  | **S&S** | full payload — PO number, ship-to, shipping method, saved payment profile, per-line warehouse | **yes**, 2 call sites in `purchase-view.tsx`, sending all of it | not set → dry run | set |
+  | **Otto** | exists, gated | **no** — `NO_AUTO_ORDER` holds it back on purpose and `ottoOrder()` has 0 callers | not set → dry run | missing |
+  | **SanMar** | exists, gated | **no** — `sanmarOrder()` exists in `lib/api.ts` with 0 callers | not set → dry run | missing |
+
+  So S&S is the only one that would send anything if its gate were flipped — and its payload
+  has still never been validated against a live account, which is the reason the gate exists.
+  Otto is refused by the UI *and* missing credentials; SanMar has no UI path at all.
+
+  The old wording here said "the UI sends only `{sku, qty}` (no address, PO number, shipping
+  or payment method)". That stopped being true for S&S and was left behind — the doc, not the
+  code, was the stale half.
 - **Design library `.pes` bytes** — `eg_design_files` is localStorage-only in the legacy app. Order-attached files *are* persisted via `POST /api/design_files`; the library upload path isn't wired to it.
 - **Thread palette** — `DEFAULT_THREAD_PALETTE` ships 16 colours. Matching is now perceptually correct (OKLab, lightness weighted 0.5 because hue is a thread's identity and lightness is a shade choice), but 16 cones can't represent real artwork; a light blue still resolves to Grey. The stock list is the bottleneck, not the matcher.
 - **Not yet built** — revert-from-Activity with correct wallet response; announcements; per-team peak-season order limits; subscription discounts; A4 multi-up label sheets.
