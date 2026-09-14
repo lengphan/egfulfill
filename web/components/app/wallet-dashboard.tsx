@@ -172,8 +172,19 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
       <div className="divide-y divide-border">
         {topups.map((t) => (
           <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-            <div>
+            {/* WHO IS ASKING, ON THE ROW. The panel printed an amount, a method and a time
+                and nothing else — so an admin could confirm a transfer without ever seeing
+                whose wallet it credits, which is the one fact a review needs. The sibling
+                payout panel below has named its seller all along; this is the same line.
+                It is `text-sm`, not the meta line's `text-xs`: an email is an IDENTIFIER —
+                read, searched, pasted into a bank statement — and §4 puts a value at 14px
+                and leaves 12px to labels. The ref and the time stay a label. */}
+            <div className="min-w-0">
               <div className="font-semibold tabular-nums">{usd2(Number(t.amount_usd) || 0)} <span className="text-sm font-normal text-muted-foreground">· {t.method || "transfer"}</span></div>
+              <div className="truncate text-sm text-foreground">
+                {t.seller_name || t.seller_email || tl("wallet", "Unknown seller")}
+                {t.seller_name && t.seller_email ? <span className="text-muted-foreground"> · {t.seller_email}</span> : null}
+              </div>
               <div className="text-xs text-muted-foreground">{t.ref ? `Ref ${t.ref} · ` : ""}{fmtDT2(t.created_at)}</div>
             </div>
             <div className="flex items-center gap-2">

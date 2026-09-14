@@ -1264,6 +1264,7 @@ const vi: Dict = {
   "wallet.Mark paid": "Đánh dấu đã trả",
   "wallet.Confirm & credit": "Xác nhận & cộng tiền",
   "wallet.Reject": "Từ chối",
+  "wallet.Unknown seller": "Không rõ người bán",
   "wallet.Rejected": "Đã từ chối",
   "wallet.Test": "Thử nghiệm",
   "wallet.Mark as test": "Đánh dấu là thử nghiệm",

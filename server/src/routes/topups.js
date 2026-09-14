@@ -74,10 +74,19 @@ export function topupsRoutes(app, requireAuth) {
         ? Math.max(0, Math.round(Number(mr.rows[0].value) || 0)) : 200;
       if (amount < floor) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
     } catch { /* settings unreadable — don't block a legitimate transfer */ }
+    /* WHO IS ASKING — read off the USER, never off the body.
+       `seller_name` was `b.name`, and no client has ever sent that field: the top-up dialog
+       posts amount/method/ref/attachment and nothing else, so the column was NULL on every
+       row ever written by either path. The admin queue's reject dialog fell back to the
+       email and the row itself printed neither, which is why a pending top-up arrived with
+       no way to tell whose money it was.
+       payouts.js already does exactly this (`me.name` at insert) — which is why its panel
+       names a seller and this one did not. Same question, same answer, one file apart. */
+    const me = (await q('select name, store_name, email from users where id=$1', [req.user.sub])).rows[0] || {};
     const r = await q(
       `insert into topup_requests (seller_id, seller_email, seller_name, amount_usd, vnd, ref, note, method, attachment, status)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') returning *`,
-      [req.user.sub, req.user.email || null, b.name || null, Number(b.amount) || 0, Math.round(Number(b.vnd) || 0), b.ref || null, b.note || null, b.method || null, b.attachment || null]
+      [req.user.sub, me.email || req.user.email || null, me.store_name || me.name || null, Number(b.amount) || 0, Math.round(Number(b.vnd) || 0), b.ref || null, b.note || null, b.method || null, b.attachment || null]
     );
     /* THE BELL, NOT JUST THE INBOX — see the same note in payouts.js. A seller's money
        arriving is the event a factory most needs to see, and it was email-only. Admins,
@@ -157,6 +166,35 @@ export function topupsRoutes(app, requireAuth) {
    */
   const HIDE_UNPAID_VQR = "not (method = 'VietQR' and status in ('pending','abandoned'))";
 
+  /**
+   * FILL IN WHO IS ASKING, FOR ROWS THAT WERE WRITTEN WITHOUT IT.
+   *
+   * The insert above names the seller now, but every row already in the table was written
+   * when `seller_name` came from a body field no client sends — so every pending top-up on
+   * an existing deployment has a NULL there, including the one an admin is looking at right
+   * now. Fixing only the insert would leave the queue blank until the next request arrives.
+   *
+   * It resolves at READ rather than backfilling the column, because the users table is the
+   * answer to "who is this" and a copy taken at submit time is a copy that goes stale when
+   * someone renames their store. The stored value is still the fallback: a seller whose
+   * account was deleted (`on delete set null`) keeps the name they had when they paid.
+   *
+   * One extra query for up to 200 rows, not one per row.
+   */
+  async function withSeller(rows) {
+    const ids = [...new Set(rows.map((r) => r.seller_id).filter(Boolean))];
+    if (!ids.length) return rows;
+    const u = await q('select id, name, store_name, email from users where id = any($1::uuid[])', [ids]);
+    const by = new Map(u.rows.map((x) => [String(x.id), x]));
+    for (const row of rows) {
+      const who = by.get(String(row.seller_id));
+      if (!who) continue;
+      row.seller_name = who.store_name || who.name || row.seller_name || null;
+      row.seller_email = who.email || row.seller_email || null;
+    }
+    return rows;
+  }
+
   app.get('/api/topups', { preHandler: requireAuth }, async (req) => {
     await ageOutStale();
     if (isStaff(req.user)) {
@@ -166,7 +204,7 @@ export function topupsRoutes(app, requireAuth) {
                     order by created_at desc limit 200`, [st])
         : await q(`select * from topup_requests where ${HIDE_UNPAID_VQR}
                     order by created_at desc limit 200`);
-      return r.rows;
+      return withSeller(r.rows);
     }
     /*
      * THE SELLER KEEPS ALL OF THEIRS, ABANDONED INCLUDED.
