@@ -6,6 +6,7 @@ import { q } from '../db.js';
 import { orderLabel, orderLabelOf } from '../order-label.js';
 import { hashOf, isPhash } from '../fingerprint.js';
 import { isStaff, resolveSeller as _resolveSeller, canSurface, canSeeMoney } from '../auth.js';
+import { COST_TYPES } from '../costs.js';
 import { refreshStaleTracking } from './dispatch.js';
 import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
@@ -2683,10 +2684,28 @@ export function ordersRoutes(app, requireAuth) {
     const own = await q('select id from orders where id=$1', [req.params.id]);
     if (!own.rows[0]) { reply.code(404); return { error: 'Order not found' }; }
 
-    // The cost types, and the words a person uses for them. An explicit map rather than
-    // pattern-matching the type string, for the same reason COST_TYPES is one: a type
-    // nobody listed becomes a visible unknown instead of a silently missing row.
-    const LABELS = {
+    /**
+     * THE WORDS. Not the list — the list is COST_TYPES in ../costs.js, and this is only the
+     * English for each one.
+     *
+     * IT USED TO BE BOTH, and that was a silent hole rather than a tidiness problem. The
+     * query below filters on `type = any(types)`, and `types` came from the keys of THIS
+     * object — so a cost type added to costs.js and not mirrored here was never SELECTED,
+     * and the `LABELS[base] || base` fallback beneath it could never fire. The comment that
+     * stood here claimed an unlisted type "becomes a visible unknown instead of a silently
+     * missing row"; the opposite was true. The money simply vanished from the order's costs,
+     * and Gross margin — the one row that says whether a job lost money — overstated by
+     * exactly that amount, with nothing on screen to suggest anything was missing.
+     *
+     * The two lists happened to agree when this was written. That is the worst state for a
+     * hand-kept mirror to be in, because it looks fine right up until someone adds the
+     * eighth type (CLAUDE.md §5: import, don't re-implement).
+     *
+     * A type with no word here now shows its RAW TYPE and is still counted. Ugly on screen
+     * is the correct failure: it is visible, it is obviously unfinished, and the arithmetic
+     * underneath it stays true. `node tools/check-cost-labels.mjs` fails on one.
+     */
+    const WORDS = {
       'label-cost': 'Postage',
       'expedite-cost': 'Dispatch partner',
       'design-partner-cost': 'Design partner',
@@ -2695,7 +2714,8 @@ export function ordersRoutes(app, requireAuth) {
       'bank-fee': 'Bank / FX fee',
       'aigen-cost': 'AI generation',
     };
-    const types = Object.keys(LABELS);
+    // THE source of truth, so a new cost type is included whether or not anyone named it.
+    const types = Object.values(COST_TYPES);
     const creditTypes = types.map((t) => t + '-credit');
 
     const r = await q(
@@ -2714,7 +2734,7 @@ export function ordersRoutes(app, requireAuth) {
       if (credit) credited += amt; else spent += amt;
       lines.push({
         type: base, credit,
-        label: (LABELS[base] || base) + (credit ? ' — credited back' : ''),
+        label: (WORDS[base] || base) + (credit ? ' — credited back' : ''),
         amount: amt, note: row.note || null, at: row.created_at,
       });
     }
