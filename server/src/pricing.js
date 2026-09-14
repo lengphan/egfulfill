@@ -859,6 +859,9 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
     // split is a fact about the product and the technique, and showing it is the only way
     // a $13.50 blank quoting $18.50 stops looking like two different prices.
     const parts = srow ? costPartsOf(srow, it, fees) : { base: null, method: 0 };
+    /* Written by freezeQuote at the moment of charge; absent on a quote and on any line
+       charged before the column existed. node-pg gives jsonb back already parsed. */
+    const stamp = it.cost_parts && typeof it.cost_parts === 'object' ? it.cost_parts : null;
     /* LINE IDENTITY, not the row id. `id` is the order_items primary key and the CLIENT's
        OrderItem does not carry it, so a caller matching a quote line back to the item on
        screen had only `sku` to go on — which is null on a manual line, and shared by
@@ -866,8 +869,9 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
        SKU are different jobs; keying on sku alone flips every sibling at once". */
     lines.push({ id: it.id, line_id: it.line_id ?? null, sku: it.sku, name: it.name, qty, size: it.size, blank: it.blank,
                  unitCost: money(cost), shipFee: money(ship), extraFee: money(extra),
-                 baseCost: parts.base == null ? null : money(parts.base),
-                 methodFee: money(parts.method || 0),
+                 baseCost: stamp && stamp.base != null ? money(stamp.base)
+                           : parts.base == null ? null : money(parts.base),
+                 methodFee: money((stamp ? stamp.method : parts.method) || 0),
                  // What the line is PRINTED on, and what the extra faces added. Shown as its
                  // own number for the same reason methodFee is: a blank quoting more than
                  // its base cost has to be able to say which surcharge did it.
@@ -877,7 +881,16 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                     thing a breakdown must never do. */
                  /* The COUNT stays on the line for every reader that has one, and the NAMES
                     ride beside it so a breakdown can say which face cost what. */
-                 sides, faces, sideFee: money(sideAddOn(faces, fees, (srow && srow.data) || null)),
+                 sides, faces,
+                 /* THE STAMP WINS ON A CHARGED LINE. `faces` above is what is on the garment
+                    NOW; the stamp is what was BILLED, and after a charge those are allowed to
+                    differ (a face added post-submit must not re-price a paid order). Reading
+                    the stamp here means the charged summary and the quote emit one shape and
+                    the client never has to know which it is looking at. A line frozen before
+                    this column existed has no stamp and falls through to the live computation,
+                    which is exactly what it did before. */
+                 sideFee: stamp ? money((stamp.sides || []).reduce((n, p) => n + (Number(p.amount) || 0), 0))
+                                : money(sideAddOn(faces, fees, (srow && srow.data) || null)),
                  /**
                   * WHAT THE EXTRA FACES ACTUALLY CONTRIBUTED TO THE PRICE THIS LINE CARRIES,
                   * as against what they would cost if it were quoted today.
@@ -897,7 +910,8 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                  sideFeeCharged: parts.base == null ? null : money(cost - parts.base - (parts.method || 0)),
                  /* WHICH face cost what, so the summary can name them instead of saying
                     "2 sides" and leaving the reader to guess which one carried the money. */
-                 sideParts: sideBreakdown(faces, fees, (srow && srow.data) || null),
+                 sideParts: stamp ? { included: stamp.included ?? null, parts: stamp.sides || [] }
+                                  : sideBreakdown(faces, fees, (srow && srow.data) || null),
                  /* WHAT EVERY face would cost on this blank, for the designer's rail — which
                     must quote the same number the charge will use. */
                  sideRates: sideRates(fees, (srow && srow.data) || null),
@@ -935,7 +949,7 @@ export async function sellerDiscountPct(sellerId) {
 
 export async function quoteOrder(orderId) {
   const [items, fees, idx, sideRows] = await Promise.all([
-    q('select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee, line_id from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),
+    q('select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee, line_id, cost_parts from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),
     feeSettings(),
     catalogIndex(),
     /**
@@ -1086,7 +1100,29 @@ export function computeTotals(lines, fees, volumePct = 0) {
 // catalog edit can never rewrite what someone was already billed.
 export async function freezeQuote(orderId, quote) {
   for (const l of quote.lines) {
+    /**
+     * THE SPLIT IS STAMPED WITH THE PRICE, because the price alone cannot be read back.
+     *
+     * unit_cost is base + method + one row per extra face summed into one number. Afterwards
+     * the only honest thing a charged summary could say about a two-sided line was "extra
+     * faces $3.00" — it knew the total and not which face paid it, because the artwork on the
+     * garment can change after submit and deliberately does not re-price the order. Stamping
+     * the parts beside the figure they add up to is what lets the charged view name them as
+     * precisely as the quote does.
+     *
+     * `where cost_parts is null` for the same reason the volume rate below carries that
+     * guard: a re-freeze must never move a stamped record of something that already happened.
+     */
     await q('update order_items set unit_cost=$1, ship_fee=$2 where id=$3', [l.unitCost, l.shipFee, l.id]).catch(() => {});
+    await q('update order_items set cost_parts=$1 where id=$2 and cost_parts is null', [
+      JSON.stringify({
+        base: l.baseCost ?? null,
+        method: money(l.methodFee || 0),
+        included: l.sideParts?.included ?? null,
+        sides: l.sideParts?.parts ?? [],
+      }),
+      l.id,
+    ]).catch(() => {});
   }
   /**
    * The RATE, stamped beside the line prices, for the same reason they are: it is an input
