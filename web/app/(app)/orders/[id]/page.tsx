@@ -837,7 +837,7 @@ export default function OrderDetailPage() {
             Blanks
             {/* A partial figure says so rather than reading as the total. */}
             {quote?.supplierKnown != null && quote?.lines && quote.supplierKnown < quote.lines.length && (
-              <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
+              <span className="text-muted-foreground/70"> · estimate · {quote.supplierKnown} of {quote.lines.length} lines</span>
             )}
           </dt>
           <dd className="tabular-nums">−{usd(blanksEstimate)}</dd>
@@ -860,7 +860,19 @@ export default function OrderDetailPage() {
           <dd className="tabular-nums">−{usd(legacyPostage)}</dd>
         </div>
       )}
-      {ourTotal === 0 && (
+      {/*
+        * NOTHING RECORDED IS NOT THE SAME AS NOTHING ESTIMATED.
+        *
+        * This asked `ourTotal === 0`, and ourTotal includes the BLANKS ESTIMATE — a figure
+        * off the quote, not money that has moved. So the one line explaining that no postage
+        * has been bought and no partner work booked was suppressed by an estimate, on exactly
+        * the orders where it is most needed: the card showed a single deduction and no way to
+        * tell "nothing else has been spent" from "nothing else is coming".
+        *
+        * It asks about RECORDED costs now, so an estimate no longer hides the fact that the
+        * real ones have not happened.
+        */}
+      {costLines.length === 0 && !legacyPostage && (
         <p className="text-xs text-muted-foreground">
           Nothing has been spent on this order yet — no postage bought, no partner work booked.
         </p>
