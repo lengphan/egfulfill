@@ -489,27 +489,35 @@ export function ProductsCatalog() {
                       >
                         <DotsThree size={16} weight="bold" />
                       </DropdownMenuTrigger>
+                      {/*
+                        * EVERY ITEM STOPS THE CLICK. The whole card is a target — clickableProps
+                        * pushes /products/<id> — and the TRIGGER already called stopPropagation,
+                        * which made this look handled. The items did not, so pressing Edit opened
+                        * the dialog AND bubbled to the card, the card navigated, and the dialog you
+                        * had just opened was gone: "clicking edit redirected to the product detail
+                        * page". Same for Design and for archive/restore.
+                        */}
                       <DropdownMenuContent align="end" className="min-w-44">
                         <DropdownMenuItem
                           className="gap-2 text-xs"
-                          onClick={() => router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`)}
+                          onClick={(e) => { e.stopPropagation(); router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`) }}
                         >
                           <PenNib size={14} /> {tl("products", "Design this product")}
                         </DropdownMenuItem>
                         {isStaff && (
-                          <DropdownMenuItem className="gap-2 text-xs" onClick={() => { setEditing(p); setEditorOpen(true) }}>
+                          <DropdownMenuItem className="gap-2 text-xs" onClick={(e) => { e.stopPropagation(); setEditing(p); setEditorOpen(true) }}>
                             <PencilSimple size={14} /> {tl("products", "Edit")}
                           </DropdownMenuItem>
                         )}
                         {isStaff && (isArchived(p)
                           ? (
-                            <DropdownMenuItem className="gap-2 text-xs" onClick={() => setProductStatus(p, "Active")}>
+                            <DropdownMenuItem className="gap-2 text-xs" onClick={(e) => { e.stopPropagation(); setProductStatus(p, "Active") }}>
                               <ArrowCounterClockwise size={14} /> {tl("products", "Restore to Active")}
                             </DropdownMenuItem>
                           ) : (
                             /* Destructive in tone but not in effect — it is reversible by the item above,
                                which is exactly why it can sit in a menu without a confirmation. */
-                            <DropdownMenuItem variant="destructive" className="gap-2 text-xs" onClick={() => setProductStatus(p, "Archived")}>
+                            <DropdownMenuItem variant="destructive" className="gap-2 text-xs" onClick={(e) => { e.stopPropagation(); setProductStatus(p, "Archived") }}>
                               <Archive size={14} /> {tl("products", "Archive")}
                             </DropdownMenuItem>
                           ))}
