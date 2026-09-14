@@ -12,7 +12,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Package, MapPin, Truck, Clock, PaperPlaneTilt, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash, ArrowUUpLeft } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
-import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
+import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard, type OrderDesignFee } from "@/lib/api"
 import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { deleteOrderItem } from "@/lib/api"
 import { refundOrder } from "@/lib/api"
@@ -664,6 +664,17 @@ export default function OrderDetailPage() {
   // Design/check fees shown in the Summary. Complex fees under review are `amount: null`
   // ("To Be Determined") and are NOT added to the number, only listed.
  const designFees = quote?.designFees
+  /** WHICH ITEMS A DESIGN FEE COVERS, as 1-based positions. One fee can span several lines
+   *  (one artwork printed on two garments), which is why it cannot simply live under an
+   *  item: shown under both it would be counted twice and the column would stop summing. */
+ /* A PLAIN FUNCTION, not useCallback. This sits below an early return, and a hook after
+     one is called on some renders and not others — the "rendered more hooks than during the
+     previous render" crash. It is read during render and memoising it buys nothing. */
+ const feeCovers = (f: OrderDesignFee): number[] =>
+    (f.lines?.length ? f.lines : [{ line_id: f.line_id, sku: f.sku }])
+      .map((l) => items.findIndex((x) => (l.line_id && x.line_id === l.line_id) || (!l.line_id && !!l.sku && x.sku === l.sku)))
+      .filter((n) => n >= 0)
+      .map((n) => n + 1)
  const dfTotal = designFees?.total ?? 0
 
   // ── Cost, revenue, and the gap between them ──────────────────────────────────
@@ -831,41 +842,47 @@ export default function OrderDetailPage() {
    */
  const spendRows = (
     <>
-      {blanksEstimate != null && (
-        <div className="flex justify-between text-sm">
-          <dt className="text-muted-foreground">
-            Blanks
-            {/* WHICH BLANKS, by sku. "1 of 2 lines" said how much of the figure was known and
-                not what it was FOR, so a partial total named nothing you could go and look
-                up. The skus are what the row is about, and the ones with no supplier cost
-                are the ones missing from it.
-
-                AND IT HAS TO RESOLVE ONE. This read `l.blank`, which is not a sku — it is
-                whatever the blank picker wrote on the line, and on a real order that was
-                "Unisex Heavy Blend™ Crewneck Sweatshirt", "EG-18000 - Unisex Heavy Blend™
-                Crewneck Sweatshirt" and "Unisex Colorblast™ Heavyweight T-Shirt": three
-                strings for two blanks, 120 characters, four wrapped lines under a one-line
-                figure. resolveProduct is the shared resolver the item rows above already
-                use (§5) and it answers the question the label asks — EG-18000, EG-18009.
-                Unresolvable lines are dropped rather than falling back to the name: this
-                row is a list of codes, and one sentence in it is worse than one fewer code.
-                Nothing here can be blank for long — the filter is `supplierCost != null`,
-                which only a line WITH a catalogue row can be. */}
-            {(() => {
-              const priced = (quote?.lines ?? []).filter((l) => l.supplierCost != null)
-              const skus = [...new Set(priced.map((l) => {
-                const it = items.find((x) =>
-                  (l.line_id && x.line_id === l.line_id)
-                  || (!l.line_id && !!l.sku && x.sku === l.sku))
-                return it ? (resolveProduct(it, catalog)?.sku ?? null) : null
-              }).filter(Boolean))]
-              if (!skus.length) return null
-              return <span className="text-muted-foreground/70"> · {skus.join(", ")}</span>
-            })()}
-          </dt>
-          <dd className="tabular-nums">−{usd(blanksEstimate)}</dd>
-        </div>
-      )}
+      {/* THE SAME SHAPE AS THE HALF ABOVE: what each garment cost US, per item, rather than
+          one combined figure nobody can check against a line. A line with no supplier cost
+          is simply absent, which is what makes the total visibly short instead of silently
+          wrong. */}
+      {(quote?.lines ?? []).map((l, i) => {
+        const cost = Number(l.supplierCost)
+        if (!Number.isFinite(cost) || cost <= 0) return null
+        const qty = Number(l.qty) || 1
+        const n = items.findIndex((x) =>
+          (l.line_id && x.line_id === l.line_id)
+          || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+        const who = n > 0 ? `Item ${n}` : (l.blank || l.sku || "Item")
+        return (
+          <div key={`cost-${i}`} className="flex justify-between text-sm">
+            <dt className="min-w-0 truncate text-muted-foreground">
+              {who}
+              {l.blank && <span className="text-muted-foreground/70"> · {l.blank}</span>}
+              {qty > 1 && <span className="text-muted-foreground/70"> × {qty}</span>}
+            </dt>
+            <dd className="tabular-nums">−{usd(cost * qty)}</dd>
+          </div>
+        )
+      })}
+      {/* WHAT IS NOT COVERED, named. The per-item rows above only exist for lines we know a
+          supplier cost for; this says which ones we do not, so a short total explains itself. */}
+      {(() => {
+        const missing = (quote?.lines ?? []).filter((l) => !(Number(l.supplierCost) > 0))
+        if (!missing.length || blanksEstimate == null) return null
+        const who = missing.map((l) => {
+          const n = items.findIndex((x) =>
+            (l.line_id && x.line_id === l.line_id)
+            || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+          return n > 0 ? `Item ${n}` : (l.blank || l.sku || "?")
+        })
+        return (
+          <div className="flex justify-between text-sm">
+            <dt className="text-muted-foreground/70">{who.join(", ")} · no blank cost</dt>
+            <dd className="tabular-nums text-muted-foreground/70">—</dd>
+          </div>
+        )
+      })()}
       {costLines.map((l, i) => (
         <div key={i} className="flex justify-between text-sm">
           <dt className="text-muted-foreground" title={l.note ?? undefined}>{l.label}</dt>
@@ -1004,44 +1021,90 @@ export default function OrderDetailPage() {
   }
  const quoteRows = quote ? (
     <>
-                    {/* BASE COST, the same word the product editor uses for this number —
-   what the seller is charged for the blank, as against "product cost",
-   which is what the blank costs US. Two names for two numbers, and this
-   screen had been using the supplier's one for the seller's money. */}
-                    <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Base cost</dt>
-                      <dd className="tabular-nums">{usd(quote.subtotal)}</dd>
-                    </div>
-                    {/**
-                      * WHICH ITEM'S EXTRA FACES, and what they added (owner, 2026-09-10: "the
-                      * summary table right now doesn't show extra surface cost of which
-                      * item").
+                    {/*
+                      * ONE GROUP PER ITEM, because "Base cost $165.60" on a two-item order
+                      * says what the garments cost TOGETHER and nothing about either of
+                      * them. A duffel at $120.60 and a beanie at $45.00 are two decisions,
+                      * and the row that combined them could not be checked against either.
                       *
-                      * The per-side charge is INSIDE Base cost — unitCostOf returns base +
-                      * method + sides as one number — so a two-sided line quietly raised the
-                      * subtotal with nothing on the card able to say why. The figures were
-                      * already on the quote (`sideFee`, `sides` per line); nothing computed
-                      * here, nothing re-derived.
+                      * Each group heads with the line's own total and breaks it into the
+                      * parts that made it: the blank, the print method, and one row per
+                      * EXTRA face. Those are exactly the three things unitCostOf adds
+                      * together, so a group always sums to its own heading and the headings
+                      * always sum to the subtotal — the column still reconciles, which is
+                      * the property a breakdown may never lose.
                       *
-                      * A SUB-ROW, NOT A PART. Making it its own Summary line would mean a new
-                      * refundable part threaded through the ledger allocation, the refund
-                      * panel and the reversal logic — a fourth way for the money to disagree
-                      * with itself, to explain a number that has not moved. Indented under the
-                      * charge it is part of, like the Refunded rows below, so the amount
-                      * column still sums to Seller paid.
-                      *
-                      * The item's NUMBER, for the same reason the design fees carry one: a
-                      * marketplace title is a keyword list and this row is about money.
+                      * The blank is computed as the remainder rather than read from
+                      * baseCost, so rounding can only ever land on the largest part instead
+                      * of leaving a stray cent that makes the arithmetic look wrong.
                       */}
-                    {/* ONE ROW PER FACE THAT WAS CHARGED, named and priced.
-                        This said "Item 1 · 2 sides $5.00" — a count and a total, which tells
-                        you money was added and not which surface added it. On a line printing
-                        a back at $3.50 and a sleeve at $1.50 those are two different
-                        decisions, and a seller asking "what if I drop the sleeve" could not
-                        answer it from the card. The per-face figures come off the quote
-                        (`sideParts`, computed by the same function as `sideFee`), so the
-                        breakdown can never disagree with the charge. */}
-                    {(quote.lines ?? []).flatMap((l, i) => sideRowsFor(l, i, false))}
+                    {(quote.lines ?? []).map((l, i) => {
+                      const qty = Number(l.qty) || 1
+                      const parts = l.sideParts?.parts ?? []
+                      const method = Number(l.methodFee) || 0
+                      const sideTotal = parts.reduce((n, p) => n + p.amount, 0)
+                      const blank = (Number(l.unitCost) || 0) - method - sideTotal
+                      const n = items.findIndex((x) =>
+                        (l.line_id && x.line_id === l.line_id)
+                        || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+                      const who = n > 0 ? `Item ${n}` : (l.blank || l.name || l.sku || "Item")
+                      /* A single-part line needs no breakdown — a heading and one row under it
+                         restating the same figure is the repetition, not a clarification. */
+                      const split = method > 0.005 || parts.length > 0
+                      return (
+                        <Fragment key={`line-${i}`}>
+                          <div className="flex justify-between">
+                            <dt className="min-w-0 truncate font-medium">
+                              {who}
+                              {l.blank && <span className="font-normal text-muted-foreground"> · {l.blank}</span>}
+                              {qty > 1 && <span className="font-normal text-muted-foreground/70"> × {qty}</span>}
+                            </dt>
+                            <dd className="tabular-nums">{usd((Number(l.unitCost) || 0) * qty)}</dd>
+                          </div>
+                          {split && (
+                            <>
+                              <div className="flex justify-between">
+                                <dt className="pl-3 text-muted-foreground">Blank</dt>
+                                <dd className="tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
+                              </div>
+                              {method > 0.005 && (
+                                <div className="flex justify-between">
+                                  {/* The ITEM's own print_type, not a suffix picked off the sku.
+                                      An order sku carries the method as a suffix and the item
+                                      carries it as a field; re-deriving it from the string would
+                                      be a second opinion about what this line is. */}
+                                  <dt className="pl-3 text-muted-foreground">
+                                    {(n > 0 ? items[n - 1]?.print_type : null) || "Print method"}
+                                  </dt>
+                                  <dd className="tabular-nums text-muted-foreground">{usd(method * qty)}</dd>
+                                </div>
+                              )}
+                              {parts.map((pt, j) => (
+                                <div key={`face-${i}-${j}`} className="flex justify-between">
+                                  <dt className="pl-3 text-muted-foreground">
+                                    <span className="capitalize">{tl("sides", pt.face)}</span>
+                                  </dt>
+                                  <dd className="tabular-nums text-muted-foreground">{usd(pt.amount * qty)}</dd>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          {/* A FEE THAT BELONGS TO THIS ITEM SITS UNDER IT. Only when it covers
+                              this line and no other — a shared fee stays at order level below,
+                              where it can name every item it covers without being counted twice. */}
+                          {(designFees?.items ?? [])
+                            .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
+                            .map((f, j) => (
+                              <div key={`fee-${i}-${j}`} className="flex justify-between">
+                                <dt className="pl-3 text-muted-foreground">{f.label}</dt>
+                                {isStaff
+                                  ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
+                                  : <dd className="tabular-nums text-muted-foreground">{f.amount == null ? <span className="italic">To Be Determined</span> : usd(f.amount)}</dd>}
+                              </div>
+                            ))}
+                        </Fragment>
+                      )
+                    })}
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">
                         Shipping
@@ -1067,7 +1130,7 @@ export default function OrderDetailPage() {
                         <dd className="tabular-nums text-success">−{usd(quote.volumeDiscount)}</dd>
                       </div>
                     )}
-                    {designFees?.items?.map((f, i) => (
+                    {designFees?.items?.filter((f) => feeCovers(f).length !== 1).map((f, i) => (
                       <div key={i} className="flex justify-between">
                         {/**
                           * THE ITEM'S NUMBER, NOT ITS TITLE.
