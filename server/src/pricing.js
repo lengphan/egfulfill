@@ -372,7 +372,7 @@ function costPartsOf(row, item, fees) {
  * additional side" box, so the per-face rates can only be set by writing fee keys directly.
  * That is a UI gap, not an engine one — do not "add" what is already here.
  */
-function sideAddOn(faces, fees, d) {
+function sideDetail(faces, fees, d) {
   /**
    * ONE FACE IS INCLUDED, the rest are charged — and WHICH one is included has to be
    * deterministic or the same line prices two ways.
@@ -388,7 +388,7 @@ function sideAddOn(faces, fees, d) {
    */
   const list = (Array.isArray(faces) ? faces : []).map((f) => String(f || '').toLowerCase()).filter(Boolean);
   const uniq = [...new Set(list)];
-  if (uniq.length < 2) return 0;
+  if (uniq.length < 2) return null;
   const ordered = uniq.slice().sort((a, b) => {
     const ia = PRICED_SIDES.indexOf(a); const ib = PRICED_SIDES.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
@@ -397,7 +397,7 @@ function sideAddOn(faces, fees, d) {
   const ownFlat = num(own);
   const ownMap = own && typeof own === 'object' ? own : null;
   const flat = (ownFlat != null && ownFlat > 0 ? ownFlat : num(fees && fees.method_side)) || 0;
-  let total = 0;
+  const parts = [];
   // ordered[0] is included in the base — charge everything after it.
   for (const face of ordered.slice(1)) {
     const perProduct = ownMap ? num(ownMap[face]) : null;
@@ -405,9 +405,31 @@ function sideAddOn(faces, fees, d) {
     const rate = (perProduct != null && perProduct > 0) ? perProduct
       : (perPlatform != null && perPlatform > 0) ? perPlatform
       : flat;
-    if (rate > 0) total += rate;
+    if (rate > 0) parts.push({ face, amount: money(rate) });
   }
-  return total;
+  /* THE INCLUDED FACE IS NAMED TOO, at zero. A breakdown listing only what was charged
+     leaves "why is the front not here" unanswered, and the answer — one face is in the base
+     cost — is a pricing rule nobody can infer from a list of the others. */
+  return { included: ordered[0], parts, total: money(parts.reduce((n, p) => n + p.amount, 0)) };
+}
+
+/** The total, which is what a PRICE needs. Unchanged shape for every existing caller. */
+export function sideAddOn(faces, fees, d) {
+  const r = sideDetail(faces, fees, d);
+  return r ? r.total : 0;
+}
+
+/**
+ * WHICH FACE COST WHAT — the same computation, as a breakdown.
+ *
+ * `sideAddOn` returns the total because that is what a price needs; every caller that wants
+ * to EXPLAIN the price needs the parts, and computing them a second time on the client is
+ * how a breakdown and a charge come to disagree about one line (CLAUDE.md §5). One function
+ * decides; this is the other shape of its answer.
+ */
+export function sideBreakdown(faces, fees, d) {
+  const r = sideDetail(faces, fees, d);
+  return r ? { included: r.included, parts: r.parts } : { included: null, parts: [] };
 }
 
 // Per-unit cost = the size's base price (else the product's base) + the print method's
@@ -807,6 +829,9 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                  /* The COUNT stays on the line for every reader that has one, and the NAMES
                     ride beside it so a breakdown can say which face cost what. */
                  sides, faces, sideFee: money(sideAddOn(faces, fees, (srow && srow.data) || null)),
+                 /* WHICH face cost what, so the summary can name them instead of saying
+                    "2 sides" and leaving the reader to guess which one carried the money. */
+                 sideParts: sideBreakdown(faces, fees, (srow && srow.data) || null),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   return { lines, unpriced };
