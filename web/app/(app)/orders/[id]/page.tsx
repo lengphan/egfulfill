@@ -929,10 +929,16 @@ export default function OrderDetailPage() {
                       const parts = l.sideParts?.parts ?? []
                       if (!parts.length) return []
                       const qty = Number(l.qty) || 1
-                      /* Matched on SKU, which is what both shapes carry — the quote line's
-                         `id` is the order_items row id and OrderItem does not expose one. */
-                      const n = items.findIndex((x) => !!l.sku && x.sku === l.sku) + 1
-                      const who = n > 0 ? `Item ${n}` : (l.sku || "Item")
+                      /* BY LINE ID, which is the only thing that identifies one line.
+                         This matched on SKU and fell through to a bare "Item": sku is null on
+                         a manual line, so the lookup never hit — and on an order with two
+                         lines of the same SKU it would have hit the WRONG one, which is the
+                         sibling bug CLAUDE.md §5 describes. sku stays as the fallback for
+                         rows written before line_id existed. */
+                      const n = items.findIndex((x) =>
+                        (l.line_id && x.line_id === l.line_id)
+                        || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+                      const who = n > 0 ? `Item ${n}` : (l.name || l.sku || "Item")
                       return parts.map((p, j) => (
                         <div key={`side-${i}-${j}`} className="flex justify-between">
                           <dt className="pl-3 text-muted-foreground">

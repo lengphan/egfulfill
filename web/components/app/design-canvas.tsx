@@ -1015,6 +1015,20 @@ export function DesignCanvasDialog({
     }, 0)
  return () => clearTimeout(t)
   }, [])
+  /**
+   * DO WE ACTUALLY KNOW WHICH FACES THIS BLANK OFFERS, yet?
+   *
+   * `offeredSides` reads the product's own `sides` first and its configured TYPE second, and
+   * that type table is a module map filled by a fetch on mount. So for the products that do
+   * NOT state their own sides — most of them — the honest answer for the first moment this
+   * window is open is "not yet", and the padded fallback below is a GUESS.
+   *
+   * Rendering that guess is what made the rail appear and then change under the pointer: six
+   * tiles on open, and a different set a beat later when the types landed. The fallback is
+   * still right for a blank nobody has configured; it is only wrong while the question is
+   * still in flight, and this is the difference between those two.
+   */
+ const facesKnown = typesLoaded || !!offeredSides(product)
  const faces = useMemo(() => {
  const f = mockupFaces(product, liveItem.color)
  const base = f.length ? f : (liveItem.img ? [{ side: "front", url: liveItem.img }] : [])
@@ -2729,7 +2743,7 @@ export function DesignCanvasDialog({
           * one costs) and add the one they could not: what is actually on each.
           */}
         <div className="flex w-full items-start gap-3">
-          {faces.length > 1 && (
+          {facesKnown && faces.length > 1 && (
             <div className="flex w-[68px] shrink-0 flex-col gap-1.5" role="tablist" aria-label="Printed faces">
               {faces.map((f, i) => {
  const k = (f.side || "front").toLowerCase()
