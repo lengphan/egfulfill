@@ -170,7 +170,7 @@ export function reorderCols(ids: OrderColId[], id: OrderColId, toIndex: number):
 // `grid` (not a Tailwind width class) because this table is a CSS grid, not a <table>: an
 // order row and its expanded detail have to share one row container, and a grid lets the
 // detail sit as a full-width sibling instead of being forced into a colspan cell.
-export type FactoryColId = "status" | "delivery" | "order" | "age" | "units" | "tracking" | "store" | "customer" | "items" | "ready" | "action"
+export type FactoryColId = "status" | "delivery" | "order" | "age" | "units" | "tracking" | "store" | "platform" | "seller" | "customer" | "email" | "items" | "ready" | "action"
 
 export type FactoryColDef = { id: FactoryColId; label: string; grid: string; align?: "left" | "right" }
 
@@ -244,6 +244,30 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // 3rem holds four digits at the weight this is set in; anything larger is an order that
   // wants opening anyway.
   units:    { id: "units",    label: "Items",    grid: "3rem", align: "right" },
+  /**
+   * THE STACK, UNPACKED — and this is the second time this file has had to do it.
+   *
+   * `store` printed THREE facts in one cell: the shop name, and under it `Etsy · EG` —
+   * platform and seller squeezed onto a sub-line that truncates first and cannot be sorted,
+   * scanned or hidden. The note on `status` above describes the same defect being fixed
+   * once already ("Store and tracking were folded into sub-lines under the order number and
+   * the item count, which made them truncate, unscannable down the page"). It grew back on
+   * `store` itself.
+   *
+   * Each fact gets a slot, and the `store` CELL drops whichever of them is currently shown
+   * as its own column — so turning Platform on moves it out of the sub-line rather than
+   * printing it twice, and leaving it off loses nothing.
+   *
+   * ALL THREE HIDDEN BY DEFAULT (see DEFAULT_HIDDEN_FACTORY_COLS). That is mechanical, not
+   * taste: minPxFor sums only the VISIBLE tracks, so a hidden column costs no width and the
+   * default row minimum is exactly what it was. Shipping them visible would push the row
+   * past the container again, which is the whole reason that constant exists.
+   */
+  /* 4.5rem holds "Shopify", the longest of the four marketplace words, at this cell's size. */
+  platform: { id: "platform", label: "Platform", grid: "4.5rem" },
+  /* Seller labels are short codes ("EG") in practice, but a deactivated account renders a
+     word beside the name, so this is sized for a name rather than a code. */
+  seller:   { id: "seller",   label: "Seller",   grid: "6rem" },
   /* 13.5rem, MEASURED, not guessed. A 22-digit USPS number sets at 198px in the row's
      15px tabular figures, and the external-link glyph and its gap take another 13 — so 12rem
      (192px) clipped every parcel by 19px, showing "…69182" where the last digits are the
@@ -279,6 +303,22 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
    * one that was truncating first.
    */
  customer: { id: "customer", label: "Customer", grid: "minmax(5rem,1fr)" },
+  /**
+   * THE BUYER'S EMAIL, for finding one order when the number is not to hand.
+   *
+   * It was ALREADY searchable — `o.customer?.email` has been in the filter haystack all
+   * along — but with nowhere on screen showing it, nobody could know that. A field you can
+   * search and cannot see is a feature nobody uses.
+   *
+   * STAFF ONLY in practice, and not by a check here: maskBuyerPII on the server replaces a
+   * seller's `customer` with `{ name, masked: true }`, so the field simply is not present
+   * to render. This column is on the factory hub, which a seller does not open.
+   *
+   * 12rem truncates a long address, which is correct — the cell is for recognising and
+   * copying, and the full value is in the opened order. It is hidden by default, so the
+   * width is only ever spent by someone who asked for it.
+   */
+  email:    { id: "email",    label: "Email",    grid: "12rem" },
   // The listing name lives here now, like the seller's Items column, and is deliberately
   // the first thing squeezed: an Etsy title runs 130 characters and truncates whatever
   // width it gets, so spending the table's flexible space on it starves everything that
@@ -330,7 +370,7 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
  *  loadFactoryColOrder; the columns shown are that list minus loadFactoryHiddenCols. Kept
  *  because it documents the intended left-to-right order, but edit the two loaders below to
  *  change what a board actually opens with. */
-export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "delivery", "order", "age", "units", "tracking", "store", "customer", "items", "ready", "action"]
+export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "delivery", "order", "age", "units", "tracking", "store", "platform", "seller", "customer", "email", "items", "ready", "action"]
 
 /**
  * HIDDEN on a board nobody has customised — `items`, and only `items`. One click in the
@@ -353,7 +393,12 @@ export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "delivery", "orde
    number, which on a production board is most of them, and a column that is blank down the
    page costs width it never repays. One click in the Columns menu brings it back, and the
    staff who want it — dispatch, anyone answering "where is it" — turn it on once. */
-export const DEFAULT_HIDDEN_FACTORY_COLS: FactoryColId[] = ["items", "delivery"]
+/* `platform`, `seller` and `email` join them, and for a different reason: they are not
+   squeezed, they are UNPACKED from the store cell and from nowhere at all. Hidden, they cost
+   no width — minPxFor sums visible tracks only — so the default board is unchanged and
+   anyone who wants to sort by marketplace, group by seller, or read a buyer's email turns
+   the one they need on once. */
+export const DEFAULT_HIDDEN_FACTORY_COLS: FactoryColId[] = ["items", "delivery", "platform", "seller", "email"]
 
 /** The two columns that absorb slack — List, then Product. Losing BOTH leaves a row of
  *  capped tracks and a hole before the actions, which is what SOAK_UP below repairs. */

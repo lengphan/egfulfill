@@ -1101,7 +1101,13 @@ export function OrdersHub() {
  if ((x < 0) !== (y < 0)) return x < 0 ? 1 : -1
  return x - y
       },
- store: (a, b) => platformOf(a).localeCompare(platformOf(b)),
+ /* SORTS BY THE SHOP, not by the marketplace. It sorted on platformOf because platform
+    was a sub-line of this cell and there was nowhere else for it to be sorted from;
+    Platform is its own column now and brings its own comparator. */
+ store: (a, b) => (a.store || platformOf(a)).localeCompare(b.store || platformOf(b)),
+ platform: (a, b) => platformOf(a).localeCompare(platformOf(b)),
+ seller: (a, b) => String(a.seller_name ?? "").localeCompare(String(b.seller_name ?? "")),
+ email: (a, b) => (a.customer?.email ?? "").localeCompare(b.customer?.email ?? ""),
  customer: (a, b) => (a.customer?.name ?? "").localeCompare(b.customer?.name ?? ""),
       // Blank tracking sorts last in BOTH directions — "not shipped yet" is the absence of
       // a value, so letting it lead one direction would hand half the sorts an empty screen.
@@ -2233,20 +2239,38 @@ export function OrdersHub() {
  store: (() => {
  const platform = platformOf(o)
  const seller = sellerLabelOf(o, { deactivated: tl("orders", "deactivated"), deleted: tl("orders", "deleted account") })
+                  /* THE SUB-LINE ONLY CARRIES WHAT HAS NOWHERE ELSE TO BE.
+                     Platform and Seller are columns of their own now. Showing one here as
+                     well would print the same fact twice on one row; dropping it outright
+                     would lose it on the default board, where both are hidden. So the cell
+                     asks what is visible and carries the remainder — which is also why
+                     turning Platform on makes this cell simpler rather than wider. */
+ const sub = [rowCols.includes("platform") ? null : platform,
+                               rowCols.includes("seller") ? null : seller].filter(Boolean).join(" · ")
  return (
                     <div className="min-w-0" title={[o.store || platform, seller && `Seller: ${seller}`, o.created_at && fmtDate(o.created_at)].filter(Boolean).join(" · ")}>
                       <div className="truncate text-sm">{o.store || platform}</div>
-                      {/* One line, two facts, in the order you narrow by: the marketplace
- first because it is a handful of known values, the seller after
- because it is the long one — so what truncates is the name, and the
- name is the part the tooltip and the opened order both repeat. */}
-                      <div className="truncate text-xs text-muted-foreground">
-                        {platform}{seller ? ` · ${seller}` : ""}
-                      </div>
+                      {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
                     </div>
                   )
                 })(),
+ platform: <div className="min-w-0 truncate text-sm">{platformOf(o)}</div>,
+ seller: (
+                  <div className="min-w-0 truncate text-sm">
+                    {sellerLabelOf(o, { deactivated: tl("orders", "deactivated"), deleted: tl("orders", "deleted account") }) || "—"}
+                  </div>
+                ),
  customer: <div className="min-w-0 truncate text-sm">{o.customer?.name || "—"}</div>,
+                /* A VALUE, so it is `text-sm` like the name beside it rather than the muted
+                   caption a contact detail usually gets (§4). It is read off the screen and
+                   pasted into a search or a mail client, which is the whole reason it is
+                   here. `title` carries it in full, because 12rem truncates a long address
+                   and the part that identifies a person is often the end. */
+ email: (
+                  <div className="min-w-0 truncate text-sm" title={o.customer?.email || undefined}>
+                    {o.customer?.email || "—"}
+                  </div>
+                ),
                 /* THE PICTURES ARE THE CELL. The name beside them was truncated to
                    "Cust…" in the width this column gets — a word that identifies nothing —
  and under it a count the Items column already carries. Two lines of

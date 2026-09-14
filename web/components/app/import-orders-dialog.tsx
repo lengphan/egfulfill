@@ -4,7 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { markCameFromImport } from "@/lib/sheet-return"
 import { useRouter } from "next/navigation"
-import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CaretRight } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -858,9 +858,19 @@ export function ImportOrdersDialog({
              * is not collapsed, it is removed — what belongs above a preview is the preview.
              */}
             {!records && (
-            <details className="rounded-xl border border-border">
-              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
-                {tl("import", "Columns —")} <span className="text-muted-foreground">{tl("import", "grouped the way you fill them")}</span>
+            <details className="group rounded-xl border border-border">
+              {/* SAY WHAT OPENING IT GIVES YOU, in as few words as possible.
+                  "Columns — grouped the way you fill them" described how the list inside is
+                  ORDERED, which is only useful once you are already looking at it. What a
+                  closed row has to answer is "is this worth opening", and the answer is:
+                  the column names your sheet needs. The count does most of that work — it is
+                  the difference between a reference you might need and a list you can skim —
+                  and the caret is drawn rather than left to the browser's default marker,
+                  which is easy to miss at this size. */}
+              <summary className="flex cursor-pointer select-none items-center gap-1.5 px-3 py-2 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                <CaretRight size={12} weight="bold" className="shrink-0 transition-transform group-open:rotate-90 [details[open]_&]:rotate-90" />
+                {tl("import", "Column names")}
+                <span className="font-normal text-muted-foreground">{CSV_COLUMNS.length}</span>
               </summary>
               <div className="space-y-2.5 px-3 pb-3">
                 {/* Bands are SUBJECTS now, and obligation rides on each chip. Grouping by

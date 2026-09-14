@@ -1356,7 +1356,7 @@ const vi: Dict = {
   "import.All three work here · uses the egful template format": "Cả ba định dạng đều dùng được · theo mẫu của egful",
   "import.Upload a CSV/XLSX, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.":
     "Tải lên CSV/XLSX, dán các dòng, hoặc lấy từ Google Sheet. Các tên cột quen thuộc của Shopify/Etsy được nhận diện tự động.",
-  "import.grouped the way you fill them": "được nhóm theo cách bạn điền",
+  "import.Column names": "Tên cột",
   "import.They’re in your orders queue now.": "Chúng đã nằm trong hàng đợi đơn hàng của bạn.",
   "import.The orders imported. Attach these from the line’s designer.": "Đã nhập đơn hàng. Hãy đính kèm các tệp này từ trình thiết kế của từng dòng.",
   "import.No template matches": "Không có mẫu nào khớp",
