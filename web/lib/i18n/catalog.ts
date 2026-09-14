@@ -603,6 +603,7 @@ const vi: Dict = {
   "filter.All platforms": "Tất cả nền tảng",
   "filter.All shops": "Tất cả cửa hàng",
   "filter.Seller": "Người bán",
+  "filter.Readiness": "Mức sẵn sàng",
   "filter.All sellers": "Tất cả người bán",
   "filter.All methods": "Tất cả kiểu in",
   "filter.Any time": "Bất kỳ lúc nào",

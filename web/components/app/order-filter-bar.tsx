@@ -175,8 +175,8 @@ export function OrderFilterBar({ orders, query, onChange, catalog, count, total,
         {/* Labelled rows, not a bare row of triggers: inside a panel there is room to say
             what each one narrows, which is exactly what the cramped toolbar could not. */}
         <div className="space-y-2">
-          <FilterRow label={tl("filter", "List")}>
-            <FilterMenu label={tl("filter", "List")} anyLabel={tl("filter", "All orders")} value={query.ready} options={readyOptions.map((o) => ({ ...o, label: tl("ready", o.label) }))} onPick={(v) => set({ ready: v })} />
+          <FilterRow label={tl("filter", "Readiness")}>
+            <FilterMenu label={tl("filter", "Readiness")} anyLabel={tl("filter", "All orders")} value={query.ready} options={readyOptions.map((o) => ({ ...o, label: tl("ready", o.label) }))} onPick={(v) => set({ ready: v })} />
           </FilterRow>
           {facets.platforms.length > 1 && (
             <FilterRow label={tl("filter", "Platform")}>

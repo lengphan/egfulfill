@@ -354,26 +354,11 @@ export const addressSourceLabel = (o: OrderRow): string => {
  * `met: null` means "not applicable to this order" (e.g. artwork on an undecorated blank),
  * which reads differently from "not done yet" and shouldn't show as a gap.
  */
-export type Check = {
-  id: string; label: string; met: boolean | null; detail?: string
-  /** How to say "this is what's missing" in a sentence — "needs Scanned" doesn't read. */
-  blocked?: string
-}
-
-export function orderReadiness(o: OrderRow, opts?: { missingArtwork?: boolean }): Check[] {
-  const stage = String(o.factory_status ?? "").toLowerCase()
-  const scanned = ["working", "shipped", "printed"].includes(stage)
-  const addr = shipAddressOf(o)
-  const hasAddr = !!(addr.line1 && addr.zip)
-  return [
-    { id: "address", label: "Address", met: hasAddr, blocked: "no address", detail: hasAddr ? addrLine(o) : "No address — can't ship" },
-    { id: "artwork", label: "Artwork", met: opts?.missingArtwork === undefined ? null : !opts.missingArtwork, blocked: "needs artwork" },
-    { id: "label", label: "Label", met: !!o.tracking, blocked: "needs a label", detail: o.tracking ?? "No label bought yet" },
-    { id: "printed", label: "Printed", met: !!o.label_printed_at, blocked: "label not printed", detail: o.label_printed_at ? `Printed ${fmtDate(o.label_printed_at)}` : "Label not printed yet" },
-    // The one genuinely stage-derived check: nothing else records that a scan happened.
-    { id: "scanned", label: "Scanned", met: scanned, blocked: "awaiting scan", detail: scanned ? "Scanned" : "Waiting on the scan" },
-  ]
-}
+/* `Check` and a SECOND `orderReadiness` lived here and were imported by nothing: both real
+   callers (readiness-dots, order-filter) read the one in lib/order-readiness.ts, which has a
+   different vocabulary — label/scan/design rather than address/artwork/label/printed/scanned.
+   Two exported functions sharing a name, one of them dead, is exactly how a private copy
+   gets picked up by mistake, so the dead one is gone rather than left as a trap. */
 
 /**
  * THE PER-FACE RATES FOR ONE LINE of a quote.
