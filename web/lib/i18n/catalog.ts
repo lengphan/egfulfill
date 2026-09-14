@@ -1337,6 +1337,7 @@ const vi: Dict = {
   // ── Import orders ─────────────────────────────────────────────────────────
   // File formats and column names (CSV, XLSX, TPL-, Order Number) are the contract with
   // the sheet, so they stay as they are — only the prose around them moves.
+  "import.Press a column to see what goes in it.": "Nhấn vào một cột để xem nội dung của cột đó.",
   "import.Import orders": "Nhập đơn hàng",
   "import.Import": "Nhập",
   "import.Importing…": "Đang nhập…",
@@ -2180,7 +2181,15 @@ const vi: Dict = {
   "products.Internal": "Nội bộ",
   "products.Edit": "Sửa",
   "products.Delete": "Xoá",
-  "products.Design this product": "Thiết kế sản phẩm này",
+  /* One word each, matching the card menu — see the note there. "Design this product" and
+     "Restore to Active" both said back what the card already shows. */
+  "products.Design": "Thiết kế",
+  /* Not ours — landed untranslated with the card's action menu (c563ffd7) and the import
+     sheet, so the i18n gate was already failing on main. Filled in here rather than left for
+     whoever trips over it next; a gate nobody can pass stops being a gate. */
+  "products.Actions for this product": "Thao tác cho sản phẩm này",
+  "products.Archive": "Lưu trữ",
+  "products.Restore": "Khôi phục",
   "products.Search products…": "Tìm sản phẩm…",
   "products.No products match that.": "Không có sản phẩm nào khớp.",
   "products.Try a different search or category.": "Hãy thử từ khoá hoặc nhóm hàng khác.",
@@ -2815,6 +2824,13 @@ const vi: Dict = {
   "purchase.Drop — not ordering this": "Bỏ — không đặt mục này",
   "purchase.Clear it off the board — the supplier is not contacted": "Gỡ khỏi bảng — không liên hệ nhà cung cấp",
   "purchase.Copy these items onto a new draft PO": "Sao chép các mặt hàng này sang đơn đặt hàng nháp mới",
+  /* A cart line with no figure anywhere. "—" plus these, never $0.00 — see the note in
+     purchase-view.tsx. {n} is substituted at the call site; `tl` has no interpolation, so the
+     placeholder has to survive translation. */
+  "purchase.+{n} unpriced": "+{n} chưa có giá",
+  "purchase.{n} unpriced": "{n} chưa có giá",
+  "purchase.1 line has no price — it is not in the supplier catalogue we synced, so this total is not what you will be billed.": "1 dòng chưa có giá — dòng này không có trong danh mục nhà cung cấp đã đồng bộ, nên tổng này không phải số tiền bạn sẽ bị tính.",
+  "purchase.{n} lines have no price — they are not in the supplier catalogue we synced, so this total is not what you will be billed.": "{n} dòng chưa có giá — các dòng này không có trong danh mục nhà cung cấp đã đồng bộ, nên tổng này không phải số tiền bạn sẽ bị tính.",
   "purchase.Goods only. Freight and any tax are added by the supplier at placement.": "Chỉ tính hàng hoá. Cước vận chuyển và thuế do nhà cung cấp cộng thêm khi đặt.",
   "purchase.Book in everything this order is still waiting on and add it to the shelf": "Ghi nhận mọi thứ đơn này còn đang chờ và đưa lên kệ",
   "purchase.The shelf was empty when an order needed this, so it was added for you.": "Kệ đã hết hàng khi một đơn cần mặt hàng này, nên nó được thêm vào sẵn cho bạn.",

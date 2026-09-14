@@ -4,7 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Plus, Package, Sparkle, PenNib, PencilSimple, Archive, ArrowCounterClockwise, DotsThree, Warning, Tag } from "@phosphor-icons/react"
+import { Plus, Package, Sparkle, DotsThree, Warning, Tag } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { TabBar } from "@/components/app/tab-bar"
@@ -497,28 +497,45 @@ export function ProductsCatalog() {
                         * had just opened was gone: "clicking edit redirected to the product detail
                         * page". Same for Design and for archive/restore.
                         */}
-                      <DropdownMenuContent align="end" className="min-w-44">
+                      {/* WORDS ONLY, AND ONE WORD EACH (owner, 2026-09-14: "simple buttons
+                          Design, Edit, Archive no more emojis").
+
+                          THE ICONS ARE GONE. A three-item menu of plain verbs does not need
+                          them: a pen nib, a pencil and an archive box beside Design, Edit and
+                          Archive are three pictures of what the word already says, and at
+                          14px they read as decoration on a list that is meant to be scanned
+                          and dismissed. They also made the row's real target ambiguous —
+                          nothing here is icon-only, so nothing here needed an icon.
+
+                          `text-sm`, not `text-xs`. These are CONTROLS, and 12px is the
+                          caption step (§4 — a label may be 12px, a thing you act on is not a
+                          caption). The menu is four words wide; there was never a density
+                          problem to solve by shrinking them.
+
+                          "Design this product" → "Design". The menu hangs off one product's
+                          own card, so "this product" was the card saying its own name back. */}
+                      <DropdownMenuContent align="end" className="min-w-40">
                         <DropdownMenuItem
-                          className="gap-2 text-xs"
+                          className="text-sm"
                           onClick={(e) => { e.stopPropagation(); router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`) }}
                         >
-                          <PenNib size={14} /> {tl("products", "Design this product")}
+                          {tl("products", "Design")}
                         </DropdownMenuItem>
                         {isStaff && (
-                          <DropdownMenuItem className="gap-2 text-xs" onClick={(e) => { e.stopPropagation(); setEditing(p); setEditorOpen(true) }}>
-                            <PencilSimple size={14} /> {tl("products", "Edit")}
+                          <DropdownMenuItem className="text-sm" onClick={(e) => { e.stopPropagation(); setEditing(p); setEditorOpen(true) }}>
+                            {tl("products", "Edit")}
                           </DropdownMenuItem>
                         )}
                         {isStaff && (isArchived(p)
                           ? (
-                            <DropdownMenuItem className="gap-2 text-xs" onClick={(e) => { e.stopPropagation(); setProductStatus(p, "Active") }}>
-                              <ArrowCounterClockwise size={14} /> {tl("products", "Restore to Active")}
+                            <DropdownMenuItem className="text-sm" onClick={(e) => { e.stopPropagation(); setProductStatus(p, "Active") }}>
+                              {tl("products", "Restore")}
                             </DropdownMenuItem>
                           ) : (
                             /* Destructive in tone but not in effect — it is reversible by the item above,
                                which is exactly why it can sit in a menu without a confirmation. */
-                            <DropdownMenuItem variant="destructive" className="gap-2 text-xs" onClick={(e) => { e.stopPropagation(); setProductStatus(p, "Archived") }}>
-                              <Archive size={14} /> {tl("products", "Archive")}
+                            <DropdownMenuItem variant="destructive" className="text-sm" onClick={(e) => { e.stopPropagation(); setProductStatus(p, "Archived") }}>
+                              {tl("products", "Archive")}
                             </DropdownMenuItem>
                           ))}
                       </DropdownMenuContent>
