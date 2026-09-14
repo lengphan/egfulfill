@@ -149,12 +149,16 @@ export function matchesStatus(o: OrderRow, value: string, ctx: FilterContext = {
  *
  *  Stock is only offered when the caller can actually evaluate it (see FilterContext) —
  *  an option that can only ever return nothing is worse than one that isn't there. */
-export const READY_OPTIONS: { value: string; label: string; stock?: true }[] = [
+export const READY_OPTIONS: { value: string; label: string; stock?: true; rule?: boolean }[] = [
   { value: "label:todo", label: "Needs a label" },
   { value: "scan:todo", label: "Not scanned" },
   { value: "design:todo", label: "Design not ready" },
   { value: "stock:out", label: "Short on stock", stock: true },
-  { value: "label:done", label: "Label bought" },
+  /* THE HALVES ARE DIFFERENT QUESTIONS. Everything above is work outstanding;
+     everything below is work finished. The order already said so and nothing on screen
+     did, which is what made eight options read as eight unrelated things rather than
+     four in two states. */
+  { value: "label:done", label: "Label bought", rule: true },
   { value: "scan:done", label: "Scanned" },
   { value: "design:done", label: "Design approved" },
   { value: "stock:in", label: "In stock", stock: true },

@@ -1,7 +1,8 @@
+import { Fragment } from "react"
 "use client"
 
 import { CaretDown, Check } from "@phosphor-icons/react"
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 
 /**
  * THE FILTER CONTROL — one of these, everywhere.
@@ -31,7 +32,9 @@ export function FilterMenu({ label, anyLabel, value, options, onPick }: {
    *  state rather than a category. */
   anyLabel: string
   value: string
-  options: { value: string; label: string }[]
+  /** `rule` draws a separator ABOVE that option — for a roster whose halves mean different
+   *  things (see READY_OPTIONS, where the not-done options come first). */
+  options: { value: string; label: string; rule?: boolean }[]
   onPick: (v: string) => void
 }) {
   const current = options.find((o) => o.value === value)
@@ -65,10 +68,13 @@ export function FilterMenu({ label, anyLabel, value, options, onPick }: {
           <span className={value ? "text-muted-foreground" : "font-medium"}>{anyLabel}</span>
         </DropdownMenuItem>
         {options.map((o) => (
-          <DropdownMenuItem key={o.value} onClick={() => onPick(o.value)} className="flex items-center gap-2 text-sm">
+          <Fragment key={o.value}>
+          {o.rule && <DropdownMenuSeparator />}
+          <DropdownMenuItem onClick={() => onPick(o.value)} className="flex items-center gap-2 text-sm">
             <Check size={12} weight="bold" className={value === o.value ? "text-primary" : "opacity-0"} />
             <span className="truncate">{o.label}</span>
           </DropdownMenuItem>
+          </Fragment>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
