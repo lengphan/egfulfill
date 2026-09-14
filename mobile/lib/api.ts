@@ -50,16 +50,59 @@ export class ApiError extends Error {
   constructor(status: number, message: string) { super(message); this.status = status }
 }
 
+/**
+ * EVERY REQUEST HAS A DEADLINE, and that is the whole reason this wrapper exists.
+ *
+ * `fetch` had no timeout and no AbortController, so a request that never settles never
+ * settles: no resolve, no reject, and the promise simply hangs. On a phone that is routine
+ * rather than exotic — the radio drops mid-flight, the socket is left half-open, and the app
+ * is holding a promise nothing will ever complete.
+ *
+ * The screens are all written the same honest way:
+ *
+ *     try { setRows(await getTopups()) } catch (e) { setErr(...) }
+ *
+ * and that catch CANNOT fire, because nothing rejects. So `rows` stays null, the spinner
+ * spins for as long as the screen is open, and the app reads as broken — "chat and top-up
+ * don't even load". Every one of those screens already had a working error state it was
+ * never given the chance to render.
+ *
+ * A timeout turns silence into a refusal, which the app already knows how to show.
+ */
+const TIMEOUT_MS = 20_000
+/** Big bodies get longer: a label buy waits on a carrier, and an attachment is base64 over a
+ *  phone connection. Neither is unbounded — they are slow, not silent. */
+const SLOW_TIMEOUT_MS = 90_000
+const SLOW_PATHS = ["/api/support/attachment", "/api/usps/label", "/api/shipping/label", "/api/design_files"]
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = await getToken()
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  })
+  const ctl = new AbortController()
+  const ms = SLOW_PATHS.some((p) => path.startsWith(p)) ? SLOW_TIMEOUT_MS : TIMEOUT_MS
+  const timer = setTimeout(() => ctl.abort(), ms)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      signal: ctl.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.headers ?? {}),
+      },
+    })
+  } catch (e) {
+    /* ABORTED BY US, or the connection failed. Both are "we got no answer", and both have to
+       reach the caller as a thrown error — returning anything here would have the screen
+       render a successful empty result, which is the one outcome worse than an error. Status
+       0 because there was no HTTP response to take one from. */
+    const aborted = e instanceof Error && e.name === "AbortError"
+    throw new ApiError(0, aborted
+      ? `The server didn't answer within ${Math.round(ms / 1000)}s.`
+      : "Couldn't reach the server.")
+  } finally {
+    clearTimeout(timer)
+  }
   const text = await res.text()
   const body = text ? JSON.parse(text) : {}
   if (!res.ok) throw new ApiError(res.status, body?.error || body?.message || `HTTP ${res.status}`)
