@@ -511,14 +511,49 @@ async function autoPushDesigns(orderId, lineId, sku) {
   return { pushed: true, cardId: id };
 }
 
+/**
+ * ASK FOR ARTWORK THE WAY ARTWORK IS FILED, which is by LINE.
+ *
+ * This asked one question — "is there an order_designs row whose SKU equals this item's
+ * sku" — and artwork has not been keyed that way since line_id arrived. The writer's key is
+ * DESIGN_KEY, `coalesce('L:' || line_id, 'S:' || sku)`, line FIRST; the order page resolves
+ * the same way (designForLine in web/lib/api.ts). So the gate was the only reader in the
+ * app still matching on sku alone, and it refused orders whose artwork every other surface
+ * could see.
+ *
+ * A MANUAL ORDER MAKES THAT CERTAIN rather than unlucky. Its lines carry `blank` and no
+ * sku at all, and the design row's `sku` column ends up holding the product NAME — so the
+ * comparison was '' against 'OTTO CAP® Beanie with Trim and Fleece Lining' and every
+ * decorated line on every manual order read "still has no artwork" with the artwork sitting
+ * right there. Order #75 (FF-jgpyfg-mu0p6ql0-sa3bk, 2026-09-14): two lines, two raster rows
+ * keyed by their line ids, both items reported missing.
+ *
+ * The sku fallback stays for rows written before line_id, and stays DELIBERATELY loose —
+ * any design row's sku, not only the line-less ones. Tightening it would newly refuse
+ * orders that pass today, and a gate that starts blocking work on an old order is a worse
+ * failure than the promiscuity it fixes. (That promiscuity: two lines of the same sku where
+ * only one has art both pass, which is what this has always done.)
+ *
+ * Not counted: `order_items.design_src`. autoPushDesigns treats it as artwork; the mockups
+ * note in this file says the opposite, that order_designs is the print file and nothing
+ * else may satisfy this check. Left as it was rather than resolved in passing — this fix is
+ * about the KEY, and loosening what counts is a separate decision.
+ */
 export async function missingArtwork(orderId) {
-  const items = await q('select sku, name, print_type from order_items where order_id=$1', [orderId]).then((r) => r.rows);
-  const designs = await q('select distinct sku from order_designs where order_id=$1', [orderId])
-    .then((r) => new Set(r.rows.map((x) => String(x.sku))))
-    .catch(() => new Set());
+  const items = await q('select sku, line_id, name, print_type from order_items where order_id=$1', [orderId]).then((r) => r.rows);
+  const rows = await q('select sku, line_id from order_designs where order_id=$1', [orderId])
+    .then((r) => r.rows)
+    .catch(() => []);
+  const byLine = new Set(rows.map((x) => String(x.line_id || '')).filter(Boolean));
+  const bySku = new Set(rows.map((x) => String(x.sku || '')).filter(Boolean));
   return items
     .filter((it) => String(it.print_type || '').trim())
-    .filter((it) => !designs.has(String(it.sku || '')))
+    .filter((it) => {
+      const lineId = String(it.line_id || '');
+      if (lineId && byLine.has(lineId)) return false;
+      const sku = String(it.sku || '');
+      return !(sku && bySku.has(sku));
+    })
     .map((it) => it.name || it.sku || 'an item');
 }
 
