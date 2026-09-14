@@ -2986,6 +2986,10 @@ export type OrderQuote = {
      *  from a list of the others. Computed by the same function as `sideFee` (sideBreakdown
      *  in server/src/pricing.js), so the explanation cannot disagree with the charge. */
     sideParts?: { included: string | null; parts: { face: string; amount: number }[] }
+    /** What EVERY face would cost on this blank, printed or not — the designer's rail shows a
+     *  price before anyone commits to a face, and it has to be the price the charge will use.
+     *  Resolved by the same three tiers as sideParts (sideRates in server/src/pricing.js). */
+    sideRates?: Record<string, number>
     supplierCost?: number | null }[]
   /** Lines with no price, and WHY — the reasons need different people to act.
    *  `no-blank`: nothing named, the seller picks one. `unknown-blank`: a blank IS named and

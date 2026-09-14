@@ -372,6 +372,44 @@ function costPartsOf(row, item, fees) {
  * additional side" box, so the per-face rates can only be set by writing fee keys directly.
  * That is a UI gap, not an engine one — do not "add" what is already here.
  */
+/**
+ * WHAT ONE FACE COSTS — the three tiers, in one place.
+ *
+ * Lifted out because the DESIGNER needs it too. Its face rail prints "+$4.00" on a tile
+ * before anyone commits to printing there, and it was reading `fees.side_<face>` and
+ * `fees.method_side` only — so a product carrying its own per-face map showed the platform
+ * flat rate on every face while the charge used the map. The rail's own note forbids exactly
+ * that: telling a seller +$3.00 on a face that actually adds $5.00 is worse than telling
+ * them nothing, because they are quoted a price and then meet a different one.
+ */
+function faceRate(face, ownMap, flat, fees) {
+  const perProduct = ownMap ? num(ownMap[face]) : null;
+  const perPlatform = num(fees && fees[`side_${face}`]);
+  return (perProduct != null && perProduct > 0) ? perProduct
+    : (perPlatform != null && perPlatform > 0) ? perPlatform
+    : flat;
+}
+
+/**
+ * EVERY FACE'S RATE for one product, whether or not it is printed yet.
+ *
+ * sideBreakdown answers about the faces a line HAS; this answers about the faces it COULD
+ * have, which is what a picker has to show. Same resolver, so the number on the tile is the
+ * number on the invoice.
+ */
+export function sideRates(fees, d) {
+  const own = d ? d.sidePrice : null;
+  const ownMap = own && typeof own === 'object' ? own : null;
+  const ownFlat = num(own);
+  const flat = (ownFlat != null && ownFlat > 0 ? ownFlat : num(fees && fees.method_side)) || 0;
+  const out = {};
+  for (const face of PRICED_SIDES) {
+    const r = faceRate(face, ownMap, flat, fees);
+    if (r > 0) out[face] = money(r);
+  }
+  return out;
+}
+
 function sideDetail(faces, fees, d) {
   /**
    * ONE FACE IS INCLUDED, the rest are charged — and WHICH one is included has to be
@@ -400,11 +438,7 @@ function sideDetail(faces, fees, d) {
   const parts = [];
   // ordered[0] is included in the base — charge everything after it.
   for (const face of ordered.slice(1)) {
-    const perProduct = ownMap ? num(ownMap[face]) : null;
-    const perPlatform = num(fees && fees[`side_${face}`]);
-    const rate = (perProduct != null && perProduct > 0) ? perProduct
-      : (perPlatform != null && perPlatform > 0) ? perPlatform
-      : flat;
+    const rate = faceRate(face, ownMap, flat, fees);
     if (rate > 0) parts.push({ face, amount: money(rate) });
   }
   /* THE INCLUDED FACE IS NAMED TOO, at zero. A breakdown listing only what was charged
@@ -837,6 +871,9 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                  /* WHICH face cost what, so the summary can name them instead of saying
                     "2 sides" and leaving the reader to guess which one carried the money. */
                  sideParts: sideBreakdown(faces, fees, (srow && srow.data) || null),
+                 /* WHAT EVERY face would cost on this blank, for the designer's rail — which
+                    must quote the same number the charge will use. */
+                 sideRates: sideRates(fees, (srow && srow.data) || null),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   return { lines, unpriced };
