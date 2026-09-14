@@ -192,6 +192,16 @@ export function OrderFilterBar({ orders, query, onChange, catalog, count, total,
                 onPick={(v) => set({ store: v })} />
             </FilterRow>
           )}
+          {/* SELLER, on the same rule as every other facet: derived from the orders in hand,
+              so it is absent for a seller (the server strips seller_name for them) and absent
+              on a factory that only has one. */}
+          {facets.sellers.length > 1 && (
+            <FilterRow label={tl("filter", "Seller")}>
+              <FilterMenu label={tl("filter", "Seller")} anyLabel={tl("filter", "All sellers")} value={query.seller}
+                options={facets.sellers.map((x) => ({ value: x, label: x }))}
+                onPick={(v) => set({ seller: v })} />
+            </FilterRow>
+          )}
           {facets.methods.length > 1 && (
             <FilterRow label={tl("filter", "Print")}>
               <FilterMenu label={tl("filter", "Print")} anyLabel={tl("filter", "All methods")} value={query.method} options={facets.methods} onPick={(v) => set({ method: v })} />

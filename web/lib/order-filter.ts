@@ -34,6 +34,9 @@ export type OrderQuery = {
   platform: string
   /** Exact store/shop string as stored on the order. "" = any. */
   store: string
+  /** WHICH SELLER's order. "" = any. Staff lists only: `seller_name` is stripped for a
+   *  seller, so the facet is empty and the control never renders for them. */
+  seller: string
   /** Normalised print-method key from print-method.ts ("emb" / "dtf" / …). "" = any. */
   method: string
   /** How far back, in days. null = any time; 0 = today only. One of the presets in
@@ -47,18 +50,18 @@ export type OrderQuery = {
   to: string
 }
 
-export const EMPTY_ORDER_QUERY: OrderQuery = { text: "", status: "", ready: "", platform: "", store: "", method: "", days: null, from: "", to: "" }
+export const EMPTY_ORDER_QUERY: OrderQuery = { text: "", status: "", ready: "", platform: "", store: "", seller: "", method: "", days: null, from: "", to: "" }
 
 /** Is anything actually narrowing the list? Drives whether a "Clear" affordance shows —
  *  and, more importantly, whether an empty result should read "no orders" or "no matches". */
 export const isOrderQueryActive = (q: OrderQuery) =>
-  !!(q.text.trim() || q.status || q.ready || q.platform || q.store || q.method || hasDateFilter(q))
+  !!(q.text.trim() || q.status || q.ready || q.platform || q.store || q.seller || q.method || hasDateFilter(q))
 
 export const activeFilterCount = (q: OrderQuery) =>
   (q.text.trim() ? 1 : 0) + (q.status ? 1 : 0) + (q.ready ? 1 : 0) +
   // ONE, whether it is a preset or a typed window — a person who set two dates set one
   // date filter, and counting the halves would report a filter they cannot turn off twice.
-  (q.platform ? 1 : 0) + (q.store ? 1 : 0) + (q.method ? 1 : 0) + (hasDateFilter(q) ? 1 : 0)
+  (q.platform ? 1 : 0) + (q.store ? 1 : 0) + (q.seller ? 1 : 0) + (q.method ? 1 : 0) + (hasDateFilter(q) ? 1 : 0)
 
 /** How a status value reads in a sentence. The two pseudo-values the pills add on top of the
  *  canonical stage ids come first; everything else is looked up in the pipeline itself, so a
@@ -343,12 +346,15 @@ export function methodsOfOrder(o: OrderRow): PrintMethod[] {
 export function orderFacets(orders: OrderRow[]) {
   const platforms = new Set<string>()
   const stores = new Set<string>()
+  const sellers = new Set<string>()
   const methods = new Map<string, string>()     // key → label
 
   for (const o of orders) {
     platforms.add(platformOf(o))
     const store = (o.store || "").trim()
     if (store) stores.add(store)
+    const seller = String(o.seller_name ?? "").trim()
+    if (seller) sellers.add(seller)
     // normTech labels a technique as a phrase ("DTF printing") because it's written into
     // sentences elsewhere; a filter wants the short name the picker uses ("DTF"), so prefer
     // the canonical roster's label and fall back to the phrase for anything not on it.
@@ -360,6 +366,7 @@ export function orderFacets(orders: OrderRow[]) {
   return {
     platforms: [...platforms].sort((a, b) => a.localeCompare(b)),
     stores: [...stores].sort((a, b) => a.localeCompare(b)),
+    sellers: [...sellers].sort((a, b) => a.localeCompare(b)),
     methods: [...methods].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)),
   }
 }
@@ -373,6 +380,12 @@ function haystack(o: OrderRow): string {
     numOf(o), o.id, String(o.seq ?? ""),
     o.customer?.name, o.customer?.email,
     o.store, o.source, o.tracking, o.carrier,
+    /* WHOSE ORDER IT IS. The search box has promised "buyer, seller or tracking" all along
+       and this was the one it could not do: `seller_name` holds the seller account's name OR
+       its email, so typing a shop's address found nothing and the control was advertising
+       something it did not deliver. Staff lists only — the server strips the field for a
+       seller, who would be searching for themselves. */
+    o.seller_name,
     // The ARTWORK, by name and by number. Typing "dsn-1042" or a design's name finds every
     // order printing it, which is how similar work gets batched — the reason this was
     // asked for. Both forms of the number are indexed ("dsn-1042" and "1042") so neither
@@ -398,6 +411,7 @@ export function matchesOrderQuery(o: OrderRow, q: OrderQuery, win?: DateWindow |
   if (q.ready && !matchesReady(o, q.ready, ctx)) return false
   if (q.platform && platformOf(o) !== q.platform) return false
   if (q.store && (o.store || "").trim() !== q.store) return false
+  if (q.seller && String(o.seller_name ?? "").trim() !== q.seller) return false
   if (q.method && !methodsOfOrder(o).some((m) => m.key === q.method)) return false
   if (win) {
     // An order with no date can't be shown to fall inside a window — dropping it is the

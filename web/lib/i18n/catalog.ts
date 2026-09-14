@@ -602,6 +602,8 @@ const vi: Dict = {
   "filter.All orders": "Tất cả đơn",
   "filter.All platforms": "Tất cả nền tảng",
   "filter.All shops": "Tất cả cửa hàng",
+  "filter.Seller": "Người bán",
+  "filter.All sellers": "Tất cả người bán",
   "filter.All methods": "Tất cả kiểu in",
   "filter.Any time": "Bất kỳ lúc nào",
   // READY_OPTIONS + DATE_RANGES, spliced into the empty-table sentence and shown in the
