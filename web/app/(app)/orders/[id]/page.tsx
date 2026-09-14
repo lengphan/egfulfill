@@ -838,10 +838,27 @@ export default function OrderDetailPage() {
             {/* WHICH BLANKS, by sku. "1 of 2 lines" said how much of the figure was known and
                 not what it was FOR, so a partial total named nothing you could go and look
                 up. The skus are what the row is about, and the ones with no supplier cost
-                are the ones missing from it. */}
+                are the ones missing from it.
+
+                AND IT HAS TO RESOLVE ONE. This read `l.blank`, which is not a sku — it is
+                whatever the blank picker wrote on the line, and on a real order that was
+                "Unisex Heavy Blend™ Crewneck Sweatshirt", "EG-18000 - Unisex Heavy Blend™
+                Crewneck Sweatshirt" and "Unisex Colorblast™ Heavyweight T-Shirt": three
+                strings for two blanks, 120 characters, four wrapped lines under a one-line
+                figure. resolveProduct is the shared resolver the item rows above already
+                use (§5) and it answers the question the label asks — EG-18000, EG-18009.
+                Unresolvable lines are dropped rather than falling back to the name: this
+                row is a list of codes, and one sentence in it is worse than one fewer code.
+                Nothing here can be blank for long — the filter is `supplierCost != null`,
+                which only a line WITH a catalogue row can be. */}
             {(() => {
-              const priced = (quote?.lines ?? []).filter((l) => l.supplierCost != null && l.blank)
-              const skus = [...new Set(priced.map((l) => String(l.blank)))]
+              const priced = (quote?.lines ?? []).filter((l) => l.supplierCost != null)
+              const skus = [...new Set(priced.map((l) => {
+                const it = items.find((x) =>
+                  (l.line_id && x.line_id === l.line_id)
+                  || (!l.line_id && !!l.sku && x.sku === l.sku))
+                return it ? (resolveProduct(it, catalog)?.sku ?? null) : null
+              }).filter(Boolean))]
               if (!skus.length) return null
               return <span className="text-muted-foreground/70"> · {skus.join(", ")}</span>
             })()}
