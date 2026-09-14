@@ -26,13 +26,15 @@ import { HOVER, enter, line } from "./motion"
  * 1280, 77% at 1024, while the comment in steps.tsx claimed the column there "is clear ground
  * because the garment hangs right." It is clear ground only above about 1700px.
  *
- * At these heights the hang is 28–32% of the card — a firm overlap nobody can miss — and
- * steps.tsx opens its content below exactly that. THE TWO NUMBERS ARE A PAIR, and the note
- * there says so: raise one without the other and the garment is back on the paragraph.
+ * At these heights the hang is 28–32% of the card — a firm overlap nobody can miss.
  *
- * IT IS PROPORTIONAL ON BOTH SIDES ON PURPOSE. The hang is a percentage of a card measured in
- * svh, so it grows with a tall window; a fixed pixel pad in the block below would clear it at
- * 900px and fail at 1200. The clearance has to scale the way the overhang scales.
+ * THE BLOCK BELOW CLEARS IT SIDEWAYS, NOT DOWNWARDS (changed 2026-09-14). steps.tsx used to
+ * pay for this overlap with `pt-[26svh]`, a quarter-viewport of bare acid above its first
+ * words — and because the garment only covers the RIGHT of that band, the left of it was
+ * simply a large empty rectangle. Its type is capped to the sleeve's x instead now and rises
+ * into the band beside the garment. So the pair is this render's WIDTH and left edge against
+ * that cap: the measured numbers are in the note on `Lead` there. Grow the garment or move
+ * its `top` and that cap is what has to move with it.
  *
  * MOVING IT UP INSTEAD DOES NOT WORK, recorded so it is not retried: keeping 178% and pulling
  * `top` negative to shorten the hang cuts the same distance off the TOP of the render, and
