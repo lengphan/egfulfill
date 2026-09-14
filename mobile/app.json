@@ -18,7 +18,7 @@
       "package": "store.egful.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#C0C4FF"
       },
       "permissions": [
         "android.permission.CAMERA",
