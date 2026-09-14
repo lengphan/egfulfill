@@ -4,6 +4,7 @@ import { STATUS_TONE, CATEGORY_TONE } from "@/lib/status-tone"
 import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { FilterMenu } from "@/components/app/filter-menu"
 import { labelRail, PAYOUT_RAILS } from "@/lib/payment-method"
 import { Plus, DownloadSimple, X } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
@@ -672,6 +673,60 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
     // bottom regardless of when it happened.
  return [...base, ...extra].sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
   }, [view?.rows, rejected])
+
+  /**
+   * NARROWING THE LEDGER.
+   *
+   * The transaction history had no filter at all, on the one table in the app that grows
+   * forever — every postage buy, every charge, every top-up, for the life of the account.
+   * "Show me the postage on the LianLian card" was a Cmd+F job over a scrolling list.
+   *
+   * THREE FACETS, and no more: what KIND of movement, which WAY the money went, and which
+   * account it was attributed to. Date is deliberately absent — the rows are already newest
+   * first and the export carries the whole set, so a date control here would be a fourth
+   * dropdown earning its place on the rarest question.
+   *
+   * OPTIONS COME FROM THE ROWS, not from a fixed list. A menu offering "Dispatch partner" to
+   * an account that has never used one is noise, and worse, it cannot be told apart from a
+   * filter that matched nothing.
+   */
+ const [txType, setTxType] = useState("")
+ const [txDir, setTxDir] = useState("")
+ const [txAcct, setTxAcct] = useState("")
+
+ const acctName = useCallback((id: string | null) =>
+ (accounts.find((a) => String(a.id) === String(id))?.name ?? id ?? ""), [accounts])
+
+ const txTypeOptions = useMemo(() => {
+ const seen = new Map<string, string>()
+ for (const r of histRows) if (r.label) seen.set(r.label, r.label)
+ return [...seen.values()].sort().map((v) => ({ value: v, label: v }))
+  }, [histRows])
+
+ const txAcctOptions = useMemo(() => {
+ const seen = new Set<string>()
+ let anyUnassigned = false
+ for (const r of histRows) {
+ if (r.cashAccount) seen.add(String(r.cashAccount)); else anyUnassigned = true
+    }
+ const opts = [...seen].map((id) => ({ value: id, label: acctName(id) }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+    /* "Unassigned" is a real answer here rather than an absence — reconciling is mostly the
+       hunt for rows nobody has placed yet, which is why the column has its own picker. */
+ return anyUnassigned ? [...opts, { value: "__none", label: tl("wallet", "Unassigned") }] : opts
+  }, [histRows, acctName, tl])
+
+ const shownRows = useMemo(() => histRows.filter((r) => {
+ if (txType && r.label !== txType) return false
+ if (txDir === "in" && !(r.amount > 0)) return false
+ if (txDir === "out" && !(r.amount < 0)) return false
+ if (txAcct === "__none" && r.cashAccount) return false
+ if (txAcct && txAcct !== "__none" && String(r.cashAccount ?? "") !== txAcct) return false
+ return true
+  }), [histRows, txType, txDir, txAcct])
+
+ const txFiltered = !!(txType || txDir || txAcct)
+
  const [topUpOpen, setTopUpOpen] = useState(false)
  const [payoutOpen, setPayoutOpen] = useState(false)
   // The row a staff/seller clicked to inspect — full detail for an audit/check-up.
@@ -1015,6 +1070,55 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                 state was already legible. */}
           </div>
         )}
+        {/* Only once there is something to narrow. A filter row over three rows of ledger is
+            chrome explaining a list you can already read. */}
+        {histRows.length > 3 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+            <FilterMenu
+              label={tl("wallet", "Type")}
+              anyLabel={tl("wallet", "All types")}
+              value={txType}
+              options={txTypeOptions}
+              onPick={setTxType}
+            />
+            <FilterMenu
+              label={tl("wallet", "Direction")}
+              anyLabel={tl("wallet", "In and out")}
+              value={txDir}
+              options={[
+                { value: "in", label: tl("wallet", "Money in") },
+                { value: "out", label: tl("wallet", "Money out") },
+              ]}
+              onPick={setTxDir}
+            />
+            {txAcctOptions.length > 0 && (
+              <FilterMenu
+                label={tl("wallet", "Account")}
+                anyLabel={tl("wallet", "All accounts")}
+                value={txAcct}
+                options={txAcctOptions}
+                onPick={setTxAcct}
+              />
+            )}
+            {txFiltered && (
+              <>
+                {/* The count is the feedback. Without it a filter that matches 900 of 1000
+                    rows looks identical to one that did nothing. */}
+                <span className="text-sm text-muted-foreground">
+                  {shownRows.length} {tl("wallet", "of")} {histRows.length}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => { setTxType(""); setTxDir(""); setTxAcct("") }}
+                >
+                  {tl("wallet", "Clear")}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
@@ -1034,14 +1138,29 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             </TableRow>
           </TableHeader>
           <TableBody>
-            {histRows.length === 0 ? (
+            {shownRows.length === 0 ? (
               <TableRow>
+                {/* AN EMPTY LEDGER AND A FILTER THAT MATCHED NOTHING ARE DIFFERENT ANSWERS
+                    (§4). One means there is no history; the other means the history is
+                    there and you are looking past it — and only the second has a way out. */}
                 <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  {tl("wallet", "No transactions yet")}
+                  {txFiltered ? (
+                    <>
+                      {tl("wallet", "No transactions match these filters")}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-2"
+                        onClick={() => { setTxType(""); setTxDir(""); setTxAcct("") }}
+                      >
+                        {tl("wallet", "Clear")}
+                      </Button>
+                    </>
+                  ) : tl("wallet", "No transactions yet")}
                 </TableCell>
               </TableRow>
             ) : (
- histRows.map((t) => (
+ shownRows.map((t) => (
                 <TableRow key={t.id} onClick={() => setDetail(t)} className="cursor-pointer hover:bg-muted/40">
                   <TableCell className="text-muted-foreground">{t.date}</TableCell>
                   {/* BOUNDED. A description is free text — a marketplace product title runs
