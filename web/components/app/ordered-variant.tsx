@@ -107,7 +107,28 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
    */
   const parts: React.ReactNode[] = []
   const ids: React.ReactNode[] = []
-  if (sku) ids.push(<span key="s"><span className="font-medium text-foreground/70">{tl("orderedVariant", "Listing SKU:")}</span> <span className="tabular-nums">{sku}</span></span>)
+  /**
+   * ALWAYS PRINTED, N/A AND ALL — §4: an absence must not look identical to a fault.
+   *
+   * This was `if (sku)`, so a line with no listing sku simply had no row, and "this line was
+   * never sold from a listing" rendered exactly the same as "we failed to read it". On an
+   * order with one imported line and one added by hand the two sit directly above each other,
+   * and the second looks like it is missing something (owner: "why is the first item have SKU
+   * and the below item doesnt have SKU… then why dont you have listing SKU: N/A").
+   *
+   * N/A rather than a dash, because the answer is not "empty", it is "does not apply": there
+   * is no listing behind this line to carry a code. Which of the two ways that happens —
+   * added by hand, or a listing that carries no SKU of its own — is in the title, since the
+   * row itself cannot tell them apart and neither can be asserted from what it holds.
+   */
+  ids.push(
+    <span key="s" title={sku ? undefined : tl("orderedVariant", "Not sold from a listing — added by hand, or the listing carries no SKU of its own.")}>
+      <span className="font-medium text-foreground/70">{tl("orderedVariant", "Listing SKU:")}</span>{" "}
+      {sku
+        ? <span className="tabular-nums">{sku}</span>
+        : <span className="text-muted-foreground">{tl("orderedVariant", "N/A")}</span>}
+    </span>,
+  )
   // The blank stands in where there is no listing sku — a manual line — and sits beside it
   // where there is one, because they are different codes for different things.
   /**

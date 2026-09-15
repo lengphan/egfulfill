@@ -4558,6 +4558,8 @@ const vi: Dict = {
   "orderedVariant.Ordered:": "Đã đặt:",
   "orderedVariant.Blank SKU:": "SKU phôi:",
   "orderedVariant.Listing SKU:": "SKU tin đăng:",
+  "orderedVariant.N/A": "Không có",
+  "orderedVariant.Not sold from a listing — added by hand, or the listing carries no SKU of its own.": "Không bán qua listing — thêm thủ công, hoặc listing không có SKU riêng.",
   "orders.Orders": "Đơn hàng",
   "orders.Upload history": "Lịch sử tải lên",
   "pagination.Per page": "Mỗi trang",
