@@ -848,13 +848,35 @@ export default function OrderDetailPage() {
    * the word was riding in the margin of every order forever to say something that is a
    * property of how we buy stock rather than news about this one.
    */
+  /**
+   * THE CARD READS IN THE ORDER THE ITEMS TAB NUMBERS THEM.
+   *
+   * `quote.lines` comes back ordered by `order_items.id`, which is a uuid — so the Summary
+   * listed Item 2 above Item 1 while the Items tab above it numbered them the other way, in
+   * BOTH halves (owner: "item numbering not clear"). Nothing was wrong with either list; they
+   * were sorted by two different things, and the one the reader can see is the numbering.
+   *
+   * A line the tab does not hold sorts last rather than first: an unknown position is not
+   * position zero, and putting it at the top would move every numbered row down.
+   */
+ const byItemNo = (lines: NonNullable<OrderQuote["lines"]>) =>
+    [...lines].sort((a, b) => {
+ const at = (l: (typeof lines)[number]) => {
+ const i = items.findIndex((x) =>
+          (l.line_id && x.line_id === l.line_id)
+          || (!l.line_id && !!l.sku && x.sku === l.sku))
+ return i < 0 ? Number.MAX_SAFE_INTEGER : i
+      }
+ return at(a) - at(b)
+    })
+
  const spendRows = (
     <>
       {/* THE SAME SHAPE AS THE HALF ABOVE: what each garment cost US, per item, rather than
           one combined figure nobody can check against a line. A line with no supplier cost
           is simply absent, which is what makes the total visibly short instead of silently
           wrong. */}
-      {(quote?.lines ?? []).map((l, i) => {
+      {byItemNo(quote?.lines ?? []).map((l, i) => {
         const cost = Number(l.supplierCost)
         if (!Number.isFinite(cost) || cost <= 0) return null
         const qty = Number(l.qty) || 1
@@ -1152,7 +1174,7 @@ export default function OrderDetailPage() {
                       * baseCost, so rounding can only ever land on the largest part instead
                       * of leaving a stray cent that makes the arithmetic look wrong.
                       */}
-                    {itemGroups(quote.lines ?? [])}
+                    {itemGroups(byItemNo(quote.lines ?? []))}
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">
                         Shipping
@@ -1409,7 +1431,7 @@ export default function OrderDetailPage() {
                          two sides of the charge read identically and the half below — which is
                          already per item — lines up with the half above. */
                       : l.part === "product" && itemsSumToCharge ? (
-                        <Fragment key={`${l.part}-${i}`}>{itemGroups(quote?.lines ?? [])}</Fragment>
+                        <Fragment key={`${l.part}-${i}`}>{itemGroups(byItemNo(quote?.lines ?? []))}</Fragment>
                       ) : (
                       <Fragment key={`${l.part}-${i}`}>
                       {/* `items-baseline`, so the FIGURE sits on the label's first line even
