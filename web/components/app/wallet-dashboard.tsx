@@ -509,6 +509,8 @@ type Row = {
   /** The stored ledger note, kept whole even when the label above it is composed — it is what
    *  somebody was told at the time, and it belongs in the tooltip and the dialog. */
  note?: string | null
+  /** The row's second line: the reason, under the reference. */
+ sub?: string | null
  amount: number
  balance: number
 }
@@ -627,6 +629,28 @@ const shortRef = (ref: string) => {
  * different seller and the name is what makes a busy day readable, while on a seller's own
  * wallet it would be their own name once per line.
  */
+/**
+ * ONE GRAMMAR FOR THE COLUMN: the REFERENCE on top, the REASON under it.
+ *
+ * Four different authors write this column and it read as four different columns (owner:
+ * "shouldn't there be a format for the finance/wallet description — it's quite all over the
+ * place"). A card title with a stray order number on the end, an adjustment's reason, free
+ * text somebody typed in Vietnamese, and a composed order label, each occupying the whole
+ * cell on its own terms:
+ *
+ *   Design work · #53-D1 · Front · 11.7" · #53
+ *   Method DTG → Embroidery · Item 1
+ *   qua soi 20k
+ *   EGF-001237 · Leng
+ *
+ * Every row is about SOMETHING and happened for a REASON, so those get one line each and
+ * always in the same place. The top line is what it is about — the order, and on the factory
+ * ledger whose it is; the line under it is the stored note, exactly as written.
+ *
+ * THE NOTE IS NOT REWRITTEN and the WHAT is not repeated: wallet_ledger is append-only, and
+ * the Type column beside this one already says Design, Adjustment or Revenue, so putting the
+ * category in the description too would be the same fact twice on one row.
+ */
 function orderLabel(l: LedgerRow, withParty: boolean): string | null {
   const ref = egfRef(l.order_ref_no)
   if (!ref) return null
@@ -655,6 +679,11 @@ function mapLedger(balance: number, ledger: LedgerRow[], fmtDate: (s?: string | 
  date: fmtDate(l.created_at, { month: "short", day: "2-digit" }),
  desc: orderLabel(l, withParty) || l.note || meta.label,
  note: l.note ?? null,
+      /* THE SECOND LINE. The note when the label above it is the reference — so the reason is
+         still on the row, one step down, rather than being the row. Otherwise the method,
+         which is what this line carried before and is the only thing left to say. */
+ sub: orderLabel(l, withParty) && l.note ? l.note
+        : (String(l.type).toLowerCase().startsWith("order-charge") ? "Wallet" : null),
  ref: shortRef(l.ref || ""),
  refFull: l.ref || "",
  method: String(l.type).toLowerCase().startsWith("order-charge") ? "Wallet" : "—",
@@ -1280,8 +1309,8 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                         It stays in the row's `title` and in the detail dialog, so support can
                         still trace a payment without it occupying the table. The method
                         keeps its line, because "ACH" or "VietQR" IS readable. */}
-                    {t.method && t.method !== "—" && (
-                      <div className="mt-0.5 truncate text-xs font-normal text-muted-foreground">{t.method}</div>
+                    {t.sub && (
+                      <div className="mt-0.5 truncate text-xs font-normal text-muted-foreground" title={t.sub}>{t.sub}</div>
                     )}
                   </TableCell>
                   <TableCell>
