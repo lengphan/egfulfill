@@ -3274,6 +3274,33 @@ export function ordersRoutes(app, requireAuth) {
     ).catch(() => ({ rows: [] }))).rows[0];
     const r = await q(`update order_items set ${sets.join(',')} where ${where}`, vals);
     if (!r.rowCount) { reply.code(404); return { error: 'item not found' }; }
+    /**
+     * A LINE ADDED BY HAND TAKES ITS BLANK'S NAME, once it has one.
+     *
+     * The client creates the row as "New item" because at that moment there is nothing else
+     * to call it — no listing, no blank, no sku. The placeholder then survived every screen it
+     * reached: the order card, the queue, the floor's pick list, and a wallet note reading
+     * "Design work · New item". Picking the blank is the moment the line acquires an identity
+     * and the only moment it is free to take it.
+     *
+     * ONLY OVER THE PLACEHOLDER, never over a name a person typed or a marketplace sent. The
+     * literal is the client's (addOrderItem in the order page) and empty counts too — either
+     * way there is nothing here to lose.
+     */
+    if (b.blank !== undefined) {
+      const had = String((wasRow && wasRow.name) || '').trim();
+      if (!had || had.toLowerCase() === 'new item') {
+        try {
+          const idx = await catalogIndex({ withImages: false });
+          const row = matchProduct(idx, { blank: String(b.blank || ''), sku: (wasRow && wasRow.sku) || sku || null });
+          const nm = row && row.data && row.data.name;
+          if (nm) {
+            await q(`update order_items set name=$1 where order_id=$2 and ${lineId ? 'line_id' : 'sku'}=$3`,
+                    [String(nm), req.params.id, lineId || sku]);
+          }
+        } catch { /* a name is a nicety; never fail the pick over it */ }
+      }
+    }
     audit(req, 'item.setup', {
       entityType: 'order', entityId: req.params.id,
       // `grant` names the permission that allowed a change the role could not otherwise
