@@ -3770,7 +3770,10 @@ export function DesignCanvasDialog({
             */}
           {sendable.length > 0 && (
             <div className="flex flex-col gap-2 pb-2">
-              <div className="text-sm font-medium">{tl("canvas", "Send to the design board")}</div>
+              {/* NO HEADING. It read "Send to the design board" directly above a filled
+                  button reading "Send to Board" — §4's prose-above-a-control, in the one shape
+                  it is easiest to miss: a heading that is the button's own label said twice.
+                  The tab is already called Board and the button says what it does. */}
               {/* HAIRLINES, NOT BOXES. Each row was an outlined, rounded card holding an
                   outlined field — and `border-input` is a CONTROL's border, held to a 3:1
                   floor precisely so it reads strongly. Three of them stacked under a heading,
@@ -3803,7 +3806,15 @@ export function DesignCanvasDialog({
                           onChange={(e) => setRowTitles((m) => ({ ...m, [row.side]: e.target.value }))}
                           disabled={off || sending}
                           aria-label={tl("canvas", "Card title")}
-                          className="mt-1 h-7 w-full text-xs"
+                          /* A HAIRLINE, NOT A CONTROL'S EDGE. `Input`'s default border is
+                             `--input`, held to a 3:1 contrast floor because a field you must
+                             find has to read strongly — but these are titles that are already
+                             correct, sitting two-to-a-row inside a list that is itself ruled,
+                             so the panel showed three weights of line in 380px (owner: "the
+                             borderline color is quite dark and thick"). Softened to the card
+                             rule the list beside it uses; focus still brings the full ring, so
+                             nothing is lost at the moment it is being typed in. */
+                          className="mt-1 h-7 w-full border-border/60 text-xs"
                         />
                         {/* THIS FACE'S PRICE, under this face's title. Small, because the row
                             is 380px wide and the pills are one of three things in it; the
