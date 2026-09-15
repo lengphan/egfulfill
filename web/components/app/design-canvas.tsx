@@ -1623,6 +1623,28 @@ export function DesignCanvasDialog({
       .then((cards) => {
  setBoardCard(cardForLine(cards ?? [], { line_id: item.line_id, sku: item.sku }) ?? null)
  setCardCount((cards ?? []).length)
+        /**
+         * WHAT HAS ALREADY GONE, SEEDED FROM THE BOARD.
+         *
+         * `sentSides` was written only by a send in THIS session, so closing the dialog and
+         * reopening it lost the fact entirely: the button came back enabled reading "Send to
+         * Board" for faces that were already on the board, one press from a duplicate card
+         * and a duplicate payout (owner: "after i sent shouldnt the send to board be disabled?
+         * and says Sent?"). The logic for disabling it was all there — it just had nothing to
+         * read.
+         *
+         * Keyed the same way a send keys it, through sentKey, so the two cannot drift. A card
+         * with no `side` was written before the column existed and a card with no `design_id`
+         * cannot say WHICH picture went — neither can be seeded, and both simply leave their
+         * face offered, which errs toward sending again rather than toward hiding a face that
+         * never went.
+         */
+ setSentSides(Object.fromEntries(
+          (cards ?? [])
+            .filter((c) => (item.line_id ? c.line_id === item.line_id : !!c.sku && c.sku === item.sku))
+            .filter((c) => c.side && c.design_id != null)
+            .map((c) => [String(c.side).toLowerCase(), `no:${c.design_id}`]),
+        ))
       })
       .catch(() => setBoardCard(null))
   }, [isStaff, orderId, item.line_id, item.sku])
@@ -1790,7 +1812,12 @@ export function DesignCanvasDialog({
    *  enabled with its message off where the eye was not, and the control read as doing
    *  nothing at all. A refusal belongs where the press was. */
  const [sendErr, setSendErr] = useState<string | null>(null)
- const going = sendable.filter((r) => !skip[r.side] && sentSides[r.side] !== r.art.data)
+ /** WHAT WENT, as one comparable value. The design NUMBER when the face has one — it changes
+  *  when the artwork is replaced, which is exactly when a face should become sendable again —
+  *  and the artwork itself when it does not, which is what this compared on before. Both ends
+  *  of the comparison go through here so a send and a seed can never key on different things. */
+ const sentKey = (art: FaceArt) => (art.no != null ? `no:${art.no}` : art.data)
+ const going = sendable.filter((r) => !skip[r.side] && sentSides[r.side] !== sentKey(r.art))
 
   /**
    * ONE CARD PER FACE (owner's call, 2026-09-09).
@@ -1810,6 +1837,7 @@ export function DesignCanvasDialog({
  try {
  for (const row of going) {
  const card = await createDesignCard({
+ side: row.side,
  title: titleOf(row.side, going.indexOf(row)),
  description: cardNote.trim() || undefined,
  band: rowBands[row.side] ?? undefined,
@@ -1827,7 +1855,7 @@ export function DesignCanvasDialog({
       }
       /* Marked AFTER the loop, so a send that failed half way leaves the faces that did not
          make it still offered — the error names which one stopped it. */
- setSentSides((m) => ({ ...m, ...Object.fromEntries(going.map((r) => [r.side, r.art.data])) }))
+ setSentSides((m) => ({ ...m, ...Object.fromEntries(going.map((r) => [r.side, sentKey(r.art)])) }))
  const cards = await getOrderDesignCards(orderId).catch(() => null)
  if (cards) setBoardCard(cardForLine(cards, { line_id: item.line_id, sku: item.sku }) ?? null)
     } catch (e) {

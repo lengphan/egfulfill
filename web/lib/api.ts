@@ -3661,6 +3661,8 @@ export function updateProfile(patch: { name?: string; username?: string | null; 
  */
 export function createDesignCard(body: {
   title: string; data?: string; type?: string; sku?: string
+  /** The face this card is for. Cards are one per face; sending a front and a back makes two. */
+  side?: string
   /** Which payout band this design is, chosen by whoever sends it — they are looking at the
    *  artwork, which is the one moment it can be judged without opening anything. Omitted
    *  means "not priced yet": the card pays the flat fallback until someone bands it. */
@@ -3830,6 +3832,14 @@ export type OrderDesignCard = {
    *  own task reference. Null while our designers hold it. */
   vendor?: string | null
   vendor_ref?: string | null
+  /** WHICH FACE this card is for. Cards are one-per-face, but the face used to live only in
+   *  the editable title — so nothing could say which faces of a line had already gone once
+   *  the sending panel was closed. Null on cards written before the column existed. */
+  side?: string | null
+  /** The design NUMBER the card was made from. It changes when the artwork is replaced, so
+   *  side + design_id together say "this face went, with this picture" — which is what lets
+   *  a swapped design become sendable again rather than reading as already sent. */
+  design_id?: string | number | null
 }
 export function getOrderDesignCards(orderId: string) {
   return api<OrderDesignCard[]>(`/api/design_cards/for-order/${encodeURIComponent(orderId)}`)

@@ -290,6 +290,16 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
                     )}
                   </p>
                   <p className="mt-2 text-[14px] font-semibold text-ploy-ink/70">{f.label}</p>
+                  {/* THE NOTE, which this section dropped.
+                      It is a stored field, already written, and site-content.ts says what it
+                      is for: "`note` says what the figure MEANS, which is what turns a row of
+                      numbers into a spec sheet rather than four unexplained digits". Five bare
+                      numerals under five bare labels is exactly the row it warns about — and
+                      the left column had space under them, which is the other half of why
+                      this is the right thing to put there. */}
+                  {f.note && (
+                    <p className="mt-1 max-w-[16rem] text-[13px] leading-snug text-ploy-ink/55">{f.note}</p>
+                  )}
                 </div>
               )
             })}
