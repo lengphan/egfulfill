@@ -304,9 +304,33 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
      * a human note anyway ("qua soi 20k", "Design work · …"); the ones that read as a key are
      * exactly the ones whose ref IS the id.
      */
+    /**
+     * THE ORDER BEHIND A REF, WITHOUT GUESSING WHAT AN ORDER ID LOOKS LIKE.
+     *
+     * A charge stores `ref` = the order id, but a fee's is `fee-<order>-<rand>-<rand>` and a
+     * design fee's is `design-<order>-<line>`. Pulling the order out of those with a regex
+     * means encoding the SHAPE of an id here — and three sync paths plus lib/order-id.ts
+     * already own that shape between them, so a fourth opinion is how they come to disagree.
+     *
+     * So this asks the table instead. Strip a leading verb, then offer every prefix formed by
+     * dropping trailing `-segment`s and let `id = any($1)` say which one is real. At most a
+     * handful of candidates per row, one query for the page, and it stays correct when the id
+     * format changes because it never knew the format.
+     */
+    const VERBS = ['fee', 'design', 'refund', 'revfee', 'expedite', 'express', 'topup'];
+    const candidatesOf = (ref) => {
+      const out = new Set([ref]);
+      let rest = ref;
+      for (const v of VERBS) if (rest.startsWith(v + '-')) { rest = rest.slice(v.length + 1); break; }
+      const seg = rest.split('-');
+      for (let n = seg.length; n >= 2; n--) out.add(seg.slice(0, n).join('-'));
+      return [...out];
+    };
+
     const refs = [...new Set(led.rows.map((r) => r.ref).filter(Boolean).map(String))];
     if (refs.length) {
-      const ords = (await q('select id, seq, ref_no, seller_id from orders where id = any($1)', [refs])
+      const probe = [...new Set(refs.flatMap(candidatesOf))];
+      const ords = (await q('select id, seq, ref_no, seller_id from orders where id = any($1)', [probe])
         .then((r) => r.rows).catch(() => []));
       const byOrder = new Map(ords.map((o) => [String(o.id), o]));
       const sellers = [...new Set(ords.map((o) => o.seller_id).filter(Boolean).map(String))];
@@ -316,7 +340,9 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
         : [];
       const byUser = new Map(users.map((u) => [String(u.id), u]));
       for (const row of led.rows) {
-        const o = byOrder.get(String(row.ref));
+        const o = row.ref
+          ? candidatesOf(String(row.ref)).map((c) => byOrder.get(c)).find(Boolean)
+          : null;
         if (!o) continue;
         row.order_id = o.id;
         /* The row, not a formatted string: numOf decides what an order is CALLED, and it
