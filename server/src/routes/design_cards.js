@@ -99,6 +99,21 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // because our designers are embroidery specialists and DTG/DTF goes to a partner.
   // vendor_ref holds the partner's own task id, so their webhooks can find the card.
   q('alter table design_cards add column if not exists vendor text').catch(() => {});
+  /**
+   * WHICH FACE THIS CARD IS FOR.
+   *
+   * Cards have been one-per-face since 2026-09-09 — a front and a back are two jobs, each
+   * with its own stitch file, each claimed and paid separately — but the face itself was only
+   * ever written into the card's TITLE, which is free text a designer can edit. So nothing
+   * could answer "has this face already gone" after the sending panel was closed: `sentSides`
+   * is component state, seeded from nothing, and on reopen the button offered to send faces
+   * that were already on the board.
+   *
+   * `design_id` already carries the design NUMBER the card was made from, and that number
+   * changes when the artwork is replaced — so side + design_id together say "this face went,
+   * with this picture", which is exactly what the panel needs to decide.
+   */
+  q('alter table design_cards add column if not exists side text').catch(() => {});
   q('alter table design_cards add column if not exists vendor_ref text').catch(() => {});
   // Pink's task carries TWO ids: ref_id (what they send us on push = our primary match key,
   // stored in vendor_ref) and their internal task_id. We keep the task_id too so the board
@@ -361,14 +376,15 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
          artwork as they send it, which is the one moment somebody can judge the work without
          opening anything. Only the three known values; anything else is stored as NULL, which
          means "not priced yet" and pays the flat fallback rather than a band nobody chose. */
-      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by, design_id, specs, band)
-       values ($1,$2,$10,$3,null,null,$4,$5,$6,$7,$8,$9,$11::jsonb,$12)
+      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by, design_id, specs, band, side)
+       values ($1,$2,$10,$3,null,null,$4,$5,$6,$7,$8,$9,$11::jsonb,$12,$13)
        returning *`,
       [title, b.type ? String(b.type) : null, b.sku ? String(b.sku) : null,
        artKey, artHash, artData, artKey ? null : (artData || thumbUrl), String((req.user && req.user.sub) || ''),
        designNo == null ? null : String(designNo), col, specs,
        ['easy', 'standard', 'complex'].includes(String(b.band || '').toLowerCase())
-         ? String(b.band).toLowerCase() : null]
+         ? String(b.band).toLowerCase() : null,
+       b.side ? String(b.side).toLowerCase() : null]
     ).catch((e) => { reply.code(500); return { error: e.message }; });
     if (!r || r.error) return r || { error: 'Could not create the card.' };
 
@@ -703,6 +719,9 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     if (!orderId) return [];
     const r = await q(
       `select c.id, c.line_id, c.sku, c.col, c.title, c.claimed_by,
+              -- WHICH FACE, and WHICH PICTURE. The sending panel reads these to know what has
+              -- already gone; without them "already sent" cannot survive closing the dialog.
+              c.side, c.design_id,
               -- WHO IS DOING IT, and their reference. Without these the order screen could
               -- not tell a card our designers hold from one already sent to a partner, so a
               -- line that had gone to Pink still offered "Send to Pink Design" — one click
