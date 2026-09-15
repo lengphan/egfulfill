@@ -98,11 +98,22 @@ function estFor(l: EtsyListing) {
  return { totalSold, sold24, views24, revenue, trending }
 }
 
+/** Why every figure on a result card carries a `~`. Shown on hover; one sentence, because
+ *  a person who is about to trust "$6.3K revenue" deserves to know where it came from. */
+const EST_WHY = "Estimated from favourites and how long the listing has been up — Etsy's API does not report views, sales or revenue."
+
 // A labelled stat box — bold value on top, small label + time-window below.
-function StatBox({ label, sub, value }: { label: string; sub?: string; value: string }) {
+//
+// `est` IS NOT DECORATION. Etsy's API exposes no views, sold or revenue for a listing, so
+// four of the six boxes on a result card are arithmetic on favourites and age (see estFor).
+// They were printed as bare figures under the word "all time", which reads as a measurement
+// of history rather than a guess about it — and people quote a revenue figure they believe
+// is real. The `~` marks every derived value, and `title` carries the reason, which is where
+// CLAUDE.md §4 puts an explanation rather than in a sentence under the control.
+function StatBox({ label, sub, value, est, estTitle }: { label: string; sub?: string; value: string; est?: boolean; estTitle?: string }) {
  return (
-    <div className="rounded-lg bg-muted/60 px-2 py-2 text-center leading-none">
-      <div className="truncate text-base font-bold tabular-nums">{value}</div>
+    <div className="rounded-lg bg-muted/60 px-2 py-2 text-center leading-none" title={est ? estTitle : undefined}>
+      <div className="truncate text-base font-bold tabular-nums">{est ? "~" : ""}{value}</div>
       <div className="mt-1 text-2xs font-medium text-muted-foreground">
         {label}{sub ? <span className="text-muted-foreground/60"> · {sub}</span> : null}
       </div>
@@ -534,12 +545,13 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, opening
             <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
           )}
 
-          {/* Estimate boxes — Views/Sold (24h) + Revenue/Sold (all time). */}
+          {/* Estimate boxes — Views/Sold (24h) + Revenue/Sold (all time). Every one of the
+              four is derived, never measured, and every one says so with a `~`. */}
           <div className="mt-2.5 grid grid-cols-2 gap-1.5">
-            <StatBox label="Views" sub="24h" value={fmtK(e.views24)} />
-            <StatBox label="Sold" sub="24h" value={fmtK(e.sold24)} />
-            <StatBox label="Revenue" sub="all time" value={moneyK(e.revenue)} />
-            <StatBox label="Sold" sub="all time" value={fmtK(e.totalSold)} />
+            <StatBox est estTitle={EST_WHY} label="Views" sub="24h" value={fmtK(e.views24)} />
+            <StatBox est estTitle={EST_WHY} label="Sold" sub="24h" value={fmtK(e.sold24)} />
+            <StatBox est estTitle={EST_WHY} label="Revenue" sub="all time" value={moneyK(e.revenue)} />
+            <StatBox est estTitle={EST_WHY} label="Sold" sub="all time" value={fmtK(e.totalSold)} />
           </div>
 
           {/* Keyword tags (up to 13) — click to research the term, or copy them all. */}
@@ -985,6 +997,11 @@ export function SpyDeckView() {
  const [maxPrice, setMaxPrice] = useState("")
  const [minSold, setMinSold] = useState("")
  const [minFav, setMinFav] = useState("")
+  // RECENCY, and it has to be client-side. /listings/active takes keywords, taxonomy,
+  // price, sort and paging — there is no created-after parameter to send, so the only
+  // thing in the whole query that expressed "now" was sort_on=created, which reorders
+  // rather than excludes. Held in days; "" is no limit.
+ const [listedIn, setListedIn] = useState("")
  const [showFilters, setShowFilters] = useState(false)
   // Filters are a STAFF tool. A seller searching for inspiration wants a search box and
   // results; sourcing decisions — "what's actually moving in this category above this
@@ -1037,9 +1054,17 @@ export function SpyDeckView() {
  const applyClientFilters = useCallback((list: EtsyListing[]) => {
  const ms = Number(minSold) || 0
  const mf = Number(minFav) || 0
- if (!ms && !mf) return list
- return list.filter((l) => (!ms || estFor(l).sold24 >= ms) && (!mf || (l.num_favorers ?? 0) >= mf))
-  }, [minSold, minFav])
+ const days = Number(listedIn) || 0
+ if (!ms && !mf && !days) return list
+    // A listing with NO creation date fails the recency filter rather than passing it.
+    // estFor treats a missing date as 45 days old, which is a reasonable default for an
+    // estimate and a wrong one for a filter: it would quietly let undated listings through
+    // as "new". A filter that cannot verify the claim must not make it.
+ const after = days ? (Date.now() / 1000) - days * 86400 : 0
+ return list.filter((l) => (!ms || estFor(l).sold24 >= ms)
+      && (!mf || (l.num_favorers ?? 0) >= mf)
+      && (!days || ((l.created ?? 0) > after)))
+  }, [minSold, minFav, listedIn])
 
   // Paging for every grid. Hooks can't be conditional, so all four are declared up
   // front; only the active tab's is rendered.
@@ -1400,7 +1425,7 @@ export function SpyDeckView() {
             </div>
 
             {canFilter && showFilters && (
-              <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-7">
                 <FilterField label={tl("spydeck", "Category")}>
                   <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select eg-control pr-8">
                     <option value="">{tl("spydeck", "All")}</option>
@@ -1430,15 +1455,24 @@ export function SpyDeckView() {
                 <FilterField label={tl("spydeck", "Min favorites")}>
                   <Input value={minFav} onChange={(e) => setMinFav(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
-                <div className="col-span-2 flex items-center gap-2 sm:col-span-3 lg:col-span-6">
+                <FilterField label={tl("spydeck", "Listed within")}>
+                  <select value={listedIn} onChange={(e) => setListedIn(e.target.value)} className="eg-select eg-control pr-8">
+                    <option value="">{tl("spydeck", "Any age")}</option>
+                    <option value="90">{tl("spydeck", "Last 90 days")}</option>
+                    <option value="180">{tl("spydeck", "Last 6 months")}</option>
+                    <option value="365">{tl("spydeck", "Last year")}</option>
+                    <option value="730">{tl("spydeck", "Last 2 years")}</option>
+                  </select>
+                </FilterField>
+                <div className="col-span-2 flex items-center gap-2 sm:col-span-3 lg:col-span-7">
                   <Button size="sm" onClick={() => run()} disabled={!query.trim() && !hasFilter}>{tl("spydeck", "Apply filters")}</Button>
                   <button
- onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav("") }}
+ onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav(""); setListedIn("") }}
  className="text-xs font-medium text-muted-foreground hover:text-foreground"
                   >
                     {tl("spydeck", "Reset")}
                   </button>
-                  <span className="ml-auto text-xs text-muted-foreground">{tl("spydeck", "Category, price & sort search Etsy; sold/day & favorites filter results live.")}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{tl("spydeck", "Category, price & sort search Etsy; sold/day, favorites & age filter results live.")}</span>
                 </div>
               </div>
             )}
