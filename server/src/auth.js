@@ -75,6 +75,39 @@ export function ensureUsernameColumn() {
 }
 
 /**
+ * IS THIS IDENTIFIER ALREADY SOMEBODY'S? — the ONE question, asked across BOTH columns.
+ *
+ * `users_username_lower_idx` makes a username unique among usernames and `users_email_key`
+ * makes an email unique among emails, and between them they left the case that actually
+ * locked someone out: a username may equal another account's EMAIL. That is not hypothetical
+ * on this deployment — staff provisioned before usernames existed have a bare name in the
+ * email column ('linh', 'uyen', 'abdul'), sign-in accepts an identifier with no '@' against
+ * either column, so a seller choosing the username 'linh' takes the string an admin signs in
+ * with. Nothing refused it, because neither index can see the other column.
+ *
+ * So the check is across both, and it is the only place that decides "taken". An address can
+ * never collide the other way — usernames exclude '@' — but it is asked the same way here
+ * rather than relying on that, because the charset rule is a separate decision that has
+ * already been revised once.
+ *
+ * Check-then-write is not atomic and deliberately isn't pretending to be: the two unique
+ * indexes still catch a same-column race, and the cross-column case is a shrinking set of
+ * legacy rows, not a lane two signups can arrive in at once.
+ */
+export async function identifierTaken(id, exceptUserId = null) {
+  const v = String(id || '').trim().toLowerCase();
+  if (!v) return false;
+  await ensureUsernameColumn().catch(() => {});
+  const r = await softQ('identifier conflict',
+    `select id from users
+      where (lower(username) = $1 or lower(email) = $1)
+        and ($2::text is null or id::text <> $2::text)
+      limit 1`,
+    [v, exceptUserId == null ? null : String(exceptUserId)]);
+  return !!r.rows[0];
+}
+
+/**
  * EMAIL CONFIRMATION — the columns, the code, and the check.
  *
  * WHAT THIS IS FOR, because it is easy to build the wrong thing: confirmation proves the
@@ -213,6 +246,9 @@ export async function signup({ email, password, role = 'seller', name = '', stor
   // Optional at signup — throws with a readable message if the shape is wrong.
   const uname = username ? normalizeUsername(username) : null;
   await ensureUsernameColumn().catch(() => {});
+  // Across BOTH columns — the unique index alone would let this username shadow a legacy
+  // account whose email is that same bare name, and sign-in would then never reach it.
+  if (uname && await identifierTaken(uname)) throw new Error('That username is taken — pick another.');
   // Staff roles can't be self-assigned via public signup — public signup is ALWAYS
   // 'seller'. Factory staff (operator/warehouse/designer/admin) are provisioned in
   // the DB via src/scripts/set-role.js. login() reads the real role back from the DB.
@@ -252,21 +288,36 @@ export async function login({ email, username, password }) {
   // An identifier CONTAINING '@' is an email and only ever matches the email column —
   // that's what stops a username being used to squat or probe a real address.
   //
-  // An identifier without '@' tries username first, then falls back to email. The
-  // fallback exists because staff accounts provisioned before usernames existed have a
-  // bare NAME in the email column ('linh', 'uyen', 'abdul'), and routing strictly to
-  // the username column locked every one of them out of their own account. A string
-  // with no '@' cannot collide with a valid address, so the fallback costs nothing.
-  let r = looksLikeEmail(id)
-    ? await q('select * from users where lower(email)=$1', [id])
-    : await softQ('login by username', 'select * from users where lower(username)=$1', [id]);
-  if (!r.rows[0] && !looksLikeEmail(id)) {
-    r = await softQ('login by email (username fallback)', 'select * from users where lower(email)=$1', [id]);
+  // An identifier without '@' can denote EITHER column: staff accounts provisioned before
+  // usernames existed have a bare NAME in the email column ('linh', 'uyen', 'abdul'), and
+  // routing strictly to the username column locked every one of them out of their own
+  // account.
+  //
+  // BOTH CANDIDATES ARE TRIED, NOT THE FIRST ONE FOUND. The fallback used to run only when
+  // the username lookup found NOTHING, which quietly locked a legacy account out the moment
+  // anyone else took its name as a username: 'linh' matched the new seller's username row,
+  // that row's password didn't match, and the legacy admin whose EMAIL is 'linh' was never
+  // looked at. The refusal said "Invalid email or password" — true of the row it checked,
+  // and the wrong row. identifierTaken() now stops the two from ever colliding again, but
+  // the rows already written don't fix themselves, so resolution stays tolerant.
+  //
+  // Trying a second candidate leaks nothing: each one still needs its own password, and an
+  // identifier that denotes two accounts denotes both of them legitimately.
+  const candidates = [];
+  const add = (rows) => { for (const row of rows) if (!candidates.some((c) => String(c.id) === String(row.id))) candidates.push(row); };
+  if (looksLikeEmail(id)) {
+    add((await q('select * from users where lower(email)=$1', [id])).rows);
+  } else {
+    add((await softQ('login by username', 'select * from users where lower(username)=$1', [id])).rows);
+    add((await softQ('login by email (username fallback)', 'select * from users where lower(email)=$1', [id])).rows);
   }
-  const u = r.rows[0];
-  if (!u || !(await bcrypt.compare(password || '', u.password_hash))) {
-    throw new Error('Invalid email or password');
+  let u = null;
+  for (const c of candidates) {
+    // A Google-only account has no hash at all; bcrypt.compare THROWS on undefined rather
+    // than returning false, which surfaced as a 400 carrying 'Illegal arguments'.
+    if (c.password_hash && await bcrypt.compare(password || '', c.password_hash)) { u = c; break; }
   }
+  if (!u) throw new Error('Invalid email or password');
   if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
   const safe = { id: u.id, email: u.email, username: u.username || null, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null, notify_sound: u.notify_sound !== false, plan: u.plan || 'starter', spydeck_addon: u.spydeck_addon === true };
   // A team member inherits their leader's plan — they never bought one themselves.

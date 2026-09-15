@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { limited } from './ratelimit.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn, renewIfStale, EMAIL_RE, issueEmailCode, confirmEmailCode, ensureEmailVerifyColumns } from './auth.js';
+import { signup, login, verify, isStaff, googleAuth, normalizeUsername, identifierTaken, ensureUsernameColumn, renewIfStale, EMAIL_RE, issueEmailCode, confirmEmailCode, ensureEmailVerifyColumns } from './auth.js';
 import { q } from './db.js';
 import { ordersRoutes } from './routes/orders.js';
 import { orderSheetsRoutes } from './routes/order_sheets.js';
@@ -621,8 +621,16 @@ app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
     const cur = (await q('select email, username from users where id=$1', [req.user.sub])).rows[0] || {};
     const own = !EMAIL_RE.test(String(cur.email || '')) && String(cur.email || '').toLowerCase();
     const moving = !!own && String(b.username || '').trim().toLowerCase() === own;
-    try { put('username', b.username === null || b.username === '' ? null : normalizeUsername(b.username, { grandfather: moving })); }
+    let uname;
+    try { uname = b.username === null || b.username === '' ? null : normalizeUsername(b.username, { grandfather: moving }); }
     catch (e) { reply.code(400); return { error: e.message }; }
+    // Taken is asked across BOTH columns (auth.js) — users_username_lower_idx cannot see a
+    // legacy account whose EMAIL is this same bare name, and taking that string is what
+    // locks the older account out of sign-in.
+    if (uname && await identifierTaken(uname, req.user.sub)) {
+      reply.code(409); return { error: 'That username is already taken' };
+    }
+    put('username', uname);
   }
   /**
    * EMAIL: A REPAIR, NOT AN EDIT.
