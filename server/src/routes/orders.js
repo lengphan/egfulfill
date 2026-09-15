@@ -1200,6 +1200,35 @@ export function ordersRoutes(app, requireAuth) {
    */
   q('alter table order_items add column if not exists mockups jsonb').catch(() => {});
   /**
+   * THE ORDER'S OWN NUMBER — `EGF-000123`, allocated once and never reused.
+   *
+   * WHAT IT REPLACES. An order id is minted client-side as `FF-<account tag>-<ms base36>-
+   * <random>` so two sellers can never collide without asking a server. That is a KEY: 24
+   * characters of base36 that match nothing a reader has seen before or will see again, and
+   * order-format.ts already says it belongs in a title attribute rather than as a label. The
+   * wallet statement was printing it as the label of a money row, truncated.
+   *
+   * WHY NOT `#seq`, WHICH ALREADY EXISTS. It is minted PER SELLER — `max(seq)+1 where
+   * seller_id=$1` — so it is not a platform reference. Measured on the live database: 1243
+   * orders, 145 with a seq, 78 distinct values, and seq 21 shared by 7 orders across 2
+   * sellers. On the factory ledger "#2" names six different orders.
+   *
+   * WHY NOT `EG-`. That is the blank SKU prefix (EG-18009, EG-VC600) and the two sit inches
+   * apart on an order page. `EGF-` follows the shape `MF-<n>` already uses for machine files.
+   *
+   * IT IS NOT IDENTITY. The FF id stays the primary key; nothing about routing, refs, the
+   * ledger or a marketplace's own number moves. A marketplace order keeps ITS number too —
+   * 4170484420 is what the buyer and Etsy both use and must never be replaced.
+   *
+   * THE DEFAULT IS SET BY scripts/number-orders.mjs, not here, and the ordering is why: a
+   * default in place before the backfill would hand 1 to the next NEW order while 1243 older
+   * ones sat unnumbered, so EGF-000001 would not be the first order. The script assigns them
+   * in created_at order inside one transaction and sets the default at the end.
+   */
+  q('create sequence if not exists order_ref_seq').catch(() => {});
+  q('alter table orders add column if not exists ref_no bigint').catch(() => {});
+  q('create unique index if not exists orders_ref_no_key on orders(ref_no)').catch(() => {});
+  /**
    * WHAT THE FROZEN PRICE IS MADE OF, stamped at charge time beside unit_cost itself.
    *
    * `unit_cost` is base + print method + one row per EXTRA printed face, added together into

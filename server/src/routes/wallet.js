@@ -280,6 +280,59 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
                   over (order by created_at asc, id asc)::float as balance_after
            from wallet_ledger where account=$1
        ) t order by created_at desc, id desc limit 200`, [account]);
+
+    /**
+     * WHICH ORDER, AND WHOSE — resolved here so the row does not have to print a key.
+     *
+     * An order charge stores `ref` = the order id and a note reading "Order
+     * FF-12jtbd4-mu1bx3i5-zyviq pushed to production". That id is minted client-side as
+     * FF-<account tag>-<ms base36>-<random> so two sellers can never collide without asking
+     * a server: it is a KEY, not a number, and order-format.ts says so in as many words —
+     * "24 characters of base36 that match nothing the reader has seen before or will see
+     * again… the full id belongs in a title attribute, never as the label". The statement
+     * was printing it as the label, and the column is narrow enough that it truncated too,
+     * so the row ended "pushed to produc…".
+     *
+     * THE NOTE IS NOT REWRITTEN. wallet_ledger is append-only and a stored note is what
+     * somebody was told at the time; this adds fields beside it and lets the client compose
+     * the label, which is also what keeps `numOf` the one definition of an order's number
+     * rather than a second opinion formed in SQL.
+     *
+     * EXACT MATCH ONLY. A fee's ref is `fee-<order>-<rand>` and a design fee's is
+     * `design-<order>-<line>`, and picking the order out of those means knowing the SHAPE of
+     * an id — a second opinion about a format three sync paths already own. Those rows carry
+     * a human note anyway ("qua soi 20k", "Design work · …"); the ones that read as a key are
+     * exactly the ones whose ref IS the id.
+     */
+    const refs = [...new Set(led.rows.map((r) => r.ref).filter(Boolean).map(String))];
+    if (refs.length) {
+      const ords = (await q('select id, seq, ref_no, seller_id from orders where id = any($1)', [refs])
+        .then((r) => r.rows).catch(() => []));
+      const byOrder = new Map(ords.map((o) => [String(o.id), o]));
+      const sellers = [...new Set(ords.map((o) => o.seller_id).filter(Boolean).map(String))];
+      const users = sellers.length
+        ? await q('select id, name, store_name, email from users where id = any($1::uuid[])', [sellers])
+            .then((r) => r.rows).catch(() => [])
+        : [];
+      const byUser = new Map(users.map((u) => [String(u.id), u]));
+      for (const row of led.rows) {
+        const o = byOrder.get(String(row.ref));
+        if (!o) continue;
+        row.order_id = o.id;
+        /* The row, not a formatted string: numOf decides what an order is CALLED, and it
+           lives on the client beside every other surface that asks. */
+        row.order_seq = o.seq ?? null;
+        /* The platform's own number. `egfRef` on the client turns it into EGF-000123 — the
+           formatting lives there beside numOf, so SQL never becomes a second opinion about
+           what an order is called. */
+        row.order_ref_no = o.ref_no ?? null;
+        const u = o.seller_id ? byUser.get(String(o.seller_id)) : null;
+        /* Whose order it was. Meaningful on the factory ledger, where every row belongs to
+           somebody else; the client drops it on a seller's own wallet, where it would be
+           their own name once per line. */
+        row.party = u ? (u.store_name || u.name || u.email || null) : null;
+      }
+    }
     // P&L summary over the FULL ledger (not the 200-row window) so the cards total everything,
     // grouped by the real ledger `type` — revenue, deposits, refunds and each cost category are
     // distinct facts, not "everything positive vs everything negative". This is the honest

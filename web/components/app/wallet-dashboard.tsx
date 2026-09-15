@@ -1,6 +1,7 @@
 "use client"
 
 import { STATUS_TONE, CATEGORY_TONE } from "@/lib/status-tone"
+import { egfRef } from "@/lib/order-format"
 import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -502,6 +503,12 @@ type Row = {
  isTest?: boolean
   /** The real account it moved through, or null while unattributed. */
  cashAccount?: string | null
+  /** The order this row is about, where the server could resolve one. The href is what makes
+   *  a money row a way INTO the order rather than a mention of it. */
+ orderHref?: string | null
+  /** The stored ledger note, kept whole even when the label above it is composed — it is what
+   *  somebody was told at the time, and it belongs in the tooltip and the dialog. */
+ note?: string | null
  amount: number
  balance: number
 }
@@ -603,7 +610,30 @@ const shortRef = (ref: string) => {
  return collapsed.slice(0, 16) + "…" + collapsed.slice(-14)
 }
 
-function mapLedger(balance: number, ledger: LedgerRow[], fmtDate: (s?: string | null, o?: Intl.DateTimeFormatOptions) => string, summary?: WalletSummary): View {
+/**
+ * WHAT A ROW IS CALLED, when the server could tell us which order it is about.
+ *
+ * The stored note reads "Order FF-12jtbd4-mu1bx3i5-zyviq pushed to production". That id is a
+ * KEY — FF-<account tag>-<ms base36>-<random>, minted client-side so two sellers cannot
+ * collide without asking a server — and order-format.ts already says it belongs in a title
+ * attribute rather than as a label. In this column it also truncated, so the row ended
+ * "pushed to produc…".
+ *
+ * THE NOTE IS NOT REWRITTEN. wallet_ledger is append-only and a stored note is what somebody
+ * was told at the time; this composes a label from fields sent beside it, and the note and
+ * the id both stay in the row's title and its detail dialog.
+ *
+ * WHOSE IT WAS, only where that is news: on the factory ledger every row belongs to a
+ * different seller and the name is what makes a busy day readable, while on a seller's own
+ * wallet it would be their own name once per line.
+ */
+function orderLabel(l: LedgerRow, withParty: boolean): string | null {
+  const ref = egfRef(l.order_ref_no)
+  if (!ref) return null
+  return withParty && l.party ? `${ref} · ${l.party}` : ref
+}
+
+function mapLedger(balance: number, ledger: LedgerRow[], fmtDate: (s?: string | null, o?: Intl.DateTimeFormatOptions) => string, summary?: WalletSummary, withParty = false): View {
  let run = balance
  let charges = 0
  let deposited = 0
@@ -623,7 +653,8 @@ function mapLedger(balance: number, ledger: LedgerRow[], fmtDate: (s?: string | 
  id: String(l.id),
  at: new Date(l.created_at).getTime(),
  date: fmtDate(l.created_at, { month: "short", day: "2-digit" }),
- desc: l.note || meta.label,
+ desc: orderLabel(l, withParty) || l.note || meta.label,
+ note: l.note ?? null,
  ref: shortRef(l.ref || ""),
  refFull: l.ref || "",
  method: String(l.type).toLowerCase().startsWith("order-charge") ? "Wallet" : "—",
@@ -631,6 +662,7 @@ function mapLedger(balance: number, ledger: LedgerRow[], fmtDate: (s?: string | 
  tone: meta.tone,
  isTest: !!l.is_test,
  cashAccount: l.cash_account ?? null,
+ orderHref: l.order_id ? `/orders/${encodeURIComponent(l.order_id)}` : null,
  amount: delta,
  balance: balanceAfter,
     }
@@ -826,7 +858,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
     // — NOT their own personal id, which is empty. Loading the wrong account is why the P&L
     // cards read $0 while the partner breakdown (no account filter) showed real costs.
  getWallet(isFactoryWallet ? "factory" : undefined)
-      .then((w) => { setView(mapLedger(w.balance, w.ledger, fmtDate, w.summary)); setLoadErr(null) })
+      .then((w) => { setView(mapLedger(w.balance, w.ledger, fmtDate, w.summary, isFactoryWallet)); setLoadErr(null) })
       // Keep any balance already on screen (a failed REFRESH shouldn't blank a good
       // reading) but never invent one where we have none — that was the $0.00 lie.
       .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server."))
@@ -1237,7 +1269,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                       Capped and truncated, with the full text on hover and in the row's own
  dialog, so the table keeps a shape a column of numbers can be read down. */}
                   <TableCell className="max-w-[26rem] font-medium">
-                    <div className="truncate" title={[t.desc, t.refFull || t.ref].filter(Boolean).join(" · ")}>{t.desc}</div>
+                    <div className="truncate" title={[t.note, t.refFull || t.ref].filter(Boolean).join(" · ")}>{t.desc}</div>
                     {/* THE REF IS GONE FROM THE PAGE. "refund-FF-1uxwlv…ndzg-fee-4-fee" is an
                         idempotency key: it exists so a retry cannot double-charge, and it is
                         addressed to the ledger, not to a person. Printed under every row it
