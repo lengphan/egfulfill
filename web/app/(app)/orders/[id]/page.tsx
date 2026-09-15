@@ -1032,6 +1032,107 @@ export default function OrderDetailPage() {
       </div>
     ))
   }
+  /**
+   * THE PER-ITEM GROUPS — ONE FUNCTION, BOTH BRANCHES.
+   *
+   * The quote has read this way for a while: each line heads with its own total and breaks
+   * into the parts that made it, so a group always sums to its heading and the headings sum
+   * to the subtotal. The CHARGED view did not — it printed the ledger's single "Base cost"
+   * with the face rows hanging under it, so a reader saw $53.91 and then $3 + $4 + $5 with no
+   * way to tell whether those were inside it or added to it. And the half below it is already
+   * per item, so the same order was grouped two different ways on one card (owner: "still
+   * quite confusing on the upper seller part … reconcile with the lower factory").
+   *
+   * IT SUMS, AND THAT IS WHY IT IS ALLOWED AFTER THE CHARGE. order_refunds.js pushes the
+   * product line as `split.gross` with the discount as its OWN line, so the item totals add
+   * up to the charged figure exactly rather than to a number net of a deduction shown
+   * separately below. The caller checks that before switching the aggregate out — if the two
+   * disagree the aggregate stays, because a column that does not add up is unreadable however
+   * correct its total is.
+   */
+  const itemGroups = (lines: NonNullable<OrderQuote["lines"]>) => (
+    <>
+                      {lines.map((l, i) => {
+                        const qty = Number(l.qty) || 1
+                        const parts = l.sideParts?.parts ?? []
+                        const method = Number(l.methodFee) || 0
+                        const sideTotal = parts.reduce((n, p) => n + p.amount, 0)
+                        const blank = (Number(l.unitCost) || 0) - method - sideTotal
+                        const n = items.findIndex((x) =>
+                          (l.line_id && x.line_id === l.line_id)
+                          || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+                        const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.name || l.sku || "Item")
+                        /* A single-part line needs no breakdown — a heading and one row under it
+                           restating the same figure is the repetition, not a clarification. */
+                        const split = method > 0.005 || parts.length > 0
+                        return (
+                          <Fragment key={`line-${i}`}>
+                            <div className="flex justify-between">
+                              <dt className="min-w-0 truncate font-medium">
+                                {who}
+                                {blankSkuOf(l) && <span className="font-normal text-muted-foreground"> · {blankSkuOf(l)}</span>}
+                                {qty > 1 && <span className="font-normal text-muted-foreground/70"> × {qty}</span>}
+                              </dt>
+                              <dd className="shrink-0 tabular-nums">{usd((Number(l.unitCost) || 0) * qty)}</dd>
+                            </div>
+                            {split && (
+                              <>
+                                {/* NAMED AFTER THE FACE IT INCLUDES. "Blank" was the garment on
+                                    its own, which is not what the figure is: one printed face is
+                                    inside the base cost, and calling the row Blank left the
+                                    reader to work out why a three-face line lists only two
+                                    surcharges. sideParts.included already knows which face that
+                                    is, so the list reads as every face, with the first one
+                                    marked as already paid for. */}
+                                <div className="flex justify-between">
+                                  <dt className="pl-3 text-muted-foreground">
+                                    {l.sideParts?.included
+                                      ? <><span className="capitalize">{tl("sides", l.sideParts.included)}</span>
+                                          <span className="text-muted-foreground/70"> · included</span></>
+                                      : "Blank"}
+                                  </dt>
+                                  <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
+                                </div>
+                                {method > 0.005 && (
+                                  <div className="flex justify-between">
+                                    {/* The ITEM's own print_type, not a suffix picked off the sku.
+                                        An order sku carries the method as a suffix and the item
+                                        carries it as a field; re-deriving it from the string would
+                                        be a second opinion about what this line is. */}
+                                    <dt className="pl-3 text-muted-foreground">
+                                      {(n > 0 ? items[n - 1]?.print_type : null) || "Print method"}
+                                    </dt>
+                                    <dd className="tabular-nums text-muted-foreground">{usd(method * qty)}</dd>
+                                  </div>
+                                )}
+                                {parts.map((pt, j) => (
+                                  <div key={`face-${i}-${j}`} className="flex justify-between">
+                                    <dt className="pl-3 text-muted-foreground">
+                                      <span className="capitalize">{tl("sides", pt.face)}</span>
+                                    </dt>
+                                    <dd className="tabular-nums text-muted-foreground">{usd(pt.amount * qty)}</dd>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                            {/* A FEE THAT BELONGS TO THIS ITEM SITS UNDER IT. Only when it covers
+                                this line and no other — a shared fee stays at order level below,
+                                where it can name every item it covers without being counted twice. */}
+                            {(designFees?.items ?? [])
+                              .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
+                              .map((f, j) => (
+                                <div key={`fee-${i}-${j}`} className="flex justify-between">
+                                  <dt className="pl-3 text-muted-foreground">{f.label}</dt>
+                                  {isStaff
+                                    ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
+                                    : <dd className="tabular-nums text-muted-foreground">{f.amount == null ? <span className="italic">To Be Determined</span> : usd(f.amount)}</dd>}
+                                </div>
+                              ))}
+                          </Fragment>
+                        )
+                      })}
+    </>
+  )
  const quoteRows = quote ? (
     <>
                     {/*
@@ -1051,85 +1152,7 @@ export default function OrderDetailPage() {
                       * baseCost, so rounding can only ever land on the largest part instead
                       * of leaving a stray cent that makes the arithmetic look wrong.
                       */}
-                    {(quote.lines ?? []).map((l, i) => {
-                      const qty = Number(l.qty) || 1
-                      const parts = l.sideParts?.parts ?? []
-                      const method = Number(l.methodFee) || 0
-                      const sideTotal = parts.reduce((n, p) => n + p.amount, 0)
-                      const blank = (Number(l.unitCost) || 0) - method - sideTotal
-                      const n = items.findIndex((x) =>
-                        (l.line_id && x.line_id === l.line_id)
-                        || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
-                      const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.name || l.sku || "Item")
-                      /* A single-part line needs no breakdown — a heading and one row under it
-                         restating the same figure is the repetition, not a clarification. */
-                      const split = method > 0.005 || parts.length > 0
-                      return (
-                        <Fragment key={`line-${i}`}>
-                          <div className="flex justify-between">
-                            <dt className="min-w-0 truncate font-medium">
-                              {who}
-                              {blankSkuOf(l) && <span className="font-normal text-muted-foreground"> · {blankSkuOf(l)}</span>}
-                              {qty > 1 && <span className="font-normal text-muted-foreground/70"> × {qty}</span>}
-                            </dt>
-                            <dd className="shrink-0 tabular-nums">{usd((Number(l.unitCost) || 0) * qty)}</dd>
-                          </div>
-                          {split && (
-                            <>
-                              {/* NAMED AFTER THE FACE IT INCLUDES. "Blank" was the garment on
-                                  its own, which is not what the figure is: one printed face is
-                                  inside the base cost, and calling the row Blank left the
-                                  reader to work out why a three-face line lists only two
-                                  surcharges. sideParts.included already knows which face that
-                                  is, so the list reads as every face, with the first one
-                                  marked as already paid for. */}
-                              <div className="flex justify-between">
-                                <dt className="pl-3 text-muted-foreground">
-                                  {l.sideParts?.included
-                                    ? <><span className="capitalize">{tl("sides", l.sideParts.included)}</span>
-                                        <span className="text-muted-foreground/70"> · included</span></>
-                                    : "Blank"}
-                                </dt>
-                                <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
-                              </div>
-                              {method > 0.005 && (
-                                <div className="flex justify-between">
-                                  {/* The ITEM's own print_type, not a suffix picked off the sku.
-                                      An order sku carries the method as a suffix and the item
-                                      carries it as a field; re-deriving it from the string would
-                                      be a second opinion about what this line is. */}
-                                  <dt className="pl-3 text-muted-foreground">
-                                    {(n > 0 ? items[n - 1]?.print_type : null) || "Print method"}
-                                  </dt>
-                                  <dd className="tabular-nums text-muted-foreground">{usd(method * qty)}</dd>
-                                </div>
-                              )}
-                              {parts.map((pt, j) => (
-                                <div key={`face-${i}-${j}`} className="flex justify-between">
-                                  <dt className="pl-3 text-muted-foreground">
-                                    <span className="capitalize">{tl("sides", pt.face)}</span>
-                                  </dt>
-                                  <dd className="tabular-nums text-muted-foreground">{usd(pt.amount * qty)}</dd>
-                                </div>
-                              ))}
-                            </>
-                          )}
-                          {/* A FEE THAT BELONGS TO THIS ITEM SITS UNDER IT. Only when it covers
-                              this line and no other — a shared fee stays at order level below,
-                              where it can name every item it covers without being counted twice. */}
-                          {(designFees?.items ?? [])
-                            .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
-                            .map((f, j) => (
-                              <div key={`fee-${i}-${j}`} className="flex justify-between">
-                                <dt className="pl-3 text-muted-foreground">{f.label}</dt>
-                                {isStaff
-                                  ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
-                                  : <dd className="tabular-nums text-muted-foreground">{f.amount == null ? <span className="italic">To Be Determined</span> : usd(f.amount)}</dd>}
-                              </div>
-                            ))}
-                        </Fragment>
-                      )
-                    })}
+                    {itemGroups(quote.lines ?? [])}
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">
                         Shipping
@@ -1361,10 +1384,33 @@ export default function OrderDetailPage() {
  return { onLine, attributed }
   })()
 
+  /**
+   * MAY THE CHARGED VIEW SHOW THE ITEM GROUPS? Only if they add up to it.
+   *
+   * The goods line is pushed gross (order_refunds.js: `split.gross`, with the discount as its
+   * own line), so on an ordinary order the item totals equal it to the cent. They can still
+   * disagree — a line added after the charge is produced and not billed, and a catalogue price
+   * that moved since would recompute differently — and in that case the aggregate stays. A
+   * breakdown that does not sum to the figure above it is worse than no breakdown: it makes a
+   * correct total look wrong.
+   */
+ const goodsLine = (charges?.lines ?? []).find((l) => l.part === "product")
+ const itemsSumToCharge = (() => {
+ if (!goodsLine || !quote?.lines?.length) return false
+ const sum = quote.lines.reduce((n, l) => n + (Number(l.unitCost) || 0) * (Number(l.qty) || 1), 0)
+ return Math.abs(sum - Number(goodsLine.amount)) < 0.01
+  })()
+
  const chargedRows = (
     <>
                     {(charges?.lines ?? []).map((l, i) => (
-                      reversedLines.marked.has(i) ? null : (
+                      reversedLines.marked.has(i) ? null
+                      /* THE GOODS LINE BECOMES ITS ITEMS. Same function the quote uses, so the
+                         two sides of the charge read identically and the half below — which is
+                         already per item — lines up with the half above. */
+                      : l.part === "product" && itemsSumToCharge ? (
+                        <Fragment key={`${l.part}-${i}`}>{itemGroups(quote?.lines ?? [])}</Fragment>
+                      ) : (
                       <Fragment key={`${l.part}-${i}`}>
                       {/* `items-baseline`, so the FIGURE sits on the label's first line even
                           when a note wraps underneath it — the amounts down this column have
@@ -1475,7 +1521,11 @@ export default function OrderDetailPage() {
                           explanation vanished at the exact moment the money became real.
                           Same function as the quote's, and only under the goods: a design fee
                           or a postage charge has no faces. */}
-                      {l.part === "product" && (quote?.lines ?? []).flatMap((ql, qi) => sideRowsFor(ql, qi, true))}
+                      {/* The face rows only when the groups are NOT being shown — inside a
+                          group each face already has its own line under its item, and printing
+                          both would list the same $3.00 twice. */}
+                      {l.part === "product" && !itemsSumToCharge
+                        && (quote?.lines ?? []).flatMap((ql, qi) => sideRowsFor(ql, qi, true))}
                       </Fragment>
                       )
                     ))}

@@ -356,6 +356,17 @@ export type LedgerRow = {
   /** Which real account this movement passed through. Null = not placed yet, which is a
    *  visible state rather than a silent one (see the Unassigned card in Finance). */
   cash_account?: string | null
+  /** THE ORDER BEHIND THIS ROW, resolved server-side so a money line never has to print a key.
+   *  Present only where `ref` IS an order id — an order charge. A fee's ref is
+   *  `fee-<order>-<rand>`, and picking the order out of that means knowing the SHAPE of an id,
+   *  which three sync paths already own; those rows carry a human note anyway.
+   *  `order_ref_no` → `egfRef()` → EGF-000123. `party` is whose order it was, which is what
+   *  makes a busy day on the factory ledger readable; the client drops it on a seller's own
+   *  wallet, where it would be their own name once per line. */
+  order_id?: string | null
+  order_seq?: number | null
+  order_ref_no?: number | null
+  party?: string | null
 }
 
 /** The card Shippo charges postage to. Passthrough from Shippo's /billing — brand and last

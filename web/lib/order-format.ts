@@ -88,6 +88,35 @@ export const plainNum = (id: string) => String(id ?? "").replace(SOURCE_PREFIX, 
  * Only for a number. Our own ids are `FF-<tag>-<time>-<rand>` and a hash in front of that
  * says nothing — it is already unmistakably a reference.
  */
+/**
+ * THE PLATFORM'S OWN NUMBER FOR AN ORDER — `EGF-000123`.
+ *
+ * An order id is minted client-side as `FF-<account tag>-<ms base36>-<random>` so two sellers
+ * can never collide without asking a server. That is a KEY, and shortOrderRef below says what
+ * printing one as a label costs: 24 characters of base36 that match nothing the reader has
+ * seen before or will see again.
+ *
+ * WHY NOT `#seq`, WHICH ALREADY EXISTS. It is minted PER SELLER, so it is not a platform
+ * reference: measured on the live database, 1243 orders carry 78 distinct seq values and seq
+ * 21 belongs to 7 orders across 2 sellers. "#2" names six different orders on the factory
+ * ledger. `ref_no` comes from one Postgres sequence, so it is unique for the life of the
+ * platform.
+ *
+ * WHY NOT `EG-`. That prefix is already the blank SKU's — EG-18009, EG-VC600 — and the two
+ * appear inches apart on an order page. `EGF-` follows `MF-<n>`, which the machine-file
+ * library already uses.
+ *
+ * SIX DIGITS, ZERO-PADDED, so a column of them is the same width and lines up under the
+ * `tabular-nums` every right-aligned cell already gets. A million orders before it grows.
+ *
+ * IT DOES NOT REPLACE A MARKETPLACE'S NUMBER. 4170484420 is what the buyer and Etsy both use
+ * to find the order; this is what WE call it, and both belong on screen.
+ */
+export const egfRef = (refNo?: number | string | null) => {
+  const n = Number(refNo)
+  return Number.isFinite(n) && n > 0 ? `EGF-${String(Math.trunc(n)).padStart(6, "0")}` : ""
+}
+
 export const numOf = (o: OrderRow) => {
   if (o.seq) return `#${o.seq}`
   const p = plainNum(String(o.id))
