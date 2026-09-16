@@ -2378,6 +2378,10 @@ export type OrderItem = {
 export type OrderRow = {
   id: string
   seq?: number | null
+  /** THE PLATFORM'S OWN NUMBER — EGF-000123 via egfRef(). One sequence for every order, so
+   *  unlike `seq` (which is per seller and collides across them) it identifies an order
+   *  anywhere on the platform. Null only on a row read through a select that predates it. */
+  ref_no?: number | null
   store?: string | null
   source?: string | null
   customer?: { name?: string; email?: string } | null
