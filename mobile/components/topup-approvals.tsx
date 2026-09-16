@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { View, Text, Pressable, ActivityIndicator, Alert, RefreshControl, ScrollView, TextInput } from "react-native"
 import { getTopups, confirmTopup, rejectTopup, type Topup } from "@/lib/api"
 import { F, C, R, SECTION, TAB_BAR, methodLabel } from "@/lib/theme"
+import { usd2 } from "@/lib/num"
 
 /**
  * TOP-UPS, APPROVED FROM THE FLOOR.
@@ -26,7 +27,7 @@ import { F, C, R, SECTION, TAB_BAR, methodLabel } from "@/lib/theme"
 
 const MONEY = (v: unknown) => {
   const n = Number(v ?? 0)
-  return isFinite(n) ? `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"
+  return usd2(n)
 }
 
 /** Status as a mark, matching the queue: a dot in the reserved colour and plain type. */
