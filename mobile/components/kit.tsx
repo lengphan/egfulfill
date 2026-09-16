@@ -22,6 +22,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { TAB_BAR, F, C, R, S, TYPE, LIFT, CARD } from "@/lib/theme"
+import { num } from "@/lib/num"
 import { useCountUp, usePressScale, useReducedMotion } from "@/lib/motion"
 import { Aura } from "@/components/aura"
 import { MomentIcon, type Moment } from "@/components/moment-icon"
@@ -158,7 +159,7 @@ export function Tile({ n, label, bg, fg, prefix, onPress }: {
         style={{ borderRadius: R.card, backgroundColor: bg, padding: 16, minHeight: 104, justifyContent: "space-between" }}
       >
         <Text style={{ fontSize: 34, lineHeight: 38, fontFamily: F.bold, color: fg, letterSpacing: -0.8 }}>
-          {prefix ?? ""}{Math.round(shown).toLocaleString()}
+          {prefix ?? ""}{num(shown)}
         </Text>
         <Text style={{ ...TYPE.small, fontFamily: F.medium, color: fg, opacity: 0.72 }}>{label}</Text>
       </Pressable>

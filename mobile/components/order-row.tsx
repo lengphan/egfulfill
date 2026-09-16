@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons"
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 import { assetUrl, type Order } from "@/lib/api"
 import { isOverdue, normalizeStage, units, numOf, lineTitle, STAGE_LABEL } from "@/lib/orders"
-import { F, C, R } from "@/lib/theme"
+import { F, C, R, toneOf } from "@/lib/theme"
 /* ImagePeek moved to its own file once it grew pinch-zoom and a dismiss gesture — it
    is a photo viewer, and two screens use it. Re-exported so importers are unchanged. */
 import { ImagePeek } from "@/components/image-peek"
@@ -210,17 +210,31 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
   const noArt = shots.length > 0 && !shots.some((s) => s.art)
 
   /*
-   * ONE FACT, RANKED. The row used to carry the stage, an item count and a "No artwork"
-   * chip side by side, which is three things claiming the same corner. Only one of them is
-   * ever the reason you would stop on this row, so only one is shown, and the order below
-   * is the order of urgency: a thing that BLOCKS production outranks a date, which outranks
-   * where the job has got to.
+   * THE STAGE IS THE STATUS, AND IT IS ALWAYS SHOWN.
+   *
+   * "ONE FACT, RANKED" used to put the blocker and the stage in the same corner and print
+   * whichever ranked highest — so the stage appeared only when nothing was wrong. On a
+   * queue where no order has artwork yet that means the stage NEVER appears: every row read
+   * "No artwork", and the column that was supposed to answer "where has this job got to"
+   * answered something else on all 607 of them. It is the same failure the comment above
+   * `noArt` already names — an exception that applies to every row has stopped being one —
+   * committed one column to the left.
+   *
+   * So they are two different questions and they get two different lines. The stage always,
+   * in the register its own vocabulary assigns it (never a colour — CLAUDE.md §4, a status
+   * is a WORD). Underneath, only when there is one, the thing standing in the way.
+   *
+   * The blocker keeps the signal inks because it is genuinely a signal: `alert` for a thing
+   * that BLOCKS production, `warn` for a clock. Those were both red, which made a missing
+   * file and a late ship date look like the same kind of problem — one you fix by uploading
+   * something, the other you cannot fix at all.
    */
-  const fact =
+  const stageWord = STAGE_LABEL[stage] ?? stage
+  const blocker =
     noArt ? { text: "No artwork", color: C.alert } :
-    late  ? { text: "Late",       color: C.alert } :
+    late  ? { text: "Late",       color: C.warn  } :
     order.rush ? { text: "Rush",  color: C.warn  } :
-    { text: STAGE_LABEL[stage] ?? stage, color: C.muted }
+    null
 
   /* Two pictures and a count, not a strip you slide. The strip was 200pt tall and put two
      orders on a screen; on a queue the job is FINDING the order, and the pictures at this
@@ -253,7 +267,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
         /* Inset by 8 so the selected FILL is an object with corners, while the content
            still starts at the screen's 18pt gutter — the same line the header and the
            search field sit on. */
-        paddingVertical: 11, paddingHorizontal: 10, marginHorizontal: 8, borderRadius: R.chip,
+        paddingVertical: 13, paddingHorizontal: 10, marginHorizontal: 8, borderRadius: R.chip,
         /* NO BORDER. Selection is a FILL, the way Apple Books does it in edit mode: nothing
            arrives at the edge, the row simply becomes a solid object. A rule between rows
            is drawn by the list, so a selected row is not also cut in half by one. */
@@ -267,8 +281,8 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
               <Image
                 source={{ uri: sh.uri }}
                 style={{
-                  width: 44, height: 44, borderRadius: R.chip, backgroundColor: C.hueMist,
-                  marginLeft: i === 0 ? 0 : -14,
+                  width: 52, height: 52, borderRadius: R.chip, backgroundColor: C.hueMist,
+                  marginLeft: i === 0 ? 0 : -16,
                   borderWidth: i === 0 ? 0 : 2, borderColor: C.canvas,
                 }}
                 resizeMode="cover"
@@ -277,7 +291,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
           ))}
           {rest > 0 && (
             <View style={{
-              width: 44, height: 44, borderRadius: R.chip, marginLeft: -14,
+              width: 52, height: 52, borderRadius: R.chip, marginLeft: -16,
               borderWidth: 2, borderColor: C.canvas, backgroundColor: C.ink,
               alignItems: "center", justifyContent: "center",
             }}>
@@ -288,19 +302,26 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
       )}
 
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ fontSize: 14.5, fontFamily: F.semi, color: C.ink, letterSpacing: -0.15 }}>
+        <Text numberOfLines={1} style={{ fontSize: 16.5, fontFamily: F.semi, color: C.ink, letterSpacing: -0.2 }}>
           {numOf(order)}
         </Text>
         {/* The buyer, and the size of the job — the two things that tell one row from the
             next. The platform name is gone: it repeats on every row of a connected shop. */}
-        <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, marginTop: 1 }}>
+        <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: F.body, color: C.muted, marginTop: 2 }}>
           {[order.customer?.name, units(order) > 1 ? `${units(order)} items` : null].filter(Boolean).join("  ·  ") || "No lines"}
         </Text>
       </View>
 
-      <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.medium, color: fact.color, textAlign: "right" }}>
-        {fact.text}
-      </Text>
+      <View style={{ alignItems: "flex-end", maxWidth: 104 }}>
+        <Text numberOfLines={1} style={{ fontSize: 14, ...toneOf(stage), textAlign: "right" }}>
+          {stageWord}
+        </Text>
+        {blocker && (
+          <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: F.medium, color: blocker.color, textAlign: "right", marginTop: 1 }}>
+            {blocker.text}
+          </Text>
+        )}
+      </View>
 
       {selecting ? (
         <View style={{

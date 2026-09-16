@@ -4,6 +4,7 @@ import * as FileSystem from "expo-file-system/legacy"
 import * as Sharing from "expo-sharing"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
+import { usd0, vnd0, num } from "@/lib/num"
 import { Ionicons } from "@expo/vector-icons"
 import QRCode from "react-native-qrcode-svg"
 import {
@@ -24,99 +25,103 @@ import { F,C, R } from "@/lib/theme"
  * admin-set, and a phone that carried its own copy would quote a price the wallet then
  * refuses.
  */
-const usd0 = (n: number) => `$${Math.round(n).toLocaleString()}`
-const vnd0 = (n: number) => `${Math.round(n).toLocaleString()} ₫`
+
 
 /**
- * THE AMOUNT, SET WITH A THUMB.
+ * THE AMOUNT, SET WITH A THUMB — a wheel of amounts, turned vertically.
  *
- * A grid of preset buttons answers "one of these five" and nothing else — $250 meant typing
- * on a numeric pad, which on this screen is the step people abandon. A ruler you drag
- * answers every amount at the same cost, and it lands on the presets on the way past.
+ * This replaces a horizontal ruler sitting under a number field beside a grid of nine preset
+ * chips: three controls answering one question, occupying most of the screen, and the ruler
+ * was the one nobody touched because the chip was always one tap and the ruler never fewer
+ * than several. The owner asked for a roller you swipe, and a roller is the right instrument
+ * for this precisely because the answer is almost always one of nine known amounts.
  *
- * IT IS A ScrollView, not a PanResponder. The feel people mean by "finger meter" is
- * MOMENTUM — you flick it and it coasts and settles — and that is the platform's scroll
- * physics, not something worth re-deriving. Snapping falls out of snapToInterval, so the
- * value can never land between two steps.
+ * ONE WHEEL OF AMOUNTS, NOT ONE WHEEL PER DIGIT. A digit-per-column odometer is the literal
+ * reading of "swipe each number", and it was drawn and rejected: five gestures to reach $500
+ * where a chip was one, and a mis-drag on the wrong column is a 10x error on the screen that
+ * moves money. The wheel carries the amounts themselves, so every stop is a legal amount and
+ * no combination of stops can produce a wrong one.
  *
- * TWO-WAY WITHOUT A LOOP, AND WITHOUT TRUSTING AN EVENT. Typing and the presets also set
- * the amount, so the ruler must follow them; but the ruler setting the amount must not
- * re-scroll the ruler. The first version gated onScroll on onScrollBeginDrag having fired,
- * which is true of a finger and NOT of a wheel or a programmatic scroll — driven under test
- * the ruler moved 350pt and the field never left blank. A control that reports nothing when
- * one event is missed is the wrong shape. So onScroll ALWAYS reports, and the follow effect
- * skips when the incoming value is the one this component last emitted.
+ * "OTHER" IS THE LAST STOP, and it is what keeps the wheel honest. Nine amounts cannot
+ * express $750, and a control that quietly cannot do a thing is worse than one that shows
+ * you where the door is. Landing on it reveals the keypad.
+ *
+ * IT IS A ScrollView, not a PanResponder. The feel people mean by a roller is MOMENTUM — you
+ * flick it, it coasts, it settles — and that is the platform's scroll physics, not something
+ * worth re-deriving. Snapping falls out of snapToInterval, so it can never stop between two
+ * amounts.
+ *
+ * THE ECHO GUARD IS KEPT FROM THE RULER IT REPLACES, because the bug it was written for is
+ * unchanged: this wheel must follow an amount set elsewhere, but its own emission must not
+ * re-scroll it. And the follow is NOT animated — a glided scrollTo fires an onScroll at every
+ * frame along the way, each reporting the value it is passing through, so a jump to $10,000
+ * would write every amount below it on the way up and the last frame to land before React
+ * settled would win.
  */
-function AmountScrub({ value, min, max, step, onChange }: {
-  value: number; min: number; max: number; step: number; onChange: (n: number) => void
-}) {
-  const PX = 14                        // one step of money, in points of travel
-  const ref = useRef<ScrollView>(null)
-  /** The last value this ruler produced, so the effect below can tell its own echo from a
-   *  change that came from the field or a preset. */
-  const emitted = useRef<number | null>(null)
-  const [w, setW] = useState(0)
-  const steps = Math.max(1, Math.round((max - min) / step))
-  const offsetFor = (v: number) => ((Math.min(max, Math.max(min, v)) - min) / step) * PX
+const WHEEL_ITEM = 52
+const WHEEL_VISIBLE = 5
+const OTHER = -1
 
-  /*
-   * Follow the field and the presets; ignore our own echo.
-   *
-   * NOT ANIMATED, and that is the whole correctness of it. A glided scrollTo emits an
-   * onScroll at every frame ALONG THE WAY, and each one reported the value it was passing
-   * through — so tapping $500 wrote 10, then 20, then 30, and the last frame to land before
-   * React settled won. Measured: the preset produced $10. An instant set emits ONE event, at
-   * the destination, which equals what we just recorded as emitted and is therefore skipped.
-   * A preset is a discrete choice; it should land, not travel.
-   */
+function AmountWheel({ values, value, onChange }: {
+  values: number[]; value: number; onChange: (n: number) => void
+}) {
+  const ref = useRef<ScrollView>(null)
+  const emitted = useRef<number | null>(null)
+  const [idx, setIdx] = useState(0)
+  const H = WHEEL_ITEM * WHEEL_VISIBLE
+  const pad = (H - WHEEL_ITEM) / 2
+  const at = (v: number) => { const i = values.indexOf(v); return i < 0 ? 0 : i }
+
   useEffect(() => {
-    if (!w || value === emitted.current) return
+    if (value === emitted.current) return
     emitted.current = value
-    ref.current?.scrollTo({ x: offsetFor(value), animated: false })
-  }, [value, w])   // eslint-disable-line react-hooks/exhaustive-deps
+    const i = at(value)
+    setIdx(i)
+    ref.current?.scrollTo({ y: i * WHEEL_ITEM, animated: false })
+  }, [value])   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    /* A WELL, so it reads as something you operate. Loose ticks on the page ground read as
-       decoration — shape says kind here as everywhere else, and this one is a field. */
-    <View
-      onLayout={(e) => setW(e.nativeEvent.layout.width)}
-      style={{ marginTop: 12, height: 46, borderRadius: R.chip, backgroundColor: C.hueMist, overflow: "hidden" }}
-    >
+    <View style={{ height: H, marginTop: 8 }}>
+      {/* THE WELL IS FIXED AND THE AMOUNTS MOVE THROUGH IT. The other way round would mean
+          reading a value off a moving marker, which is what makes a slider hard to land. */}
+      <View pointerEvents="none" style={{
+        position: "absolute", left: 0, right: 0, top: pad, height: WHEEL_ITEM,
+        borderRadius: R.chip, backgroundColor: C.hueMist,
+      }} />
       <ScrollView
         ref={ref}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={PX}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={WHEEL_ITEM}
         decelerationRate="fast"
         scrollEventThrottle={16}
+        contentContainerStyle={{ paddingVertical: pad }}
         onScroll={(e) => {
-          const n = Math.min(max, Math.max(min, min + Math.round(e.nativeEvent.contentOffset.x / PX) * step))
+          const i = Math.min(values.length - 1, Math.max(0, Math.round(e.nativeEvent.contentOffset.y / WHEEL_ITEM)))
+          setIdx(i)
+          const n = values[i]
           if (n === emitted.current) return
           emitted.current = n
           onChange(n)
         }}
-        /* Half the width of padding at each end, so step zero sits under the centre mark
-           rather than at the left edge. */
-        contentContainerStyle={{ paddingHorizontal: w / 2 }}
       >
-        {Array.from({ length: steps + 1 }, (_, i) => {
-          const major = i % 5 === 0
+        {values.map((v, i) => {
+          const on = i === idx
           return (
-            <View key={i} style={{ width: PX, alignItems: "center", justifyContent: "center", height: 46 }}>
-              <View style={{
-                width: major ? 2 : 1, height: major ? 22 : 11, borderRadius: 1,
-                backgroundColor: major ? C.edge : C.muted, opacity: major ? 1 : 0.45,
-              }} />
+            <View key={v} style={{ height: WHEEL_ITEM, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{
+                fontSize: on ? 30 : 25,
+                fontFamily: on ? F.bold : F.semi,
+                color: on ? C.ink : C.muted,
+                /* Not a fade to nothing — an amount you cannot read is one you cannot aim
+                   for, and the whole point of a wheel is seeing what is coming. */
+                opacity: on ? 1 : 0.45,
+              }}>
+                {v === OTHER ? "Other" : usd0(v)}
+              </Text>
             </View>
           )
         })}
       </ScrollView>
-      {/* THE MARK IS FIXED AND THE RULER MOVES — the other way round would mean reading a
-          value off a moving pointer, which is what makes a slider hard to land precisely. */}
-      <View pointerEvents="none" style={{
-        position: "absolute", left: "50%", marginLeft: -1.5, top: 7, bottom: 7,
-        width: 3, borderRadius: 2, backgroundColor: C.hueDeep,
-      }} />
     </View>
   )
 }
@@ -139,6 +144,8 @@ export default function TopUp() {
   const qrSize = Math.min(380, Math.max(200, screenW - (20 + 16) * 2))
   const [cfg, setCfg] = useState<TopupConfig | null>(null)
   const [amount, setAmount] = useState("")
+  /** Whether the wheel is parked on "Other", which is the only state the keypad exists in. */
+  const [custom, setCustom] = useState(false)
   const [phase, setPhase] = useState<"pick" | "qr" | "paid">("pick")
   const [payment, setPayment] = useState<VietqrPayment | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -212,6 +219,15 @@ export default function TopUp() {
    */
   const presets = Array.from(new Set([...(cfg?.smallPresets ?? []), ...(cfg?.bulkPresets ?? [])]))
     .sort((a, b) => a - b)
+  /* The wheel's stops: every preset the server offers, ascending — a wheel you push upward
+     must count upward — with the escape hatch last. `OTHER` is a sentinel rather than a
+     magic string, so the wheel stays a list of numbers and cannot be handed an amount that
+     is not one of them. */
+  const wheelValues = [...presets, OTHER]
+  /* Until the server's presets arrive the wheel has ONE stop, and a wheel with one stop is
+     not a choice — it is a keypad wearing a wheel's clothes. Say so by drawing the keypad,
+     rather than showing a control that cannot move. */
+  const onlyOther = wheelValues.length === 1
 
   const start = useCallback(async () => {
     if (usdAmt <= 0) { setErr("Enter an amount."); return }
@@ -417,76 +433,52 @@ export default function TopUp() {
             </Text>
 
             {/*
-              * WHAT YOU TYPE AND WHAT YOU SEND, IN ONE BOX.
-              *
-              * The dong figure sat under the preset chips — four rows of buttons away from
-              * the number it converts — so the two never read as the same fact, and the
-              * line had to name itself ("You'll transfer …") to explain what it was about.
-              * In the corner of the field it needs no sentence: it is plainly this amount,
-              * in the currency the transfer actually happens in.
-              *
-              * The rate stays below on its own, because it explains the conversion rather
-              * than being part of it.
+              * THE CONVERSION SITS ABOVE THE WHEEL, not in the corner of a field, because
+              * there is no field any more in the common case. It is the one fact that has to
+              * travel with the amount — what actually leaves the bank — so it stays adjacent
+              * and needs no sentence naming itself.
               */}
-            <View style={{
-              marginTop: 10, borderRadius: R.chip, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 8,
-              borderWidth: 1, borderColor: C.edge,
-              backgroundColor: C.surface,
+            <Text style={{
+              height: 20, marginTop: 6, textAlign: "center", fontSize: 13, fontFamily: F.medium,
+              color: usdAmt > 0 && rate > 0 ? C.muted : "transparent",
             }}>
-              <TextInput
-                value={amount}
-                onChangeText={(t) => { setAmount(t.replace(/[^0-9.]/g, "")); setErr(null) }}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor={C.muted}
-                style={{ height: 52, padding: 0, color: C.ink, fontSize: 30, fontFamily: F.bold }}
-              />
-              {/* Only once there is an amount to convert. "≈ 0 ₫" under a blank field is a
-                  sum nobody asked for. */}
-              <Text style={{
-                height: 16, textAlign: "right", fontSize: 12, fontFamily: F.medium,
-                color: usdAmt > 0 && rate > 0 ? C.muted : "transparent",
-              }}>
-                {usdAmt > 0 && rate > 0 ? `≈ ${vnd0(vndAmt)}` : "·"}
-              </Text>
-            </View>
+              {usdAmt > 0 && rate > 0 ? `\u2248 ${vnd0(vndAmt)}` : "\u00B7"}
+            </Text>
 
-            {/* The ruler is bounded by what the server allows below and a ceiling of ten
-                minimums or the largest preset, whichever is further — a ruler that runs to
-                a number nobody tops up is mostly empty travel. */}
-            <AmountScrub
-              value={usdAmt}
-              min={0}
-              max={Math.max(minUsd * 10, ...(presets.length ? presets : [minUsd]), 500)}
-              step={10}
-              onChange={(n) => { setAmount(String(n)); setErr(null) }}
+            <AmountWheel
+              values={wheelValues}
+              value={custom ? OTHER : usdAmt}
+              onChange={(n) => {
+                setErr(null)
+                if (n === OTHER) { setCustom(true); setAmount("") }
+                else { setCustom(false); setAmount(String(n)) }
+              }}
             />
 
-            {presets.length > 0 && (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-                {presets.map((p) => (
-                  <Pressable
-                    key={p}
-                    onPress={() => { setAmount(String(p)); setErr(null) }}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 16, height: 40, borderRadius: R.chip, justifyContent: "center",
-                      backgroundColor: String(p) === amount ? C.hueDeep : C.hueMist,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
-                  >
-                    <Text style={{
-                      fontSize: 15, fontFamily: F.semi,
-                      color: String(p) === amount ? "#FFFFFF" : C.ink,
-                    }}>{usd0(p)}</Text>
-                  </Pressable>
-                ))}
+            {/* THE KEYPAD ONLY WHEN THE WHEEL CANNOT ANSWER. Nine amounts cover almost every
+                top-up; the field is the door for the tenth, and showing it permanently was
+                what made this screen three controls deep. */}
+            {(custom || onlyOther) && (
+              <View style={{
+                marginTop: 14, borderRadius: R.chip, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 8,
+                borderWidth: 1, borderColor: C.edge, backgroundColor: C.surface,
+              }}>
+                <TextInput
+                  value={amount}
+                  onChangeText={(t) => { setAmount(t.replace(/[^0-9.]/g, "")); setErr(null) }}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor={C.muted}
+                  autoFocus
+                  style={{ height: 52, padding: 0, color: C.ink, fontSize: 30, fontFamily: F.bold }}
+                />
               </View>
             )}
 
             {cfg && (
               <Text style={{ fontSize: 14, color: C.muted, marginTop: 18 }}>
                 {usdAmt > 0 && rate > 0
-                  ? `${Math.round(rate).toLocaleString()} ₫ per $1`
+                  ? `${num(rate)} ₫ per $1`
                   : `Minimum ${usd0(minUsd)}`}
               </Text>
             )}
