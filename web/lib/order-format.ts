@@ -118,6 +118,22 @@ export const egfRef = (refNo?: number | string | null) => {
 }
 
 export const numOf = (o: OrderRow) => {
+  /**
+   * THE PLATFORM NUMBER FIRST, and this is the bug it fixes rather than a tidy-up.
+   *
+   * `seq` is minted PER SELLER — max(seq)+1 where seller_id=$1 — so two sellers reach the
+   * same number independently. Measured on the live database: seq 125266 belongs to two
+   * different orders from two different sellers, 125265 to two more, and one seller's #53
+   * sits in the middle of another's 125xxx run. The staff list mixes every seller together,
+   * so it printed #125266 · #125265 · #125264 · #53 · #125263 — the same numbers coming round
+   * again, which is why a genuinely new order looked like one already seen (owner: "why there
+   * seems to be no new order?").
+   *
+   * `ref_no` comes from one sequence for the whole platform, so it can never do that. `seq`
+   * stays as the fallback for anything read before the column was backfilled.
+   */
+  const ref = egfRef(o.ref_no)
+  if (ref) return ref
   if (o.seq) return `#${o.seq}`
   const p = plainNum(String(o.id))
   return /^\d+$/.test(p) ? `#${p}` : p

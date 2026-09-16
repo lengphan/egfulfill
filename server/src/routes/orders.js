@@ -4706,7 +4706,7 @@ export function ordersRoutes(app, requireAuth) {
       if (recent.rows.length) return;
 
       const o = (await q(
-        `select id, seq, source, store, status, factory_status, gates, tracking, carrier,
+        `select id, seq, ref_no, source, store, status, factory_status, gates, tracking, carrier,
                 service, delivery, est_delivery, total, customer, timeline, created_at
            from orders where id=$1`, [orderId])).rows[0];
       if (!o) return;
