@@ -12,7 +12,7 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
-import { quoteSpec, catalogIndex, feeSettings, priceLines, computeTotals, sellerDiscountPct } from '../pricing.js';
+import { quoteSpec, catalogIndex, feeSettings, priceLines, computeTotals, sellerDiscountPct, offeredSizes, matchProduct } from '../pricing.js';
 import { limited, LIMITS } from '../ratelimit.js';
 import { stripMethod } from '../replenish.js';
 import { VISIBLE_TO_PARTNERS } from './inventory.js';
@@ -352,6 +352,58 @@ export function sandboxRoutes(app, requireAuth) {
    * charging 0 fulfils it for free, silently, forever. Same rule quoteOrder() applies to
    * every other order (see `unpriced` in pricing.js).
    */
+  /**
+   * THE SIZE A LINE WILL ACTUALLY BE MADE IN — snap where there is one answer, refuse where
+   * there is a guess.
+   *
+   * An unrecognised size used to fall through to `base_price`, which is not a refusal and not
+   * a correct price — it is a third number. Measured: "Clean Up Cap" in size L quoted $13.72
+   * when the cap comes in ONE size and costs $7.00, and the duffel in size L quoted $50.00,
+   * which happens to equal its real OSFA price. That coincidence is the danger — the fallback
+   * is wrong silently, and whether anyone notices is luck.
+   *
+   * SO IT DOES NOT SIMPLY REJECT. Orders getting through is the point of this API, and for a
+   * one-size product there is nothing to decide: OSFA is the only answer, so a caller who said
+   * "L" gets OSFA and the order stands. A refusal is reserved for the case where we genuinely
+   * cannot know — several sizes offered and the named one among none of them — because there
+   * the only alternatives are guessing, or making a garment nobody asked for.
+   *
+   * A size that matches is returned in the CATALOGUE'S spelling ("osfa" → "OSFA"), so what is
+   * priced and what is produced read the same on the floor.
+   *
+   * NO SIZE NAMED is left exactly as it was. That is the shape a partner may already be
+   * sending, and this is not the change that starts rejecting it.
+   */
+  async function normaliseSizes(items) {
+    const idx = await catalogIndex({ withImages: false });
+    const out = [];
+    const refused = [];
+    (items || []).forEach((it, i) => {
+      const src = (it && typeof it === 'object') ? it : {};
+      const row = matchProduct(idx, { sku: src.product_id || src.sku || null, blank: src.blank || src.product || null });
+      // An unknown PRODUCT is the unpriceable-lines path's business, not this one's.
+      if (!row) return void out.push(it);
+      const offered = offeredSizes(row);
+      if (!offered.length) return void out.push(it);          // we have not been told; nothing to check
+      const want = String(src.size || '').trim();
+      const hit  = want && offered.find((z) => z.toLowerCase() === want.toLowerCase());
+      if (hit) return void out.push(hit === src.size ? it : { ...src, size: hit });
+      if (offered.length === 1) return void out.push({ ...src, size: offered[0] });
+      if (!want) return void out.push(it);
+      refused.push({ line: i + 1, sku: src.product_id || src.sku || null, size: want, available: offered });
+    });
+    return { items: out, refused };
+  }
+
+  /** The 400 for a size we do not make — named separately from an unknown sku, because the
+   *  fix is different: the sku is right and one field needs changing. */
+  const sizeRefusal = (reply, refused, mode) => {
+    reply.code(400);
+    return { error: 'Some lines name a size that product is not made in.',
+      code: 'unavailable_size', mode, unavailable: refused,
+      detail: 'Each entry lists what that product IS available in. Sizes are on GET /api/v1/products.' };
+  };
+
   async function priceLiveLines(items) {
     const out = [];
     const unpriced = [];
@@ -463,7 +515,11 @@ export function sandboxRoutes(app, requireAuth) {
        * `sku` stays, and is the handle: POST /api/v1/orders resolves `product_id || sku`
        * against the same column, so nothing a partner can do with the catalogue is lost.
        */
-      const r = await q('select sku, name, type, method, price, base_price from catalog_products order by name limit 200');
+      /* `data` is read for the SIZES and for nothing else, and the images are stripped in
+         SQL because they are base64 in that column — ~7MB across the catalogue. */
+      const r = await q(`select sku, name, type, method, price, base_price,
+                                (data - 'img' - 'images' - 'side_mockups') as data
+                           from catalog_products order by name limit 200`);
       /**
        * MONEY AS NUMBERS, because that is what the documented sample shows.
        *
@@ -473,17 +529,44 @@ export function sandboxRoutes(app, requireAuth) {
        * the exact trap the statement route already guards with money(), two hundred lines
        * below, on the same kind of column.
        */
-      const data = r.rows.map((row) => ({ ...row, price: money(row.price), base_price: money(row.base_price) }));
+      /**
+       * EVERY FIELD IS NAMED, and the spread that used to be here is gone on purpose.
+       *
+       * `...row` was safe only while the SELECT listed scalar columns. It now carries the
+       * `data` blob — which holds `productCost` (34.19 on the duffel, i.e. what we PAY) —
+       * so spreading the row would publish our margin to every partner. §2.9, and the
+       * cheapest possible way to breach it: widen a SELECT and a spread does the rest.
+       *
+       * SIZES ARE PUBLISHED because without them a partner cannot send a valid one. This
+       * endpoint never returned them, so an integrator had to invent a list — and an
+       * unrecognised size used to fall back to `base_price` rather than fail, which quoted
+       * $13.72 for a cap whose real price was $7.00. You cannot ask someone to send the
+       * right size and then not tell them what the sizes are.
+       */
+      const data = r.rows.map((row) => ({
+        sku: row.sku, name: row.name, type: row.type, method: row.method,
+        price: money(row.price), base_price: money(row.base_price),
+        sizes: offeredSizes(row),
+      }));
       return { object: 'list', mode: k.mode, data, count: r.rowCount };
     } catch { return { object: 'list', mode: k.mode, data: [], count: 0 }; }
   });
 
   app.post('/api/v1/orders', async (req, reply) => {
     const k = await requireKey(req, reply, { orderLimit: true, scope: 'orders.write' }); if (k.error) return k;
-    const b = req.body || {};
+    let b = req.body || {};
     const items = Array.isArray(b.items) ? b.items : null;
     if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items'], k.mode);
     if (!b.shipping_address) return bad(reply, 'An order needs a "shipping_address" object.', ['shipping_address'], k.mode);
+    /* BEFORE the live/test split, so the sandbox and a real order cannot disagree about
+       which sizes exist — the whole promise of this sandbox is that you flip one key. */
+    let sized;
+    try {
+      const r = await normaliseSizes(items);
+      if (r.refused.length) return sizeRefusal(reply, r.refused, k.mode);
+      sized = r.items;
+    } catch (e) { req.log.error({ err: e }, 'size check failed'); sized = items; }
+    b = { ...b, items: sized };
     if (k.mode === 'live') {
       // Retry-safe. Returning the ORIGINAL order (200, not 409) is what makes this
       // usable: a client that retried a timeout gets the same answer it would have had,
@@ -522,7 +605,7 @@ export function sandboxRoutes(app, requireAuth) {
     //
     // So the same rules run here — catalogue pricing, caller price ignored, unknown SKU
     // refused. The ONLY difference is that nothing is written and no webhook fires.
-    const { priced, unpriced } = await priceLiveLines(items);
+    const { priced, unpriced } = await priceLiveLines(b.items);
     if (unpriced.length) {
       reply.code(400);
       return { error: 'Some lines have no catalogue match, so they cannot be priced or produced.',
@@ -704,9 +787,13 @@ export function sandboxRoutes(app, requireAuth) {
     if (!items || !items.length) return bad(reply, 'A quote needs a non-empty "items" array.', ['items'], k.mode);
     try {
       const [idx, fees] = await Promise.all([catalogIndex({ withImages: false }), feeSettings()]);
+      /* THE SAME CHECK THE ORDER ROUTE RUNS. A quote that prices a size the order refuses —
+         or vice versa — is worse than either answer alone. */
+      const sizes = await normaliseSizes(items);
+      if (sizes.refused.length) return sizeRefusal(reply, sizes.refused, k.mode);
       /* The API's item shape into the one the pricer reads. `blank` carries the product
          name or sku a partner sent; matchProduct tries both halves of a composite. */
-      const mapped = items.map((it) => ({
+      const mapped = sizes.items.map((it) => ({
         sku: it.product_id || it.sku || null,
         blank: it.blank || it.product || null,
         name: it.name || null,

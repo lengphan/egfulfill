@@ -431,7 +431,7 @@ function sizeRank(raw) {
   if (/^\d+$/.test(s)) return [50, parseInt(s, 10), s];                            // 3230 waist+inseam
   return [90, 0, s];
 }
-const bySize = (a, b) => {
+export const bySize = (a, b) => {
   const x = sizeRank(a), y = sizeRank(b);
   return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2]);
 };

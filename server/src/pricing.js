@@ -25,6 +25,7 @@ import { shippingBandOf, SETTING_DEFAULTS } from './routes/factory_settings.js';
 // IMPORT time, so Fastify never listens and every /api/* route 502s, not just this one.
 // Two different questions must not share a name in one module.
 import { tierFor as volumeTierFor, normalizeTiers, periodKey, previousPeriod, unitsForSeller } from './volume.js';
+import { bySize } from './routes/sanmar.js';   // the ONE size ladder — see offeredSizes below
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
 const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -576,6 +577,32 @@ export function priceByMethodOf(row, fees, methods) {
  * null when nothing in the ladder answers — the caller's cue to print nothing, never to fall
  * back to a number that is really a cost.
  */
+/**
+ * WHICH SIZES A PRODUCT OFFERS — the one server-side answer to that question.
+ *
+ * MIRRORS `sizesOf` in web/lib/variant-resolve.ts: the UNION of `data.sizes` and
+ * `data.sizePrices[].size`, ordered by the one ladder (`bySize`, routes/sanmar.js, which
+ * web/lib/size-order.ts mirrors in turn). Alphabetical is not an ordering here — it gives
+ * "2XL, 3XL, L, M, S, XL", a scrambled list rather than a range.
+ *
+ * THE UNION IS THE POINT, and it is where the existing readers disagree. catalog.js takes
+ * `d.sizes` ELSE sizePrices, so a product carrying both publishes only the first; the line
+ * in sellerBaseCostOf below reads sizePrices ONLY. Three answers to one question is the
+ * shape §4 keeps warning about — this is the definition the partner API is built on, and
+ * the other two are noted rather than moved because one of them decides money and changing
+ * it silently reprices the catalogue.
+ *
+ * An empty array means WE HAVE NOT BEEN TOLD, never "one size" — the caller decides what
+ * that means, exactly as offeredSides does for faces.
+ */
+export function offeredSizes(row) {
+  const d = (row && row.data) || {};
+  const out = new Set();
+  for (const s of (Array.isArray(d.sizes) ? d.sizes : [])) if (s != null && String(s).trim()) out.add(String(s).trim());
+  for (const t of (Array.isArray(d.sizePrices) ? d.sizePrices : [])) if (t && t.size != null && String(t.size).trim()) out.add(String(t.size).trim());
+  return [...out].sort(bySize);
+}
+
 export function sellerBaseCostOf(row, fees) {
   const d = (row && row.data) || {};
   const sizes = Array.isArray(d.sizePrices) ? d.sizePrices.map((t) => t && t.size).filter(Boolean) : [];
