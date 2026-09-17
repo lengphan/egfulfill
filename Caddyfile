@@ -158,9 +158,49 @@ egful.store {
 	# secret in any single one — but together they are a map of the private app drawn for
 	# anyone who guesses a filename, and none of it was ever meant to be a web asset.
 	# dashboard-drag.js and nav-drag.js are NOT here: 4 and 18 legacy pages load them.
-	@hidden path /.env* /*/.env* /.git /.git/* /.github /.github/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /mobile /mobile/* /tools /tools/* /extension /extension/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md /images/*.pdf /images/*.PDF /images/*.pes /images/*.PES /images/*.dst /images/*.DST /images/*.emb /images/*.EMB /images/SS-Activewear-logo.png /images/otto-updatedlogo_0.png /*.bak /*.py /*.mjs /audit1.js /lbl2_tmp.js /op_thread_check.js /ss_wallet_seller.png /ss_wallet_scrolled.png /*.code-workspace /skills /skills/* /agent-memory /agent-memory/* /projects /projects/* /dist /dist/* /scratchpad /scratchpad/* /agents /rules /.playwright-mcp /.playwright-mcp/*
+	#
+	# THE THREE STAFF PAGES ARE BLOCKED (2026-09-17) BECAUSE THEY NAMED OUR SUPPLIERS.
+	#
+	# admin.html, operator.html and warehouse.html answered 200 to anyone and their bodies
+	# carried "S&S Activewear", "ssactivewear.com", "Otto Cap", "SanMar" and "AlphaBroder" —
+	# measured over the wire, unauthenticated. §2.9 exists to stop exactly that, and the
+	# whole apparatus around it (the /api/public/products/<slug>/img proxy, the allow-list
+	# rather than a redaction list, publishing `brand` only when it is not the SanMar
+	# fallback, the two supplier logos already in this list) was guarding the front door
+	# while three static pages handed out the list.
+	#
+	# eg-guard.js does NOT gate these. Its own header calls it a "client-side access lock":
+	# it runs in a browser, so it redirects a person and does nothing to curl, view-source
+	# or any HTTP client. The body ships in full either way.
+	#
+	# BOTH SPELLINGS, because `try_files {path} {path}.html` means /admin serves admin.html —
+	# blocking only the .html leaves the clean URL open, and /admin was measured leaking 9
+	# supplier mentions.
+	#
+	# eg-products.js and eg-products-tabs.js go with them: both name S&S Activewear, and
+	# grep says the ONLY pages that load them are these same three, so nothing public loses
+	# a script it needs.
+	#
+	# TO REVERT: delete the eight paths at the end of @hidden. The files are untouched on
+	# disk — §2.7 keeps them frozen, and this stops SERVING them rather than retiring them.
+	@hidden path /.env* /*/.env* /.git /.git/* /.github /.github/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /mobile /mobile/* /tools /tools/* /extension /extension/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md /images/*.pdf /images/*.PDF /images/*.pes /images/*.PES /images/*.dst /images/*.DST /images/*.emb /images/*.EMB /images/SS-Activewear-logo.png /images/otto-updatedlogo_0.png /*.bak /*.py /*.mjs /audit1.js /lbl2_tmp.js /op_thread_check.js /ss_wallet_seller.png /ss_wallet_scrolled.png /*.code-workspace /skills /skills/* /agent-memory /agent-memory/* /projects /projects/* /dist /dist/* /scratchpad /scratchpad/* /agents /rules /.playwright-mcp /.playwright-mcp/* /admin /admin.html /operator /operator.html /warehouse /warehouse.html /eg-products.js /eg-products-tabs.js
 	handle @hidden {
 		respond 404
+	}
+
+	# ACCESS LOG. There was none, which is why CLAUDE.md had to say "is anyone using these
+	# is currently unmeasurable" — the honest reason the staff pages above were left alone
+	# for so long. A 404 from the block is now visible, so if a staff member is still on the
+	# old UI it shows up here rather than as silence.
+	#
+	# To the /data VOLUME, not stderr: docker-compose sets no logging driver options, so
+	# stderr would grow the json-file log unbounded on a box that has run out of disk before.
+	# Caddy rolls this one itself and it survives a restart.
+	log {
+		output file /data/access.log {
+			roll_size 10MiB
+			roll_keep 3
+		}
 	}
 
 	# Everything else → the static frontend (clean URLs: /orders → orders.html)
