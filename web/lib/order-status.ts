@@ -1,88 +1,21 @@
+/**
+ * THE WEB'S FACE ON THE SELLER VOCABULARY.
+ *
+ * The words, the groups and the filters moved to `@/shared/order-status` so the phone reads
+ * the same ones — see the note at the top of that file. What stays here is the one thing
+ * that is genuinely web-only: turning a register into Tailwind classes. Every existing
+ * import of this module keeps working unchanged, which is why the move is a re-export rather
+ * than a rename.
+ */
 import { STATUS_TONE } from "@/lib/status-tone"
-// Canonical seller-facing order status — ported VERBATIM from egfulfill-store.js
-// `SELLER_STATUS`. The seller deliberately sees COLLAPSED stages: every production
-// sub-state (awaiting_scan/scanned/printing/qc/packed/…) shows as "In
-// Production". This is an established product decision in the original app — do NOT
-// reinvent granular seller stages here. The granular factory stages belong to the
-// factory boards, not the seller surfaces.
-export type SellerStatusInfo = { label: string; tone: string; group: SellerGroup }
-export type SellerGroup = "draft" | "pending" | "production" | "shipped" | "attention" | "closed"
+import { sellerStatus as vocabulary, type SellerStatus } from "@/shared/order-status"
 
-// Weight, not colour — see lib/status-tone.ts. This table and factory-status.ts's had
-// already drifted (`wait` here against `review` there for one idea), which is what a second
-// copy always does. Both read from one definition now.
-const TONE = {
-  neutral: STATUS_TONE.settled,
-  wait: STATUS_TONE.live,
-  prod: STATUS_TONE.live,
-  shipped: STATUS_TONE.settled,
-  hold: STATUS_TONE.attention,
-  alert: STATUS_TONE.attention,
-}
+export { SELLER_FILTERS, matchesFilter } from "@/shared/order-status"
+export type { SellerGroup, SellerFilter } from "@/shared/order-status"
 
-const P = (label: string, tone: string, group: SellerGroup): SellerStatusInfo => ({ label, tone, group })
-
-// The seller-facing lifecycle: Draft -> Pending -> In Process -> Fulfilled (+ On Hold /
-// Cancelled / Refunded). Mirrors factory ids; keys cover every raw value the backend emits.
-const MAP: Record<string, SellerStatusInfo> = {
-  // Draft = created/synced, NOT submitted. The seller's next action is to submit it. Same
-  // label whatever the origin (synced or manual).
-  new: P("Draft", TONE.neutral, "draft"),
-  draft: P("Draft", TONE.neutral, "draft"),
-  // Pending = submitted + charged, awaiting the factory to approve it. STILL cancellable
-  // (full refund) — the Cancel button appears alongside this, driven by factory_status.
-  in_review: P("Pending", TONE.wait, "pending"),
-  // In Process starts HERE, not at working. Approved means an operator has confirmed the
-  // blank, which is the factory accepting the job — and it is the moment the seller's
-  // cancel window closes (SELLER_ZONE in orders.js stops at in_review). It was reaching
-  // "In Process" only through the unknown-status FALLBACK below, so the one stage where
-  // the seller loses a right was the one stage nothing named.
-  approved: P("In Process", TONE.prod, "production"),
-  // In Process = the factory approved it and is making it. Every internal make-stage
-  // (awaiting_scan / working, + legacy) collapses to this one label — the factory's steps
-  // are not the seller's business.
-  awaiting_scan: P("In Process", TONE.prod, "production"),
-  printed: P("In Process", TONE.prod, "production"),     // retired id; legacy rows
-  working: P("In Process", TONE.prod, "production"),
-  scanned: P("In Process", TONE.prod, "production"),     // retired id; legacy rows
-  printing: P("In Process", TONE.prod, "production"),    // retired id; legacy rows
-  packing: P("In Process", TONE.prod, "production"),     // retired stage; legacy rows still carry it
-  shipped: P("Fulfilled", TONE.shipped, "shipped"),
-  flagged: P("Action Needed", TONE.alert, "attention"),
-  cancelled: P("Cancelled", TONE.neutral, "closed"),
-  refunded: P("Refunded", TONE.neutral, "closed"),
-  // legacy aliases
-  prescan: P("In Process", TONE.prod, "production"),
-  ready_print: P("In Process", TONE.prod, "production"),
-  in_queue: P("In Process", TONE.prod, "production"),
-  production: P("In Process", TONE.prod, "production"),
-  qc: P("In Process", TONE.prod, "production"),
-  packed: P("In Process", TONE.prod, "production"),
-  queued: P("In Process", TONE.prod, "production"),
-  delivered: P("Fulfilled", TONE.shipped, "shipped"),
-  fulfilled: P("Fulfilled", TONE.shipped, "shipped"),
-  on_hold: P("On Hold", TONE.hold, "attention"),
-  unfunded: P("Action Needed", TONE.alert, "attention"),
-}
-// Unknown/missing non-empty status → treat as mid-pipeline (In Process), the old default.
-const FALLBACK = P("In Process", TONE.prod, "production")
+export type SellerStatusInfo = { label: string; tone: string; group: SellerStatus["group"] }
 
 export function sellerStatus(o: { factory_status?: string | null; status?: string | null }): SellerStatusInfo {
-  const raw = String(o?.factory_status || o?.status || "new").toLowerCase()
-  return MAP[raw] ?? FALLBACK
-}
-
-// Seller-facing filter tabs (grouped, not the granular factory stages).
-export const SELLER_FILTERS = ["All", "Draft", "Pending", "In Process", "Fulfilled", "Needs attention"] as const
-export type SellerFilter = (typeof SELLER_FILTERS)[number]
-
-export function matchesFilter(o: { factory_status?: string | null; status?: string | null }, f: SellerFilter): boolean {
-  if (f === "All") return true
-  const g = sellerStatus(o).group
-  if (f === "Draft") return g === "draft"
-  if (f === "Pending") return g === "pending"
-  if (f === "In Process") return g === "production"
-  if (f === "Fulfilled") return g === "shipped"
-  if (f === "Needs attention") return g === "attention"
-  return true
+  const s = vocabulary(o)
+  return { label: s.label, tone: STATUS_TONE[s.register], group: s.group }
 }

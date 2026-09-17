@@ -3,8 +3,8 @@ import { View, Text, Image, Pressable, Modal, Animated, Easing, PanResponder } f
 import { Ionicons } from "@expo/vector-icons"
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 import { assetUrl, type Order } from "@/lib/api"
-import { isOverdue, normalizeStage, units, numOf, lineTitle, STAGE_LABEL } from "@/lib/orders"
-import { F, C, R, toneOf } from "@/lib/theme"
+import { isOverdue, normalizeStage, units, numOf, lineTitle, STAGE_LABEL, statusFor } from "@/lib/orders"
+import { F, C, R, toneOf, STATUS_REGISTER } from "@/lib/theme"
 /* ImagePeek moved to its own file once it grew pinch-zoom and a dismiss gesture — it
    is a photo viewer, and two screens use it. Re-exported so importers are unchanged. */
 import { ImagePeek } from "@/components/image-peek"
@@ -151,8 +151,12 @@ function RowMenu({ open, onClose, title, actions }: {
  */
 
 
-export function OrderRow({ order, selecting, selected, onPress, onLongPress, onAdvance, advanceLabel }: {
+export function OrderRow({ order, staff, selecting, selected, onPress, onLongPress, onAdvance, advanceLabel }: {
   order: Order
+  /** WHICH VOCABULARY THIS READER GETS. The queue already knows — it derives the whole
+   *  selection and advance affordance from it — so the row is told rather than asking
+   *  again, and `statusFor` is the only thing that branches on it. */
+  staff: boolean
   selecting: boolean
   selected: boolean
   onPress: () => void
@@ -199,7 +203,11 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
     .map((it) => {
       const a = assetUrl(it.design_src)
       const l = assetUrl(it.img_ref || it.img)
-      return (l || a) ? { uri: (l || a) as string, title: lineTitle(it), art: !!a } : null
+      /* `has_art` is the server's answer and it outranks ours: it reads order_designs as
+         well as design_src, which is the whole definition. Falling back to design_src keeps
+         this correct against an API that has not been deployed yet — an older server sends
+         no flag, and the row then says what it always said rather than claiming Ready. */
+      return (l || a) ? { uri: (l || a) as string, title: lineTitle(it), art: it.has_art ?? !!a } : null
     })
     .filter(Boolean) as { uri: string; title: string; art: boolean }[]
 
@@ -207,7 +215,31 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
    * Every image carried a LISTING tag, and because none of these orders has a file yet the
    * exception became the rule — a marker on every row marks nothing. It belongs in the state
    * line instead, where it reads as what it actually means: this cannot be produced yet. */
-  const noArt = shots.length > 0 && !shots.some((s) => s.art)
+  /*
+   * READY, NOT "NO ARTWORK".
+   *
+   * This asked `design_src` — the BUYER's upload off the marketplace — and called its
+   * absence "No artwork". Two things were wrong with that, and the second is the one that
+   * made every row say it.
+   *
+   * ONE: `design_src` is not where artwork lives. `lineArt()` is the definition and it reads
+   * `order_designs` FIRST — the file a designer attached to the line — and falls back to the
+   * buyer's upload. The list never loads `order_designs`, only the detail screen does, so an
+   * order with a file attached read "No artwork" here and showed the file when opened: one
+   * question, two functions, two answers. The server now stamps `has_art` per line from the
+   * same definition, so the list and the detail screen cannot disagree.
+   *
+   * TWO: even answered correctly it was the wrong FLAG. These orders are personalised with
+   * NAMES, which arrive as text inside `variations` and never as an uploaded image, so the
+   * honest answer is "no file" on essentially the whole queue — and a marker true of 607 of
+   * 607 rows marks nothing. That is the failure the comment above `shots` already names,
+   * committed one column to the left. So the exception is inverted: say which orders CAN be
+   * produced, because that is the short list and the one worth spotting.
+   */
+  /* COUNTED OVER THE LINES, NOT OVER THE PICTURES. `shots` drops any line with neither a
+     listing photo nor a file, so asking `every` of it can be true while two lines of the
+     order have nothing at all — a subset agreeing is not the order being ready. */
+  const ready = items.length > 0 && items.every((it) => it.has_art ?? !!assetUrl(it.design_src))
 
   /*
    * THE STAGE IS THE STATUS, AND IT IS ALWAYS SHOWN.
@@ -229,11 +261,11 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
    * file and a late ship date look like the same kind of problem — one you fix by uploading
    * something, the other you cannot fix at all.
    */
-  const stageWord = STAGE_LABEL[stage] ?? stage
+  const status = statusFor(order, staff)
   const blocker =
-    noArt ? { text: "No artwork", color: C.alert } :
     late  ? { text: "Late",       color: C.warn  } :
     order.rush ? { text: "Rush",  color: C.warn  } :
+    ready ? { text: "Ready",      color: C.success } :
     null
 
   /* Two pictures and a count, not a strip you slide. The strip was 200pt tall and put two
@@ -313,8 +345,8 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
       </View>
 
       <View style={{ alignItems: "flex-end", maxWidth: 104 }}>
-        <Text numberOfLines={1} style={{ fontSize: 14, ...toneOf(stage), textAlign: "right" }}>
-          {stageWord}
+        <Text numberOfLines={1} style={{ fontSize: 14, ...STATUS_REGISTER[status.register], textAlign: "right" }}>
+          {status.label}
         </Text>
         {blocker && (
           <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: F.medium, color: blocker.color, textAlign: "right", marginTop: 1 }}>
