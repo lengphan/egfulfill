@@ -52,6 +52,7 @@ export function VariantField({
  compact,
  className,
  prefix,
+ clearLabel,
  clearable = true,
 }: {
  label: string
@@ -85,6 +86,19 @@ export function VariantField({
    * caption row this component exists to have removed.
    */
  prefix?: string
+  /**
+   * WHAT THE CLEAR ROW SAYS, when the placeholder would read as an option.
+   *
+   * The clear row prints `ph` — the placeholder — which for most fields is the field's own
+   * name ("Colour") and is unmistakably not a value. A per-surface method sets its
+   * placeholder to the LINE's method, so an unset face reads "Front · DTG printing" rather
+   * than blank; that put "DTG printing" at the top of a menu whose options also contain
+   * "DTG printing", and the same words twice in one list is indistinguishable from a bug.
+   *
+   * So the row can be named for what it DOES — "Same as the line" — while the trigger keeps
+   * showing what that resolves to. Defaults to `ph`, so every other field is unchanged.
+   */
+ clearLabel?: string
   /**
    * Can this field go back to having no value?
    *
@@ -187,7 +201,7 @@ export function VariantField({
  every field though: see `clearable`. */}
         {clearable && (
           <DropdownMenuItem onClick={() => onChange("")} className="text-muted-foreground">
-            {ph}
+            {clearLabel ? tl("field", clearLabel) : ph}
           </DropdownMenuItem>
         )}
         {options.map((o) => (

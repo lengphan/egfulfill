@@ -4265,7 +4265,31 @@ export function ordersRoutes(app, requireAuth) {
                   where d.order_id = i.order_id
                     and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
                     and (d.data is not null or d.storage_key is not null)
-               ) ks), '{}') as image_keys
+               ) ks), '{}') as image_keys,
+              /**
+               * EVERY TECHNIQUE ON THE GARMENT, because the line's own column is no longer
+               * the whole answer.
+               *
+               * A face carries its own method now (order_designs.method) — one hoodie is
+               * embroidered at the front and printed at the back — and tierOf tested
+               * i.print_type alone. So a seller who embroidered ONE surface of a line whose
+               *
+               * (NO BACKTICKS IN HERE: this whole query is a JS template literal and one ends
+               * it. The note on image_keys above says the same; this comment broke the file
+               * on its first write for exactly that reason.)
+               * column said DTG was charged NO digitising or check fee at all: the work
+               * happens, the money does not. Same root cause as the summary naming the wrong
+               * technique and the canvas refusing a stitch file — the per-face work reached
+               * pricing and the UI, and the rules that still read the column were missed.
+               *
+               * A face that says nothing inherits the line, so it contributes no entry here
+               * and the line's own value is what answers for it (see tierOf).
+               */
+              coalesce((select array_agg(distinct d.method) from order_designs d
+                 where d.order_id = i.order_id
+                   and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
+                   and coalesce(d.method, '') <> ''
+              ), '{}') as face_methods
          from order_items i where i.order_id = $1`,
       [orderId]).then((r) => r.rows).catch(() => []);
   }
@@ -4284,7 +4308,11 @@ export function ordersRoutes(app, requireAuth) {
    */
   function tierOf(r) {
     if (r.design_tier) return r.design_tier;
-    if (!/emb/i.test(String(r.print_type || ''))) return null;
+    /* THE LINE'S METHOD *OR ANY FACE'S*. Embroidering one surface is embroidery work, and
+       testing the line's column alone billed nothing for it whenever the column said
+       something else. The line's own value still counts, for every face that inherits it. */
+    const techniques = [String(r.print_type || ''), ...(Array.isArray(r.face_methods) ? r.face_methods : [])];
+    if (!techniques.some((m) => /emb/i.test(String(m || '')))) return null;
     return r.machine_key ? 'supplied' : imageKeysOf(r).length ? 'standard' : null;
   }
 

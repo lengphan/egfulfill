@@ -3553,9 +3553,17 @@ export function DesignCanvasDialog({
               value={faceMethod[sd] ?? ""}
               options={faceMethodOptions}
               placeholder={lineMethod || tl("canvas", "Same as the line")}
+              /* NAMED FOR WHAT IT DOES, or it reads as a repeat of the option below it. The
+                 placeholder here is the LINE's method, so the clear row printed the same
+                 words the option list already contained — "DTG printing" twice in one menu,
+                 which looks like a bug whatever it means. */
+              clearLabel={tl("canvas", "Same as the line")}
               emptyLabel={lineMethod ? `${lineMethod} (${tl("canvas", "from the line")})` : undefined}
               disabled={methodBusy}
-              compact
+              /* NOT compact. That is `text-2xs` — 11px, which §4 reserves for a MARK you
+                 recognise, never a value you read and set. A print method is the latter, and
+                 it also has to sit legibly beside the face name now prefixed to it. The
+                 pickers above it are full size for the same reason. */
               onChange={(v) => void setFaceMethodFor(sd, v)}
             />
           ))}

@@ -1139,11 +1139,15 @@ export default function OrderDetailPage() {
                                     ? faceRows.findIndex((r) => r.method.toLowerCase() === billed.toLowerCase())
                                     : -1
                                   return (<>
-                                    {/* THE GARMENT, named as the garment. It was labelled with a
-                                        face ("Front · included") while carrying the blank's price,
-                                        which reads as the cost of decorating the front. */}
+                                    {/* THE BLANK, called what this app calls it everywhere else —
+                                        the variant picker's own field is "Blank", and a summary
+                                        inventing a synonym for the thing the rest of the product
+                                        names one way is a second vocabulary to learn. It was
+                                        labelled with a FACE ("Front · included") while carrying
+                                        this price, which read as the cost of decorating the
+                                        front. */}
                                     <div className="flex justify-between">
-                                      <dt className="pl-3 text-muted-foreground">{tl("order", "Garment")}</dt>
+                                      <dt className="pl-3 text-muted-foreground">{tl("order", "Blank")}</dt>
                                       <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
                                     </div>
                                     {faceRows.map((r, j) => {
