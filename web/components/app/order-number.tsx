@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { updateOrder, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
-import { numOf } from "@/lib/order-format"
+import { numOf, shortOrderRef } from "@/lib/order-format"
 import { cn } from "@/lib/utils"
 
 /**
@@ -95,9 +95,28 @@ export function OrderNumber({
    * Nothing shows for an order that never carried one, which is most of them: an empty
    * caption under every number is worse than the omission it is fixing.
    */
+  /**
+   * THE NUMBER THE OTHER SIDE USES, under ours.
+   *
+   * This carried the import sheet's reference and nothing else, so a row imported from a
+   * spreadsheet showed the buyer's number and a row synced from Etsy showed none at all
+   * (owner: "the platform synced ID should be underneath — not just for imported sheet").
+   * The two are the same question: what does whoever sent us this order call it?
+   *
+   * For a synced order that number is in the id — `etsy-4176340642` — and shortOrderRef is
+   * the shared rule for taking the routing prefix off, which "leaves the number the buyer and
+   * the marketplace both use". Reusing it means the wallet, the purchase orders and this row
+   * all shorten an id the same way rather than three of them agreeing by luck (§5).
+   *
+   * A MANUAL ORDER GETS NOTHING, deliberately. shortOrderRef would hand back `FF-2mfrc`, the
+   * tail of a key we minted ourselves — not a number anyone else holds, and the line under
+   * EGF-001295 is for the other side's reference. An order nobody else numbered has none.
+   */
   const sheetRef = String(
     (order.meta as { sourceOrderNumber?: unknown } | undefined)?.sourceOrderNumber ?? ""
   ).trim()
+  const fromPlatform = !!order.source && String(order.source).toLowerCase() !== "manual"
+  const otherRef = sheetRef || (fromPlatform ? shortOrderRef(String(order.id ?? "")) : "")
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
   const [busy, setBusy] = useState(false)
@@ -130,7 +149,7 @@ export function OrderNumber({
   const mayEdit = editable && !!role && (role !== "seller" || unsubmitted)
 
   if (!mayEdit) {
-    if (!sheetRef) return <span className={cn(BASE, className)}>{label}</span>
+    if (!otherRef) return <span className={cn(BASE, className)}>{label}</span>
     return (
       <span className={cn("inline-flex flex-col leading-tight", className)}>
         <span className={BASE}>{label}</span>
@@ -146,8 +165,13 @@ export function OrderNumber({
             below its floor is not a way to make it secondary, it is a way to make it
             unreadable, and at 12px against a semibold 14px the size jump was the thing that
             read as untidy. */}
-        <span className="text-sm font-normal tabular-nums text-muted-foreground" title={tl("orderNumber", "The number from the import sheet")}>
-          {sheetRef}
+        <span
+          className="text-sm font-normal tabular-nums text-muted-foreground"
+          title={sheetRef
+            ? tl("orderNumber", "The number from the import sheet")
+            : tl("orderNumber", "The order's number on the platform it came from")}
+        >
+          {otherRef}
         </span>
       </span>
     )
@@ -191,8 +215,8 @@ export function OrderNumber({
         {label}
         {/* The editable state shows it too, or pressing the number would make the seller's own
             reference disappear — a control that hides a fact while you use it. */}
-        {sheetRef && (
-          <span className="ml-1.5 text-sm font-normal tabular-nums text-muted-foreground">{sheetRef}</span>
+        {otherRef && (
+          <span className="ml-1.5 text-sm font-normal tabular-nums text-muted-foreground">{otherRef}</span>
         )}
       </button>
     )
