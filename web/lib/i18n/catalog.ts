@@ -4555,6 +4555,7 @@ const vi: Dict = {
   "orderHistory.Hide": "Ẩn",
   "orderNumber.Order number": "Số đơn hàng",
   "orderNumber.The number from the import sheet": "Số đơn từ file nhập",
+  "orderNumber.The order's number on the platform it came from": "Mã đơn trên nền tảng gốc",
   "orderNumber.Save number": "Lưu số",
   "orderNumber.Cancel": "Huỷ",
   "orderNumber.Change this order's number": "Đổi số của đơn hàng này",
