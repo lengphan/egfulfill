@@ -266,8 +266,14 @@ function tierFor(d, size) {
  * `base` is null when nothing in the ladder answers — the caller's cue that the line is
  * unpriceable, never a reason to bill 0.
  */
-function costPartsOf(row, item, fees) {
+function costPartsOf(row, item, fees, faces = null) {
   const d = row.data || {};
+  /* THE METHODS ACTUALLY ON THIS GARMENT, the line's own as the floor. A face says nothing
+     when it agrees with its line (order_designs.method is null), so the line's value is what
+     every face resolves to until one disagrees. */
+  const faceMethods = (Array.isArray(faces) ? faces : [])
+    .map((f) => (f && typeof f === 'object' ? String(f.method || '').trim() : ''))
+    .filter(Boolean);
   const markup = num(fees && fees.base_markup) || 0;
   // BASE COST is what the seller pays before the print-method surcharge. It comes from
   // the first of these that answers, most specific first:
@@ -295,7 +301,11 @@ function costPartsOf(row, item, fees) {
    * a real positive number. Products with no blank price behave exactly as they did, which
    * is what keeps this from silently repricing the whole catalogue the day it ships.
    */
-  const isBlankLine = !String(item.print_type || '').trim();
+  /* A BLANK IS A GARMENT NOBODY DECORATED, and that is now two questions rather than one.
+     The line's own column can be empty while a FACE names a method — an import where every
+     Type sits in a placement block and the row-level column is gone — and reading only the
+     line would have charged the bare-blank price for an embroidered hoodie. */
+  const isBlankLine = !String(item.print_type || '').trim() && !faceMethods.length;
   if (isBlankLine && tier && tier.blank != null) {
     const bl = num(tier.blank);
     if (bl != null && bl > 0) base = bl;
@@ -325,7 +335,11 @@ function costPartsOf(row, item, fees) {
   if (base == null) { const c = num(d.productCost ?? d.product_cost); if (c != null && c > 0) base = c + markup; }
   // No base, no surcharge to report: a method fee on a line we can't price is a number
   // with nothing to sit on top of.
-  return { base, method: base == null ? 0 : methodAddOn(d, item.print_type, fees) };
+  /* The dearest face's method, falling back to the line's own for a caller that has no faces
+     (the order list prices hundreds of lines and does not read artwork) and for every line
+     written before faces could carry one. */
+  const billed = billingMethodOf(faceMethods, d, fees) || item.print_type;
+  return { base, method: base == null ? 0 : methodAddOn(d, billed, fees), billedMethod: billed || null };
 }
 
 /**
@@ -480,11 +494,18 @@ export function sideBreakdown(faces, fees, d) {
 // add-on. Mirrors productUnitPrice in eg-design-tools.js, which is what the boards show
 // the seller — if these two disagree, the quote lies about the price on screen.
 function unitCostOf(row, item, fees, faces = ['front']) {
+  /* TWO QUESTIONS, TWO SHAPES. costPartsOf needs the METHOD on each face; sideAddOn needs
+     the face NAMES and nothing else. `faces` may arrive as either — priceLines hands objects,
+     the lookbook and quoteSpec hand names — so the names are taken here rather than assumed.
+     Handing objects straight to sideAddOn is not a type error, it is a silent zero: every
+     name comes back "[object Object]", no face matches PRICED_SIDES, and the extra-face
+     charge quietly disappears from every order on the platform. */
+  const names = (Array.isArray(faces) ? faces : []).map((f) => (f && typeof f === 'object' ? f.side : f));
   // The method surcharge sits ON TOP of the base cost, never inside it — so changing
   // the markup never silently changes what embroidery adds. The per-side charge sits on
   // top of both, for the same reason.
-  const { base, method } = costPartsOf(row, item, fees);
-  return base == null ? null : base + method + sideAddOn(faces, fees, (row && row.data) || null);
+  const { base, method } = costPartsOf(row, item, fees, faces);
+  return base == null ? null : base + method + sideAddOn(names, fees, (row && row.data) || null);
 }
 
 /**
@@ -620,6 +641,48 @@ export function methodAddOnsFor(row, fees, methods) {
     }
   }
   return out;
+}
+
+/**
+ * WHICH METHOD A MIXED LINE IS BILLED AT — the DEAREST of its faces.
+ *
+ * A garment can be embroidered on the front and printed on the back, and the surcharge has
+ * always been charged ONCE per line. So with two methods on one line, one of them is the one
+ * the base already pays for, and "which" has to be decided by a rule or the same garment
+ * prices two ways.
+ *
+ * CHEAPEST-INCLUDED (owner's call): the cheaper method is the one absorbed, so the line is
+ * billed at the dearer. Two properties earn it:
+ *
+ *   · ORDER-INDEPENDENT. A max does not care which face was uploaded first, so front-EMB /
+ *     back-DTG and front-DTG / back-EMB cost the same, which they must — it is one garment
+ *     with the same work done to it. The alternative, "the first face recorded", is
+ *     order_designs insertion order: when somebody happened to upload, not a fact about the
+ *     garment. That is the bug the shipping rate had when it took lines[0].
+ *   · NOTHING ALREADY BILLED MOVES. A max over one distinct value IS that value, so every
+ *     single-method line — which is every line in the database today — prices to the cent it
+ *     prices at now. Measured: EMB front $24.00, EMB front+back $28.50, DTG front $18.00,
+ *     DTG front+back $22.50, all unchanged.
+ *
+ * DEAREST BY THE RESOLVER, never by a hardcoded ranking of techniques. A product's own
+ * `methodPrices` can make DTG dearer than embroidery on that blank, and a table of "EMB beats
+ * DTG" written here would quietly bill the cheaper one. Ties keep the first, so the answer is
+ * stable rather than merely correct.
+ *
+ * A TRANSITION RULE, AND IT SHOULD BE SAID: it inherits an under-charge. Three embroidered
+ * faces pay ONE embroidery surcharge, because that surcharge has always been per line. Mixed
+ * methods make that visible as a choice rather than an accident. Charging per face is a price
+ * RISE on orders people are already placing, so it is a decision and not a refactor.
+ */
+export function billingMethodOf(methods, d, fees) {
+  let best = null, bestRate = -1;
+  for (const m of methods) {
+    const v = String(m || '').trim();
+    if (!v) continue;
+    const rate = methodAddOn(d || {}, v, fees) || 0;
+    if (rate > bestRate) { bestRate = rate; best = v; }
+  }
+  return best;
 }
 
 function methodAddOn(d, printType, fees) {
@@ -807,8 +870,18 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
        still handing back a number (an older embedder, or a test): it becomes that many
        unnamed faces, which prices exactly as the flat rate did. */
     const raw = sidesOf(it);
-    const faces = Array.isArray(raw) ? raw
+    /* THREE SHAPES, ONE NORMALISATION, AND IT HAPPENS HERE SO NOWHERE ELSE HAS TO GUESS.
+       A caller may hand back {side, method} objects (quoteOrder, which reads the artwork),
+       bare names (the order list, which cannot afford to), or a count (an older embedder or
+       a test). `faces` stays NAMES for the side maths — sideAddOn and sideBreakdown are
+       about which surface, not what is on it — and `withMethods` carries the pair for the
+       one question that needs both. */
+    const rawList = Array.isArray(raw) ? raw
       : Array.from({ length: Math.max(1, Number(raw) || 1) }, (_, i) => (i === 0 ? 'front' : `face-${i}`));
+    const withMethods = rawList.map((f) => (f && typeof f === 'object'
+      ? { side: String(f.side || 'front'), method: String(f.method || '').trim() || String(it.print_type || '').trim() }
+      : { side: String(f || 'front'), method: String(it.print_type || '').trim() }));
+    const faces = withMethods.map((f) => f.side);
     const sides = faces.length;
     // A frozen cost wins: once charged, an order's price is history and must not move
     // when someone edits the catalog — which is also what stops artwork added to a second
@@ -845,7 +918,7 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                         blank: it.blank || null, reason: named ? 'unknown-blank' : 'no-blank' });
         continue;
       }
-      if (cost == null) cost = unitCostOf(row, it, fees, faces);
+      if (cost == null) cost = unitCostOf(row, it, fees, withMethods);
       if (ship == null) ship = shipFeeOf(row, it.size, fees);
       extra = extraFeeOf(row, fees);
       if (cost == null) { unpriced.push({ id: it.id, line_id: it.line_id, sku: it.sku || '(no sku)', name: it.name || '', blank: it.blank || null, reason: 'no-cost' }); continue; }
@@ -858,7 +931,7 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
     // What the unit cost is MADE OF. Read from the catalogue even on a frozen line: the
     // split is a fact about the product and the technique, and showing it is the only way
     // a $13.50 blank quoting $18.50 stops looking like two different prices.
-    const parts = srow ? costPartsOf(srow, it, fees) : { base: null, method: 0 };
+    const parts = srow ? costPartsOf(srow, it, fees, withMethods) : { base: null, method: 0 };
     /* Written by freezeQuote at the moment of charge; absent on a quote and on any line
        charged before the column existed. node-pg gives jsonb back already parsed. */
     const stamp = it.cost_parts && typeof it.cost_parts === 'object' ? it.cost_parts : null;
@@ -882,6 +955,15 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                  /* The COUNT stays on the line for every reader that has one, and the NAMES
                     ride beside it so a breakdown can say which face cost what. */
                  sides, faces,
+                 /* WHICH METHOD THIS LINE IS BILLED AT, and the set that is actually on the
+                    garment. The summary printed the line's own print_type as the surcharge's
+                    label, which on a mixed line names one face and describes the other
+                    wrongly; `billedMethod` is the one the money belongs to and `methods` is
+                    what the strip has to say. Stamped on a charged line for the same reason
+                    the faces are — what was billed is history. */
+                 billedMethod: (stamp && stamp.billedMethod) || parts.billedMethod || it.print_type || null,
+                 methods: stamp && Array.isArray(stamp.methods) ? stamp.methods
+                          : [...new Set(withMethods.map((f) => f.method).filter(Boolean))],
                  /* THE STAMP WINS ON A CHARGED LINE. `faces` above is what is on the garment
                     NOW; the stamp is what was BILLED, and after a charge those are allowed to
                     differ (a face added post-submit must not re-price a paid order). Reading
@@ -966,12 +1048,27 @@ export async function quoteOrder(orderId) {
        everything pricing ever knew about the faces — which is exactly why a back and a sleeve
        could not be charged apart. array_agg keeps them, and the count is derived from the
        array on the other side, so the two can never disagree. */
+    /* THE METHOD TRAVELS WITH THE FACE. This aggregated side names only, so a garment
+       embroidered at the front and printed at the back reached pricing as two anonymous
+       faces and was billed at whatever single value sat on the line. Rows rather than an
+       aggregate because two rows can share a side (a raster and its stitch file) and only
+       one of them may carry a method — that is a dedupe with a preference, which is a
+       sentence of JavaScript and an unreadable jsonb expression. */
     q(`select coalesce('L:' || line_id, 'S:' || sku) as key,
-              array_agg(distinct lower(coalesce(side,'front'))) as faces
-          from order_designs where order_id=$1 group by 1`, [orderId])
+              lower(coalesce(side,'front')) as side, method
+         from order_designs where order_id=$1`, [orderId])
       .then((r) => r.rows).catch(() => []),
   ]);
-  const sidesByKey = new Map(sideRows.map((r) => [r.key, Array.isArray(r.faces) ? r.faces : []]));
+  /* ONE ENTRY PER FACE, first method wins. A second row on the same side that says nothing
+     must not blank one that does — absent means inherit, never "no". */
+  const sidesByKey = new Map();
+  for (const r of sideRows) {
+    let list = sidesByKey.get(r.key);
+    if (!list) sidesByKey.set(r.key, (list = []));
+    const hit = list.find((f) => f.side === r.side);
+    if (hit) { if (!hit.method && r.method) hit.method = String(r.method).trim(); continue; }
+    list.push({ side: r.side, method: String(r.method || '').trim() });
+  }
   /* A line with no artwork prices as ONE face, which is what "there is no count" meant before
      and must keep meaning: a missing row charges for one side, never none and never more. */
   const sidesOf = (it) => {
@@ -1120,6 +1217,14 @@ export async function freezeQuote(orderId, quote) {
         method: money(l.methodFee || 0),
         included: l.sideParts?.included ?? null,
         sides: l.sideParts?.parts ?? [],
+        /* WHICH METHOD THE MONEY WAS FOR, stamped for exactly the reason the faces are. One
+           surcharge is charged per line and a mixed line has more than one candidate, so
+           without this a charged summary could only print the line's own column — which is
+           true of one face and wrong about the other. `methods` is what was on the garment
+           when it was billed; artwork added later does not re-price a paid order, so the two
+           are allowed to differ afterwards and only the stamp can say what happened. */
+        billedMethod: l.billedMethod ?? null,
+        methods: Array.isArray(l.methods) ? l.methods : [],
       }),
       l.id,
     ]).catch(() => {});
