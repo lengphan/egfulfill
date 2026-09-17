@@ -1074,9 +1074,67 @@ export default function OrderDetailPage() {
    */
   const itemGroups = (lines: NonNullable<OrderQuote["lines"]>) => (
     <>
+                      {/**
+                        * SHIPPING, SPLIT OVER THE ITEMS THAT CAUSED IT (owner, 2026-09-17).
+                        *
+                        * It is not a flat order charge and never was — pricing.js's own header
+                        * states the model: the DEAREST line's shipping, plus ship_extra for
+                        * every other unit. The parcel is sized by the biggest thing in it, so
+                        * one item carries the postage and the rest carry only what they add to
+                        * the box. That is per-item information presented as an order-level
+                        * lump, which is why "why is shipping $8.99" had no answer on screen.
+                        *
+                        * THE ARITHMETIC IS MIRRORED EXACTLY, not re-derived loosely:
+                        *   first  = the line with the highest shipFee
+                        *   extra  = THAT line's extraFee, else the platform rate
+                        *   total  = first.shipFee + extra × (units − 1)
+                        * so Σ(per-item shipping) is quote.shipping to the cent. A summary whose
+                        * parts do not add up to its own total is worse than one that never
+                        * broke the figure down.
+                        */}
+                      {(() => null)()}
                       {lines.map((l, i) => {
                         const qty = Number(l.qty) || 1
+                        /* The postage-bearing line and the per-unit extra, resolved the same
+                           way pricing.js resolves them. `reduce` with lines[0] as the seed
+                           matches its tie-breaking too — first line wins an equal rate. */
+                        const shipLine = lines.reduce((a, b) => ((Number(b.shipFee) || 0) > (Number(a.shipFee) || 0) ? b : a), lines[0])
+                        const shipExtra = shipLine?.extraFee != null ? Number(shipLine.extraFee) || 0 : (Number(quote?.fees?.ship_extra) || 0)
+                        const isShipLine = shipLine === l
+                        /* This line's share: the postage if it is the parcel-sizing line, plus
+                           the extra rate for every unit beyond the first one in the box. */
+                        const shipOwn = (isShipLine ? (Number(l.shipFee) || 0) : 0)
+                          + shipExtra * (isShipLine ? qty - 1 : qty)
                         const parts = l.sideParts?.parts ?? []
+                        /**
+                         * THE DISCOUNT COMES OFF THE GOODS, so it belongs beside them.
+                         *
+                         * pricing.js: volumeDiscount = subtotal × pct — never shipping, which is
+                         * a courier's price and not ours to discount. So each item's share is
+                         * exactly its own goods × pct, and the shares sum to the whole.
+                         *
+                         * THE LAST ITEM ABSORBS THE ROUNDING. Each share is rounded to the cent
+                         * and the sum of rounded shares can miss the rounded total by one; the
+                         * remainder goes on the final line rather than leaving a summary whose
+                         * parts do not reach its own total.
+                         */
+                        /* THE RATE THAT ACTUALLY APPLIED — best-of plan vs volume, never the
+                           sum, and `discountFrom` is the server's own word for which one won.
+                           Shown for the label only. */
+                        const dpct = quote?.discountFrom === "plan" ? (Number(quote?.planPct) || 0) : (Number(quote?.volumePct) || 0)
+                        /* THE MONEY comes from the ratio the charge itself used, not from that
+                           percentage. A rate rounded for display and then re-applied is how a
+                           breakdown ends up a cent away from the total it is breaking down. */
+                        const goods = (Number(l.unitCost) || 0) * qty
+                        const dRatio = (Number(quote?.subtotal) || 0) > 0
+                          ? (Number(quote?.volumeDiscount) || 0) / (Number(quote?.subtotal) || 0) : 0
+                        const isLast = i === lines.length - 1
+                        /* The last line absorbs the rounding, so the shares always reach the
+                           whole. Everything before it takes its own exact share. */
+                        const shareBefore = lines.slice(0, i).reduce((n, x) => n + Math.round((Number(x.unitCost) || 0) * (Number(x.qty) || 1) * dRatio * 100) / 100, 0)
+                        const discOwn = isLast
+                          ? Math.max(0, Math.round(((Number(quote?.volumeDiscount) || 0) - shareBefore) * 100) / 100)
+                          : Math.round(goods * dRatio * 100) / 100
                         const method = Number(l.methodFee) || 0
                         const sideTotal = parts.reduce((n, p) => n + p.amount, 0)
                         const blank = (Number(l.unitCost) || 0) - method - sideTotal
@@ -1107,7 +1165,13 @@ export default function OrderDetailPage() {
                                 {blankSkuOf(l) && <span className="font-normal text-muted-foreground"> · {blankSkuOf(l)}</span>}
                                 {qty > 1 && <span className="font-normal text-muted-foreground/70"> × {qty}</span>}
                               </dt>
-                              <dd className="shrink-0 tabular-nums">{usd((Number(l.unitCost) || 0) * qty)}</dd>
+                              {/* ALL-IN, because everything under it now is. The heading was the
+                                  GOODS while shipping and the discount sat at order level; with
+                                  both moved onto the item that caused them, a goods-only heading
+                                  would no longer be the sum of its own children — and a
+                                  breakdown whose parts do not reach its total is worse than one
+                                  that never broke the figure down. Σ(headings) is quote.total. */}
+                              <dd className="shrink-0 tabular-nums">{usd(goods + shipOwn - discOwn)}</dd>
                             </div>
                             {split && (
                               <>
@@ -1233,6 +1297,40 @@ export default function OrderDetailPage() {
                                       )
                                     }).flatMap((row, j) => [row, ...feesFor(faceRows[j].face).map((f, k) => feeRow(f, `fee-${i}-${j}-${k}`, faceRows[j].face))])}
                                     {orphanFees.map((f, k) => feeRow(f, `fee-${i}-orphan-${k}`, null))}
+                                    {/* SHIPPING, ON THE ITEM THAT CAUSED IT. The parcel is sized
+                                        by the biggest thing in it, so one line carries the
+                                        postage and the rest carry only what they add to the box.
+                                        The hover splits a line that does both. */}
+                                    {shipOwn > 0.005 && (
+                                      <div className="flex justify-between">
+                                        <dt
+                                          className="pl-3 text-muted-foreground"
+                                          title={isShipLine && qty > 1
+                                            ? `${usd(Number(l.shipFee) || 0)} ${tl("order", "postage")} + ${usd(shipExtra)} × ${qty - 1}`
+                                            : undefined}
+                                        >
+                                          {tl("order", "Shipping")}
+                                          {!isShipLine && (
+                                            <span className="text-muted-foreground/70"> · {tl("order", "extra in the box")}</span>
+                                          )}
+                                        </dt>
+                                        <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(shipOwn)}</dd>
+                                      </div>
+                                    )}
+                                    {/* THE DISCOUNT, BESIDE THE GOODS IT CAME OFF — with its rate,
+                                        because a deduction with no percentage beside it is a
+                                        number nobody can check. */}
+                                    {discOwn > 0.005 && (
+                                      <div className="flex justify-between">
+                                        <dt className="pl-3 text-muted-foreground">
+                                          {tl("order", "Discount")}
+                                          {dpct > 0 && (
+                                            <span className="text-muted-foreground/70 tabular-nums"> · {dpct}%</span>
+                                          )}
+                                        </dt>
+                                        <dd className="shrink-0 tabular-nums text-success">−{usd(discOwn)}</dd>
+                                      </div>
+                                    )}
                                     {/* Only when no face could claim it — see `at` above. */}
                                     {method > 0.005 && at < 0 && (
                                       <div className="flex justify-between">
@@ -1269,31 +1367,23 @@ export default function OrderDetailPage() {
                       * of leaving a stray cent that makes the arithmetic look wrong.
                       */}
                     {itemGroups(byItemNo(quote.lines ?? []))}
-                    <div className="flex justify-between">
-                      <dt className="text-muted-foreground">
-                        Shipping
-                        {quote.units > 1 && <span className="opacity-70"> · {quote.units} items</span>}
-                      </dt>
-                      <dd className="tabular-nums">{usd(quote.shipping)}</dd>
-                    </div>
-                    {/* SHOWN, not folded into the base cost. A discount a seller can't see is
-   one they can't check, and the whole point of the programme is that they
-   know they earned it. Sits directly under the two numbers it comes off —
-   it applies to the goods, never to shipping or to design fees, and a row
-   further down would imply it covered those too. */}
-                    {quote.volumeDiscount > 0 && (
-                      <div className="flex justify-between">
-                        <dt className="text-muted-foreground">
-                          {/* NAMED. Two rates can produce this line — the volume ladder and
-                              the plan — and best-of means exactly one of them did. "Volume
-                              discount" on a Pro seller's order who shipped nothing last month
-                              is a deduction attributed to a thing that did not happen. */}
-                          {quote.discountFrom === "plan" ? "Plan discount" : "Volume discount"}
-                          <span className="opacity-70"> · {quote.discountFrom === "plan" ? (quote.planPct ?? 0) : quote.volumePct}%</span>
-                        </dt>
-                        <dd className="tabular-nums text-success">−{usd(quote.volumeDiscount)}</dd>
-                      </div>
-                    )}
+                    {/**
+                      * SHIPPING AND THE DISCOUNT HAVE MOVED ONTO THE ITEMS (owner, 2026-09-17).
+                      *
+                      * Neither was ever an order-level fact. Shipping is the DEAREST line's
+                      * postage plus an extra rate for every other unit, and the discount comes
+                      * off the GOODS — so both are per-item figures that were being presented
+                      * as lumps, which is why "why is shipping $8.99" had no answer on screen.
+                      *
+                      * They are NOT repeated here. Each item's heading is now all-in, so these
+                      * rows would be the same money twice, and a reader adding the column would
+                      * reach a number that is not the total.
+                      *
+                      * What stays at order level is only what genuinely cannot belong to one
+                      * item: a design fee covering SEVERAL of them. The same picture on two
+                      * garments is digitised once — nesting it under both would charge twice,
+                      * under one would be arbitrary — so it sits here and names them all.
+                      */}
                     {designFees?.items?.filter((f) => feeCovers(f).length !== 1).map((f, i) => (
                       <div key={i} className="flex justify-between">
                         {/**

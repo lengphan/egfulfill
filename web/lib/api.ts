@@ -3035,6 +3035,11 @@ export type OrderQuote = {
      *  shared by identical-SKU siblings. This is the only field that identifies one line. */
     line_id: string | null
     sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number
+    /** What each ADDITIONAL unit of this line adds to the same box — the product's own
+     *  additionalItemShipping when it sets one, else the platform's ship_extra. Only the
+     *  parcel-sizing line's value is ever used (pricing.js picks the dearest shipFee and takes
+     *  the extra rate from that same line, so both halves describe one product). */
+    extraFee?: number | null
     /** What unitCost is MADE OF: the blank's price for this size, plus the print method's
      *  surcharge. A $13.50 product quoting $18.50 on an embroidered line is not two prices
      *  — it is the blank and the technique, and the row shows both so they can't read as a
