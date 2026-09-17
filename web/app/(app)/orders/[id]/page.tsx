@@ -1150,6 +1150,52 @@ export default function OrderDetailPage() {
                                   const at = billed
                                     ? faceRows.findIndex((r) => r.method.toLowerCase() === billed.toLowerCase())
                                     : -1
+
+                                  /**
+                                   * FEES SIT UNDER THE SURFACE THEY BELONG TO (owner, 2026-09-17).
+                                   *
+                                   * They were listed after every face, so a reader had to carry
+                                   * "Front" down three rows to join "Front · Design fee" back to
+                                   * the surface it pays for. Grouping by KIND is how a ledger is
+                                   * written; grouping by SURFACE is how the garment is made, and
+                                   * this summary exists to answer "what did the back cost me".
+                                   *
+                                   * Only a fee covering THIS line and no other — a shared fee
+                                   * stays at order level, where it can name every item it covers
+                                   * without being counted twice.
+                                   */
+                                  const mine = (designFees?.items ?? [])
+                                    .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
+                                  const feesFor = (face: string) =>
+                                    mine.filter((f) => (f.sides ?? []).some((sd) => sd.toLowerCase() === face.toLowerCase()))
+                                  /* A fee whose surface we never recorded, or one naming a face this
+                                     line no longer prints. It still has to be shown — it is money —
+                                     so it falls to the end of the item rather than being dropped. */
+                                  const orphanFees = mine.filter((f) => {
+                                    const sds = (f.sides ?? [])
+                                    return !sds.length || !sds.some((sd) => faceRows.some((r) => r.face.toLowerCase() === sd.toLowerCase()))
+                                  })
+                                  const feeRow = (f: typeof mine[number], key: string, face: string | null) => (
+                                    <div key={key} className="flex justify-between">
+                                      <dt className="pl-3 text-muted-foreground">
+                                        {/* The face is repeated on the fee row rather than implied by
+                                            indentation: these rows are read one at a time, and a row
+                                            that only makes sense in the company of the one above it
+                                            stops making sense the moment anything is inserted. */}
+                                        {(face ? [face] : (f.sides ?? [])).length > 0 && (
+                                          <span className="capitalize">
+                                            {(face ? [face] : (f.sides ?? [])).map((sd) => tl("sides", sd)).join(", ")}
+                                            <span className="text-muted-foreground/60"> · </span>
+                                          </span>
+                                        )}
+                                        {f.label}
+                                      </dt>
+                                      {isStaff
+                                        ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
+                                        : <dd className="tabular-nums text-muted-foreground">{f.amount == null ? <span className="italic">To Be Determined</span> : usd(f.amount)}</dd>}
+                                    </div>
+                                  )
+
                                   return (<>
                                     {/* THE BLANK, called what this app calls it everywhere else —
                                         the variant picker's own field is "Blank", and a summary
@@ -1185,7 +1231,8 @@ export default function OrderDetailPage() {
                                           </dd>
                                         </div>
                                       )
-                                    })}
+                                    }).flatMap((row, j) => [row, ...feesFor(faceRows[j].face).map((f, k) => feeRow(f, `fee-${i}-${j}-${k}`, faceRows[j].face))])}
+                                    {orphanFees.map((f, k) => feeRow(f, `fee-${i}-orphan-${k}`, null))}
                                     {/* Only when no face could claim it — see `at` above. */}
                                     {method > 0.005 && at < 0 && (
                                       <div className="flex justify-between">
@@ -1197,33 +1244,6 @@ export default function OrderDetailPage() {
                                 })()}
                               </>
                             )}
-                            {/* A FEE THAT BELONGS TO THIS ITEM SITS UNDER IT. Only when it covers
-                                this line and no other — a shared fee stays at order level below,
-                                where it can name every item it covers without being counted twice. */}
-                            {(designFees?.items ?? [])
-                              .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
-                              .map((f, j) => (
-                                <div key={`fee-${i}-${j}`} className="flex justify-between">
-                                  {/* THE SURFACE THE WORK IS ON, in front of the fee, so the row
-                                      reads like the face rows above it — "Front · Design fee".
-                                      A bare "Design fee" beside a figure gave a seller nothing
-                                      to connect the charge to. Absent when no side was recorded
-                                      (designs written before faces existed), and the label then
-                                      stands alone exactly as it did. */}
-                                  <dt className="pl-3 text-muted-foreground">
-                                    {(f.sides ?? []).length > 0 && (
-                                      <span className="capitalize">
-                                        {(f.sides ?? []).map((sd) => tl("sides", sd)).join(", ")}
-                                        <span className="text-muted-foreground/60"> · </span>
-                                      </span>
-                                    )}
-                                    {f.label}
-                                  </dt>
-                                  {isStaff
-                                    ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
-                                    : <dd className="tabular-nums text-muted-foreground">{f.amount == null ? <span className="italic">To Be Determined</span> : usd(f.amount)}</dd>}
-                                </div>
-                              ))}
                           </Fragment>
                         )
                       })}
