@@ -9,10 +9,10 @@ import {
 } from "@/lib/api"
 import {
   normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines, PIPELINE,
-  STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder, recordedRevenue, heldFromOf,
+   stageAction, stageDenialReason, isFactoryOrder, recordedRevenue, heldFromOf,
   statusFor,
 } from "@/lib/orders"
-import { F, C, R, S, TYPE, SECTION, toneOf, HERO_BUTTON, HERO_LABEL, HERO_GLYPH, STATUS_REGISTER } from "@/lib/theme"
+import { F, C, R, S, TYPE, SECTION, HERO_BUTTON, HERO_LABEL, HERO_GLYPH, STATUS_REGISTER } from "@/lib/theme"
 import { AuraCard } from "@/components/kit"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
@@ -238,6 +238,13 @@ export default function OrderDetail() {
    * quantity, and the count that answers "how much is in the box" is the pieces: two
    * lines of one and one line of two are both two things to make.
    */
+  /* WHEN THERE IS A BAR AT ALL. Staff, an order that is not mid-shipment, a move that
+     exists, and nothing refusing it — every other case is a panel or a sentence and stays
+     in the body. Read once, so the bar and the space reserved for it can never disagree;
+     a footer drawn over the last row is the bug that shape usually ships with. */
+  const pinnedAction = !!(staff && o && stage !== "working" && to && !denial)
+  const BAR_H = 76
+
   const itemCount = o ? units(o) : 0
   const sizeText = `${itemCount} ${itemCount === 1 ? "item" : "items"}`
 
@@ -260,7 +267,10 @@ export default function OrderDetail() {
         <Text style={{ color: C.alert, fontSize: 14, paddingHorizontal: 20, marginTop: 12 }}>{err}</Text>
       ) : o ? (
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }}
+          contentContainerStyle={{
+            paddingHorizontal: 18,
+            paddingBottom: insets.bottom + 40 + (pinnedAction ? BAR_H : 0),
+          }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.ink} />}
         >
           {/* ── THE JOB, in one block ──────────────────────────────────────────── */}
@@ -314,12 +324,34 @@ export default function OrderDetail() {
                 </View>
               )}
             </View>
+
+            {/*
+             * WHO, WHERE FROM, AND BY WHEN — one quiet line.
+             *
+             * The header's own note above argues these are LOOKUPS belonging in Details, and
+             * for the channel that was right. It was wrong about the other two. The buyer is
+             * not a detail, it is who the order is for, and it was six sections down in a
+             * list of eight rows; the ship-by date is the thing the LATE chip beside it is
+             * measured against, and a chip whose reason is elsewhere is a chip you cannot
+             * act on. One line, muted, under the facts it qualifies — not ten facts at two
+             * weights, which is what that note was actually written against.
+             */}
+            <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.medium, color: C.muted, marginTop: 8 }}>
+              {[
+                o.customer?.name,
+                platformOf(o),
+                o.ship_by ? `ship by ${new Date(o.ship_by).toLocaleDateString()}` : null,
+              ].filter(Boolean).join("  ·  ")}
+            </Text>
           </AuraCard>
 
           {/* ── THE ONE THING TO PRESS ─────────────────────────────────────────────
-              Directly under the job and nowhere else. Which button it is depends on where
-              the order stands: everything before production is a move, production itself
-              ends in a shipment, and a shipped order has nothing to press at all. */}
+              WHAT STAYS HERE IS WHAT CANNOT BE A BAR. Confirming a shipment is a flow with
+              a camera step in it, and a refusal is a sentence you read — neither compresses
+              into 56pt at the foot of the screen. The plain stage advance, which is the
+              common case and the one people press all day, is pinned below instead: it used
+              to sit here, at the top, so by the time you had scrolled through the work it was
+              the one thing no longer on screen. */}
           {staff && (
             stage === "working" ? (
               shipDenial ? (
@@ -340,34 +372,6 @@ export default function OrderDetail() {
                 </Text>
                 <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>{denial}</Text>
               </View>
-            ) : to ? (
-              /*
-               * ONE BUTTON, ONE SENTENCE. It was a 40pt circular icon tile, a title, a
-               * subtitle and a trailing arrow — four elements to say "Start Order", with
-               * two of them arrows pointing at each other. The biggest thing on the screen
-               * should be the words, not the furniture around them.
-               */
-              <Pressable
-                onPress={advance}
-                disabled={moving}
-                style={({ pressed }) => ({
-                  ...HERO_BUTTON,
-                  marginTop: 12, backgroundColor: C.hueDeep,
-                  opacity: pressed || moving ? 0.8 : 1,
-                })}
-              >
-                {/* THE PLAY MARK, and only on Start. It is the one glyph here that is not a
-                    picture of the word next to it — starting has a universal mark and
-                    "Approve" does not, which is why the arrow came off that one. */}
-                {moving
-                  ? <ActivityIndicator color={"#FFFFFF"} />
-                  : to === "working"
-                    ? <Ionicons name="play" size={HERO_GLYPH} color={"#FFFFFF"} />
-                    : null}
-                <Text style={{ ...HERO_LABEL, color: "#FFFFFF" }}>
-                  {stageAction(to)}
-                </Text>
-              </Pressable>
             ) : null
           )}
 
@@ -378,6 +382,29 @@ export default function OrderDetail() {
               SKU: an order number returns "Unknown SKU: 4149084185". So it was a barcode
               whose only possible outcome was an error, printed under a heading for a
               concept the floor does not have. */}
+
+
+          {/* ── THE LINES ──────────────────────────────────────────────────────────
+              Each with its own artwork, its own files and its own button. This is the
+              screen's centre of gravity: an order is not a piece count. */}
+          <Section title="ITEMS" right={sizeText} />
+          {items.length === 0 ? (
+            <Text style={{ fontSize: 15, color: C.muted, paddingVertical: 12 }}>This order has no lines on it.</Text>
+          ) : (
+            items.map((it, i) => (
+              <OrderLine
+                key={it.line_id || it.id || `${it.sku}-${i}`}
+                orderId={String(o.id)}
+                order={o}
+                item={it}
+                index={i}
+                designs={designs}
+                canWork={staff}
+                role={role}
+                onChanged={refresh}
+              />
+            ))
+          )}
 
           {/*
             * WHO IT IS FOR, AND WHERE IT GOES.
@@ -428,6 +455,50 @@ export default function OrderDetail() {
               </>
             )}
           </View>
+
+          {/*
+           * MONEY IS NOT A DETAIL.
+           *
+           * Cost and what the buyer paid were rows nine and ten of a list that opened with a
+           * raw enum — the same 14pt as the labels beside them, in a group called DETAILS, at
+           * the bottom of the screen. They are figures somebody reads and repeats, which §4
+           * sizes by what the text IS rather than by the row it sits in. Two tiles, and only
+           * the ones we actually have: a zero here is not "free", it is "not recorded", and
+           * the web omits rather than zeroes for the same reason.
+           *
+           * Cost sits first because it is OUR number. The phone carried only the buyer's for
+           * a long time, and on a manual order that is the one figure that is $0.00.
+           */}
+          {(o.cost != null || recordedRevenue(o) != null) && (
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 20 }}>
+              {o.cost != null && (
+                <View style={{
+                  flex: 1, backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.hairline,
+                  borderRadius: R.card, paddingHorizontal: 14, paddingVertical: 12,
+                }}>
+                  <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 1 }}>
+                    {o.cost_estimated ? "COST (EST.)" : "COST"}
+                  </Text>
+                  <Text style={{ fontSize: 22, fontFamily: F.bold, color: C.ink, marginTop: 3 }}>
+                    {usd2(Number(o.cost) || 0)}
+                  </Text>
+                </View>
+              )}
+              {recordedRevenue(o) != null && (
+                <View style={{
+                  flex: 1, backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.hairline,
+                  borderRadius: R.card, paddingHorizontal: 14, paddingVertical: 12,
+                }}>
+                  <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 1 }}>
+                    CUSTOMER PAID
+                  </Text>
+                  <Text style={{ fontSize: 22, fontFamily: F.bold, color: C.ink, marginTop: 3 }}>
+                    {usd2(recordedRevenue(o) ?? 0)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* ── TRACKING ───────────────────────────────────────────────────────── */}
           <Section title="SHIPPING" />
@@ -513,29 +584,6 @@ export default function OrderDetail() {
               </View>
             )}
           </View>
-
-          {/* ── THE LINES ──────────────────────────────────────────────────────────
-              Each with its own artwork, its own files and its own button. This is the
-              screen's centre of gravity: an order is not a piece count. */}
-          <Section title="ITEMS" right={sizeText} />
-          {items.length === 0 ? (
-            <Text style={{ fontSize: 15, color: C.muted, paddingVertical: 12 }}>This order has no lines on it.</Text>
-          ) : (
-            items.map((it, i) => (
-              <OrderLine
-                key={it.line_id || it.id || `${it.sku}-${i}`}
-                orderId={String(o.id)}
-                order={o}
-                item={it}
-                index={i}
-                designs={designs}
-                canWork={staff}
-                role={role}
-                onChanged={refresh}
-              />
-            ))
-          )}
-
           <Section title="DETAILS" />
           <View style={{
             ...SECTION_FLUSH, paddingBottom: 2,
@@ -544,24 +592,21 @@ export default function OrderDetail() {
                 spelling, `in_review` — six sections below a header that already names the
                 same thing properly. Two statuses on one screen, one of them in database
                 words, and the wrong one was the one a person could copy. */}
-            {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
+            {/* Ship by has moved into the header, beside the LATE chip it explains. */}
             {o.created_at ? <Row label="Placed" value={new Date(o.created_at).toLocaleDateString()} /> : null}
             {/* WHAT IT COSTS YOU, above what the buyer paid — the phone had only the second
                 one, and on a manual order that is $0.00, which is the one number it is not.
                 "Est." says the charge has not happened; the web board says the same thing by
                 weight, which it can and a Row cannot. Both are omitted rather than zeroed
                 when nothing is recorded: see revenueOf on the web. */}
-            {o.cost != null
-              ? <Row label={o.cost_estimated ? "Cost (est.)" : "Cost"} value={usd2(Number(o.cost) || 0)} />
-              : null}
-            {recordedRevenue(o) != null ? <Row label="Customer paid" value={usd2(recordedRevenue(o) ?? 0)} /> : null}
+            {/* The money has moved out of this list — see the two tiles above. */}
             {/* THE NUMBER, THEN THE MARKETPLACE. This printed the routing id verbatim —
                 `etsy-4152219958` — which is not what the buyer quotes, not what the seller's
                 Etsy dashboard shows, and not what support asks for. Same formatter the web
                 uses, out of shared/order-rules.ts, so the phone and the browser name an
                 order identically. */}
-            <Row label="Channel" value={platformOf(o)} />
-            {o.customer?.name ? <Row label="Buyer" value={o.customer.name} /> : null}
+            {/* Channel and Buyer have moved into the header line. What is left here is what
+                a person genuinely comes looking for rather than reads in passing. */}
             <Row label="Order id" value={orderRefLabel(String(o.id))} />
           </View>
 
@@ -576,6 +621,48 @@ export default function OrderDetail() {
                 : activity.slice().reverse().map((e) => <ActivityRow key={String(e.id)} e={e} />)}
           </View>
         </ScrollView>
+      ) : null}
+
+      {/*
+       * THE ACTION, PINNED.
+       *
+       * It was the first thing on the screen and therefore the first thing to scroll away —
+       * on an order with ten lines you read the whole job and then had to travel back up to
+       * act on it. A bar costs ~56pt permanently and buys the thing the screen exists for
+       * being reachable from anywhere in it.
+       *
+       * ONLY THE PLAIN ADVANCE. A shipment confirmation carries a camera step and a refusal
+       * carries its reason; both stay in the body, where there is room to read them. A bar
+       * that sometimes holds a button and sometimes holds a paragraph is not a bar.
+       */}
+      {o && pinnedAction && to ? (
+        <View style={{
+          position: "absolute", left: 0, right: 0, bottom: 0,
+          paddingHorizontal: 18, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 12),
+          backgroundColor: C.canvas, borderTopWidth: 1, borderTopColor: C.hairline,
+        }}>
+          <Pressable
+            onPress={advance}
+            disabled={moving}
+            style={({ pressed }) => ({
+              ...HERO_BUTTON,
+              marginTop: 0, backgroundColor: C.hueDeep,
+              opacity: pressed || moving ? 0.8 : 1,
+            })}
+          >
+            {/* THE PLAY MARK, and only on Start. It is the one glyph here that is not a
+                picture of the word next to it — starting has a universal mark and "Approve"
+                does not, which is why the arrow came off that one. */}
+            {moving
+              ? <ActivityIndicator color={"#FFFFFF"} />
+              : to === "working"
+                ? <Ionicons name="play" size={HERO_GLYPH} color={"#FFFFFF"} />
+                : null}
+            <Text style={{ ...HERO_LABEL, color: "#FFFFFF" }}>
+              {stageAction(to)}
+            </Text>
+          </Pressable>
+        </View>
       ) : null}
     </View>
   )
