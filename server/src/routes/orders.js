@@ -1301,6 +1301,16 @@ export function ordersRoutes(app, requireAuth) {
     // Object-storage URL for the artwork. When set, `data` is null — the bytes live in
     // storage, not Postgres. Readers take url ?? data.
     .then(() => q('alter table order_designs add column if not exists storage_key text'))
+    /**
+     * HOW THIS FACE IS DECORATED, and NULL means inherit the line's own method.
+     *
+     * A garment can be embroidered on the front and printed on the back, which one
+     * column on order_items cannot say. Null rather than a copy of the line's value is
+     * the same rule a product's ticked sides follow (CLAUDE.md §4): absent means
+     * inherit, set always means set — so changing the line still moves every face that
+     * never disagreed, and a face that did keeps disagreeing.
+     */
+    .then(() => q('alter table order_designs add column if not exists method text'))
     .then(() => q('create index if not exists order_designs_art_hash on order_designs (art_hash)'))
     // GET /api/orders joins design_ids for the per-line design number, so it must exist
     // before the first list request — not merely on the first upload that mints one.
@@ -3696,10 +3706,13 @@ export function ordersRoutes(app, requireAuth) {
       const to = lineMap.get(d.line_id || ('S:' + d.sku));
       if (!to) continue;
       const ok = await q(
-        `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+        /* `method` travels with the face. A duplicated order that kept the artwork and
+           dropped which face was embroidered would be a copy that quietly costs a different
+           amount and routes to a different bench. */
+        `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, method, updated_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
          on conflict do nothing`,
-        [newId, d.sku, to, d.kind, d.side, d.data, d.storage_key, d.name, d.pos, d.art_hash, d.art_phash]
+        [newId, d.sku, to, d.kind, d.side, d.data, d.storage_key, d.name, d.pos, d.art_hash, d.art_phash, d.method ?? null]
       ).then(() => true).catch(() => false);
       if (ok) art++;
     }
@@ -3746,6 +3759,10 @@ export function ordersRoutes(app, requireAuth) {
     // machine file may be reused, so a forged one would attach the wrong deliverable.
     // The perceptual hash is only ever a suggestion, so taking it from the client is fine.
     const artPhash = isPhash(req.body && req.body.phash) ? String(req.body.phash).toLowerCase() : null;
+    /* THE FACE'S OWN METHOD, or null for "same as the line". Stored verbatim in the same
+       label vocabulary order_items.print_type uses, so every reader that already normalises
+       one (methodCode in print-route.js, normTech on the client) reads the other unchanged. */
+    const method = String((req.body || {}).method || '').trim().slice(0, 40) || null;
     /**
      * BYTES OR A REFERENCE — and this route could not tell them apart.
      *
@@ -3830,14 +3847,18 @@ export function ordersRoutes(app, requireAuth) {
     const tplSpoken = rawTpl !== undefined && rawTpl !== null;
     const templateId = String(rawTpl || '').trim().slice(0, 64) || null;
     await q(
-      `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, template_id, updated_at)
-       values ($1,$2,$10,$3,$11,$4,$9,$5,$6,$7,$8,$12, now())
+      `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, template_id, method, updated_at)
+       values ($1,$2,$10,$3,$11,$4,$9,$5,$6,$7,$8,$12,$14, now())
        on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
+         /* SAME RULE AS template_id ABOVE, and for the same reason: a client that knows
+            nothing about per-face methods (the phone, an older web build) must not blank one
+            by saving a line for an unrelated reason. $14 null keeps what is recorded. */
+         method=coalesce($14, order_designs.method),
          art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash),
          /* $13 is "the caller spoke about templates at all" — see tplSpoken above. A save
             that says nothing keeps what is there; a save that says "" clears it. */
          template_id=(case when $13 then $12 else coalesce($12, order_designs.template_id) end), updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side, templateId, tplSpoken]
+      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side, templateId, tplSpoken, method]
     );
     // The artwork now has a number, minted on first sight of these exact bytes and reused
     // every time they turn up again — see design-id.js. Handed back so the uploader sees it
@@ -4547,7 +4568,7 @@ export function ordersRoutes(app, requireAuth) {
     for (const id of ids) { if (await canSeeOrder(req.user, id)) allowed.push(id); }
     if (!allowed.length) return {};
     const r = await q(
-      `select order_id, sku, line_id, kind, coalesce(side,'front') as side, data, storage_key,
+      `select order_id, sku, line_id, kind, coalesce(side,'front') as side, method, data, storage_key,
               art_hash, name, pos, template_id
          from order_designs where order_id = any($1::text[])`,
       [allowed]
@@ -4560,7 +4581,7 @@ export function ordersRoutes(app, requireAuth) {
       const url = designUrlOf(row);
       const designId = row.art_hash ? `D-${String(row.art_hash).slice(0, 8).toUpperCase()}` : null;
       (out[row.order_id] ||= []).push({
-        sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, name: row.name,
+        sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, method: row.method ?? null, name: row.name,
         pos: row.pos, data: url || row.data, url, design_id: designId,
         template_id: row.template_id || null,
       });
@@ -4581,7 +4602,7 @@ export function ordersRoutes(app, requireAuth) {
        Files list then printed one real reference and, beside it, whatever filename the image
        happened to arrive under. Same `design_ids` join as the list query above, so both
        screens name a picture identically. */
-    const r = await q(`select d.sku, d.line_id, d.kind, coalesce(d.side,'front') as side, d.data, d.storage_key,
+    const r = await q(`select d.sku, d.line_id, d.kind, coalesce(d.side,'front') as side, d.method, d.data, d.storage_key,
                               d.art_hash, d.name, d.pos, d.template_id, di.design_no
                          from order_designs d
                          left join design_ids di on di.art_hash = d.art_hash
@@ -4608,7 +4629,7 @@ export function ordersRoutes(app, requireAuth) {
          seller-specific — it names one of OUR placement recipes, so it travels to whoever
          can already see the order. Null for artwork somebody simply dropped, which is most
          of it. */
-      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, name: row.name, pos: row.pos, data: url || row.data, url, design_id: designId, template_id: row.template_id || null };
+      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, method: row.method ?? null, name: row.name, pos: row.pos, data: url || row.data, url, design_id: designId, template_id: row.template_id || null };
     });
   });
 

@@ -51,6 +51,104 @@ function ready() {
 
 const isStaff = (u) => !!u && u.role && u.role !== 'seller';
 
+/**
+ * A SHEET SAVED UNDER AN OLDER COLUMN LIST.
+ *
+ * `rows` is positional — the grid verbatim in CSV_COLUMNS order — so adding or dropping a
+ * column shifts every cell after it on every sheet already stored. Two such moves have
+ * happened, and both are undone here on the way out; the next save writes the row back in
+ * today's shape.
+ *
+ *   21 -> 20   Price was index 18 of 21 and was removed. Left as-is, a saved draft
+ *              reopened with the store name under Price's old heading.
+ *   20 -> 21   Placement was INSERTED at index 14 (2026-09-08). Left as-is, every cell
+ *              from Quantity rightwards reads one column to the left of where it belongs.
+ *
+ * WIDTH ALONE CANNOT TELL THEM APART — today's list is 21 wide, which is exactly what a
+ * pre-price sheet is — so `cols` decides and width only picks the step. A row written
+ * before that column existed has NULL, which is the one thing that reliably means "some
+ * older shape"; anything with a number was written by the code below and is left alone.
+ *
+ * NOT A DATE. `updated_at` was the obvious guard and it is wrong twice over: `complete`
+ * bumps it without rewriting a single cell, and `duplicate` copies rows into a brand-new
+ * row whose timestamp is today — so both would have stamped an old-shape sheet as new and
+ * served it one column out. `cols` travels WITH the rows through both.
+ *
+ * Checked against production before shipping: 11 sheets stored 21-wide, every one of them
+ * empty at indexes 18, 19 and 20 — so the price step is provably lossless on the data it
+ * actually runs against, rather than only in principle.
+ *
+ * Nothing is rewritten in the database. A completed sheet is the record of what was
+ * submitted, so it is read forward into today's columns and never edited in place.
+ *
+ * DELETE THIS once no sheet is left with a null `cols`.
+ */
+const CURRENT_WIDTH = 36;
+const PRICE_AT = 18;
+const PLACEMENT_WIDTH = 20;
+const PLACEMENT_AT = 14;
+/**
+ * 32 -> 36, AND IT MOVES A VALUE RATHER THAN DROPPING ONE.
+ *
+ * Type moved onto each placement (one garment, embroidered front, printed back), so the
+ * row-level 'Print Type' left the template and five 'Type N' cells arrived inside the
+ * blocks. Left alone, a saved draft would be read one column out from Colour rightwards
+ * — and worse than crooked, its method would be GONE: the importer's fallback reads the
+ * old column, and a stored row has no columns, only positions.
+ *
+ * So the old value is COPIED INTO ALL FIVE Type cells rather than discarded. That is what
+ * it meant — one method for every position on the row — said once per position instead of
+ * once per row. A Type cell in an unused block is ignored by the importer (a position with
+ * no placement, no artwork and no file is not a face), so filling all five is free.
+ *
+ * THE 21 -> 32 STEP WAS NEVER WRITTEN, and this does not add it. Placement blocks 2-5
+ * arrived without one, so a sheet still stored 21-wide has been read against a wider list
+ * since that day; it is a real gap and it is older than this change. Left visible here
+ * rather than papered over with a guess at a layout nobody recorded.
+ */
+const PRE_TYPE_WIDTH = 32;
+const PRE_TYPE_METHOD_AT = 12;              // 'Print Type', between Quantity and Colour
+const PRE_TYPE_BLOCKS = [15, 18, 21, 24, 27];  // each block's Placement cell, pre-removal
+const blank = (v) => !String(v ?? '').trim();
+export const migrate = (rows, cols) => {
+  if (!Array.isArray(rows)) return [];
+  // `cols < CURRENT_WIDTH` as well as null: a tab left open across the deploy autosaves
+  // 20-wide rows, and those are stamped with their real width rather than left null — so
+  // "has a number" is not the same as "is in today's shape".
+  if (cols != null && cols >= CURRENT_WIDTH) return rows;
+  return rows.map((x) => {
+    if (!Array.isArray(x)) return x;
+    // Length picks the step. Exact rather than `>=`: a row of some other width is not one
+    // this knows how to fix, and guessing at it would corrupt what it is trying to rescue.
+    //
+    // The price step also checks that the last three cells are EMPTY, which is the one
+    // thing that separates an old 21-wide row from a new one: today's list is 21 wide too,
+    // and its cells 18-20 are Size, Store Name and Internal Notes. Every 21-wide row in
+    // production is blank across all three (checked), so this never declines a real old
+    // row — and it can never eat a new row that has a size on it, which is the shape the
+    // web bundle writes if it goes live before the API does.
+    if (x.length === PRE_TYPE_WIDTH) {
+      const method = String(x[PRE_TYPE_METHOD_AT] ?? '').trim();
+      const out = [];
+      for (let i = 0; i < x.length; i++) {
+        if (i === PRE_TYPE_METHOD_AT) continue;            // the row-level column goes
+        out.push(x[i]);
+        if (PRE_TYPE_BLOCKS.includes(i)) out.push(method); // ...and lands on every position
+      }
+      return out;
+    }
+    const old21 = x.length === 21 && blank(x[18]) && blank(x[19]) && blank(x[20]);
+    const priced = old21 ? [...x.slice(0, PRICE_AT), ...x.slice(PRICE_AT + 1)] : x;
+    return priced.length === PLACEMENT_WIDTH
+      ? [...priced.slice(0, PLACEMENT_AT), '', ...priced.slice(PLACEMENT_AT)]
+      : priced;
+  });
+};
+
+/* AT MODULE SCOPE so server/scripts/check-sheet-migrate.mjs can RUN it against a real
+   pre-Type row instead of reading it. A positional migration is exactly the kind that
+   looks right and is off by one — the two steps above were both found that way. */
+
 export function orderSheetsRoutes(app, requireAuth) {
   // A team member acts as the owner, so a sheet started by one is visible to the others —
   // the same rule the wallet and the design library already follow.
@@ -74,67 +172,6 @@ export function orderSheetsRoutes(app, requireAuth) {
     return row.seller_id === (await owner(user)) ? row : null;
   }
 
-  /**
-   * A SHEET SAVED UNDER AN OLDER COLUMN LIST.
-   *
-   * `rows` is positional — the grid verbatim in CSV_COLUMNS order — so adding or dropping a
-   * column shifts every cell after it on every sheet already stored. Two such moves have
-   * happened, and both are undone here on the way out; the next save writes the row back in
-   * today's shape.
-   *
-   *   21 -> 20   Price was index 18 of 21 and was removed. Left as-is, a saved draft
-   *              reopened with the store name under Price's old heading.
-   *   20 -> 21   Placement was INSERTED at index 14 (2026-09-08). Left as-is, every cell
-   *              from Quantity rightwards reads one column to the left of where it belongs.
-   *
-   * WIDTH ALONE CANNOT TELL THEM APART — today's list is 21 wide, which is exactly what a
-   * pre-price sheet is — so `cols` decides and width only picks the step. A row written
-   * before that column existed has NULL, which is the one thing that reliably means "some
-   * older shape"; anything with a number was written by the code below and is left alone.
-   *
-   * NOT A DATE. `updated_at` was the obvious guard and it is wrong twice over: `complete`
-   * bumps it without rewriting a single cell, and `duplicate` copies rows into a brand-new
-   * row whose timestamp is today — so both would have stamped an old-shape sheet as new and
-   * served it one column out. `cols` travels WITH the rows through both.
-   *
-   * Checked against production before shipping: 11 sheets stored 21-wide, every one of them
-   * empty at indexes 18, 19 and 20 — so the price step is provably lossless on the data it
-   * actually runs against, rather than only in principle.
-   *
-   * Nothing is rewritten in the database. A completed sheet is the record of what was
-   * submitted, so it is read forward into today's columns and never edited in place.
-   *
-   * DELETE THIS once no sheet is left with a null `cols`.
-   */
-  const CURRENT_WIDTH = 21;
-  const PRICE_AT = 18;
-  const PLACEMENT_WIDTH = 20;
-  const PLACEMENT_AT = 14;
-  const blank = (v) => !String(v ?? '').trim();
-  const migrate = (rows, cols) => {
-    if (!Array.isArray(rows)) return [];
-    // `cols < CURRENT_WIDTH` as well as null: a tab left open across the deploy autosaves
-    // 20-wide rows, and those are stamped with their real width rather than left null — so
-    // "has a number" is not the same as "is in today's shape".
-    if (cols != null && cols >= CURRENT_WIDTH) return rows;
-    return rows.map((x) => {
-      if (!Array.isArray(x)) return x;
-      // Length picks the step. Exact rather than `>=`: a row of some other width is not one
-      // this knows how to fix, and guessing at it would corrupt what it is trying to rescue.
-      //
-      // The price step also checks that the last three cells are EMPTY, which is the one
-      // thing that separates an old 21-wide row from a new one: today's list is 21 wide too,
-      // and its cells 18-20 are Size, Store Name and Internal Notes. Every 21-wide row in
-      // production is blank across all three (checked), so this never declines a real old
-      // row — and it can never eat a new row that has a size on it, which is the shape the
-      // web bundle writes if it goes live before the API does.
-      const old21 = x.length === CURRENT_WIDTH && blank(x[18]) && blank(x[19]) && blank(x[20]);
-      const priced = old21 ? [...x.slice(0, PRICE_AT), ...x.slice(PRICE_AT + 1)] : x;
-      return priced.length === PLACEMENT_WIDTH
-        ? [...priced.slice(0, PLACEMENT_AT), '', ...priced.slice(PLACEMENT_AT)]
-        : priced;
-    });
-  };
 
   /** The width to record for what is about to be written — the widest row in it, and 0 for
    *  a sheet with nothing in it yet. Never NULL: null is reserved for "written before this

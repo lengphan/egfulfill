@@ -121,7 +121,6 @@ export const CSV_COLUMNS: CsvColumn[] = [
      has no machine to run on a DTG line, which is why those cells grey out). Having the
      column that governs them fifteen tracks to their right was backwards. */
   { header: "Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
-  { header: "Print Type", key: "print_type", required: false, section: "product", help: "Embroidery, DTG printing, Appliqué … Defaults to DTG printing if blank." },
   { header: "Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
   { header: "Size", key: "item_size", required: false, section: "product", help: "Garment size." },
   /**
@@ -148,18 +147,23 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * template, not from the parser.
    */
   { header: "Placement 1", key: "print_side", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Leave every placement blank and a template keeps the one it was drawn with, and a bare artwork goes on the front." },
+  { header: "Type 1", key: "print_method", required: false, section: "product", help: "HOW THIS POSITION IS DECORATED — Embroidery, DTG printing, Appliqué … It sits with the position and not with the garment, because one hoodie can be embroidered on the front and printed on the back. Leave it blank and it falls back to the row's Print Type column when the sheet is an older one that has it, and to DTG printing when it is not." },
   { header: "Artwork/Template 1", key: "hero_image", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: a template also carries the blank, and where several positions name one it is the FIRST that sets it — the rest contribute only their design." },
   { header: "Machine File 1", key: "machine_file_id", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Per POSITION, not per garment: a front logo and a back design are two different .EMB files. Embroidered lines only — there is no machine to run a stitch file on a DTG line, so a row that names one is rejected rather than charged for a file nothing can use." },
   { header: "Placement 2", key: "print_side_2", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 2 or more places." },
+  { header: "Type 2", key: "print_method_2", required: false, section: "product", help: "HOW THIS POSITION IS DECORATED. Only needed when this position uses a different method from the first — leave it blank and it inherits the same fallback position 1 does." },
   { header: "Artwork/Template 2", key: "artwork_2", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
   { header: "Machine File 2", key: "machine_file_id_2", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
   { header: "Placement 3", key: "print_side_3", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 3 or more places." },
+  { header: "Type 3", key: "print_method_3", required: false, section: "product", help: "HOW THIS POSITION IS DECORATED. Only needed when this position uses a different method from the first — leave it blank and it inherits the same fallback position 1 does." },
   { header: "Artwork/Template 3", key: "artwork_3", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
   { header: "Machine File 3", key: "machine_file_id_3", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
   { header: "Placement 4", key: "print_side_4", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 4 or more places." },
+  { header: "Type 4", key: "print_method_4", required: false, section: "product", help: "HOW THIS POSITION IS DECORATED. Only needed when this position uses a different method from the first — leave it blank and it inherits the same fallback position 1 does." },
   { header: "Artwork/Template 4", key: "artwork_4", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
   { header: "Machine File 4", key: "machine_file_id_4", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
   { header: "Placement 5", key: "print_side_5", required: false, section: "product", help: "WHERE ON THE GARMENT the design beside it goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. Only needed when the garment prints in 5 or more places." },
+  { header: "Type 5", key: "print_method_5", required: false, section: "product", help: "HOW THIS POSITION IS DECORATED. Only needed when this position uses a different method from the first — leave it blank and it inherits the same fallback position 1 does." },
   { header: "Artwork/Template 5", key: "artwork_5", required: false, section: "product", help: "THE DESIGN FOR THIS POSITION — EITHER a design from your library (IMG-30) or a URL, OR a saved template (TPL-12), which brings its own artwork. One or the other, not both: same rule as position 1." },
   { header: "Machine File 5", key: "machine_file_id_5", required: false, section: "product", help: "YOUR OWN STITCH FILE for this position, from Design Lab › Machine files (MF-12). Only needed when this position is embroidered with its own file." },
   // ── EXTRAS ────────────────────────────────────────────────────────────────
@@ -342,7 +346,16 @@ export const COLUMN_OPTIONS: Record<string, string[]> = {
    * spreadsheet knows that APL is Appliqué. `label` is the same row of the same table, and
    * methodCode() on the server matches it back by regex, so both spellings import.
    */
+  /* Still offered for a sheet that carries the old row-level column. */
   print_type: PRODUCT_METHODS.map((m) => m.label),
+  /* The SAME list on all five positions, for the reason the placements give below: a method
+     is a method whichever slot it sits in, and a second vocabulary is what §4's faces rule
+     forbids. */
+  print_method: PRODUCT_METHODS.map((m) => m.label),
+  print_method_2: PRODUCT_METHODS.map((m) => m.label),
+  print_method_3: PRODUCT_METHODS.map((m) => m.label),
+  print_method_4: PRODUCT_METHODS.map((m) => m.label),
+  print_method_5: PRODUCT_METHODS.map((m) => m.label),
   print_side: SIDE_OPTIONS,
   /* The other four placements offer the SAME list — a face is a face whichever slot it
      sits in, and a second opinion about the vocabulary is exactly what §4's faces rule
@@ -414,7 +427,25 @@ const COL_ALIASES: Record<string, string[]> = {
      data the file already contains. `shipping_service` and `sales_channel` below have been
      column-less aliases for the same reason for as long as this file has existed. */
   item_price: ["item_price", "price", "unit_price", "lineitem_price", "line_item_price", "product_price"],
-  print_type: ["print_type", "print", "method", "technique", "print_method", "decoration"],
+  /**
+   * THE ROW-LEVEL METHOD IS A FALLBACK NOW, NOT A COLUMN.
+   *
+   * It left the template when Type moved onto each placement (one garment can be embroidered
+   * on the front and printed on the back, and one cell per row cannot say that). It stays
+   * HERE because every sheet already sitting in a seller's Downloads folder has it, and a
+   * column dropped from the template is not a column dropped from the files people hold —
+   * the same reason "Blank SKU" is still read. An old sheet's single value becomes the
+   * fallback for every placement, which imports to exactly what it imports to today.
+   */
+  print_type: ["print_type", "print", "method", "technique", "decoration"],
+  /* Per position. "print_method" was an alias of the row-level column and is now the KEY of
+     position 1, so it must not appear in the list above — a spelling claimed by two keys
+     resolves to whichever is tried first, which is not a thing to leave to iteration order. */
+  print_method: ["print_method", "type", "type_1", "print_type_1", "method_1", "technique_1", "decoration_1"],
+  print_method_2: ["print_method_2", "type_2", "print_type_2", "method_2"],
+  print_method_3: ["print_method_3", "type_3", "print_type_3", "method_3"],
+  print_method_4: ["print_method_4", "type_4", "print_type_4", "method_4"],
+  print_method_5: ["print_method_5", "type_5", "print_type_5", "method_5"],
   item_color: ["item_color", "color", "colour", "variant_color"],
   item_size: ["item_size", "size", "variant_size"],
   /** The same thing as Artwork ID, under the spellings a seller's own export uses. It has
@@ -748,23 +779,43 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
      * on a blank row is refused exactly like one on a DTG row — it just is not the filler's
      * doing, so the message names the default instead of a method they never typed.
      */
+    /**
+     * ASKED PER POSITION, WHICH IS THE SCALE IT WAS ALWAYS ABOUT.
+     *
+     * This read ONE method for the row and judged all five files against it, so a garment
+     * embroidered on the front and printed on the back could not be expressed correctly in
+     * either direction: call the row Embroidery and the stitch file on the DTG back is
+     * waved through to a server that will refuse it; call it DTG and the legitimate file on
+     * the embroidered front is condemned. Type now sits on the position, so the question
+     * each file actually poses — "is THIS surface stitched?" — is the one being asked.
+     *
+     * Still a WARNING and not an error, for the reason it always was: the row still makes a
+     * garment, and refusing the whole thing over a file that simply will not be attached is
+     * the harsher mistake.
+     */
     if (rec._valid) {
-      const method = S(rec.print_type).trim()
-      if (!/emb|stitch|embroid/i.test(method)) {
-        const named = [
-          ["Machine File 1", S(rec.machine_file_id)],
-          ["Machine File 2", S(rec.machine_file_id_2)],
-          ["Machine File 3", S(rec.machine_file_id_3)],
-          ["Machine File 4", S(rec.machine_file_id_4)],
-          ["Machine File 5", S(rec.machine_file_id_5)],
-        ].filter(([, v]) => v)
-        // NAMED, because with five slots "a stitch file was ignored" does not say which.
-        if (named.length) {
-          const which = named.map(([k]) => k).join(", ")
-          warn.push(methodWasBlank
-            ? `${which} named, but Print Type is blank — a blank row imports as DTG printing, so the stitch file will not be attached. Set Print Type to Embroidery.`
-            : `${which} on a ${method} row — a stitch file has no machine to run on, so it will not be attached`)
-        }
+      const positions: [string, string, string][] = [
+        ["Machine File 1", S(rec.machine_file_id), S(rec.print_method)],
+        ["Machine File 2", S(rec.machine_file_id_2), S(rec.print_method_2)],
+        ["Machine File 3", S(rec.machine_file_id_3), S(rec.print_method_3)],
+        ["Machine File 4", S(rec.machine_file_id_4), S(rec.print_method_4)],
+        ["Machine File 5", S(rec.machine_file_id_5), S(rec.print_method_5)],
+      ]
+      for (const [label, file, own] of positions) {
+        if (!file) continue
+        // The same fallback the position itself resolves through, so the warning is about
+        // the method that will actually be stored rather than about an empty cell.
+        const method = own || S(rec.print_type)
+        if (/emb|stitch|embroid/i.test(method)) continue
+        /* WHICH FALLBACK ANSWERED changes what the filler has to go and do, so the message
+           says. A method they typed is theirs to correct; the DTG default is one they never
+           chose, and telling them to "change Embroidery" when they wrote nothing at all is
+           the confusion the old message was already careful to avoid. */
+        warn.push(own
+          ? `${label} on a ${method} position — a stitch file has no machine to run on, so it will not be attached`
+          : methodWasBlank
+            ? `${label} named, but its Type is blank — a position with no Type imports as DTG printing, so the stitch file will not be attached. Set Type to Embroidery.`
+            : `${label} named, but its Type is blank, so it falls back to the row's ${method} — a stitch file has no machine to run on. Set that position's Type to Embroidery.`)
       }
     }
     rec._warnings = warn.join("; ")
@@ -815,7 +866,7 @@ export type ImportItem = {
    * column because a stitch file is not a design — a front logo and a back design are two
    * different .EMB files, which is why the server's attach carries a side now.
    */
-  sides?: { side: string; artwork: string; templateId: string; machineFileId: string }[]
+  sides?: { side: string; artwork: string; templateId: string; machineFileId: string; method: string }[]
   /**
    * Filled by applyTemplates, read by the order write — placement, and the other faces.
    *
@@ -973,8 +1024,8 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
            * sheet built the new way has no Line column, so `lineRows` is always length 1.
            */
           const seen = new Set<string>()
-          const out: { side: string; artwork: string; templateId: string; machineFileId: string }[] = []
-          const add = (rawSide: string, ref: string, mfRef: string) => {
+          const out: { side: string; artwork: string; templateId: string; machineFileId: string; method: string }[] = []
+          const add = (rawSide: string, ref: string, mfRef: string, rawMethod: string) => {
             /* ONE CELL, TWO READINGS. A TPL- reference names a template (which brings its
                own artwork); anything else is the artwork itself. See looksLikeTemplate for
                why this asks for the prefix rather than assuming. */
@@ -990,16 +1041,25 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
             // face would otherwise lose its design entirely.
             if (seen.has(key)) return
             seen.add(key)
-            out.push({ side: key, artwork: url(rawArt), templateId, machineFileId: mfRef })
+            /* THE POSITION'S OWN METHOD, ELSE THE ROW'S — and `r.print_type` is never empty
+               here, because a row with no method at all was defaulted to DTG above. So the
+               chain is: this position said so > the sheet's old row-level column said so >
+               the default. Normalised to a LABEL, the same shape the row-level value carries,
+               so nothing downstream has to know which of the three answered. */
+            const method = normalizeMethods([String(rawMethod || "").trim()])[0]?.label
+              || String(rawMethod || "").trim()
+              || S(r.print_type)
+            out.push({ side: key, artwork: url(rawArt), templateId, machineFileId: mfRef, method })
           }
-          add(S(r.print_side), S(r.design_file_url) || S(r.hero_image), S(r.machine_file_id))
-          add(S(r.print_side_2), S(r.artwork_2), S(r.machine_file_id_2))
-          add(S(r.print_side_3), S(r.artwork_3), S(r.machine_file_id_3))
-          add(S(r.print_side_4), S(r.artwork_4), S(r.machine_file_id_4))
-          add(S(r.print_side_5), S(r.artwork_5), S(r.machine_file_id_5))
-          // The legacy shape: extra ROWS joined by a Line key, each carrying one face.
+          add(S(r.print_side), S(r.design_file_url) || S(r.hero_image), S(r.machine_file_id), S(r.print_method))
+          add(S(r.print_side_2), S(r.artwork_2), S(r.machine_file_id_2), S(r.print_method_2))
+          add(S(r.print_side_3), S(r.artwork_3), S(r.machine_file_id_3), S(r.print_method_3))
+          add(S(r.print_side_4), S(r.artwork_4), S(r.machine_file_id_4), S(r.print_method_4))
+          add(S(r.print_side_5), S(r.artwork_5), S(r.machine_file_id_5), S(r.print_method_5))
+          // The legacy shape: extra ROWS joined by a Line key, each carrying one face. Those
+          // sheets predate per-position Type entirely, so every face takes the row's method.
           for (const row of lineRows.slice(1)) {
-            add(S(row.print_side), S(row.design_file_url) || S(row.hero_image), S(row.machine_file_id))
+            add(S(row.print_side), S(row.design_file_url) || S(row.hero_image), S(row.machine_file_id), S(row.print_method))
           }
           /* ONE position is not a multi-face line — leave it undefined so a plain order keeps
              the existing designUrl/printSide path and nothing about a one-face import changes

@@ -106,11 +106,16 @@ const optLabel = (o: Opt) => (typeof o === "string" ? o : o.label)
  */
 const QTY_OPTIONS = Array.from({ length: 20 }, (_, i) => String(i + 1))
 
+/** The five Type cells, in block order — one per placement. */
+const METHOD_KEYS = ["print_method", "print_method_2", "print_method_3", "print_method_4", "print_method_5"]
+
 const FIXED_OPTIONS: Record<string, string[]> = {
   item_quantity: QTY_OPTIONS,
   item_size: ITEM_SIZES,
   ship_state: US_STATES,
-  print_type: COLUMN_OPTIONS.print_type ?? [],
+  /* One entry per position. They all offer the same list — a method is a method whichever
+     block it sits in — and optionsFor narrows each to what the row's blank actually does. */
+  ...Object.fromEntries(METHOD_KEYS.map((k) => [k, COLUMN_OPTIONS[k] ?? []])),
   /* All eight faces, for a row that has not named a product yet. Once it has, optionsFor
      narrows this to the faces that garment's TYPE actually has — a beanie has no sleeve. */
   print_side: SIDE_OPTIONS,
@@ -128,6 +133,8 @@ const IDX = Object.fromEntries(CSV_COLUMNS.map((c, i) => [c.key, i])) as Record<
 
 /** The five Machine File columns, by key. One list, so a cell and its warning cannot disagree. */
 const MACHINE_FILE_KEYS = ["machine_file_id", "machine_file_id_2", "machine_file_id_3", "machine_file_id_4", "machine_file_id_5"]
+/** Each Machine File cell is governed by the Type cell in its own block. */
+const METHOD_FOR = Object.fromEntries(MACHINE_FILE_KEYS.map((k, i) => [k, METHOD_KEYS[i]])) as Record<string, string>
 
 /**
  * IS A STITCH FILE OF ANY USE ON THIS ROW?
@@ -151,8 +158,12 @@ const MACHINE_FILE_KEYS = ["machine_file_id", "machine_file_id_2", "machine_file
  * So the cell greys only on a method we can read that ISN'T embroidery, and the warning
  * catches the blank case a moment later. Do not "fix" this into agreement.
  */
-const stitchDeadOn = (row: string[]) => {
-  const m = String(row[IDX.print_type] ?? "").trim()
+/* ASKED OF ONE POSITION, because that is the scale a stitch file belongs to. It used to read
+   the row's single Print Type, so on a garment embroidered at the front and printed at the
+   back it greyed BOTH file cells or NEITHER — and the legitimate file on the front was the
+   one it got wrong. `methodKey` is that position's own Type cell. */
+const stitchDeadOn = (row: string[], methodKey: string) => {
+  const m = String(row[IDX[methodKey]] ?? "").trim()
   return !!m && !/emb|stitch|embroid/i.test(m)
 }
 
@@ -710,7 +721,10 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
          by both the `dependent` check and the branch below — writing the list twice is how the
          2nd..5th would have quietly kept offering all eight faces for a cap. */
       const isPlacement = colKey === "print_side" || /^print_side_[2-5]$/.test(colKey)
-      const dependent = colKey === "item_color" || colKey === "item_size" || colKey === "print_type" || isPlacement
+      /* Same reasoning as isPlacement directly above: EVERY Type column narrows to what the
+         chosen blank can actually be decorated with, not just the first. */
+      const isMethod = METHOD_KEYS.includes(colKey)
+      const dependent = colKey === "item_color" || colKey === "item_size" || isMethod || isPlacement
       if (!dependent) return FIXED_OPTIONS[colKey] ?? null
       // resolveProduct, not a private name match — it is the canonical matcher and it is what
       // knows the cell may be "SKU - Name" (CLAUDE.md §5: import, don't re-implement). A
@@ -841,7 +855,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         if (cols.includes(IDX.blank) && next[r][IDX.blank] !== src[cLo + ((IDX.blank - tLo) % width + width) % width]) {
           next[r][IDX.item_color] = ""
           next[r][IDX.item_size] = ""
-          next[r][IDX.print_type] = ""
+          for (const k of METHOD_KEYS) next[r][IDX[k]] = ""
           /* ALL FIVE placements, not just the first — a row that now names a beanie must
              not keep a sleeve in its 3rd slot any more than in its 1st. */
           for (const k of ["print_side", "print_side_2", "print_side_3", "print_side_4", "print_side_5"] as const) {
@@ -960,7 +974,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
       if (c === IDX.blank && prev[r][c] !== v) {
         next[r][IDX.item_color] = ""
         next[r][IDX.item_size] = ""
-        next[r][IDX.print_type] = ""
+        for (const k of METHOD_KEYS) next[r][IDX[k]] = ""
         /* A face is as much a property of the garment as a size is — a sleeve placement
            left behind on a row that now names a beanie is a value its dropdown no longer
            offers, which is the exact thing this block exists to clear. */
@@ -1444,14 +1458,15 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                        Machine File before the Print Type. So the cell says it is pointless
                        and still accepts what you put there — validation then warns, and the
                        server has the final word against the saved line. */
-                    const inert = MACHINE_FILE_KEYS.includes(col.key) && stitchDeadOn(row)
+                    const methodKey = METHOD_FOR[col.key]
+                    const inert = !!methodKey && stitchDeadOn(row, methodKey)
                     return (
                       <td
                         key={col.key}
                         /* `relative` so the handle can sit on the cell's own corner, and
                            `group` so it can appear on hover as well as on focus — a sheet
                            shows you the grip before you have committed to the cell. */
-                        title={inert ? `This row is ${row[IDX.print_type]}, so a stitch file has nothing to run on — it will not be attached.` : undefined}
+                        title={inert ? `This position is ${row[IDX[methodKey]]}, so a stitch file has nothing to run on — it will not be attached.` : undefined}
                         className={`group relative border-b border-l border-border p-0 ${missing ? "bg-destructive/10" : ""}${inert ? " bg-muted/60" : ""}`}
                       >
                         <input
