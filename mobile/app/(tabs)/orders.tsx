@@ -465,6 +465,7 @@ export default function Orders() {
           renderItem={({ item }) => (
             <OrderRow
               order={item}
+              staff={staff}
               selecting={selecting}
               selected={picked.includes(item.id)}
               onPress={() => (selecting ? toggle(item.id) : router.push(`/order/${encodeURIComponent(item.id)}`))}

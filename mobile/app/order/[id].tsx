@@ -10,12 +10,14 @@ import {
 import {
   normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines, PIPELINE,
   STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder, recordedRevenue, heldFromOf,
+  statusFor,
 } from "@/lib/orders"
-import { F, C, R, S, TYPE, SECTION, toneOf, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
+import { F, C, R, S, TYPE, SECTION, toneOf, HERO_BUTTON, HERO_LABEL, HERO_GLYPH, STATUS_REGISTER } from "@/lib/theme"
 import { AuraCard } from "@/components/kit"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
+import { usd2 } from "@/lib/num"
 import { recall } from "@/lib/order-cache"
 import { printOrderLabel, printWasCancelled } from "@/lib/print-label"
 
@@ -198,10 +200,14 @@ export default function OrderDetail() {
   const code = o?.tracking ?? null
   const link = trackingLink(o?.carrier, code)
   const stage = normalizeStage(o?.factory_status)
-  /* The header is the INK block, so the pill takes the on-ink pair. */
-  const tone = toneOf(stage)
   const role = me?.role ?? ""
   const staff = !!role && role !== "seller"
+  /* THE WORDS THIS READER GETS — the factory ladder for staff, the collapsed lifecycle for
+     a seller. One function decides, shared with the queue and with the browser, so an order
+     is never named one thing on a list and another on the screen it opens. The progress
+     segments below still draw the FACTORY pipeline: a seller sees how far along it is
+     without being told the name of each internal step. */
+  const status = o ? statusFor(o, staff) : { label: "", register: "live" as const }
   const to = o ? nextStage(o) : null
   /**
    * WHETHER THIS PERSON MAY MAKE THIS MOVE — asked before the button is drawn, not after
@@ -291,8 +297,8 @@ export default function OrderDetail() {
                   measured that vocabulary and retired it: 16 of its 36 pairs sat under the
                   0.150 OKLab separation floor. Weight and a rule carry it now, and both
                   survive a bad screen. */}
-              <Text style={{ fontSize: 13, letterSpacing: 0.2, ...tone }}>
-                {STAGE_LABEL[stage] ?? stage}
+              <Text style={{ fontSize: 13, letterSpacing: 0.2, ...STATUS_REGISTER[status.register] }}>
+                {status.label}
               </Text>
               <View style={{ flex: 1 }} />
               {/* The two chips stay in the header, and only these two: they are the only
@@ -534,7 +540,10 @@ export default function OrderDetail() {
           <View style={{
             ...SECTION_FLUSH, paddingBottom: 2,
           }}>
-            {o.status ? <Row label="Status" value={String(o.status)} /> : null}
+            {/* THE RAW STATUS ROW IS GONE. It printed `o.status` unmapped — the stored
+                spelling, `in_review` — six sections below a header that already names the
+                same thing properly. Two statuses on one screen, one of them in database
+                words, and the wrong one was the one a person could copy. */}
             {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
             {o.created_at ? <Row label="Placed" value={new Date(o.created_at).toLocaleDateString()} /> : null}
             {/* WHAT IT COSTS YOU, above what the buyer paid — the phone had only the second
@@ -543,9 +552,9 @@ export default function OrderDetail() {
                 weight, which it can and a Row cannot. Both are omitted rather than zeroed
                 when nothing is recorded: see revenueOf on the web. */}
             {o.cost != null
-              ? <Row label={o.cost_estimated ? "Cost (est.)" : "Cost"} value={`$${(Number(o.cost) || 0).toFixed(2)}`} />
+              ? <Row label={o.cost_estimated ? "Cost (est.)" : "Cost"} value={usd2(Number(o.cost) || 0)} />
               : null}
-            {recordedRevenue(o) != null ? <Row label="Customer paid" value={`$${(recordedRevenue(o) ?? 0).toFixed(2)}`} /> : null}
+            {recordedRevenue(o) != null ? <Row label="Customer paid" value={usd2(recordedRevenue(o) ?? 0)} /> : null}
             {/* THE NUMBER, THEN THE MARKETPLACE. This printed the routing id verbatim —
                 `etsy-4152219958` — which is not what the buyer quotes, not what the seller's
                 Etsy dashboard shows, and not what support asks for. Same formatter the web

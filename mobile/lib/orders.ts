@@ -1,4 +1,6 @@
 import type { Order } from "./api"
+import { registerOf } from "./theme"
+import { sellerStatus } from "@shared/order-status"
 import {
   PIPELINE, STAGE_LABEL, normalizeStage, isOpenStage, isException,
   nextStage as nextStageOn, stageDenialReason, canSetStage, isFactoryOrder, heldFromOf,
@@ -26,6 +28,36 @@ import {
 export {
   PIPELINE, STAGE_LABEL, normalizeStage, isException, stageDenialReason, canSetStage, heldFromOf,
   isFactoryOrder, plainNum, recordedRevenue,
+}
+
+/**
+ * THE SELLER'S WORDS FOR THE SAME ORDER.
+ *
+ * Two vocabularies exist and both are correct: the factory climbs New -> Pending -> Approved
+ * -> Working -> Shipped, and the seller sees those collapsed to Draft / Pending / In Process
+ * / Fulfilled. The collapse is a product decision, not a simplification for small screens —
+ * the factory's sub-steps are not the seller's business.
+ *
+ * The phone had only the factory ladder, so a seller reading their own order here saw
+ * "Working" and "Approved", words the web deliberately never shows them. It now reads the
+ * same definition the browser does.
+ */
+export { matchesFilter, SELLER_FILTERS } from "@shared/order-status"
+export { sellerStatus }
+export type { SellerStatus, SellerGroup, SellerFilter, StatusRegister } from "@shared/order-status"
+
+/**
+ * WHICH WORDS THIS READER GETS, and the one place that decides it.
+ *
+ * Passing a role into every row and branching there is how two surfaces start disagreeing
+ * about who sees what. One function: staff get the stage they act on, a seller gets the
+ * lifecycle they own. `register` comes back either way, so the caller paints identically
+ * and never needs to know which vocabulary it received.
+ */
+export function statusFor(o: Order, staff: boolean): { label: string; register: "live" | "settled" | "attention" } {
+  if (!staff) { const s = sellerStatus(o); return { label: s.label, register: s.register } }
+  const stage = normalizeStage(o.factory_status)
+  return { label: STAGE_LABEL[stage] ?? stage, register: registerOf(stage) }
 }
 /** The stage as a person reads it. Raw ids ("working", "in_review") were being printed
  *  straight onto rows, which is why the phone and the boards disagreed on wording. */

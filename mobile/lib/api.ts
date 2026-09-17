@@ -151,6 +151,10 @@ export type OrderItem = {
   factory_status?: string | null
   /** Artwork the seller supplied as a URL, rather than bytes we stored. */
   design_src?: string | null
+  /** Server-computed: does this line have ARTWORK — an order_designs row of an artwork kind,
+   *  or the buyer's own upload. Absent from an older API, and the caller must treat absent
+   *  as "ask the old way" rather than as false. */
+  has_art?: boolean
 }
 
 /**

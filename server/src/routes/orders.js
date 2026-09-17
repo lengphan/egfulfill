@@ -1921,6 +1921,32 @@ export function ordersRoutes(app, requireAuth) {
           'blank', i.blank, 'print_type', i.print_type, 'line_id', i.line_id,
           'factory_status', i.factory_status, 'unit_price', i.unit_price,
           'design_src', i.design_src, 'threads', i.threads,
+          -- DOES THIS LINE HAVE ARTWORK? The one question the queue kept answering wrong.
+          -- The phone's row asked design_src alone -- which is the BUYER's upload off the
+          -- marketplace -- while lineArt() (mobile/lib/orders.ts, and the detail screen that
+          -- uses it) reads order_designs FIRST and falls back to design_src. So a line with
+          -- a file attached by a designer read "no artwork" on the list and showed the file
+          -- when opened. Answering it here means the list and the detail screen cannot
+          -- disagree, and the list does not have to carry every design row to do it.
+          --
+          -- The kind filter mirrors isArtwork() exactly: 'raster' (the default), 'print' and
+          -- 'image' are artwork; a .pes/.emb is a machine file and has_machine_file already
+          -- reports those separately. The line-match predicate is deliberately the same one
+          -- the dz lateral above uses, INCLUDING the legacy sku-holds-the-line-id case --
+          -- change one and change both, or a line's artwork becomes visible to the name and
+          -- invisible to this flag.
+          -- (No backticks in here: this whole query is a JS template literal, and one ends it.)
+          'has_art', (
+            coalesce(i.design_src,'') <> ''
+            or exists (
+              select 1 from order_designs d
+               where d.order_id = i.order_id
+                 and d.kind in ('raster','print','image')
+                 and (
+                   (d.line_id is not null and d.line_id = i.line_id)
+                   or (d.line_id is null and (d.sku = i.sku or d.sku = i.line_id))
+                 ))
+          ),
           'personalization', i.personalization, 'created_at', i.created_at,
           -- What the artwork on this line is called, and its automatic number (DSN-1042).
           -- Both travel on the LIST because searching by design is the point: a name that
