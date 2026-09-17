@@ -23,16 +23,44 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import vm from 'node:vm'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SRC = readFileSync(join(ROOT, 'extension/src/parse.js'), 'utf8')
 
-/* Load it exactly as Chrome does: a CLASSIC script that publishes onto a global. If an
-   `export` ever creeps back in, this throws here — which is the whole point, because Chrome
-   drops such a file silently and the symptom appears three files away. */
-const globalThisShim = {}
-new Function('globalThis', SRC)(globalThisShim)
-const { extractOrders, extractReceipts, isUsable } = globalThisShim.EG_PARSE || {}
+/**
+ * LOAD IT EXACTLY AS CHROME DOES, WHICH IS TWICE INTO ONE GLOBAL.
+ *
+ * `new Function('globalThis', SRC)(shim)` was wrong in a way that hid a real bug for a whole
+ * release. It hands the file a FRESH FUNCTION SCOPE on every call, so a top-level `const`
+ * could be re-declared for ever and nothing ever complained here.
+ *
+ * Chrome does not do that. `chrome.scripting.executeScript({files})` evaluates the file at the
+ * TOP LEVEL of the page's isolated world, and that world SURVIVES between injections — so the
+ * second injection of a file declaring `const STATES` threw
+ *
+ *     Uncaught SyntaxError: Identifier 'STATES' has already been declared
+ *
+ * which fails the whole file, leaving EG_PARSE on whatever the FIRST injection set. A tab kept
+ * answering with a parser from before the extension was updated, while the popup showed the
+ * new build number — because the popup is a fresh document and the injected world is not.
+ *
+ * `vm.runInContext` on ONE context, run twice, is that situation. If parse.js ever grows a
+ * top-level declaration again, the second run throws and this gate fails at load.
+ */
+const ctx = vm.createContext({ console })
+ctx.globalThis = ctx
+vm.runInContext(SRC, ctx, { filename: 'parse.js (first injection)' })
+try {
+  vm.runInContext(SRC, ctx, { filename: 'parse.js (second injection)' })
+} catch (e) {
+  console.error('FAIL  parse.js cannot be injected twice into one world:', e.message)
+  console.error('      Chrome re-injects on every popup open. A top-level const or function')
+  console.error('      declaration fails the whole file and freezes EG_PARSE on the old code.')
+  console.error('      Keep the body inside the IIFE at the top of parse.js.')
+  process.exit(1)
+}
+const { extractOrders, extractReceipts, isUsable } = ctx.EG_PARSE || {}
 if (typeof extractOrders !== 'function' || typeof extractReceipts !== 'function') {
   console.error('FAIL  parse.js did not publish EG_PARSE.extractOrders + extractReceipts')
   process.exit(1)

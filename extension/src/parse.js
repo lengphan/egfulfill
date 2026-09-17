@@ -28,6 +28,32 @@
  * "found 0 on a page with 20 orders" rather than as nothing happening.
  */
 
+/*
+ * WRAPPED, AND THAT IS NOT STYLE — IT IS WHAT MAKES RE-INJECTION WORK.
+ *
+ * popup.js injects this file with chrome.scripting.executeScript EVERY time the popup opens,
+ * deliberately, so the code that runs is always the code on disk. But an injected file is
+ * evaluated at the TOP LEVEL of the page's isolated world, and that world SURVIVES between
+ * injections. A top-level `const STATES` therefore threw
+ *
+ *     Uncaught SyntaxError: Identifier 'STATES' has already been declared
+ *
+ * on the second and every later injection — which fails the ENTIRE file, so `EG_PARSE` kept
+ * whatever the FIRST injection had set. The tab went on answering with a parser from before
+ * the extension was updated, for as long as that tab stayed open.
+ *
+ * That is a silent stale-code bug with a loud symptom somewhere else: an extension reloaded
+ * to a new version, its popup showing the new build number (the popup IS a fresh document),
+ * and the page still being read by the old parser. Here it looked like "the item reader finds
+ * nothing" and cost a round of chasing selectors that were never the problem.
+ *
+ * Inside a function scope nothing is declared on the world's global, so every injection
+ * re-evaluates cleanly and overwrites EG_PARSE with the current code. The gate asserts this
+ * by running the file TWICE in one vm context, which is how Chrome does it — `new Function`
+ * hands out a fresh scope each call and cannot see the fault.
+ */
+;(() => {
+
 /** US state codes — used to find where a city/state/zip line is inside free text. */
 const STATES = new Set([
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA',
@@ -658,3 +684,5 @@ function extractReceipts(doc, wanted) {
  * position that cannot rot.
  */
 globalThis.EG_PARSE = { extractOrders, extractReceipts, isUsable }
+
+})()

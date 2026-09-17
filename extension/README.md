@@ -65,6 +65,16 @@ INJECTED ON DEMAND rather than declared as a content script, so nothing of ours 
 on an Etsy page until the moment you open the popup and ask — and the code that runs is
 always the code on disk, never a copy Chrome injected before the last reload.
 
+**That claim was false for a release, and the way it failed is worth keeping.** An injected
+file is evaluated at the top level of the page's isolated world, and that world SURVIVES
+between injections — so `const STATES` at the top of `parse.js` threw *"Identifier 'STATES'
+has already been declared"* on the second injection, which fails the WHOLE file and leaves
+`EG_PARSE` on whatever the first injection set. A tab went on being read by a parser from
+before the extension was updated, while the popup showed the new build number, because the
+popup is a fresh document and the injected world is not. `parse.js` is wrapped in an IIFE for
+exactly this reason, and `tools/check-extension-parse.mjs` runs it twice in one vm context so
+a top-level declaration fails the gate instead of a seller's page.
+
 ## Install (unpacked, for testing)
 
 1. `chrome://extensions` → turn on **Developer mode** (top right)
