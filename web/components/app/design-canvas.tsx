@@ -1252,6 +1252,21 @@ export function DesignCanvasDialog({
    */
  const zone = printZoneOf(product, sideName)
  const areaIn = printSizeOf(product, sideName)
+ /**
+  * IS THE PRINTABLE RECTANGLE ALREADY ON SCREEN? — mirrors the `printZone` prop handed to
+  * DesignStage below, and exists so the empty-state prompt can stop drawing a SECOND one.
+  *
+  * The two dashed outlines said different things and read as one confused idea: the
+  * rectangle is the production FACT (everything outside it is trimmed), while the prompt's
+  * own box was chrome around an icon. Nested, they look like two competing print areas —
+  * the same complaint the drag-over highlight already earned once, noted further down this
+  * file ("two competing dashed rectangles").
+  *
+  * So the guide sits INSIDE the zone instead of beside it. With no zone — a seller's own
+  * photo, which we did not calibrate — the prompt keeps its box, because then it is the
+  * only thing on the stage saying where artwork will land.
+  */
+ const showsPrintZone = !!zone && !ownMockups[sideKey]
   // One src, measured once and cached by content. Unconditional — hooks may not be skipped
   // just because a face happens to be empty.
  const natural = useNaturalSizes(designUrl ? [designUrl] : [])
@@ -3162,8 +3177,11 @@ export function DesignCanvasDialog({
               {/* Same %-geometry the artwork itself uses, so this is a preview of the
  placement rather than a decorative box that happens to be centred. */}
               <span
- className={"pointer-events-none absolute flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-3 text-center transition-colors " +
-                  (over ? "border-primary bg-primary/10 text-foreground" : "border-muted-foreground/35 bg-background/60 text-muted-foreground")}
+ className={"pointer-events-none absolute flex flex-col items-center justify-center gap-1.5 rounded-xl px-3 text-center transition-colors "
+                  + (showsPrintZone ? "" : "border-2 border-dashed ")
+                  + (over
+                      ? (showsPrintZone ? "bg-primary/10 text-foreground" : "border-primary bg-primary/10 text-foreground")
+                      : (showsPrintZone ? "text-muted-foreground" : "border-muted-foreground/35 bg-background/60 text-muted-foreground"))}
  style={{
  left: `${DEFAULT_POS.x}%`, top: `${DEFAULT_POS.y}%`,
  width: `${DEFAULT_POS.w}%`, aspectRatio: "1",
