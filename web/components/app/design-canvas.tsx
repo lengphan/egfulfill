@@ -2425,8 +2425,27 @@ export function DesignCanvasDialog({
         ? `${names(other)} aren't images or machine files, so there's nothing to do with them here.`
         : `${names(other)} isn't an image or a machine file, so there's nothing to do with it here.`)
     }
-    if (machine.length && !isEmb) {
-      notes.push(`${names(machine)} ${machine.length > 1 ? "are embroidery files" : "is an embroidery file"}, and this line is ${item.print_type || "not embroidered"} — there is no machine to run ${machine.length > 1 ? "them" : "it"}. Use a PNG or JPG instead.`)
+    /**
+     * NO METHOD YET IS NOT "NOT EMBROIDERED", and this refused on the second as if it were
+     * the first.
+     *
+     * `isEmbroidery(null)` is false, so a line whose method nobody has picked was told
+     * "this line is not embroidered — there is no machine to run it". Marketplace lines
+     * arrive with their method UNSET by design (§5: only the factory's own picks pre-fill),
+     * so every order brought in from a channel refused the stitch file it was ordered for,
+     * and the message asserted a fact about the line that nothing had established.
+     *
+     * THE SERVER ALREADY HAD THIS RIGHT: /api/machine_files/:id/attach refuses only when a
+     * method is SET and is not embroidery (`if (!embroidered && method)`). This screen was
+     * the stricter of the two, which is the divergence CLAUDE.md warns about wherever a gate
+     * is hand-mirrored — and the stricter copy is the one that silently loses work.
+     *
+     * Attaching a stitch file to a method-less line is EVIDENCE that the line is embroidery,
+     * not a mistake to block. A real DTG or laser line still refuses, and still says which.
+     */
+    const methodSet = String(liveItem.print_type || "").trim()
+    if (machine.length && methodSet && !isEmb) {
+      notes.push(`${names(machine)} ${machine.length > 1 ? "are embroidery files" : "is an embroidery file"}, and this line is ${methodSet} — there is no machine to run ${machine.length > 1 ? "them" : "it"}. Use a PNG or JPG instead.`)
     }
     /**
      * MORE THAN ONE IMAGE FILLS MORE THAN ONE FACE (owner's call, 2026-09-09).
@@ -2455,7 +2474,12 @@ export function DesignCanvasDialog({
     // Machine files FIRST and awaited, because attaching one clears the error line on
     // success — running it after the notes were written would wipe them.
     let failed = false
-    if (isEmb) for (const f of machine) { if (!(await attachMachineFile(f))) failed = true }
+    /* Mirrors the refusal above: a method-less line accepts the file, exactly as the server
+       does. Gating this on `isEmb` was the other half of the same bug — even with the note
+       removed, the attach would not have run. */
+    if (machine.length && (!methodSet || isEmb)) {
+      for (const f of machine) { if (!(await attachMachineFile(f))) failed = true }
+    }
     // A real attach failure outranks the notes: it is the thing that went wrong, and it
     // already says which file.
     const settle = () => { if (!failed) setErr(notes.length ? notes.join(" ") : null) }
