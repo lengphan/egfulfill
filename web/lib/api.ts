@@ -2865,6 +2865,15 @@ export type OrderDesign = { sku?: string; line_id?: string | null; kind?: string
   /** Which face of the garment. Absent = front, which is what every pre-per-side row is. */
   side?: string | null
   /**
+   * How THIS face is decorated — a hoodie embroidered on the front and printed on the back.
+   *
+   * Null/absent means INHERIT the line's own `print_type`, which is every row written before
+   * per-face methods and every face that simply agrees with its line. Read it through the
+   * shared resolver rather than here: a surface deciding for itself what an absent value
+   * means is the faces bug (CLAUDE.md §4) one question earlier.
+   */
+  method?: string | null
+  /**
    * The template this artwork came off — `TPL-…`, or null for artwork somebody dropped.
    *
    * Recorded per line and per SIDE, because that is how a template is chosen: two lines of
@@ -3291,7 +3300,16 @@ export function setItemMockup(orderId: string, body: { line_id?: string | null; 
 export function postOrderDesign(id: string, body: { sku: string; line_id?: string; /** Which face. Omitted = front, which is what the server assumes. */ side?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null
   /** The template this placement came from. Omitting it LEAVES any id already recorded
    *  alone — the server coalesces — so a routine re-save cannot erase the provenance. */
-  template_id?: string | null }) {
+  template_id?: string | null
+  /**
+   * HOW THIS FACE IS DECORATED — embroidery on the front, DTG on the back.
+   *
+   * Absent means INHERIT the line's own method, which is what every caller meant before
+   * per-face methods existed and what a single-method line still means. It is never a
+   * second opinion about the line: a face that agrees with it simply says nothing, so
+   * changing the line still moves every face that never disagreed.
+   */
+  method?: string | null }) {
   /** `design_no`/`design_id` come back from the save: the number minted for these exact
    *  bytes, or the existing one if this artwork has been seen before (server/design-id.js). */
   return api<{ ok?: boolean; error?: string; design_no?: number | null; design_id?: string | null }>(`/api/orders/${encodeURIComponent(id)}/designs`, {

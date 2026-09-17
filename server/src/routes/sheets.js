@@ -111,7 +111,6 @@ const T_COLUMNS = [
      `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a fixed
      list. See LISTS below for how that is wired. */
   { h: 'Quantity', g: 'product', duty: '', sample: '1' },
-  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG printing', opts: 'methods', dep: 'methods' },
   { h: 'Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
   { h: 'Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
   /**
@@ -137,18 +136,28 @@ const T_COLUMNS = [
    * showing them five times would read as five required cells.
    */
   { h: 'Placement 1', g: 'product', duty: '', sample: 'Front', opts: 'sides' },
+  /* HOW, beside WHERE. It was one cell for the whole row, which cannot describe a hoodie
+     embroidered on the front and printed on the back — and it is what decides whether the
+     Machine File cell in this same block is usable at all. A sheet that still carries the
+     old row-level 'Print Type' column keeps importing: it becomes the fallback for every
+     position that leaves its own blank. Mirrors CSV_COLUMNS. */
+  { h: 'Type 1', g: 'product', duty: '', sample: 'Embroidery', opts: 'methods', dep: 'methods' },
   { h: 'Artwork/Template 1', g: 'product', duty: '', sample: '' },
   { h: 'Machine File 1', g: 'product', duty: '', sample: '' },
   { h: 'Placement 2', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: 'Type 2', g: 'product', duty: '', sample: '', opts: 'methods', dep: 'methods' },
   { h: 'Artwork/Template 2', g: 'product', duty: '', sample: '' },
   { h: 'Machine File 2', g: 'product', duty: '', sample: '' },
   { h: 'Placement 3', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: 'Type 3', g: 'product', duty: '', sample: '', opts: 'methods', dep: 'methods' },
   { h: 'Artwork/Template 3', g: 'product', duty: '', sample: '' },
   { h: 'Machine File 3', g: 'product', duty: '', sample: '' },
   { h: 'Placement 4', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: 'Type 4', g: 'product', duty: '', sample: '', opts: 'methods', dep: 'methods' },
   { h: 'Artwork/Template 4', g: 'product', duty: '', sample: '' },
   { h: 'Machine File 4', g: 'product', duty: '', sample: '' },
   { h: 'Placement 5', g: 'product', duty: '', sample: '', opts: 'sides' },
+  { h: 'Type 5', g: 'product', duty: '', sample: '', opts: 'methods', dep: 'methods' },
   { h: 'Artwork/Template 5', g: 'product', duty: '', sample: '' },
   { h: 'Machine File 5', g: 'product', duty: '', sample: '' },
   { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },

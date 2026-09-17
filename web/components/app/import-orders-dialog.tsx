@@ -126,7 +126,9 @@ async function downloadXlsxTemplate() {
     if (names.length) live.blank = names
     if (colors.length) live.item_color = colors
     if (sizes.length) live.item_size = sizes
-    if (methods.length) live.print_type = methods
+    /* Every position's Type offers what the CATALOGUE actually does, not a fixed list —
+       same as the colour and size columns beside it. One entry per block. */
+    if (methods.length) for (const k of ["print_method", "print_method_2", "print_method_3", "print_method_4", "print_method_5"]) live[k] = methods
   } catch { /* no catalogue → the fixed lists below, exactly as before */ }
 
   const listCols = Object.entries(live)
@@ -465,12 +467,23 @@ export function ImportOrdersDialog({
     const unknown = new Set<string>()
     const wrongMethod = new Set<string>()
     let ok = 0
+    /* THE METHOD BESIDE THE FILE, not the one at the top of the row. A garment embroidered
+       on the front and printed on the back has one valid stitch file and one useless one,
+       and a single row-level method has to be wrong about one of them. Blank is still
+       allowed through — the position has not said it ISN'T embroidery, and the server makes
+       the final call against the saved line. */
+    const METHOD_OF: Record<string, string> = {
+      machine_file_id: "print_method", machine_file_id_2: "print_method_2",
+      machine_file_id_3: "print_method_3", machine_file_id_4: "print_method_4",
+      machine_file_id_5: "print_method_5",
+    }
     for (const r of rows) {
-      // The row's own method. Blank is allowed through — the line has not said it ISN'T
-      // embroidery, and the server makes the final call against the saved line.
-      const m = String(r.print_type || "").toUpperCase()
-      const dead = !!m && !/EMB|STITCH|EMBROID/.test(m)
-      for (const ref of refsOn(r as unknown as Record<string, unknown>)) {
+      const rec = r as unknown as Record<string, unknown>
+      for (const key of MF_KEYS) {
+        const ref = String(rec[key] ?? "").trim()
+        if (!ref) continue
+        const m = String(rec[METHOD_OF[key]] ?? rec.print_type ?? "").toUpperCase()
+        const dead = !!m && !/EMB|STITCH|EMBROID/.test(m)
         if (!machineFiles[ref]) { unknown.add(ref); continue }
         if (dead) { wrongMethod.add(ref); continue }
         ok++
@@ -734,8 +747,12 @@ export function ImportOrdersDialog({
                  the instruction, the template is the default. A face with no artwork is
                  filtered out below, not here, so the list stays a record of what was asked
                  for. */
-              const faces = (it.sides?.length
-                ? it.sides.map((f) => ({ side: f.side, artwork: f.artwork, pos: null }))
+              /* THE METHOD RIDES WITH THE FACE. Only the sheet's own positions can carry one
+                 — every other branch here describes a line that named a single placement or
+                 none at all, and those take the line's own method, which is what passing
+                 nothing means on the server. */
+              const faces: { side: string; artwork: string; pos: DesignPos | TemplatePos | null; method?: string }[] = (it.sides?.length
+                ? it.sides.map((f) => ({ side: f.side, artwork: f.artwork, pos: null, method: f.method }))
                 : it.printSide
                 ? (it.designUrl ? [{ side: it.printSide, artwork: it.designUrl, pos: it.templatePos ?? null }] : [])
                 : it.templateSides?.length
@@ -775,6 +792,7 @@ export function ImportOrdersDialog({
                     ? `Template ${it.templateId}`
                     : (artworkNameFor(String(f.artwork ?? "")) || undefined),
                   pos: (f.pos ?? undefined) as DesignPos | undefined,
+                  method: f.method || undefined,
                 }).catch(() => {})
               }
               // The stitch file the template carried, filed against the same line — an
