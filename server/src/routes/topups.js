@@ -144,6 +144,13 @@ export function topupsRoutes(app, requireAuth) {
      would never see it otherwise. */
   q('alter table topup_requests add column if not exists dismissed_at timestamptz').catch(() => {});
 
+  /* 50 rows today, and every query on it sorts by created_at — the seq scan is not what made
+     this route slow, but the table only grows and the index costs nothing. Created here
+     rather than in schema.sql, which runs on first init only and so never reaches a live
+     deployment (CLAUDE.md §6). */
+  q('create index if not exists topup_requests_created_at on topup_requests (created_at desc)').catch(() => {});
+  q('create index if not exists topup_requests_seller on topup_requests (seller_id, created_at desc)').catch(() => {});
+
   async function ageOutStale() {
     await q(`update topup_requests set status='abandoned'
               where method='VietQR' and status='pending'
@@ -181,6 +188,29 @@ export function topupsRoutes(app, requireAuth) {
    *
    * One extra query for up to 200 rows, not one per row.
    */
+  /**
+   * EVERY COLUMN EXCEPT THE ONE THAT WEIGHS 10 MEGABYTES.
+   *
+   * `attachment` is the seller's proof-of-transfer photo, stored as a base64 data URL in the
+   * row. This route was `select *`, so every list request dragged every receipt ever
+   * uploaded across the wire: 50 rows, 9,994 kB of which was that one column, and the route
+   * measured 8,778 ms on the live box while every other endpoint in the same log was under
+   * 90 ms. On the phone that is past the request deadline, so the Wallet screen timed out,
+   * bounced and retried — "the server doesn't respond in 20s" was this, arriving as a
+   * navigation bug.
+   *
+   * Nothing renders it. It is WRITTEN by the top-up dialog and read by no surface on either
+   * front-end, so the bytes were crossing the network to be displayed nowhere.
+   *
+   * The precedent is orders.js, which says the same thing about listing photos in as many
+   * words: image bytes do not travel in a list. A boolean says whether there is one, and a
+   * route serves it to whoever opens it.
+   */
+  const COLS = `id, seller_id, seller_email, seller_name, amount_usd, vnd, ref, note, status,
+    created_at, confirmed_at, confirmed_by, txn_id, method, qr_content, qr_code, bank_code,
+    va_account, receiver_name, dismissed_at, charged_usd, fee_usd, net_usd, payer_email,
+    (attachment is not null and attachment <> '') as has_attachment`;
+
   async function withSeller(rows) {
     const ids = [...new Set(rows.map((r) => r.seller_id).filter(Boolean))];
     if (!ids.length) return rows;
@@ -200,9 +230,9 @@ export function topupsRoutes(app, requireAuth) {
     if (isStaff(req.user)) {
       const st = req.query && req.query.status;
       const r = st
-        ? await q(`select * from topup_requests where status=$1 and ${HIDE_UNPAID_VQR}
+        ? await q(`select ${COLS} from topup_requests where status=$1 and ${HIDE_UNPAID_VQR}
                     order by created_at desc limit 200`, [st])
-        : await q(`select * from topup_requests where ${HIDE_UNPAID_VQR}
+        : await q(`select ${COLS} from topup_requests where ${HIDE_UNPAID_VQR}
                     order by created_at desc limit 200`);
       return withSeller(r.rows);
     }
@@ -214,9 +244,26 @@ export function topupsRoutes(app, requireAuth) {
      * not rubbish — it is a payment they can still make. It just isn't anyone else's work.
      */
     const r = await q(
-      'select * from topup_requests where seller_id=$1 and dismissed_at is null order by created_at desc limit 100',
+      `select ${COLS} from topup_requests where seller_id=$1 and dismissed_at is null
+        order by created_at desc limit 100`,
       [req.user.sub]);
     return r.rows;
+  });
+
+  /**
+   * THE RECEIPT, ON DEMAND — the other half of taking it out of the list.
+   *
+   * Staff read any of them, because confirming a manual transfer is exactly the job of
+   * reading somebody's receipt. A seller reads their OWN: it is their photo, and having
+   * uploaded it they should be able to check what they sent. Anyone else gets a 404 rather
+   * than a 403 — a payment receipt's existence is not a fact worth confirming to a stranger.
+   */
+  app.get('/api/topups/:id/attachment', { preHandler: requireAuth }, async (req, reply) => {
+    const r = await q('select seller_id, attachment from topup_requests where id=$1', [req.params.id]);
+    const row = r.rows[0];
+    const mine = row && row.seller_id && String(row.seller_id) === String(req.user.sub);
+    if (!row || !row.attachment || !(isStaff(req.user) || mine)) { reply.code(404); return { error: 'Not found' }; }
+    return { attachment: row.attachment };
   });
 
   // Admin/staff confirm a transfer was received → credits the seller (their wallet
