@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Pressable, View, Text, Animated, Easing, AccessibilityInfo, ActivityIndicator, ScrollView, useWindowDimensions } from "react-native"
+import { Pressable, View, Text, Animated, Easing, AccessibilityInfo, ActivityIndicator, ScrollView, TextInput, Keyboard, Platform, useWindowDimensions } from "react-native"
 import { useRouter, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { getMe, getSupportThreads, getOrderMessages, type SupportThread, type ChatEntry } from "@/lib/api"
+import { getMe, getSupportThreads, getOrderMessages, postOrderMessage, type SupportThread, type ChatEntry } from "@/lib/api"
 import { C, F, R, S, TAB_BAR, LIFT } from "@/lib/theme"
 
 /**
@@ -74,6 +74,14 @@ export function ChatPeek() {
    *  has no messages yet — a different answer, and the one the panel used to give for both. */
   const [msgsErr, setMsgsErr] = useState<string | null>(null)
   const [reduced, setReduced] = useState(false)
+  const [draft, setDraft] = useState("")
+  const [sending, setSending] = useState(false)
+  const [sendErr, setSendErr] = useState<string | null>(null)
+  /* WHO IS WRITING. The poll below already fetches this to decide whether to run at all; it
+     was thrown away each tick. The composer needs it to stamp the role, and asking twice for
+     one answer is how two call sites start disagreeing about what a staffer is. */
+  const [meRole, setMeRole] = useState<string>("")
+  const [meName, setMeName] = useState<string>("")
 
   useEffect(() => {
     let alive = true
@@ -87,7 +95,9 @@ export function ChatPeek() {
     const tick = async () => {
       try {
         const me = await getMe()
-        if (!alive || !me?.role || me.role === "seller") return
+        if (!alive) return
+        setMeRole(me?.role ?? ""); setMeName(me?.name ?? "")
+        if (!me?.role || me.role === "seller") return
         const rows = await getSupportThreads()
         if (!alive) return
         setThreads(rows.filter((t) => (Number(t.unanswered) || 0) > 0))
@@ -184,6 +194,66 @@ export function ChatPeek() {
     return () => { alive = false }
   }, [open, top?.order_id])
 
+  /*
+   * THE KEYBOARD LIFTS THE WHOLE PEEK.
+   *
+   * KeyboardAvoidingView is for a screen that owns its layout; this is an absolutely
+   * positioned overlay pinned above the tab bar, so there is no flex container to squeeze and
+   * the keyboard would simply cover the box you are typing into. Listening and translating is
+   * the shape that fits — and translateY is one of the two properties the native driver can
+   * take, so the lift runs on the same thread as the open.
+   *
+   * It rises by the keyboard's height LESS the room the peek already sits above the bottom,
+   * clamped at zero: the peek is already clear of the tab bar, and lifting by the full
+   * height would leave a gap the size of that clearance.
+   */
+  const kb = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    /* `Will` on iOS so the lift starts with the keyboard rather than after it; Android only
+       emits `Did`, and its own windowSoftInputMode has usually done the work already. */
+    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
+    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
+    const rest = TAB_BAR.clearance + S.sm
+    const show = Keyboard.addListener(showEvt, (e) => {
+      const h = Math.max(0, (e?.endCoordinates?.height ?? 0) - rest)
+      Animated.timing(kb, {
+        toValue: h, duration: e?.duration || 220,
+        easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }).start()
+    })
+    const hide = Keyboard.addListener(hideEvt, (e) => {
+      Animated.timing(kb, {
+        toValue: 0, duration: e?.duration || 200,
+        easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }).start()
+    })
+    return () => { show.remove(); hide.remove() }
+  }, [kb])
+
+  /* Closing the peek must put the keyboard away with it — a keyboard left up over a screen
+     with nothing to type into is the state people report as "it froze". */
+  useEffect(() => { if (!open) { Keyboard.dismiss(); setSendErr(null) } }, [open])
+
+  const send = useCallback(async () => {
+    const body = draft.trim()
+    if (!body || sending || !top?.order_id) return
+    setSending(true); setSendErr(null)
+    try {
+      await postOrderMessage(top.order_id, body, {
+        /* The role the SERVER stamps on the row — the same expression the full screen uses.
+           A staffer writing in a seller's thread writes as staff. */
+        role: meRole && meRole !== "seller" ? "staff" : "seller",
+        by: meName || undefined,
+        clientId: `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      })
+      setDraft("")
+      const rows = await getOrderMessages(top.order_id)
+      setMsgs(rows.slice(-30))
+    } catch (e) {
+      setSendErr(e instanceof Error && e.message ? e.message : "That didn't send.")
+    } finally { setSending(false) }
+  }, [draft, sending, top?.order_id, meRole, meName])
+
   /* NOTHING IS WAITING, NOTHING IS DRAWN. */
   if (!top || waiting === 0) return null
 
@@ -192,9 +262,12 @@ export function ChatPeek() {
   return (
     /* box-none: the wrapper hugs the bubble, but it is still an absolute layer over the
        page — anything it does not draw has to stay pressable. */
-    <View
+    <Animated.View
       pointerEvents="box-none"
-      style={{ position: "absolute", right: S.lg, bottom: TAB_BAR.clearance + S.sm, alignItems: "flex-end" }}
+      style={{
+        position: "absolute", right: S.lg, bottom: TAB_BAR.clearance + S.sm, alignItems: "flex-end",
+        transform: [{ translateY: Animated.multiply(kb, -1) }],
+      }}
     >
       {/* The wrapper is now the size of the OPEN panel and draws nothing. The bubble and the
           panel are siblings inside it, each with its own transform — the box that used to
@@ -230,7 +303,16 @@ export function ChatPeek() {
           pointerEvents={open ? "auto" : "none"}
           style={{
             position: "absolute", right: 0, bottom: 0, width: OPEN_W, height: OPEN_H,
-            borderRadius: R.card, backgroundColor: C.hueDeep, overflow: "hidden",
+            /* A CARD, NOT A PLATE OF THE ACTION COLOUR.
+               The panel was a solid `hueDeep` rectangle — the largest painted object on any
+               screen it opened over, in the one hue this app reserves for things you PRESS.
+               It is not a thing you press; it is a surface you read on, and the phone's rule
+               for that is one line long: warm paper, white card, 1.5pt hairline, large
+               radius. Periwinkle stays where it means something — the resting bubble, the
+               count, your own messages and the Reply button — and by not being everywhere it
+               can go back to meaning "act on this". */
+            borderRadius: R.card, backgroundColor: C.surface, overflow: "hidden",
+            borderWidth: 1.5, borderColor: C.hairline,
             opacity: panelOp,
             /* Translate BEFORE scale: the centre moves by the translation and the scale then
                happens about the moved centre, which is what pins the bottom-right corner. */
@@ -239,13 +321,26 @@ export function ChatPeek() {
           }}
         >
           {/* THE HEAD — who, and the way back to the bubble. */}
-          <Pressable
-            onPress={() => setOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Close conversation"
-            style={({ pressed }) => ({
+          {/* TWO TARGETS, NOT ONE. The whole head used to close the peek, which was fine when
+              the only other control was a button that left anyway. Now that you can answer
+              here, the name has a job — it is the way through to the full thread, where the
+              attachments and the poll live — and closing belongs to the cross alone. */}
+          <View
+            style={{
               height: HEAD_H, paddingHorizontal: S.lg, flexDirection: "row", alignItems: "center", gap: S.md,
-              opacity: pressed ? 0.85 : 1,
+              borderBottomWidth: 1, borderBottomColor: C.hairline,
+            }}
+          >
+          <Pressable
+            onPress={() => {
+              setOpen(false)
+              router.push(`/chat/${encodeURIComponent(top.order_id)}`)
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Open the full conversation with ${top.seller_name || "this seller"}`}
+            style={({ pressed }) => ({
+              flex: 1, flexDirection: "row", alignItems: "center", gap: S.md,
+              opacity: pressed ? 0.7 : 1,
             })}
           >
             <View style={{
@@ -259,13 +354,25 @@ export function ChatPeek() {
             </View>
 
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text numberOfLines={1} style={{ color: "#FFFFFF", fontSize: 14, fontFamily: F.semi }}>
+              <Text numberOfLines={1} style={{ color: C.ink, fontSize: 14, fontFamily: F.semi }}>
                 {top.seller_name || "Seller"}
               </Text>
+              <Text numberOfLines={1} style={{ color: C.muted, fontSize: 11.5, fontFamily: F.body }}>
+                Open full thread
+              </Text>
             </View>
-
-            <Ionicons name="close" size={20} color={"#FFFFFF"} />
           </Pressable>
+
+          <Pressable
+            onPress={() => setOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close conversation"
+            hitSlop={10}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 2 })}
+          >
+            <Ionicons name="close" size={20} color={C.muted} />
+          </Pressable>
+          </View>
 
           {/* THE CONVERSATION, READ-ONLY. Replying is the full screen — it has the composer, the
               attachments and the six-second poll, and a second composer in here would be a
@@ -285,13 +392,13 @@ export function ChatPeek() {
               onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: false })}
             >
               {msgs === null ? (
-                <ActivityIndicator color={"#FFFFFF"} />
+                <ActivityIndicator color={C.ink} />
               ) : msgsErr ? (
                 /* A refusal carries its reason — that IS the answer (§4). With a deadline on
                    every request this is now reachable at all: it used to spin for ever. */
-                <Text style={{ color: "#FFFFFF", opacity: 0.7, fontSize: 13 }}>{msgsErr}</Text>
+                <Text style={{ color: C.alert, fontSize: 13 }}>{msgsErr}</Text>
               ) : msgs.length === 0 ? (
-                <Text style={{ color: "#FFFFFF", opacity: 0.7, fontSize: 13 }}>No messages yet.</Text>
+                <Text style={{ color: C.muted, fontSize: 13 }}>No messages yet.</Text>
               ) : (
                 msgs.map((m) => (
                   <View
@@ -330,18 +437,61 @@ export function ChatPeek() {
               )}
             </ScrollView>
 
-            <Pressable
-              onPress={() => {
-                setOpen(false)
-                router.push(`/chat/${encodeURIComponent(top.order_id)}`)
-              }}
-              style={({ pressed }) => ({
-                height: 42, borderRadius: R.chip, backgroundColor: C.hueDeep,
-                alignItems: "center", justifyContent: "center", opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 14.5, fontFamily: F.semi, color: "#FFFFFF" }}>Reply</Text>
-            </Pressable>
+            {/*
+              * YOU ANSWER FROM HERE (owner, 2026-09-17).
+              *
+              * This was a button that closed the peek and pushed the full screen, under a
+              * comment arguing that a second composer would be "a weaker copy" of the one
+              * there. That argument was about FEATURES — attachments, the six-second poll —
+              * and it answered the wrong question. The peek exists to stop you losing your
+              * place; a control whose whole behaviour is to take you somewhere else is the
+              * one thing it must not be. Two words back to a seller should not cost the
+              * screen you were on.
+              *
+              * SO IT IS DELIBERATELY NOT THE FULL COMPOSER. One line of text and send.
+              * Attachments, history beyond thirty and the live poll stay on the thread
+              * screen, which the name in the header still opens — and that is the split the
+              * old comment was right about, once it is a door rather than the only door.
+              */}
+            {sendErr && (
+              <Text style={{ fontSize: 12, color: C.alert, marginBottom: 2 }}>{sendErr}</Text>
+            )}
+            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+              <TextInput
+                value={draft}
+                onChangeText={(v) => { setDraft(v); if (sendErr) setSendErr(null) }}
+                placeholder="Write a reply"
+                placeholderTextColor={C.muted}
+                multiline
+                /* Grows to four lines and then scrolls. A composer that grows without a
+                   ceiling eats the conversation it is answering. */
+                style={{
+                  flex: 1, minHeight: 40, maxHeight: 96, paddingHorizontal: 12, paddingTop: 10,
+                  paddingBottom: 10, borderRadius: R.chip, borderWidth: 1, borderColor: C.edge,
+                  backgroundColor: C.canvas, color: C.ink, fontSize: 14, fontFamily: F.body,
+                }}
+                onSubmitEditing={() => { void send() }}
+                editable={!sending}
+              />
+              <Pressable
+                onPress={() => { void send() }}
+                disabled={!draft.trim() || sending}
+                accessibilityRole="button"
+                accessibilityLabel="Send reply"
+                style={({ pressed }) => ({
+                  width: 40, height: 40, borderRadius: R.pill,
+                  alignItems: "center", justifyContent: "center",
+                  /* Disabled is the MIST, not the deep at low alpha: an action you cannot take
+                     should stop looking like the action, rather than looking like it is loading. */
+                  backgroundColor: draft.trim() && !sending ? C.hueDeep : C.hueMist,
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                {sending
+                  ? <ActivityIndicator color={C.hueDeep} size="small" />
+                  : <Ionicons name="arrow-up" size={19} color={draft.trim() ? "#FFFFFF" : C.hueDeep} />}
+              </Pressable>
+            </View>
           </View>
         </Animated.View>
       </View>
@@ -367,6 +517,6 @@ export function ChatPeek() {
           {waiting > 99 ? "99+" : waiting}
         </Text>
       </Animated.View>
-    </View>
+    </Animated.View>
   )
 }
