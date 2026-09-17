@@ -244,7 +244,41 @@ export const sellerLabelOf = (
   return o.seller_active === false ? `${name} (${labels?.deactivated ?? "deactivated"})` : name
 }
 
-export const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
+/**
+ * HOW A LINE'S METHOD READS WHEN IT HAS MORE THAN ONE.
+ *
+ * `print_type` is the line's own, and on a garment embroidered at the front and printed at
+ * the back it is true of one face and wrong about the other. `methods` is what is actually
+ * on the garment — the resolved set, a face that says nothing having already inherited the
+ * line. The line's own value LEADS when it is among them, which is both stable and the
+ * least surprising: the word that was there before is still the first word.
+ *
+ * Not "dearest first", which is what the billing rule uses. That would be the better lead
+ * and this cannot know it — the rate comes from the fee table and a product's own overrides,
+ * neither of which a list row carries. Sorting by a guess at cost would be a second pricing
+ * opinion on a label, which is exactly the drift §4 keeps warning about.
+ *
+ * CAPPED AT TWO, and then a count. Three spelled-out methods wrap the chip row on the order
+ * list, and a row that reflows is worse than one that summarises. Two is also the realistic
+ * ceiling: a garment with three techniques on it is rare enough that "+2 more" costs nobody
+ * anything.
+ *
+ * A SINGLE-METHOD LINE IS UNTOUCHED, which is every line in the database today: one distinct
+ * value renders exactly the string `print_type` rendered. That is the same non-regression
+ * property the pricing rule has, and it is deliberate — this is a label, and a label that
+ * changes on orders nobody edited is a bug report waiting to be filed.
+ */
+export const methodsLabelOf = (it: OrderItem): string => {
+  const all = (Array.isArray(it.methods) ? it.methods : [])
+    .map((m) => String(m ?? "").trim()).filter(Boolean)
+  const seen = new Set<string>()
+  const uniq = all.filter((m) => { const k = m.toLowerCase(); return seen.has(k) ? false : (seen.add(k), true) })
+  if (uniq.length < 2) return String(it.print_type ?? "").trim() || uniq[0] || ""
+  const own = String(it.print_type ?? "").trim().toLowerCase()
+  const led = own ? [...uniq].sort((a, b) => Number(b.toLowerCase() === own) - Number(a.toLowerCase() === own)) : uniq
+  return led.length === 2 ? led.join(" + ") : `${led[0]} + ${led.length - 1} more`
+}
+export const variantOf = (it: OrderItem) => [it.color, it.size, methodsLabelOf(it)].filter(Boolean).join(" · ")
 
 /**
  * WHAT A LINE IS, when the line itself is what you're identifying — blank first.
@@ -259,7 +293,7 @@ export const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].f
  * caller must say so rather than render the empty string as a blank line.
  */
 export const lineFactsOf = (it: OrderItem) =>
-  [it.blank, it.color, it.print_type, it.size].filter(Boolean).join(" · ")
+  [it.blank, it.color, methodsLabelOf(it), it.size].filter(Boolean).join(" · ")
 export const unitsOf = (o: OrderRow) => (o.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
 export const lineTotal = (it: OrderItem) => (Number(it.unit_price) || 0) * (Number(it.qty) || 1)
 

@@ -72,7 +72,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf, sellerLabelOf, sideRatesFor } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf, sellerLabelOf, sideRatesFor, methodsLabelOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
@@ -3271,7 +3271,7 @@ export function OrdersHub() {
                               <div className="mt-1">
                                 <VariantStrip
  blank={resolveProduct(it, catalog)?.name || it.blank || undefined}
- color={it.color} size={it.size} method={it.print_type}
+ color={it.color} size={it.size} method={methodsLabelOf(it)}
  marketplace={it.variant} locked
                                 />
                               </div>

@@ -1985,6 +1985,30 @@ export function ordersRoutes(app, requireAuth) {
           -- change one and change both, or a line's artwork becomes visible to the name and
           -- invisible to this flag.
           -- (No backticks in here: this whole query is a JS template literal, and one ends it.)
+          -- EVERY METHOD ON THIS GARMENT, resolved. A face that says nothing inherits the
+          -- line, so coalesce here rather than in four readers; the array is empty on a line
+          -- with no artwork at all, and methodsLabelOf then falls back to print_type — which
+          -- is what every single-method line has always rendered.
+          --
+          -- GATED ON ARTWORK, exactly as the price is. A surface can be DECLARED before it is
+          -- drawn and costs nothing until it is; a label that counted the declaration would
+          -- sit beside a figure that did not, and the two disagreeing about one line is worse
+          -- than the label being a beat behind.
+          --
+          -- Same line-match predicate as the has_art check below and the dz lateral above.
+          -- Change one and change all three, or a line's methods become visible to one
+          -- reader and invisible to the next.
+          'methods', coalesce((
+            select array_agg(distinct coalesce(d.method, i.print_type))
+              from order_designs d
+             where d.order_id = i.order_id
+               and coalesce(d.method, i.print_type) is not null
+               and (d.data is not null or d.storage_key is not null)
+               and (
+                 (d.line_id is not null and d.line_id = i.line_id)
+                 or (d.line_id is null and (d.sku = i.sku or d.sku = i.line_id))
+               )
+          ), '{}'),
           'has_art', (
             coalesce(i.design_src,'') <> ''
             or exists (

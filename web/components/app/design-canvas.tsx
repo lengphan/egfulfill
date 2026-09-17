@@ -2134,6 +2134,21 @@ export function DesignCanvasDialog({
  designId, orderId, sku: item.sku ?? undefined,
         // THIS line only. "Apply file to all items" below is the deliberate way to widen it.
  lineId: item.line_id ?? undefined,
+        /**
+         * ...AND THIS FACE, but only when there is more than one to choose between.
+         *
+         * A file dropped while you are looking at the Back is for the Back — that is what
+         * the rail means — and filing it against the whole garment is what put a front logo
+         * and a back design in one undifferentiated list. But on a single-face line there is
+         * no choice being made, so sending a face there would pin every file on every
+         * one-sided order in the product to "front" for no reason and change what the Files
+         * panel groups. One rule, stated once, and it is the narrow half.
+         *
+         * Widening it afterwards is what "Apply file to all items" already does, and the
+         * scope route clears the face when it does — a file on the whole ORDER cannot belong
+         * to one surface.
+         */
+ side: faces.length > 1 ? sideKey : undefined,
  name: f.name, mime: f.type || undefined, data,
       })
  if (r?.error) throw new Error(r.error)
@@ -2159,17 +2174,16 @@ export function DesignCanvasDialog({
        */
  setLineFiles((prev) => prev.some((x) => x.designId === designId)
         ? prev
- /* NULL, BECAUSE THAT IS WHAT THE SERVER STORED. POST /api/design_files takes a
-             line and no face, so a dropped file belongs to the garment — and an optimistic
-             row claiming the surface would sit in the wrong group until a reload moved it,
-             which is a lie with a delayed correction rather than a guess.
-             Carrying the face through the drop is the next step and it wants one rule: take
-             the selected face only when there is more than one to choose between, so a
-             single-face line keeps behaving exactly as it does today. */
- : [...prev, { designId, kind: /\.pes$/i.test(f.name) ? "pes" : "emb", name: f.name, side: null }])
+ /* THE SAME FACE THE UPLOAD JUST SENT — not the selected one, the one that was
+             actually stored. They are the same expression on purpose: an optimistic row that
+             guesses differently from the write sits in the wrong group until a reload moves
+             it, which is a lie with a delayed correction. */
+ : [...prev, { designId, kind: /\.pes$/i.test(f.name) ? "pes" : "emb", name: f.name, side: faces.length > 1 ? sideKey : null }])
  return true
     } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`); return false }
-  }, [orderId, item.line_id, item.sku])
+    /* sideKey and faces are read for the file's face — without them the callback keeps the
+       surface it was created on and files every later drop against that one. */
+  }, [orderId, item.line_id, item.sku, sideKey, faces.length])
 
   /**
    * Put THIS line's artwork on every other line of the order.

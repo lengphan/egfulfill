@@ -351,8 +351,8 @@ export function designFilesRoutes(app, requireAuth) {
       } catch (e) { /* storage failed → keep inline */ }
     }
     await q(
-      `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, source, created_at, updated_at)
-       values ($1,$2,$3,$12,$4,$5,$6,$7,$8,$13,$9, coalesce($10, 0), $11, $14, now(), now())
+      `insert into design_file_data (design_id, order_id, sku, line_id, side, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, source, created_at, updated_at)
+       values ($1,$2,$3,$12,$15,$4,$5,$6,$7,$8,$13,$9, coalesce($10, 0), $11, $14, now(), now())
        on conflict (design_id) do update set
          -- Whoever wrote it LAST owns the row's provenance: staff replacing a seller's file
          -- with a cut version makes it a factory file, which is exactly what it now is.
@@ -364,6 +364,11 @@ export function designFilesRoutes(app, requireAuth) {
          -- able to widen: re-filing a per-line file as an "applies to all" file (line_id
          -- null) must not silently keep it pinned to the line it started on.
          line_id=excluded.line_id,
+         -- ...and the FACE rides with it, for the same reason and with the same verbatim
+         -- rule: re-filing a front logo as a file for the whole garment (side null) must not
+         -- silently keep it pinned to the face it started on. A file with no line cannot
+         -- have a face at all, which the caller has already resolved below.
+         side=excluded.side,
          seller_id=coalesce(excluded.seller_id, design_file_data.seller_id),
          file_name=excluded.file_name, mime=excluded.mime, data=excluded.data, url=excluded.url,
          storage_key=excluded.storage_key, content_hash=excluded.content_hash,
@@ -374,7 +379,19 @@ export function designFilesRoutes(app, requireAuth) {
        // "" and undefined both mean the whole order — only a real line id scopes a file.
        (b.lineId || b.line_id) ? String(b.lineId || b.line_id) : null,
        storageKey,
-       isStaff(req.user) ? 'factory' : 'seller']);
+       isStaff(req.user) ? 'factory' : 'seller',
+       /**
+        * WHICH FACE — and only ever alongside a line, because a file that applies to the
+        * whole order cannot belong to one surface of one garment.
+        *
+        * The CALLER decides whether to send one, and the rule it follows is worth stating
+        * because getting it wrong is silent: take the selected face only when the garment
+        * has more than one to choose between. A single-face line then stores null exactly
+        * as it always did, so nothing about a one-sided order changes shape.
+        */
+       ((b.lineId || b.line_id) && b.side)
+         ? String(b.side).trim().toLowerCase().slice(0, 24) || null
+         : null]);
     /**
      * Record it + wake the boards. Without these two lines the file lands in storage but
      * nothing tells the UI: the Design readiness tag stayed grey until a full reload (it

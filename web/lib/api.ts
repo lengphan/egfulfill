@@ -2003,7 +2003,16 @@ export function getDesignFiles(orderId: string) {
   return api<DesignFileRow[]>(`/api/design_files?orderId=${encodeURIComponent(orderId)}`)
 }
 /** `lineId` scopes the file to one line; omit it (or pass null) for "applies to every item". */
-export function uploadDesignFile(body: { designId: string; orderId?: string; sku?: string; lineId?: string | null; name?: string; mime?: string; data: string; price?: number }) {
+export function uploadDesignFile(body: { designId: string; orderId?: string; sku?: string; lineId?: string | null; name?: string; mime?: string; data: string; price?: number
+  /**
+   * WHICH FACE this file is for, when the garment prints on more than one.
+   *
+   * Send it only when there IS more than one face to choose between — a single-face line
+   * stores null exactly as it always did, so nothing about a one-sided order changes. It is
+   * ignored without a `lineId`, because a file that applies to the whole order cannot belong
+   * to one surface of one garment.
+   */
+  side?: string | null }) {
   return api<{ ok?: boolean; stored?: string; error?: string }>(`/api/design_files`, { method: "POST", body: JSON.stringify(body) })
 }
 export function setDesignFilePrice(designId: string, price: number) {
@@ -2347,6 +2356,15 @@ export function importOttoProducts(products: OttoImportRow[]) {
 export type OrderItem = {
   name?: string
   sku?: string
+  /**
+   * EVERY METHOD ACTUALLY ON THIS GARMENT — the resolved set, a face that says nothing
+   * having already inherited the line's own `print_type`.
+   *
+   * Absent on any caller that has not asked for it, and `methodsLabelOf` falls back to
+   * `print_type` when it is: the label then reads exactly as it always did, which is what
+   * every single-method line in the database needs it to do.
+   */
+  methods?: string[] | null
   /** Which design charge this line attracts, and where its quote stands. Null tier = nobody
    *  has judged it yet, which is deliberate: defaulting to `standard` would assert a
    *  difficulty call no human made, and that call is several times the money. */

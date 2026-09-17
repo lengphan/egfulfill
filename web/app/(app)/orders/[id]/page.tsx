@@ -3,7 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import { Fragment, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
-import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, sideRatesFor } from "@/lib/order-format"
+import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, sideRatesFor, methodsLabelOf } from "@/lib/order-format"
 import { CopyButton } from "@/components/app/copy-button"
 import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
@@ -2155,7 +2155,7 @@ export default function OrderDetailPage() {
                           <VariantPicker orderId={String(id)} item={it} catalog={catalog}
                             onSaved={() => { reloadOne(); setQuoteNonce((n) => n + 1) }} />
                         ) : (
-                          <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked />
+                          <VariantStrip blank={it.blank} color={it.color} size={it.size} method={methodsLabelOf(it)} marketplace={it.variant} locked />
                         )}
                       </div>
                     </div>

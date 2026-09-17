@@ -34,7 +34,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, sideRatesFor } from "@/lib/order-format"
+import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, sideRatesFor, methodsLabelOf } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
@@ -589,7 +589,7 @@ export function OrdersList() {
                                       {mayEditVariants(role, o.factory_status, { editAfterApproval }) ? (
                                         <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                                       ) : (
-                                        <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-1.5" />
+                                        <VariantStrip color={it.color} size={it.size} method={methodsLabelOf(it)} marketplace={it.variant} locked className="mt-1.5" />
                                       )}
                                     </div>
                                   </div>
