@@ -3789,19 +3789,35 @@ export function ordersRoutes(app, requireAuth) {
     const side = (req.body || {}).side
       ? (String((req.body || {}).side).trim().toLowerCase().slice(0, 24) || 'front')
       : 'front';
+    /* THE FACE'S OWN METHOD, or null for "same as the line". Stored verbatim in the same
+       label vocabulary order_items.print_type uses, so every reader that already normalises
+       one (methodCode in print-route.js, normTech on the client) reads the other unchanged. */
+    const method = String((req.body || {}).method || '').trim().slice(0, 40) || null;
     // Artwork keys line-first (coalesce('L:'||line_id,'S:'||sku)), so a marketplace line whose
     // SKU is still unset attaches by line_id. Require DATA + a line identity, not specifically
     // a SKU — the old `!sku` check rejected exactly those lines with "sku and data required".
-    if (!data || (!sku && !lineId)) return { error: 'data and (sku or line id) required' };
+    /**
+     * A SURFACE MAY BE DECLARED BEFORE IT IS DRAWN (owner, 2026-09-17).
+     *
+     * "the back is embroidered" is a decision someone makes while quoting, and the artwork
+     * turns up later — the mini designer exists to add it. So a save carrying a METHOD and no
+     * bytes is a real save, not a malformed one.
+     *
+     * IT MUST NOT BE A FEE. A declared surface with nothing on it costs nothing until there is
+     * something to print: pricing counts a face only when it carries artwork (see quoteOrder),
+     * which is the same rule that has always applied to a line with no design yet. Recording
+     * intent is free; printing is what is billed.
+     */
+    const methodOnly = !data && !!method;
+    if ((!data && !methodOnly) || (!sku && !lineId)) {
+      return { error: 'data and (sku or line id) required' };
+    }
     const posJson = (pos && typeof pos === 'object') ? JSON.stringify(pos) : null;
     // Exact hash is ours, never the client's — it decides whether an already-produced
     // machine file may be reused, so a forged one would attach the wrong deliverable.
     // The perceptual hash is only ever a suggestion, so taking it from the client is fine.
     const artPhash = isPhash(req.body && req.body.phash) ? String(req.body.phash).toLowerCase() : null;
-    /* THE FACE'S OWN METHOD, or null for "same as the line". Stored verbatim in the same
-       label vocabulary order_items.print_type uses, so every reader that already normalises
-       one (methodCode in print-route.js, normTech on the client) reads the other unchanged. */
-    const method = String((req.body || {}).method || '').trim().slice(0, 40) || null;
+
     /**
      * BYTES OR A REFERENCE — and this route could not tell them apart.
      *
@@ -3888,16 +3904,27 @@ export function ordersRoutes(app, requireAuth) {
     await q(
       `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, template_id, method, updated_at)
        values ($1,$2,$10,$3,$11,$4,$9,$5,$6,$7,$8,$12,$14, now())
-       on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
+       on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do update set
+         /* $15 is "this save carried artwork". A METHOD-ONLY save must leave the picture
+            alone — writing excluded.data unconditionally would erase a design the moment
+            somebody changed the surface's technique. A real re-upload always carries bytes,
+            so it still wins; only the silent case is protected. Not coalesce: moving artwork
+            from data into storage leaves it NULL deliberately, and coalescing would keep
+            a stale copy beside the stored one. */
+         data=(case when $15 then excluded.data else order_designs.data end),
+         storage_key=(case when $15 then excluded.storage_key else order_designs.storage_key end),
+         name=(case when $15 then excluded.name else order_designs.name end),
+         pos=(case when $15 then excluded.pos else order_designs.pos end),
          /* SAME RULE AS template_id ABOVE, and for the same reason: a client that knows
             nothing about per-face methods (the phone, an older web build) must not blank one
             by saving a line for an unrelated reason. $14 null keeps what is recorded. */
          method=coalesce($14, order_designs.method),
-         art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash),
+         art_hash=(case when $15 then excluded.art_hash else order_designs.art_hash end),
+         art_phash=(case when $15 then coalesce(excluded.art_phash, order_designs.art_phash) else order_designs.art_phash end),
          /* $13 is "the caller spoke about templates at all" — see tplSpoken above. A save
             that says nothing keeps what is there; a save that says "" clears it. */
          template_id=(case when $13 then $12 else coalesce($12, order_designs.template_id) end), updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side, templateId, tplSpoken, method]
+      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side, templateId, tplSpoken, method, !methodOnly]
     );
     // The artwork now has a number, minted on first sight of these exact bytes and reused
     // every time they turn up again — see design-id.js. Handed back so the uploader sees it
@@ -3953,19 +3980,43 @@ export function ordersRoutes(app, requireAuth) {
      * SIBLING's artwork on an order with two lines of the same sku — the exact bug the
      * line_id migration exists to prevent, in its most destructive form.
      */
-    const r = await q(
-      `delete from order_designs
-        where order_id = $1
+    /**
+     * REMOVING THE ARTWORK IS NOT UNDECLARING THE SURFACE.
+     *
+     * A face can now carry a METHOD before it carries a picture — "the back is embroidered",
+     * artwork to follow. Deleting the row outright would throw that decision away every time
+     * somebody swapped a design, and the person would have to remember to set it again on a
+     * surface that still looks the same.
+     *
+     * So a row that remembers a method keeps its row and loses its bytes; everything else is
+     * deleted as before. Either way the FEE goes immediately, because pricing counts a face
+     * only while it carries artwork — which is the half that must never be got wrong in this
+     * direction. `removed` counts both, since to the caller one design went away.
+     */
+    const match = `where order_id = $1
           and ( ($2::text is not null and line_id = $2)
              or (line_id is null and $3::text is not null and sku = $3) )
-          and ($4::text is null or coalesce(side,'front') = $4)`,
+          and ($4::text is null or coalesce(side,'front') = $4)`;
+    const kept = await q(
+      `update order_designs
+          set data=null, storage_key=null, art_hash=null, art_phash=null, pos=null, name=null,
+              template_id=null, updated_at=now()
+        ${match} and method is not null
+          and (data is not null or storage_key is not null)`,
+      [req.params.id, lineId, sku, side]
+    ).catch(() => ({ rowCount: 0 }));
+    const r = await q(
+      `delete from order_designs ${match} and method is null`,
       [req.params.id, lineId, sku, side]
     );
-    const removed = r.rowCount || 0;
+    const removed = (r.rowCount || 0) + (kept.rowCount || 0);
     if (removed) {
       audit(req, 'design.removed', {
         entityType: 'order', entityId: req.params.id,
-        before: { line_id: lineId, sku, side: side || 'all sides', rows: removed },
+        before: { line_id: lineId, sku, side: side || 'all sides', rows: removed,
+                  /* Which of them kept their declared method and which went entirely — the
+                     audit is the only place that difference is recoverable afterwards. */
+                  emptied: kept.rowCount || 0, deleted: r.rowCount || 0 },
       });
     }
     return { ok: true, removed };

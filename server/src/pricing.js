@@ -1054,9 +1054,29 @@ export async function quoteOrder(orderId) {
        aggregate because two rows can share a side (a raster and its stitch file) and only
        one of them may carry a method — that is a dedupe with a preference, which is a
        sentence of JavaScript and an unreadable jsonb expression. */
+    /**
+     * A FACE IS CHARGED WHEN IT CARRIES ARTWORK — nothing else can make one true.
+     *
+     * That has always been the rule ("a seller who has not placed a design has not asked for
+     * a second print"), and it was enforced by accident: the POST refused a save with no
+     * bytes, so every row in this table had some. A surface can now be DECLARED before it is
+     * drawn — "the back is embroidered", artwork to follow — and without this filter each of
+     * those would have walked straight into the side charge and, worse, into the billing
+     * method: mark a back as embroidery on a DTG line and the whole line would bill at
+     * embroidery for work nobody has placed.
+     *
+     * So the filter is the fee gate, in both directions. Adding a Type costs nothing; adding
+     * ARTWORK starts the charge; removing the artwork stops it on the very next quote,
+     * because the row stops matching here even though it still remembers its method.
+     *
+     * It is also a NO-OP on every row that exists today, which is what makes it safe to add
+     * to a live pricing path: `data` was required until now, so nothing already stored can
+     * fail it.
+     */
     q(`select coalesce('L:' || line_id, 'S:' || sku) as key,
               lower(coalesce(side,'front')) as side, method
-         from order_designs where order_id=$1`, [orderId])
+         from order_designs
+        where order_id=$1 and (data is not null or storage_key is not null)`, [orderId])
       .then((r) => r.rows).catch(() => []),
   ]);
   /* ONE ENTRY PER FACE, first method wins. A second row on the same side that says nothing
