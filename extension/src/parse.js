@@ -531,20 +531,98 @@ function receiptsFromJson(doc) {
 /* ── receipts from the rendered cards ──────────────────────────────────────── */
 
 /**
+ * A LABELLED PAIR IS A STATEMENT. UNLABELLED TEXT IS A GUESS.
+ *
+ * The first version of the card reader carried a name and a quantity and refused everything
+ * else, on the grounds that a wrong size is a garment remade and a wrong personalisation is
+ * a garment remade with somebody else's name on it. That reasoning was right about UNLABELLED
+ * text and wrong about the page: Etsy prints these as LABELS — "Size: L", "Colour: Black",
+ * "Personalisation: Dana" — and a label is the seller's own words, not our inference.
+ *
+ * So the rule is narrowed rather than abandoned: read a value only where the page NAMES it.
+ * Nothing is taken from position, proximity or "the line under the title".
+ *
+ * BOTH RENDERINGS, because Etsy uses both and which one you get is not stable:
+ *   "Size: L"  in one element          -> matched inline
+ *   "Size" then "L" in two elements    -> matched as an adjacent pair
+ */
+const VARIANT_LABEL = /^(size|colou?r|style|material|type|design|font|scent|flavou?r|length|width|finish|placement|fabric)$/i
+const PERSONALIZATION_LABEL = /^personali[sz]ation$/i
+
+/**
+ * The text of every LEAF element, in document order.
+ *
+ * Leaves, because `textContent` on a container concatenates its descendants with no separator
+ * — the same trap that made "#4172259915" and "1 item" read as one number and is written up
+ * against the order id above. A leaf holds one string, which is the only level at which
+ * "Size" and "L" can be told apart from "SizeL".
+ */
+function textChunks(el) {
+  const out = []
+  for (const n of el.querySelectorAll('*')) {
+    if (n.children && n.children.length) continue
+    const t = clean(n.textContent)
+    if (t && t.length < 300) out.push(t)
+  }
+  return out
+}
+
+/** Every `Label: Value` on a card, however Etsy chose to render it this week. */
+function labelledPairs(el) {
+  const chunks = textChunks(el)
+  const pairs = []
+  for (let i = 0; i < chunks.length; i++) {
+    const m = chunks[i].match(/^([A-Za-z][A-Za-z ]{1,24}?)\s*:\s*(.+)$/)
+    if (m) { pairs.push([clean(m[1]), clean(m[2])]); continue }
+    /* Label alone, value in the next element. Only accepted for a label we RECOGNISE — any
+       two adjacent strings would otherwise become a variant, which is the guessing this is
+       supposed to avoid. */
+    const bare = chunks[i].replace(/:$/, '').trim()
+    if ((VARIANT_LABEL.test(bare) || PERSONALIZATION_LABEL.test(bare)) && chunks[i + 1]) {
+      pairs.push([bare, chunks[i + 1]])
+      i++
+    }
+  }
+  return pairs
+}
+
+/**
+ * THE SMALLEST CONTAINER THAT IS STILL JUST THIS ITEM.
+ *
+ * Walk up from the item's own link and stop the moment a level holds a SECOND item — exactly
+ * the rule the address reader uses to decide which order an address belongs to, and for the
+ * same reason: one level too far and this item takes the next item's size.
+ */
+function itemBox(link, doc) {
+  let n = link.parentElement
+  let best = link
+  for (let up = 0; up < 6 && n; up++, n = n.parentElement) {
+    if (n.querySelectorAll('a[href*="/listing/"]').length > 1) break
+    best = n
+  }
+  return best
+}
+
+/** Etsy's own image CDN. A shop logo or an icon must not become the artwork thumbnail. */
+function listingImage(box) {
+  for (const im of box.querySelectorAll('img')) {
+    const src = String(im.getAttribute('src') || '')
+    if (/etsystatic\.com|\/il_|il_fullxfull/i.test(src)) return src
+  }
+  return null
+}
+
+/**
  * ITEMS OUT OF A CARD, when the page ships no usable JSON.
  *
  * ANCHORED ON THE LISTING LINK, because that is the one thing an order card cannot render
- * without: every item is a link to `/listing/<id>`. Titles, prices and quantities all live
- * in generated class names that change; the href does not.
+ * without: every item is a link to `/listing/<id>`. Titles, prices and quantities all live in
+ * generated class names that change; the href does not.
  *
- * WHAT THIS DELIBERATELY DOES NOT GUESS. There is no attempt to pull a variant, a
- * personalisation or a per-line price out of surrounding text. On a card those sit in
- * unlabelled lines beside the title, and a regex that is right most of the time here is
- * worse than a blank: a wrong SIZE is a garment remade, and a wrong PERSONALISATION is a
- * garment remade with somebody else's name on it. A missing variant is a picker a human
- * fills in; an invented one is a parcel that gets returned. So the fallback carries the
- * name and the quantity — which is what makes the order recognisable — and leaves the rest
- * to the seller or to a later JSON read.
+ * WHAT IS STILL NOT GUESSED: a per-line price. Money on a card is ambiguous in a way a size is
+ * not — an item price, a shipping charge and an order total are all "$12.50" to a regex, and
+ * charging the wrong one is worse than charging none. It arrives null and the order still
+ * carries its total.
  */
 function itemsFromCard(card, receiptId) {
   const out = []
@@ -556,19 +634,45 @@ function itemsFromCard(card, receiptId) {
     if (!m) continue
     const listingId = m[1]
     const title = clean(a.textContent)
-    /* A thumbnail is also a link to the listing, and its text is empty. Skipping the
-       empty one rather than the second occurrence keeps the pairing right whichever
-       order Etsy renders them in. */
+    /* A thumbnail is also a link to the listing, and its text is empty. Skipping the empty
+       one rather than the second occurrence keeps the pairing right whichever order Etsy
+       renders them in. */
     if (!title) continue
     const nth = (seenListing.get(listingId) || 0) + 1
     seenListing.set(listingId, nth)
+
+    const box = itemBox(a, card)
+    let qty = 1, personalization = null
+    const vparts = []
+    for (const [label, value] of labelledPairs(box)) {
+      if (/^(qty|quantity)$/i.test(label)) {
+        const n = parseInt(value, 10)
+        if (n > 0) qty = n
+      } else if (PERSONALIZATION_LABEL.test(label)) {
+        personalization = value
+      } else if (VARIANT_LABEL.test(label)) {
+        /* The LABEL is kept, not just the value. "Black" alone is a colour to a human and
+           nothing to a queue; "Colour: Black" survives being read by someone who did not
+           take the order. It also matches how the JSON path formats a multi-part variant. */
+        vparts.push(`${label}: ${value}`)
+      }
+    }
+    /* Quantity is also rendered unlabelled as "2 items" or "×2" on some cards. Read from the
+       item's own box, never the whole card, or every line takes the first count on screen. */
+    if (qty === 1) {
+      const t = clean(box.textContent || '')
+      const q = t.match(/(?:qty|quantity)[:\s]+(\d{1,3})\b/i) || t.match(/\u00d7\s*(\d{1,3})\b/)
+      if (q && Number(q[1]) > 0) qty = Number(q[1])
+    }
+
     out.push(item({
       line_id: derivedLineId(receiptId, listingId, nth),
       listing_id: listingId,
       name: title,
-      /* Quantity is read from the card, not the link: "Qty: 2" renders as a sibling.
-         Absent means one, which is what an Etsy card omitting it means. */
-      qty: (clean(card.textContent).match(/(?:qty|quantity)[:\s]+(\d{1,3})/i) || [])[1] || 1,
+      qty,
+      variant: vparts.join(', ') || null,
+      personalization,
+      img: listingImage(box),
     }))
   }
   return out

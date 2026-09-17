@@ -103,19 +103,27 @@ function doc({ scripts = [], cards = [] }) {
  * A NODE TREE with class lookup and parent links — enough to exercise fromAddressBlocks,
  * which is the strategy that matters now that the real markup is known.
  */
-function node(tag, cls, text, kids = [], href = null) {
+function node(tag, cls, text, kids = [], href = null, attrs = {}) {
   const n = {
     _tag: tag, _cls: cls, _kids: kids, parentElement: null, href,
-    get textContent() { return text || n._kids.map((k) => k.textContent).join(' ') },
+    /* NO SEPARATOR, exactly like the real thing. textContent concatenating its descendants
+       is the trap parse.js documents against the order id, and a shim that joined with a
+       space would quietly make the leaf rule look unnecessary. */
+    get textContent() { return text || n._kids.map((k) => k.textContent).join('') },
     get innerText() { return n.textContent },
-    getAttribute: (k) => (k === 'href' ? href : k === 'class' ? cls : null),
+    getAttribute: (k) => (k === 'href' ? href : k === 'class' ? cls : (attrs[k] ?? null)),
     attributes: [{ name: 'class', value: cls || '' }],
     _all(pred, out = []) {
       for (const k of n._kids) { if (pred(k)) out.push(k); k._all && k._all(pred, out) }
       return out
     },
+    /* `children` is what parse.js uses to tell a LEAF from a container — the only level at
+       which "Size" and "L" can be told apart from the concatenated "SizeL". */
+    get children() { return n._kids },
     querySelectorAll(sel) {
       const want = sel.replace(/^[.#]/, '')
+      if (sel === '*') return n._all(() => true)
+      if (sel === 'img') return n._all((k) => k._tag === 'img')
       if (sel.startsWith('.')) return n._all((k) => (k._cls || '').split(/\s+/).includes(want))
       if (sel.includes('a[href*="order_id="]')) return n._all((k) => k._tag === 'a' && /order_id=/.test(k.href || ''))
       if (sel.includes('a[href*="/listing/"]')) return n._all((k) => k._tag === 'a' && /\/listing\//.test(k.href || ''))
@@ -379,23 +387,96 @@ console.log('\nJSON WITHOUT TRANSACTIONS — an id alone is not a receipt')
   check('no order invented from a bare id', rows.length, 0)
 }
 
-console.log('\nRECEIPTS FROM CARDS — the fallback, and what it refuses to guess')
+console.log('\nRECEIPTS FROM CARDS — a LABELLED value is read, an unlabelled one is not')
 {
+  /* The item as Etsy renders it: the link, its thumbnail, and the options printed as labels.
+     This is the whole reason the card reader is allowed to carry a variant at all — "Size: L"
+     is the seller's own words, not our inference from where a line sits. */
+  const thumb = node('img', 'thumb', '', [], null, { src: 'https://i.etsystatic.com/1/il_570xN.jpg' })
   const page = docOf(node('div', 'list', null, [
-    card('4172003959', [itemLink('881', 'Monogrammed Tote Bag'), node('span', null, 'Qty: 3')]),
+    card('4172003959', [node('div', 'item', null, [
+      itemLink('881', 'Monogrammed Tote Bag'),
+      thumb,
+      node('span', null, 'Size: L'),
+      node('span', null, 'Colour: Black'),
+      node('span', null, 'Personalization: Dana'),
+      node('span', null, 'Qty: 3'),
+    ])]),
   ]))
   const { rows, stats } = extractReceipts(page, [])
   const it = (rows[0] || {}).items[0] || {}
   check('one receipt read', rows.length, 1)
   check('product NAME is carried', it.name, 'Monogrammed Tote Bag')
-  check('quantity read off the card', it.qty, 3)
+  check('quantity read off the item', it.qty, 3)
+  /* THE THREE FIELDS THE OWNER NAMED as the minimum to work an order. */
+  check('VARIANT is carried, with its label', it.variant, 'Size: L, Colour: Black')
+  check('PERSONALIZATION is carried', it.personalization, 'Dana')
+  check('IMAGE is carried', it.img, 'https://i.etsystatic.com/1/il_570xN.jpg')
   /* DERIVED, AND SAYING SO. `rd-` means "this came from a reader"; `et-` would claim it is
      Etsy's own transaction id, which is a lie the database would keep forever. */
   check('derived line id wears rd-', it.line_id, 'rd-4172003959-881-1')
   check('a derived id NEVER wears the platform prefix', /^et-/.test(it.line_id), false)
-  check('no variant is guessed from card text', it.variant, null)
-  check('no personalization is guessed from card text', it.personalization, null)
   check('strategy reported', stats.how, 'card')
+}
+
+console.log('\nTHE LABEL MAY SIT IN ITS OWN ELEMENT')
+{
+  /* Etsy renders these both ways and which one you get is not stable. Split across two
+     elements, `textContent` on the parent yields "SizeL" — which is why the reader works off
+     LEAVES and not off a concatenated blob. */
+  const page = docOf(node('div', 'list', null, [
+    card('4172003959', [node('div', 'item', null, [
+      itemLink('881', 'Tote Bag'),
+      node('span', 'label', 'Size'),
+      node('span', 'value', 'XL'),
+    ])]),
+  ]))
+  const it = extractReceipts(page, []).rows[0].items[0]
+  check('adjacent label/value is read', it.variant, 'Size: XL')
+}
+
+console.log('\nAN UNLABELLED LINE IS STILL NOT A VARIANT')
+{
+  /* The narrowing is the point: a label is a statement, loose text beside a title is a guess,
+     and a wrong size is a garment remade. */
+  const page = docOf(node('div', 'list', null, [
+    card('4172003959', [node('div', 'item', null, [
+      itemLink('881', 'Tote Bag'),
+      node('span', null, 'Black'),
+      node('span', null, 'Ships in 3-5 days'),
+    ])]),
+  ]))
+  const it = extractReceipts(page, []).rows[0].items[0]
+  check('loose text is not adopted as a variant', it.variant, null)
+  check('and not as a personalization', it.personalization, null)
+}
+
+console.log('\nTWO ITEMS ON ONE ORDER — neither may take the other one’s size')
+{
+  /* The failure this guards is the same one the address reader guards: climb one level too
+     far and an item inherits its neighbour's options. */
+  const page = docOf(node('div', 'list', null, [
+    card('4172003959', [
+      node('div', 'item', null, [itemLink('881', 'Tote Bag'), node('span', null, 'Size: S')]),
+      node('div', 'item', null, [itemLink('902', 'Cap'), node('span', null, 'Size: XL')]),
+    ]),
+  ]))
+  const items = extractReceipts(page, []).rows[0].items
+  check('both items read', items.length, 2)
+  check('first keeps its own size', items[0].variant, 'Size: S')
+  check('second keeps its own size', items[1].variant, 'Size: XL')
+}
+
+console.log('\nA SHOP LOGO IS NOT THE ARTWORK')
+{
+  const page = docOf(node('div', 'list', null, [
+    card('4172003959', [node('div', 'item', null, [
+      itemLink('881', 'Tote Bag'),
+      node('img', 'logo', '', [], null, { src: 'https://www.etsy.com/images/brand.svg' }),
+    ])]),
+  ]))
+  const it = extractReceipts(page, []).rows[0].items[0]
+  check('a non-CDN image is refused', it.img, null)
 }
 
 console.log('\nTWO OF THE SAME LISTING — different jobs, different line ids')
