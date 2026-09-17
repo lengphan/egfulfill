@@ -12,12 +12,16 @@ import { useParams, useRouter } from "next/navigation"
 import { Package, MapPin, Truck, Clock, PaperPlaneTilt, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash, ArrowUUpLeft } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
-import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard, type OrderDesignFee } from "@/lib/api"
+import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard, type OrderDesignFee, type ReuseMatch } from "@/lib/api"
 import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { deleteOrderItem } from "@/lib/api"
 import { refundOrder } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { OrderAdjustPanel } from "@/components/app/order-adjust-panel"
+import { sendLineToBoard, boardArtworkFor } from "@/lib/design-board"
+import { canvasReadableSrc } from "@/lib/thread-match"
+import { variantOf } from "@/lib/order-format"
+import { EmptyState } from "@/components/app/empty-state"
 import { DesignFeeAmount } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { designCardFor } from "@/lib/api"
@@ -152,7 +156,7 @@ export default function OrderDetailPage() {
  const [addrErr, setAddrErr] = useState<string | null>(null)
  const [messages, setMessages] = useState<ChatEntry[]>([])
  const [msg, setMsg] = useState("")
- const [detailTab, setDetailTab] = useState<"items" | "files" | "history" | "activity">("items")
+ const [detailTab, setDetailTab] = useState<"items" | "files" | "board" | "history" | "activity">("items")
   /**
    * WHICH TABS HAVE BEEN OPENED. Panels stay mounted once visited so a switch never drops a
    * draft or a scroll position — but History costs an audit query, and mounting it on page
@@ -160,7 +164,7 @@ export default function OrderDetailPage() {
    * tab is the event that pays for it.
    */
  const [seen, setSeen] = useState<Set<string>>(() => new Set(["items"]))
- const goTab = (t: "items" | "files" | "history" | "activity") => {
+ const goTab = (t: "items" | "files" | "board" | "history" | "activity") => {
  setDetailTab(t)
  setSeen((s) => (s.has(t) ? s : new Set(s).add(t)))
   }
@@ -410,6 +414,48 @@ export default function OrderDetailPage() {
 
   // The directly-fetched order wins; the list is a fallback for anything already loaded.
  const order = useMemo(() => one ?? (orders ?? []).find((o) => o.id === id) ?? null, [one, orders, id])
+
+  /**
+   * SENDING A LINE TO A DESIGNER, FROM THE ORDER (owner, 2026-09-17).
+   *
+   * It was only reachable from the orders hub, so working an order meant leaving it — while
+   * everything the decision needs is already on this page: the lines, their artwork, their
+   * methods, and the board cards above.
+   *
+   * THE ACT IS lib/design-board.ts, not a copy of the hub's. §5: private copies of shared
+   * logic have already been found in three separate files, and this one carries rules that
+   * each cost something — refusing a card with no artwork rather than failing silently, and
+   * asking whether we have already made this file before spending a designer on it.
+   */
+ const reloadBoard = useCallback(() => {
+ if (!isStaff || !id) return
+ getOrderDesignCards(String(id)).then((r) => setBoardCards(r ?? [])).catch(() => setBoardCards([]))
+  }, [isStaff, id])
+ const [boardBusy, setBoardBusy] = useState<string | null>(null)
+ const [boardNote, setBoardNote] = useState<{ ok: boolean; text: string } | null>(null)
+  /** Reuse hits for one line — SHOWN, never acted on. §6: a perceptual match suggests and a
+   *  human confirms; auto-attaching one is how another seller's work reaches this order. */
+ const [boardReuse, setBoardReuse] = useState<{ key: string; exact: ReuseMatch[]; similar: ReuseMatch[] } | null>(null)
+
+ const sendToBoard = async (it: OrderItem, force = false) => {
+ const key = it.line_id || it.sku || it.name || ""
+ setBoardBusy(key); setBoardNote(null)
+    try {
+ const r = await sendLineToBoard({ id: String(id), customer: order?.customer ?? null }, it,
+        { art: boardArtworkFor(designs, it), force })
+ if (r.status === "no-art") {
+ setBoardNote({ ok: false, text: tl("order", "That line has no saved artwork yet, so there is nothing to digitise.") })
+ return
+      }
+ if (r.status === "reuse") { setBoardReuse({ key, exact: r.exact, similar: r.similar }); return }
+ if (r.status === "error") { setBoardNote({ ok: false, text: r.message }); return }
+ setBoardReuse(null)
+ setBoardNote({ ok: true, text: r.status === "duplicate"
+        ? tl("order", "Already on the board.") : tl("order", "Sent to the designer board.") })
+ reloadBoard()
+    } finally { setBoardBusy(null) }
+  }
+
 
   // The quote is fetched HERE rather than inside the submit button because two places
   // render it: the Summary card (the breakdown) and the confirm dialog (the amount).
@@ -1968,6 +2014,11 @@ export default function OrderDetailPage() {
             items={[
               { id: "items" as const, label: "Items", count: items.length },
               { id: "files" as const, label: "Files", count: dfiles.length || undefined },
+              /* STAFF ONLY. Sending work to a designer is factory business, and §6 is blunt
+                 about the reason: a seller must never learn their design was used by another
+                 seller, which is precisely what the reuse check on the way to the board
+                 reports. The tab is absent for a seller rather than present and refusing. */
+              ...(isStaff ? [{ id: "board" as const, label: "Board", count: boardCards.length || undefined }] : []),
               { id: "history" as const, label: "History" },
               /* A NOTE ON AN ORDER IS THE ONE THING HERE NOBODY MAY MISS — "chỉ trắng giúp
                  em" changes what gets sewn, and it was sitting behind a word that looked
@@ -2394,6 +2445,94 @@ export default function OrderDetailPage() {
               do ask: "what happened to this order" is now a word you press, not a scroll to
               the end of the summary. The staff timeline sits with it, since they answer the
               same question at two grains. */}
+          {/**
+            * THE BOARD TAB — every line, and whether it has reached a designer.
+            *
+            * ONE ROW PER LINE, not per card: the question is "which of this order's lines still
+            * need a designer", and a list of cards can only answer it by omission. A line that
+            * cannot be sent says WHY on its own row rather than offering a button that refuses.
+            */}
+          {isStaff && (
+          <div className={detailTab === "board" ? "space-y-5" : "hidden"}>
+            <SectionCard title={tl("order", "Designer board")}>
+              {boardNote && (
+                <div className={"mb-3 rounded-lg border px-3 py-2 text-sm "
+                  + (boardNote.ok ? "border-success/40 bg-success/5 text-foreground" : "border-alert/40 bg-alert/5 text-foreground")}>
+                  {boardNote.text}
+                </div>
+              )}
+              {items.length === 0
+                ? <EmptyState icon={Package} title={tl("order", "No lines on this order")} />
+                : (
+                <div className="divide-y divide-border">
+                  {items.map((it, ix) => {
+                    const key = it.line_id || it.sku || it.name || String(ix)
+                    const card = cardForLine(boardCards, { line_id: it.line_id, sku: it.sku })
+                    const art = boardArtworkFor(designs, it)
+                    const busy = boardBusy === key
+                    const hits = boardReuse?.key === key ? boardReuse : null
+                    return (
+                      <div key={key} className="py-3">
+                        <div className="flex items-center gap-3">
+                          {/* The ARTWORK, not the product photo — what a designer would be
+                              handed is the thing to check before handing it over. */}
+                          <div className="size-10 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                            {art
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              ? <img src={canvasReadableSrc(art)} alt="" className="size-full object-cover" />
+                              : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">{it.name || it.sku || tl("order", "Line")}</div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {[variantOf(it), it.print_type].filter(Boolean).join(" · ") || "—"}
+                            </div>
+                          </div>
+                          {/* THREE STATES, AND THEY ARE NOT THE SAME. On the board already;
+                              nothing to send; ready. §4 forbids drawing "can't" and "done" alike. */}
+                          {card
+                            ? <span className="shrink-0 text-xs text-muted-foreground">{tl("order", "On the board")}{card.col ? ` · ${card.col}` : ""}</span>
+                            : !art
+                              ? <span className="shrink-0 text-xs text-muted-foreground">{tl("order", "No artwork yet")}</span>
+                              : (
+                                <Button size="sm" variant="outline" disabled={busy}
+                                  onClick={() => void sendToBoard(it)}>
+                                  {busy ? tl("order", "Sending…") : tl("order", "Send to board")}
+                                </Button>
+                              )}
+                        </div>
+                        {/* WE MAY HAVE MADE THIS ALREADY. Shown, never acted on (§6) — and the
+                            seller is never told whose it was, only that a file exists. */}
+                        {hits && (
+                          <div className="mt-2 rounded-lg border border-hold/40 bg-hold/5 px-3 py-2 text-xs">
+                            <div className="font-medium text-foreground">
+                              {tl("order", "We may already have this file")}
+                            </div>
+                            <div className="mt-1 text-muted-foreground">
+                              {hits.exact.length > 0 && <>{hits.exact.length} {tl("order", "identical")}</>}
+                              {hits.exact.length > 0 && hits.similar.length > 0 && " · "}
+                              {hits.similar.length > 0 && <>{hits.similar.length} {tl("order", "that look alike")}</>}
+                            </div>
+                            <div className="mt-2 flex gap-2">
+                              <Button size="sm" variant="outline" disabled={busy}
+                                onClick={() => void sendToBoard(it, true)}>
+                                {tl("order", "Send anyway")}
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setBoardReuse(null)}>
+                                {tl("order", "Leave it")}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </SectionCard>
+          </div>
+          )}
+
           <div className={detailTab === "history" ? "space-y-5" : "hidden"}>
 
           {/* FACTORY ONLY. A seller's order page shows them what they need to act on; the

@@ -20,6 +20,7 @@ import { pushToDispatch, getDispatchStatus, getOrders, cachedOrders, streamOrder
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock, stockSkuOf } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
+import { sendLineToBoard } from "@/lib/design-board"
 import { labelableOrders, buyLabelsFor, summarise, releaseLabelBlobs, DEFAULT_BULK_PARCEL } from "@/lib/bulk-labels"
 import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { VariantPicker } from "@/components/app/variant-picker"
@@ -871,70 +872,31 @@ export function OrdersHub() {
  load()
     } finally { setBusy(null) }
   }
-  // Send a line item to the Designer board as a new card (whole-board upsert).
+  /**
+   * Send a line to the Designer board.
+   *
+   * THE ACT ITSELF LIVES IN lib/design-board.ts — the order detail page sends from its own
+   * Board tab and §5 is explicit about what a second copy becomes. What stays here is what is
+   * genuinely local: this screen's busy key, its reuse modal, and its notices.
+   */
  const sendToDesigner = async (o: OrderRow, it: OrderItem, force = false, artOverride?: string) => {
  const key = lineKey(o, it)
-    // A designer card with no artwork is an empty job — there is nothing to digitise and
-    // no way to tell what it should become.
-    //
-    // `artOverride` is the designer window handing over the artwork it just saved: this
-    // component's `designs` map can still be a beat behind that write, and reading only
-    // from it is how a push landed on the guard below and did nothing.
-    //
-    // And it now SAYS SO. This used to be a bare `return` — the commonest way to reach it
-    // was a real push with a real file, and the operator got no card, no error and no
-    // reason, which is indistinguishable from the board being broken.
- const art = artOverride || artworkFor(o, it)
- if (!art) {
+ setBusy(`dsn:${key}`)
+    try {
+ const r = await sendLineToBoard(o, it, { art: artOverride || artworkFor(o, it), force })
+ if (r.status === "no-art") {
+        // SAYS SO. This used to be a bare return, and the commonest way to reach it was a real
+        // push with a real file — no card, no error, indistinguishable from a broken board.
  setActionErr("That line has no saved artwork yet, so there's nothing to digitise. Add artwork and save it first.")
  return
-    }
- setBusy(`dsn:${key}`)
-    // Before spending a designer on this, ask whether we've already made the file. An
-    // exact hit means identical artwork; a fuzzy hit only means it looks alike, so both
-    // are shown to a human rather than acted on. `force` is the human saying "push anyway".
- if (!force && it.sku) {
- try {
- const r = await getDesignReuse(o.id, it.sku, it.line_id)
- if (r && (r.exact.length || r.similar.length)) {
- setReuse({ order: o, item: it, exact: r.exact, similar: r.similar })
- setBusy(null)
+      }
+ if (r.status === "reuse") { setReuse({ order: o, item: it, exact: r.exact, similar: r.similar }); return }
+ if (r.status === "error") {
+ setActionErr(`Couldn't send that line to a designer: ${r.message}`)
  return
-        }
-      } catch { /* lookup is an optimisation — never block the push on it */ }
-    }
- try {
- const cards = await getDesignCards().catch(() => [])
- const dup = (cards ?? []).some((c) =>
- c.order_id === o.id && (it.line_id ? c.line_id === it.line_id : !c.line_id && c.sku === it.sku))
- if (!dup) {
- const card: DesignCard = {
- id: nowId(), order_id: o.id, sku: it.sku || undefined, line_id: it.line_id,
- title: it.name || it.sku || "Design", product: variantOf(it),
-          // The ARTWORK, not the listing photo — a designer needs to see the file
-          // they're digitising, not a product shot.
-          // `art`, not a second artworkFor call — that would re-read the possibly-stale map
-          // and hand the designer a card with no thumbnail on the very push that needed the
-          // override.
- type: it.print_type || undefined, thumb: art || null,
- col: "incoming", pay_status: "pending", payment: 0,
- customer: o.customer?.name ?? null, is_emb: /emb/i.test(it.print_type || ""),
-        }
-        // The RESULT is checked. This is a POST of the ENTIRE board and every card carries
-        // a base64 thumb, so the payload grows with the board and is exactly the shape that
-        // gets rejected once it's big enough — the same hazard deleteDesignCard was split
-        // out to avoid. `api` resolves with {error} rather than throwing on a handled
-        // failure, so awaiting without looking swallowed it.
- const r = await saveDesignCards([...(cards ?? []), card])
- if (r?.error) throw new Error(r.error)
       }
  setSent((prev) => new Set(prev).add(key))
- setNote(dup ? "That line is already on the designer board." : "Sent to the designer board.")
-    } catch (e) {
-      // Was `catch { /* ignore */ }`. A push that failed looked identical to one that
-      // worked: no card, no message, and an operator with no reason to think anything
-      // went wrong until they opened the board and found it empty.
- setActionErr(`Couldn't send that line to a designer: ${e instanceof Error ? e.message : "unknown error"}`)
+ setNote(r.status === "duplicate" ? "That line is already on the designer board." : "Sent to the designer board.")
     } finally { setBusy(null) }
   }
 
