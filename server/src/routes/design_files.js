@@ -604,7 +604,10 @@ export function designFilesRoutes(app, requireAuth) {
     const orderId = String(req.query?.orderId || '');
     if (!orderId) { reply.code(400); return { error: 'orderId is required' }; }
     const r = await q(
-      'select design_id, order_id, sku, line_id, seller_id, file_name, mime, price, kind, source, created_at from design_file_data where order_id=$1 order by created_at',
+      /* `side` travels with the row. The column has existed since per-side artwork did; it was
+   simply never selected, so no client could tell a front logo from a back design and the
+   Files panel asserted "every face" about both. */
+      'select design_id, order_id, sku, line_id, side, seller_id, file_name, mime, price, kind, source, created_at from design_file_data where order_id=$1 order by created_at',
       [orderId]
     );
     if (!isStaff(req.user)) {
@@ -642,7 +645,7 @@ export function designFilesRoutes(app, requireAuth) {
       const mine = ours.filter((x) => x.kind === 'pes' || x.source === 'seller');
       // Tell the seller what's unlocked without handing over any bytes.
       return Promise.all(mine.map(async (x) => ({
-        designId: x.design_id, sku: x.sku, lineId: x.line_id, name: x.file_name, mime: x.mime, kind: x.kind,
+        designId: x.design_id, sku: x.sku, lineId: x.line_id, side: x.side ?? null, name: x.file_name, mime: x.mime, kind: x.kind,
         source: x.source || 'factory',
         price: Number(x.price) || 0, created_at: x.created_at,
         // Their own upload is not a purchase. `paid` drives the button, and a file they
@@ -651,7 +654,7 @@ export function designFilesRoutes(app, requireAuth) {
       })));
     }
     // Staff (every factory board) see every file on the order.
-    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, lineId: x.line_id, name: x.file_name, mime: x.mime, kind: x.kind, source: x.source || "factory", price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
+    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, lineId: x.line_id, side: x.side ?? null, name: x.file_name, mime: x.mime, kind: x.kind, source: x.source || "factory", price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
   });
 
   /**
@@ -673,13 +676,34 @@ export function designFilesRoutes(app, requireAuth) {
     const b = req.body || {};
     // null / '' = the whole order. A real line id scopes it back to one line.
     const lineId = b.lineId ? String(b.lineId) : null;
-    await q('update design_file_data set line_id=$2, updated_at=now() where design_id=$1', [id, lineId]);
+    /**
+     * THE RUNG UNDER THE LINE — which FACE, when the garment prints on more than one.
+     *
+     * The column has existed since per-side artwork did ("NULL means the whole line"), and
+     * nothing could ever set it: this route moved a file between the order and a line and
+     * stopped there. So a front logo and a back design were one undifferentiated list, and
+     * the Files panel said "every face" about both — an assertion the data never made.
+     *
+     * Three answers, the same three `method` and `template_id` already use: absent keeps
+     * what is recorded, null pins the file to the whole LINE, a value pins it to one face.
+     * A file widened to the whole ORDER cannot belong to a face, so that combination clears
+     * the side rather than storing a contradiction.
+     */
+    const sideSpoken = b.side !== undefined;
+    const side = lineId ? (String(b.side || '').trim().toLowerCase().slice(0, 24) || null) : null;
+    await q(
+      `update design_file_data
+          set line_id=$2,
+              side=(case when $4 or $2::text is null then $3 else side end),
+              updated_at=now()
+        where design_id=$1`,
+      [id, lineId, side, sideSpoken]);
     audit(req, 'design_file.scoped', {
       entityType: 'order', entityId: String(row.order_id || ''),
-      after: { design_id: id, line_id: lineId, sku: row.sku || null },
+      after: { design_id: id, line_id: lineId, sku: row.sku || null, ...(sideSpoken ? { side } : {}) },
     });
     egBroadcast({ type: 'design-file', orderId: row.order_id || null });
-    return { ok: true, lineId };
+    return { ok: true, lineId, ...(sideSpoken ? { side } : {}) };
   });
 
   // Download a machine file. Staff any; a seller only their own AND only once paid.

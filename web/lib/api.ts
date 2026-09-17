@@ -1959,7 +1959,17 @@ export type DesignFileRow = { designId: string; sku?: string | null; lineId?: st
   /** WHO put it here — "seller" (they sent it to us) or "factory" (we made it). Visibility
    *  and the buy button both hang off this: a file a seller sent is already theirs, so it is
    *  never offered back to them with a price on it. */
-  source?: "seller" | "factory" }
+  source?: "seller" | "factory"
+  /**
+   * WHICH FACE this file belongs to, when the garment prints on more than one.
+   *
+   * NULL means the whole LINE — a size chart, a customer's reference photo, a stitch file
+   * that really does cover every face. It is the rung under `lineId`, which is itself the
+   * rung under the order, and the three are the same ladder: order › garment › surface. A
+   * reader showing a face's files must ask for BOTH this face and the line-wide ones, or a
+   * file that legitimately applies everywhere disappears from every surface.
+   */
+  side?: string | null }
 
 /** Which files apply to THIS line: its own, else the order-wide ones. Line beats whole-order,
  *  the same precedence designForLine uses for artwork — so a file filed against one item
@@ -2024,10 +2034,14 @@ export function duplicateOrder(id: string) {
  *  gone; the server records it in the order's tag history and broadcasts a refresh. */
 /** Widen a file to the whole order (lineId null) or pin it back to one line. Metadata only
  *  — no bytes move, so it works for a seller, who cannot download their own machine file. */
-export function scopeDesignFile(designId: string, lineId: string | null) {
-  return api<{ ok?: boolean; lineId?: string | null; error?: string }>(
+export function scopeDesignFile(designId: string, lineId: string | null, side?: string | null) {
+  /* `side` is the rung UNDER the line: null pins the file to the whole garment, a face name
+     pins it to that surface. Omitting it leaves whatever is recorded alone, so the existing
+     order↔line callers keep behaving exactly as they did. A file widened to the whole ORDER
+     has no face by definition, and the server clears it rather than storing a contradiction. */
+  return api<{ ok?: boolean; lineId?: string | null; side?: string | null; error?: string }>(
     `/api/design_files/${encodeURIComponent(designId)}/scope`,
-    { method: "POST", body: JSON.stringify({ lineId }) })
+    { method: "POST", body: JSON.stringify({ lineId, ...(side === undefined ? {} : { side }) }) })
 }
 export function deleteDesignFile(designId: string) {
   return api<{ ok?: boolean; error?: string }>(`/api/design_files/${encodeURIComponent(designId)}`, { method: "DELETE" })

@@ -1529,7 +1529,7 @@ export function DesignCanvasDialog({
  const [hasFile, setHasFile] = useState(false)
   /** Every file on this line, whatever kind — the list under the stage. Carries the id
    *  because a row you cannot open is a row that only tells you something is missing. */
- const [lineFiles, setLineFiles] = useState<{ designId: string; kind: string; name: string }[]>([])
+ const [lineFiles, setLineFiles] = useState<{ designId: string; kind: string; name: string; side: string | null }[]>([])
   /**
    * THE SELLER'S MACHINE-FILE LIBRARY — built, and reachable from neither editor until now.
    *
@@ -1603,7 +1603,47 @@ export function DesignCanvasDialog({
       .map((f) => ({ side: f.side, art: all[f.side] }))
       .filter((r): r is { side: string; art: FaceArt } => !!r.art?.data)
   }, [faceArt, sideName, designUrl, pos, designName, faces])
-  const fileCount = lineFiles.length + artFaces.length
+  /**
+   * THE THREE SCOPES, SPLIT ONCE — order › garment › surface.
+   *
+   * `filesForLine` has already narrowed the order's files to this GARMENT. The rung under it
+   * was in the data all along (design_file_data.side, "NULL means the whole line") and no
+   * reader used it, so a front logo and a back design sat in one undifferentiated list and
+   * the panel printed "every face" about both — an assertion the row never made.
+   *
+   * A file pinned to ANOTHER face is not shown here. That is the point of a scope: the order
+   * page's Files tab is the flat everything-view, this window is the garment, and this group
+   * is the surface in front of you.
+   */
+ const surfaceFiles = useMemo(() => lineFiles.filter((f) => f.side === sideKey), [lineFiles, sideKey])
+ const itemFiles = useMemo(() => lineFiles.filter((f) => !f.side), [lineFiles])
+  /**
+   * WHAT THE BADGE COUNTS — everything the tab will show, which is both groups plus the
+   * artwork on this face. It moves as you click the rail, because the surface half of it
+   * does; that is the whole reason a count belongs here rather than a line-wide total, which
+   * read identically on every face and taught the reader that the tabs ignore the rail.
+   */
+ const fileCount = surfaceFiles.length + itemFiles.length + (artFaces.some((f) => f.side === sideKey) ? 1 : 0)
+  /**
+   * IS THE SURFACE IN FRONT OF YOU STITCHED?
+   *
+   * Threads and Board are stitch apparatus, and `isEmb` reads the LINE — so on a garment
+   * embroidered at the front and printed at the back they were either wrongly present on the
+   * ink face or wrongly missing from the stitched one, and no click could change it.
+   */
+ const faceIsEmb = isEmbroidery(faceMethod[sideKey] || liveItem.print_type)
+  /**
+   * DOES THIS GARMENT STITCH ANYWHERE? — which is a different question, and it decides
+   * whether the tabs EXIST rather than whether they are usable.
+   *
+   * Keeping the two apart is what stops this change reaching orders it has nothing to do
+   * with. A line that is DTG everywhere still shows no stitch tabs at all, exactly as today;
+   * a line that is embroidery everywhere still shows them enabled on every face, exactly as
+   * today. Only a MIXED line sees the new state — present, and disabled on the ink face with
+   * the reason on the hover. The tab strip therefore never changes LENGTH as you click
+   * around one garment, which is the flicker that made hiding them the wrong answer.
+   */
+ const lineHasStitch = isEmb || Object.values(faceMethod).some((m) => isEmbroidery(m))
   // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
   // current after a revision, instead of a bare "added".
  const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
@@ -1966,7 +2006,7 @@ export function DesignCanvasDialog({
            * machine file — and nothing on this screen could answer it once the summary strip
            * came off. The rail badge answers it; the tier still reads `hasFile`.
            */
- setLineFiles(forLine.map((f) => ({ designId: f.designId, kind: String(f.kind || ""), name: f.name || "" })))
+ setLineFiles(forLine.map((f) => ({ designId: f.designId, kind: String(f.kind || ""), name: f.name || "", side: f.side ? String(f.side).toLowerCase() : null })))
  const mine = forLine.filter((f) => f.kind === "emb" || f.kind === "pes")
  setHasFile(mine.length > 0)
  const newest = mine.slice().sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0]
@@ -2119,7 +2159,14 @@ export function DesignCanvasDialog({
        */
  setLineFiles((prev) => prev.some((x) => x.designId === designId)
         ? prev
- : [...prev, { designId, kind: /\.pes$/i.test(f.name) ? "pes" : "emb", name: f.name }])
+ /* NULL, BECAUSE THAT IS WHAT THE SERVER STORED. POST /api/design_files takes a
+             line and no face, so a dropped file belongs to the garment — and an optimistic
+             row claiming the surface would sit in the wrong group until a reload moved it,
+             which is a lie with a delayed correction rather than a guess.
+             Carrying the face through the drop is the next step and it wants one rule: take
+             the selected face only when there is more than one to choose between, so a
+             single-face line keeps behaving exactly as it does today. */
+ : [...prev, { designId, kind: /\.pes$/i.test(f.name) ? "pes" : "emb", name: f.name, side: null }])
  return true
     } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`); return false }
   }, [orderId, item.line_id, item.sku])
@@ -3286,8 +3333,19 @@ export function DesignCanvasDialog({
                  line the image IS the print file. A tab that is always empty on half the
                  orders is worse than no tab. Non-embroidery lines reach a designer from the
                  rail, which is where that route already lives. */
-              ...(isEmb ? [
-                { id: "threads", label: tl("canvas", "Threads"), count: Object.keys(picks).length || undefined },
+              /* PRESENT BECAUSE THE GARMENT STITCHES SOMEWHERE, USABLE BECAUSE THIS FACE
+                 DOES. `isEmb` alone reads the LINE, so on a garment embroidered at the front
+                 and printed at the back these were either wrongly offered on the ink face or
+                 wrongly missing from the stitched one — and clicking the rail could not change
+                 it, which is the whole complaint. Splitting the two questions also keeps the
+                 strip a FIXED LENGTH within one garment: it never reflows under the pointer,
+                 which is the reason TabBarItem carries `disabled` rather than being omitted. */
+              ...(lineHasStitch ? [
+                { id: "threads", label: tl("canvas", "Threads"),
+                  count: faceIsEmb ? (Object.keys(picks).length || undefined) : undefined,
+                  disabled: !faceIsEmb,
+                  title: faceIsEmb ? undefined
+                    : tl("canvas", "Threads are for stitching. This surface is printed — set its type to Embroidery and they come back.") },
                 /* BOARD IS STAFF-ONLY, and the tab has to know it. Sending a line to the
                    design board is a factory act — the route is gated, so a seller who opened
                    this tab got the panel, filled in the tier and the note, pressed Send and
@@ -3295,7 +3353,13 @@ export function DesignCanvasDialog({
                    worse than no control: it advertises a capability, takes the work of using
                    it, and then withdraws it. The rail's own route to a designer is the one a
                    seller has, and it is unaffected. */
-                ...(isStaff ? [{ id: "board", label: tl("canvas", "Board") }] : []),
+                ...(isStaff ? [{ id: "board", label: tl("canvas", "Board"),
+                  disabled: !faceIsEmb,
+                  /* The board is the DIGITISING queue, and there is nothing to digitise on a
+                     printed surface — the image IS the print file. So the tab refuses with its
+                     reason rather than opening a panel whose Send could only be meaningless. */
+                  title: faceIsEmb ? undefined
+                    : tl("canvas", "The design board is for digitising. This surface is printed, so there is nothing to send.") }] : []),
               ] : []),
             ]}
           />
@@ -3635,22 +3699,42 @@ export function DesignCanvasDialog({
             {/* ONE ROW SHAPE for every file on the line, whatever it is and wherever it came
                 from — the same FileRow the drop zones and the order page print. The artwork
                 above and a stitch file below were two different rows for two files doing the
-                same job of being ON this line. */}
-            <div className="flex flex-col gap-1">
-              {lineFiles.map((f) => (
+                same job of being ON this line.
+
+                TWO GROUPS NOW, BECAUSE THERE ARE TWO SCOPES AND THE LIST WAS ASSERTING ONE.
+                design_file_data has carried a `side` since per-side artwork did — "NULL means
+                the whole line" — and no reader ever asked for it, so a front logo and a back
+                design sat in one undifferentiated list while the note underneath said "every
+                face" about both. That note was the panel making a claim the row never made.
+                The order page's Files tab stays the flat everything-view; this window is one
+                garment, and the first group is the surface in front of you. */}
+            {([
+              [surfaceFiles, `${tl("sides", sideKey)} · ${tl("canvas", "this surface")}`],
+              /* Named for what it IS, not for what it is not: a size chart or a customer's
+                 reference photo belongs to the garment however many faces it has. */
+              [itemFiles, tl("canvas", "Whole item")],
+            ] as const).filter(([list]) => list.length > 0).map(([list, heading]) => (
+            <div key={heading} className="flex flex-col gap-1">
+              {/* Only drawn when BOTH groups have something. One group needs no heading —
+                  a label over a list with nothing to distinguish it from is furniture. */}
+              {surfaceFiles.length > 0 && itemFiles.length > 0 && (
+                <div className="mt-1 text-2xs font-medium uppercase tracking-wide text-muted-foreground first:mt-0">{heading}</div>
+              )}
+              {list.map((f) => (
                 <FileRow
                   key={f.designId}
                   file={{
                     name: f.name || "Untitled file",
                     /* The format, or what is happening to the row — the sub-line carries
                        FACTS, and "Downloading…" is one while it is true. */
-                    /* "· every face" on a MACHINE row, because that is what looked like a
-                       bug: one .EMB seen on the front and again on the back. It is one file
-                       on the line — a stitch file is not a per-face thing — and saying so is
-                       cheaper than a list that leaves you to work it out. */
+                    /* "· every face" was the stale half. It was written when nothing could
+                       pin a file to a surface, so a machine file seen on the front and again
+                       on the back looked like a bug and the note explained it away. A file
+                       that says which face it is for is not on every face, and only the
+                       line-scoped group can still honestly claim to be. */
                     note: dlBusy === f.designId
                       ? "Working…"
-                      : [fileRoleLabel(f.kind), artFaces.length > 1 ? tl("canvas", "every face") : null]
+                      : [fileRoleLabel(f.kind), !f.side && artFaces.length > 1 ? tl("canvas", "every face") : null]
                           .filter(Boolean).join(" · "),
                     /* NO status here. FileRow's "uploading" prints "Uploading…" under the
                        name, and this row is DOWNLOADING — the same spinner would be saying
@@ -3669,6 +3753,7 @@ export function DesignCanvasDialog({
                 />
               ))}
             </div>
+            ))}
             {/* THE ONE PLACE A FILE ERROR IS SAID. It used to sit inside the `isEmb` block,
                 so a failed open on a DTG line set the message and nothing rendered it. */}
             {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
