@@ -314,23 +314,36 @@ export function sandboxRoutes(app, requireAuth) {
   // ─────────────────────────  /api/v1/*  (mode-aware: TEST simulates, LIVE is real)  ────────
   // A LIVE key (egk_live_…) makes these do the real thing; a TEST key simulates. Same paths,
   // so a partner flips one key to go from sandbox → production (PayPal-style).
-  const priceLines = (items) => (items || []).map((it, i) => {
-    const prod = SANDBOX_PRODUCTS.find((p) => p.id === it.product_id);
-    const qty  = Math.max(1, parseInt(it.quantity, 10) || 1);
-    const unit = (it.unit_price != null && it.unit_price !== '') ? parseFloat(it.unit_price) : (prod ? prod.base_price : 12.0);
-    return { line: i + 1, sku: it.product_id || it.sku || null, product: prod ? prod.name : (it.name || 'Custom item'),
-      color: it.color || null, size: it.size || null, method: it.method || 'DTG', quantity: qty,
-      unit_price: +unit.toFixed(2), line_total: +(unit * qty).toFixed(2) };
-  });
+  /**
+   * THE LOCAL `priceLines` IS GONE, AND ITS LAST ACT WAS TO SHADOW THE REAL ONE.
+   *
+   * A `const priceLines` used to sit here: the original sandbox pricer, looking SKUs up in
+   * SANDBOX_PRODUCTS (four demo items) and falling back to a flat 12.00. `priceLiveLines`
+   * below replaced it for BOTH modes when the sandbox was made to price from the real
+   * catalogue, which left it uncalled — but not harmless, because the name is also imported
+   * from ../pricing.js at the top of this file, and a local const shadows an import for the
+   * whole of sandboxRoutes.
+   *
+   * So POST /api/v1/orders/quote — the one route that wants the REAL priceLines — got this
+   * one instead. It returns an ARRAY, the route destructures `{ lines, unpriced }` from it,
+   * and `unpriced.length` threw for EVERY payload: the endpoint answered 500 "Cannot read
+   * properties of undefined (reading 'length')" for a valid SKU, an unknown SKU and an empty
+   * item alike, from the day it shipped. Dead code cannot look wrong, which is why reading
+   * it found nothing — the real pricer returned a correct quote whenever it was called
+   * directly with the same data in the same container.
+   *
+   * A NAME IS A DEPENDENCY. Deleting an unused local is normally cosmetic; here it is the
+   * fix, and a second local named after an import would break the same route again.
+   */
 
   /**
    * Price a LIVE order line from the real catalogue — the same path that bills every
    * other order in the system.
    *
-   * priceLines() above is for the SANDBOX: it looks SKUs up in SANDBOX_PRODUCTS (four demo
-   * items) and falls back to a flat 12.00. That is fine for a simulation and was very much
-   * not fine here — a partner pushing any real SKU created a genuine order in the factory
-   * queue at an invented price, and the floor made it.
+   * The sandbox pricer this replaced looked SKUs up in SANDBOX_PRODUCTS (four demo items)
+   * and fell back to a flat 12.00. That was fine for a simulation and was very much not fine
+   * here — a partner pushing any real SKU created a genuine order in the factory queue at an
+   * invented price, and the floor made it. It is deleted now; see the note above.
    *
    * A partner-supplied unit_price is IGNORED. What they pay is ours to compute; letting the
    * caller name our cost means a line arrives at 0.01 and gets produced.
