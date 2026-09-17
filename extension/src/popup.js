@@ -147,14 +147,34 @@ function statsLine(s, toSend) {
   return ver
 }
 
+/**
+ * WHERE THE ORDERS WERE READ FROM, IN THE SELLER'S WORDS.
+ *
+ * `s.how` is the name of a PARSING STRATEGY — `json`, `card`, `address-block`. Those mean
+ * something to whoever edits parse.js and nothing at all to the person pressing Sync, and
+ * the panel used to print them raw. The diagnostic value is real (knowing Etsy's own data
+ * stopped being available is how a quiet degradation gets caught), so it is translated
+ * rather than dropped: the same fact, in words that answer "where did this come from".
+ */
+const SOURCE_WORDS = {
+  json: 'from Etsy\u2019s own order data',
+  card: 'from the order list',
+  'address-block': 'from the address panel',
+  text: 'from the page text',
+}
+
 /* The full reading, for whoever is looking for it. Kept off the face of the panel and on
-   the element, so the detail survives without being read aloud on every healthy page. */
+   the element, so the detail survives without being read aloud on every healthy page.
+   NO PARSER VOCABULARY HERE. "unreadable", "usable", "rows" and a strategy name are words
+   from inside this codebase; the person hovering runs a shop. Every line says what happened
+   to their orders, and the one that matters is the count we could not read \u2014 that is the
+   real answer to "why didn't it pick up that order". */
 function statsTitle(s, toSend) {
   const found = s.foundOnPage || 0
-  const bits = [`${found} found on this page`, `${toSend} to send`]
+  const bits = [`${found} ${found === 1 ? 'order' : 'orders'} on this page`, `${toSend} to send`]
   const bad = found - (s.usable || 0)
-  if (bad > 0) bits.push(`${bad} unreadable`)
-  if (s.how) bits.push(`read via ${s.how}`)
+  if (bad > 0) bits.push(`${bad} we couldn\u2019t read`)
+  if (s.how) bits.push(SOURCE_WORDS[s.how] || 'read from the page')
   return bits.join(' \u00b7 ')
 }
 
@@ -388,10 +408,14 @@ async function sync() {
         ({ order_id, buyer, buyer_email, total, ship_by, created_at, address, items }))
       try {
         const res = await api(`/api/reader/${PLATFORM}/import`, { method: 'POST', body: JSON.stringify({ rows: orders }) })
-        if (res.created) said.push(`${res.created} ${res.created === 1 ? 'order' : 'orders'} created`)
-        if (res.existed) said.push(`${res.existed} already there`)
-        if (res.skipped) said.push(`${res.skipped} skipped`)
-        if (res.notYours) said.push(`${res.notYours} not yours`)
+        /* THE SELLER'S WORDS, NOT THE ROUTE'S. The server returns `created`, `existed`,
+           `skipped`, `notYours` — field names, and two of them are meaningless to whoever
+           pressed the button. "skipped" in particular hides the only actionable fact in the
+           whole reply: we could not read that order, so it is still sitting on Etsy. */
+        if (res.created) said.push(`${res.created} ${res.created === 1 ? 'order' : 'orders'} added`)
+        if (res.existed) said.push(`${res.existed} already in egful`)
+        if (res.skipped) said.push(`${res.skipped} we couldn\u2019t read`)
+        if (res.notYours) said.push(`${res.notYours} from another shop`)
         NEW_ORDERS = []
       } catch (e) { trouble = e.message }
     }
@@ -404,8 +428,8 @@ async function sync() {
         // What was just filled is no longer wanted, so a second press cannot double-send.
         WANTED = WANTED.filter((id) => !rows.some((r) => r.order_id === id))
         ROWS = []
-        if (res.updated) said.push(`${res.updated} ${res.updated === 1 ? 'address' : 'addresses'} filled`)
-        if (res.alreadyHad) said.push(`${res.alreadyHad} already had one`)
+        if (res.updated) said.push(`${res.updated} ${res.updated === 1 ? 'address' : 'addresses'} filled in`)
+        if (res.alreadyHad) said.push(`${res.alreadyHad} already had an address`)
       } catch (e) { trouble = trouble || e.message }
     }
 
