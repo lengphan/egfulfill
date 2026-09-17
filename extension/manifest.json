@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "egful",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Bring orders from your own Etsy Shop Manager page into egful \u2014 items, quantities and buyer addresses \u2014 without connecting a shop.",
   "permissions": [
     "storage",
