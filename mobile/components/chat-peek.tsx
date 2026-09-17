@@ -3,7 +3,7 @@ import { Pressable, View, Text, Animated, Easing, AccessibilityInfo, ActivityInd
 import { useRouter, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, getSupportThreads, getOrderMessages, type SupportThread, type ChatEntry } from "@/lib/api"
-import { C, F, R, S, TAB_BAR } from "@/lib/theme"
+import { C, F, R, S, TAB_BAR, LIFT } from "@/lib/theme"
 
 /**
  * THE PEEK — a bubble that opens into the conversation.
@@ -39,6 +39,30 @@ import { C, F, R, S, TAB_BAR } from "@/lib/theme"
 const BUBBLE = 56
 const HEAD_H = 58
 const OPEN_H = 380
+
+/**
+ * THE SMALLEST THING THAT STOPS ASTERISKS REACHING THE SCREEN.
+ *
+ * The factory brief is written as markdown and was printed verbatim, so a message opened with
+ * a literal `**Blocking Issues:**` and a `- ` in front of every line. That is not a rendering
+ * style, it is an unrendered document.
+ *
+ * NOT A MARKDOWN LIBRARY. A dependency for two constructs is weight on a screen that has to
+ * open in one frame, and the phone's rule about native modules applies to JS ones too: the
+ * peek is READ-ONLY and answers one question — what do they want — so it needs bold and it
+ * needs bullets. Anything richer belongs on the chat screen, which is one tap away.
+ *
+ * Unmatched asterisks are left alone rather than swallowed: a stray `*` in a seller's message
+ * is a character they typed, and eating it would be a second, quieter kind of wrong.
+ */
+function rich(text: string | null | undefined): { text: string; bold: boolean }[][] {
+  return String(text ?? "").split("\n").map((raw) => {
+    const line = raw.replace(/^\s*[-*\u2022]\s+/, "\u2022  ")
+    const parts = line.split(/\*\*(.+?)\*\*/g)
+    // split() with one capture group alternates: plain, captured, plain, captured…
+    return parts.map((piece, i) => ({ text: piece, bold: i % 2 === 1 })).filter((p) => p.text !== "")
+  }).filter((l) => l.length > 0)
+}
 
 export function ChatPeek() {
   const router = useRouter()
@@ -82,31 +106,66 @@ export function ChatPeek() {
   const top = threads[0]
   const waiting = threads.reduce((n, t) => n + (Number(t.unanswered) || 0), 0)
 
-  /* THE PANEL GROWS FROM THE BUBBLE, it does not appear over it. The box is anchored to the
-     bottom-right corner, so width and height both grow AWAY from that corner — which is what
-     makes the close feel like putting it back rather than dismissing a dialog.
-     ONE driver, three interpolations: two Animated.Values for width and height can be
-     interrupted at different points and leave the box a shape neither state describes. */
+  /*
+   * THE PANEL GROWS FROM THE BUBBLE — ON THE NATIVE THREAD.
+   *
+   * It used to animate `width`, `height` and `borderRadius`, and NONE of those three can be
+   * driven natively, which is why the call carried `useNativeDriver: false`. So every frame
+   * of the open crossed the JS bridge and was re-laid-out in JavaScript — and the peek opens
+   * precisely when a screen is busy fetching, which is when the JS thread has least to give.
+   * That is the whole of "the motion is not smooth": it was not a curve that needed tuning,
+   * it was three properties that can only be animated in the wrong place.
+   *
+   * TRANSFORM AND OPACITY ONLY, therefore. The panel is laid out ONCE at its full size and
+   * scaled down to the bubble's footprint at rest, so nothing re-measures and nothing
+   * re-wraps mid-flight — the old version reflowed the type on every single frame.
+   *
+   * THE CORNER IS PINNED WITH ARITHMETIC, NOT `transformOrigin`. A transform scales about the
+   * centre, so shrinking by `s` pulls the bottom-right corner inward by (1-s)·W/2 and
+   * (1-s)·H/2; translating by exactly that puts it back. Listing the translates BEFORE the
+   * scale is what makes it true — the centre moves by the translation and the scale then
+   * happens about the moved centre. `transformOrigin` would say the same thing in one line,
+   * but this composes to a plain matrix on any version and cannot silently stop being
+   * native-driver-safe.
+   *
+   * A SPRING, NOT A CURVE, for the open. A 320ms ease-out is a distance travelled in a fixed
+   * time; a spring is a thing with weight arriving, which is what "smooth" means when people
+   * say it about a panel. The close is a short timing — putting something back should not
+   * take as long as taking it out, and it should not bounce.
+   */
   const scroller = useRef<ScrollView | null>(null)
   const t = useRef(new Animated.Value(0)).current
   useEffect(() => {
     const to = open ? 1 : 0
     if (reduced) { t.setValue(to); return }
-    const a = Animated.timing(t, {
-      toValue: to, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: false,
-    })
+    const a = open
+      ? Animated.spring(t, {
+          toValue: 1, useNativeDriver: true,
+          /* Mild, and deliberately not bouncy: a panel that overshoots reads as a toy. */
+          stiffness: 190, damping: 22, mass: 0.9,
+          restDisplacementThreshold: 0.001, restSpeedThreshold: 0.01,
+        })
+      : Animated.timing(t, {
+          toValue: 0, duration: 170, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+        })
     a.start()
     return () => a.stop()
   }, [open, reduced, t])
 
   const OPEN_W = winW - S.lg * 2
-  const boxW = t.interpolate({ inputRange: [0, 1], outputRange: [BUBBLE, OPEN_W] })
-  const boxH = t.interpolate({ inputRange: [0, 1], outputRange: [BUBBLE, OPEN_H] })
-  const boxR = t.interpolate({ inputRange: [0, 1], outputRange: [BUBBLE / 2, R.card] })
+  /* The resting scale is the bubble's width as a fraction of the panel's, so the shrunken
+     panel occupies almost exactly the bubble's footprint and the cross-fade has nothing to
+     hide. The height lands within a few points of BUBBLE at the same scale, which is why one
+     uniform scale is enough and a second axis is not. */
+  const REST = BUBBLE / OPEN_W
+  const scale = t.interpolate({ inputRange: [0, 1], outputRange: [REST, 1] })
+  const panTX = t.interpolate({ inputRange: [0, 1], outputRange: [(1 - REST) * OPEN_W / 2, 0] })
+  const panTY = t.interpolate({ inputRange: [0, 1], outputRange: [(1 - REST) * OPEN_H / 2, 0] })
   /* The two contents CROSS-fade rather than swapping at the midpoint: the bubble is gone
-     before the box is wide enough to show a name, and the panel arrives once it is. */
-  const bubbleOp = t.interpolate({ inputRange: [0, 0.35], outputRange: [1, 0], extrapolate: "clamp" })
-  const panelOp = t.interpolate({ inputRange: [0.45, 1], outputRange: [0, 1], extrapolate: "clamp" })
+     before the panel is wide enough to show a name, and the panel arrives once it is. */
+  const bubbleOp = t.interpolate({ inputRange: [0, 0.3], outputRange: [1, 0], extrapolate: "clamp" })
+  const bubbleSc = t.interpolate({ inputRange: [0, 0.3], outputRange: [1, 1.25], extrapolate: "clamp" })
+  const panelOp = t.interpolate({ inputRange: [0.12, 0.55], outputRange: [0, 1], extrapolate: "clamp" })
 
   /* The conversation is fetched only when it is actually opened. A peek that pre-loads every
      waiting thread is a poll with extra steps. */
@@ -137,15 +196,21 @@ export function ChatPeek() {
       pointerEvents="box-none"
       style={{ position: "absolute", right: S.lg, bottom: TAB_BAR.clearance + S.sm, alignItems: "flex-end" }}
     >
-      <Animated.View
-        style={{ width: boxW, height: boxH, borderRadius: boxR, backgroundColor: C.hueDeep, overflow: "hidden" }}
-      >
+      {/* The wrapper is now the size of the OPEN panel and draws nothing. The bubble and the
+          panel are siblings inside it, each with its own transform — the box that used to
+          grow between them was the thing that could not be animated natively. */}
+      <View style={{ width: OPEN_W, height: OPEN_H, justifyContent: "flex-end", alignItems: "flex-end" }} pointerEvents="box-none">
         {/* THE BUBBLE. Pinned to the bottom-right at its FINAL size rather than filling the
             box: centred content in a box that is growing drifts across the screen while it
             fades, which reads as two objects rather than one opening. */}
         <Animated.View
           pointerEvents={open ? "none" : "auto"}
-          style={{ position: "absolute", right: 0, bottom: 0, width: BUBBLE, height: BUBBLE, opacity: bubbleOp }}
+          style={{
+            position: "absolute", right: 0, bottom: 0, width: BUBBLE, height: BUBBLE,
+            borderRadius: BUBBLE / 2, backgroundColor: C.hueDeep,
+            opacity: bubbleOp, transform: [{ scale: bubbleSc }],
+            ...LIFT,
+          }}
         >
           <Pressable
             onPress={() => setOpen(true)}
@@ -163,7 +228,15 @@ export function ChatPeek() {
             corner — so the type does not re-wrap on every frame of the growth. */}
         <Animated.View
           pointerEvents={open ? "auto" : "none"}
-          style={{ position: "absolute", right: 0, bottom: 0, width: OPEN_W, height: OPEN_H, opacity: panelOp }}
+          style={{
+            position: "absolute", right: 0, bottom: 0, width: OPEN_W, height: OPEN_H,
+            borderRadius: R.card, backgroundColor: C.hueDeep, overflow: "hidden",
+            opacity: panelOp,
+            /* Translate BEFORE scale: the centre moves by the translation and the scale then
+               happens about the moved centre, which is what pins the bottom-right corner. */
+            transform: [{ translateX: panTX }, { translateY: panTY }, { scale }],
+            ...LIFT,
+          }}
         >
           {/* THE HEAD — who, and the way back to the bubble. */}
           <Pressable
@@ -179,7 +252,10 @@ export function ChatPeek() {
               width: 30, height: 30, borderRadius: R.pill, backgroundColor: C.hueMist,
               alignItems: "center", justifyContent: "center",
             }}>
-              <Text style={{ color: "#FFFFFF", fontSize: 13, fontFamily: F.semi }}>{initial}</Text>
+              {/* Same pair, same fault: an initial in white on the mist wash. `hueDeep` is
+                  the value that reads on its own wash — 4.51:1, and the only periwinkle that
+                  does both jobs a hue has to do. */}
+              <Text style={{ color: C.hueDeep, fontSize: 13, fontFamily: F.semi }}>{initial}</Text>
             </View>
 
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -227,8 +303,27 @@ export function ChatPeek() {
                       borderRadius: R.chip, paddingHorizontal: 11, paddingVertical: 7,
                     }}
                   >
-                    <Text style={{ fontSize: 13.5, fontFamily: F.body, color: m.me ? "#FFFFFF" : "#FFFFFF" }}>
-                      {m.text}
+                    {/* A TERNARY RETURNING THE SAME VALUE ON BOTH BRANCHES is what shipped
+                        here, which is proof the intent was two colours and only one was ever
+                        written. So an incoming message was white on the `hueMist` wash —
+                        1.15:1, invisible — while the bubble underneath it looked perfectly
+                        fine, which is why it survived. Ink on that ground is 14.75:1.
+                        The gate already DECLARED the right pair — ink on the action wash —
+                        and still missed this, because it measures the palette rather than
+                        what a component paints with, and a bare "#FFFFFF" is allow-listed
+                        everywhere for the good reason that it usually is fine. The inverse
+                        is asserted in the gate's SHAPE half now. */}
+                    <Text style={{ fontSize: 13.5, color: m.me ? "#FFFFFF" : C.ink }}>
+                      {rich(m.text).map((line, li) => (
+                        <Text key={li}>
+                          {li > 0 ? "\n" : ""}
+                          {line.map((piece, pi) => (
+                            <Text key={pi} style={{ fontFamily: piece.bold ? F.semi : F.body }}>
+                              {piece.text}
+                            </Text>
+                          ))}
+                        </Text>
+                      ))}
                     </Text>
                   </View>
                 ))
@@ -249,7 +344,7 @@ export function ChatPeek() {
             </Pressable>
           </View>
         </Animated.View>
-      </Animated.View>
+      </View>
 
       {/* THE COUNT sits OUTSIDE the box, because the box clips — a badge on the corner of a
           circle is half outside it by definition, and moving it inside a 56pt bubble would
@@ -259,7 +354,11 @@ export function ChatPeek() {
       <Animated.View
         pointerEvents="none"
         style={{
-          position: "absolute", top: -3, right: -3, opacity: bubbleOp,
+          /* ON THE BUBBLE'S CORNER, not the wrapper's. The wrapper used to hug the bubble, so
+             top/right -3 landed on it; it is the open panel's size now, and the same two
+             values would have parked the count at the top of an invisible 380pt box. Measured
+             off BUBBLE so it cannot drift if that changes. */
+          position: "absolute", bottom: BUBBLE - 19, right: -3, opacity: bubbleOp,
           minWidth: 22, height: 22, borderRadius: R.pill, paddingHorizontal: 6,
           backgroundColor: C.hueDeep, alignItems: "center", justifyContent: "center",
         }}

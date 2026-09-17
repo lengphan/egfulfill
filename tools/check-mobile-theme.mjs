@@ -122,6 +122,15 @@ const SHAPE = [
   [T.ink40, PAGE, 4.5, "ink40 is NOT TEXT — the kit set inactive tab labels in it at 2.47:1"],
   [T.hairline, PAGE, 3, "the hairline is a line, not a target"],
   [T.hueBase, PAGE, 4.5, "the identity periwinkle carries no small text — that is `hueDeep`'s job"],
+  /* WHITE IS NOT A UNIVERSAL FOREGROUND, and this is the pair that proves it. chat-peek set
+     an incoming message with `m.me ? "#FFFFFF" : "#FFFFFF"` — a ternary returning the same
+     value on both branches — so the message that is NOT yours rendered white on the mist
+     wash at 1.15:1. The FLOOR list already declared the right pair (ink on hueMist, 14.75:1);
+     what nothing said was that the wrong one is wrong, and a bare "#FFFFFF" is allow-listed
+     everywhere precisely because it usually is fine. So it is asserted here instead: white on
+     a pale wash must NEVER clear, and if it ever does, that wash has stopped being pale. */
+  ["#FFFFFF", T.hueMist, 4.5, "white is not type on the action wash — chat-peek shipped it at 1.15:1"],
+  ["#FFFFFF", T.limeWash, 4.5, "nor on the lime wash, for the same reason"],
 ]
 
 /* ---- run ------------------------------------------------------------------------------ */
