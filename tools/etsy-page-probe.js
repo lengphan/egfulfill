@@ -48,44 +48,58 @@
   say('scripts w/ transactions :', withTransactions, '(0 means the JSON strategy cannot work)')
   say('of those, valid JSON    :', parseable, '  largest chars:', biggest)
 
-  /* 3. WHAT AN ORDER ROW IS MADE OF. Walk up from the first order link the way the reader
-        does, and describe the container: its tag, its classes, and every link shape inside. */
+  /* 3. EVERY LEVEL ABOVE THE ORDER LINK, rather than one guessed container.
+        The first version walked up until a level held MORE than one order link and reported
+        that — which is the list, not the row, and on a page filtered to a single order it is
+        most of <body>. Reporting each level instead cannot pick wrong: the row is whichever
+        level first contains the thumbnails, and that is visible in the counts. */
   const a0 = orderLinks[0]
-  if (!a0) { say('NO ORDER LINKS — is this the sold-orders page, and is it finished loading?'); return }
-  let n = a0, up = 0
-  while (n.parentElement && up < 12) {
-    n = n.parentElement; up++
-    if (n.querySelectorAll('a[href*="order_id="]').length > 1) { n = n; break }
-  }
+  if (!a0) { say('NO ORDER LINKS \u2014 is this the sold-orders page, and has it finished loading?'); return }
   say('')
-  say('--- one order row, ' + up + ' levels up ---')
-  say('container      :', n.tagName.toLowerCase(), cls(n) && ('.' + cls(n)))
-  say('text length    :', (n.textContent || '').trim().length, 'chars (content NOT printed)')
+  say('--- levels above the first order link ---')
+  say('   lvl  tag.class                        imgs links  chars')
+  let n = a0
+  for (let up = 0; up <= 10 && n; up++, n = n.parentElement) {
+    if (!n.tagName) break
+    const tag = n.tagName.toLowerCase() + (cls(n) ? '.' + cls(n) : '')
+    say('   ' + String(up).padEnd(4)
+      + tag.slice(0, 32).padEnd(33)
+      + String(n.querySelectorAll('img').length).padEnd(5)
+      + String(n.querySelectorAll('a').length).padEnd(6)
+      + (n.textContent || '').trim().length)
+  }
 
+  /* 4. WHERE AN ITEM LIVES. Anchored on the thumbnails, because an order row cannot render
+        without them and their alt text is usually the product title — which is the field the
+        reader actually needs and currently cannot find. */
+  say('')
+  say('--- thumbnails and what sits around them ---')
+  const imgs = [...document.querySelectorAll('img')].filter((im) => {
+    const s2 = im.getAttribute('src') || ''
+    return /etsystatic|ii_fullxfull|il_/.test(s2)
+  })
+  say('listing-looking images:', imgs.length)
+  for (const im of imgs.slice(0, 3)) {
+    const alt = im.getAttribute('alt') || ''
+    say('   img src', mask(im.getAttribute('src')))
+    say('       alt is', alt.length, 'chars', alt.length ? '(a title lives here)' : '(EMPTY \u2014 no title on the image)')
+    let q = im.parentElement, path = []
+    for (let k = 0; k < 4 && q && q.tagName; k++, q = q.parentElement) {
+      path.push(q.tagName.toLowerCase() + (cls(q) ? '.' + cls(q) : ''))
+    }
+    say('       ancestors:', path.join(' < '))
+  }
+
+  /* 5. LINK SHAPES ACROSS THE WHOLE PAGE. If items do not link to /listing/ they link to
+        something, and that something is what the card reader should key on instead. */
+  say('')
+  say('--- link shapes on this page ---')
   const shapes = new Map()
-  for (const a of n.querySelectorAll('a')) {
+  for (const a of document.querySelectorAll('a')) {
     const k = mask(a.getAttribute('href'))
     shapes.set(k, (shapes.get(k) || 0) + 1)
   }
-  say('link shapes inside this row:')
-  for (const [k, v] of [...shapes].slice(0, 14)) say('   ', v + '×', k)
-
-  say('images inside  :', n.querySelectorAll('img').length)
-  const imgShapes = new Set()
-  for (const im of [...n.querySelectorAll('img')].slice(0, 4)) imgShapes.add(mask(im.getAttribute('src')))
-  for (const k of imgShapes) say('    img', k)
-
-  /* 4. THE DIRECT CHILDREN, so a name for the item container can be found. */
-  say('child skeleton :')
-  const walk = (el, depth) => {
-    if (depth > 3) return
-    for (const c of [...el.children].slice(0, 6)) {
-      say('   '.repeat(depth + 1) + c.tagName.toLowerCase() + (cls(c) ? '.' + cls(c) : '')
-        + '  [' + (c.textContent || '').trim().length + ' chars]')
-      walk(c, depth + 1)
-    }
-  }
-  walk(n, 0)
+  for (const [k, v] of [...shapes].sort((x, y) => y[1] - x[1]).slice(0, 16)) say('   ' + String(v).padEnd(4) + k)
 
   say('')
   say('=== copy everything above ===')
