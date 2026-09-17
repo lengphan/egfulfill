@@ -12,6 +12,8 @@ import { useAccent } from "@/components/app/accent-boot"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { SetupGuide } from "@/components/app/setup-guide"
 import { getUser, getToken } from "@/lib/auth"
+import { refreshUser } from "@/lib/api"
+import { onLive } from "@/lib/live"
 import { isStaffRole, landingFor, staffCanUseAppPath, ordersHomeFor } from "@/lib/staff-nav"
 import { sellerNav, allowedByPerms } from "@/lib/nav"
 import { getMyAccess } from "@/lib/api"
@@ -30,6 +32,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [mode, setMode] = useState<"loading" | "seller" | "staff">("loading")
   const [collapsed, toggleRail] = useRailCollapsed()
+  /**
+   * KEEP THE CACHED "WHO AM I" HONEST, without a sign-out.
+   *
+   * The session is a snapshot written at sign-in. Anything that moved the row afterwards —
+   * an admin correcting an email from the Users page, a role change, a plan upgrade — stayed
+   * invisible until the next login, and the settings page went on offering to repair an
+   * address that had already been repaired.
+   *
+   * THREE MOMENTS, and each catches what the others cannot:
+   *   · on mount      — a reload, and the first paint after signing in
+   *   · on the event  — the server pushes `account` to that user's own sockets, so a change
+   *                     made in one tab (or by an admin in another browser) lands in under a
+   *                     second, with no polling
+   *   · on focus      — the belt: a tab that was asleep while the event went past, or a
+   *                     session whose socket never opened at all
+   *
+   * refreshUser never blanks the session on a failed call — this runs on every focus, and a
+   * flaky network must not log somebody out of a page they are working in.
+   */
+  useEffect(() => {
+    /* Deferred, like every other effect in this shell: react-hooks/set-state-in-effect, and
+       the write lands in a listener that may setState. */
+    const id = setTimeout(() => { void refreshUser() }, 0)
+    const stop = onLive("account", () => { void refreshUser() })
+    const onFocus = () => { void refreshUser() }
+    window.addEventListener("focus", onFocus)
+    return () => { clearTimeout(id); stop(); window.removeEventListener("focus", onFocus) }
+  }, [])
 
   useEffect(() => {
     const id = setTimeout(() => {

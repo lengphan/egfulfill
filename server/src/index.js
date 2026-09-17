@@ -75,7 +75,7 @@ import { alibabaRoutes } from './routes/alibaba.js';
 import { pinkDesignRoutes } from './routes/pinkdesign.js';
 import { backupRoutes } from './routes/backup.js';
 import { piiRetentionRoutes } from './routes/pii_retention.js';
-import { addClient } from './events.js';
+import { addClient, egSendTo } from './events.js';
 import { storageEnabled, putObject, deleteObject, presignGet, publicUrl, designUrlTtlDays } from './storage.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
@@ -700,6 +700,11 @@ app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
     throw e;
   }
   if (!r.rows.length) { reply.code(404); return { error: 'User not found' }; }
+  /* THE OTHER TABS TOO. The tab that made this edit updates its own cached user from the
+     response; every other one this person has open is still holding the snapshot it took at
+     sign-in. Same event the admin editor sends, and the client re-reads /api/me for itself
+     rather than being handed anything here. */
+  egSendTo([String(req.user.sub)], { type: 'account' });
   return r.rows[0];
 });
 

@@ -1,4 +1,4 @@
-import { getToken, clearSession, setToken } from "./auth"
+import { getToken, clearSession, setToken, updateUser } from "./auth"
 import type { SiteContent } from "./site-content"
 
 // Same-origin in production (Caddy reverse-proxies /api → Fastify). For local
@@ -3422,7 +3422,45 @@ export function uploadChatAttachment(dataUrl: string, name: string) {
 
 // Current user's id (sub) from the JWT — used to address the seller's own support thread.
 export function getMe() {
-  return api<{ sub?: string; role?: string; email?: string }>(`/api/me`)
+  /* The server answers with the whole row minus every secret, merged over the token's own
+     claims — so this carries the name, the avatar, the plan and the username too, not just
+     the three fields the old type named. */
+  return api<{ sub?: string; id?: string; role?: string; email?: string; name?: string; username?: string | null
+    avatar_emoji?: string | null; avatar_color?: string | null; notify_sound?: boolean
+    plan?: string; spydeck_addon?: boolean }>(`/api/me`)
+}
+/**
+ * RE-READ WHO I AM, and write it back over the cached session.
+ *
+ * The session is a snapshot taken at sign-in. Anything that changes the row afterwards — an
+ * admin correcting an email from the Users page, a role change, a plan upgrade — was
+ * invisible until the next sign-in, and the page would go on rendering a repair banner over
+ * a field that had already been fixed.
+ *
+ * FIELD BY FIELD, NOT A WHOLESALE REPLACE. The response carries more than the cached shape
+ * and a blind spread would store bookkeeping columns in localStorage forever; picking the
+ * known keys also means a server that starts returning something new cannot silently change
+ * what the client believes about itself.
+ *
+ * A FAILURE LEAVES THE SESSION ALONE. This runs on boot and on every focus, so the network
+ * being briefly unavailable must not blank the user out from under a working page — and a
+ * 401 is already handled one layer down, where lib/api.ts ends the session outright.
+ */
+export async function refreshUser(): Promise<void> {
+  const me = await getMe().catch(() => null)
+  if (!me || !(me.sub || me.id)) return
+  updateUser({
+    id: String(me.id ?? me.sub ?? ""),
+    ...(me.name !== undefined ? { name: me.name } : {}),
+    ...(me.username !== undefined ? { username: me.username } : {}),
+    ...(me.email !== undefined ? { email: me.email } : {}),
+    ...(me.role !== undefined ? { role: me.role } : {}),
+    ...(me.avatar_emoji !== undefined ? { avatar_emoji: me.avatar_emoji } : {}),
+    ...(me.avatar_color !== undefined ? { avatar_color: me.avatar_color } : {}),
+    ...(me.notify_sound !== undefined ? { notify_sound: me.notify_sound } : {}),
+    ...(me.plan !== undefined ? { plan: me.plan } : {}),
+    ...(me.spydeck_addon !== undefined ? { spydeck_addon: me.spydeck_addon } : {}),
+  })
 }
 // Ask the account-aware AI to reply in the seller's support thread. No-op server-side
 // if ANTHROPIC_API_KEY isn't configured ({ ok:false, disabled:true }).

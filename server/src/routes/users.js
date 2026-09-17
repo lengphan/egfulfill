@@ -4,6 +4,7 @@ import { q, withLock } from '../db.js';
 import { moveFunds } from './wallet.js';
 import { hashPassword, passwordProblem, isStaff, canManageUsers } from '../auth.js';
 import { audit } from '../audit.js';
+import { egSendTo } from '../events.js';
 import { readAll } from './factory_settings.js';
 
 const ROLES = ['seller', 'operator', 'admin', 'warehouse', 'designer'];
@@ -254,6 +255,20 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
       before: email != null ? { email: prevEmail } : undefined,
       after: { role, name, active, plan, spydeck_addon, email: email != null ? String(email).trim().toLowerCase() : undefined, password: password ? 'reset' : undefined },
     });
+    /**
+     * TELL THE PERSON IT HAPPENED TO, not the room.
+     *
+     * The browser holds a SNAPSHOT of who you are, taken at sign-in — so an email corrected
+     * here, a role changed, a plan moved, stayed invisible on that person's screen until
+     * they signed in again. Worse than invisible: the settings page went on offering to
+     * repair an address that had already been repaired.
+     *
+     * egSendTo rather than egBroadcast, because this is about one account and carries no
+     * content anyone else has any business being told about. The event says only that
+     * something moved; the client re-reads /api/me for itself, over its own token, so
+     * nothing is asserted here about what that person is allowed to see.
+     */
+    egSendTo([String(req.params.id)], { type: 'account' });
     return { ok: true };
   });
 

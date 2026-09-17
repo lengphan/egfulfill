@@ -29,7 +29,7 @@ import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { VolumeBoard } from "@/components/app/volume-board"
 import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
-import { getUser, updateUser, canSeeMoney } from "@/lib/auth"
+import { getUser, updateUser, canSeeMoney, onUserChange } from "@/lib/auth"
 import { VolumeTiersPanel } from "@/components/app/volume-tiers-panel"
 import { PlanPackagesPanel } from "@/components/app/plan-packages-panel"
 import { UserAvatar, AVATAR_COLORS, AVATAR_EMOJIS } from "@/components/app/user-avatar"
@@ -127,8 +127,11 @@ function ProfilePanel() {
  const [saving, setSaving] = useState(false)
  const [saved, setSaved] = useState(false)
  const [err, setErr] = useState<string | null>(null)
+ /** Is somebody typing in one of these fields right now? A refresh landing mid-edit must
+  *  not replace what they are writing — so the reseed skips exactly those two. */
+ const dirtyRef = useRef(false)
  useEffect(() => {
- const id = setTimeout(() => {
+    const seed = () => {
  const u = getUser()
  setUser(u)
  setName(u?.name ?? "")
@@ -140,8 +143,30 @@ function ProfilePanel() {
  setEmoji(u?.avatar_emoji ?? "")
  setColor(u?.avatar_color ?? AVATAR_COLORS[0])
  setSound(u?.notify_sound !== false)
-    }, 0)
- return () => clearTimeout(id)
+    }
+    const id = setTimeout(seed, 0)
+    /**
+     * AND AGAIN WHENEVER THE CACHED USER MOVES.
+     *
+     * This read the session ONCE at mount, so a change made to the row afterwards — an admin
+     * correcting the email from the Users page, a role change — left this page rendering the
+     * snapshot it opened with. The banner below then went on asking for an address that was
+     * already saved, which is how a fixed account looks broken.
+     *
+     * Only the fields nobody is mid-edit are reseeded, and that is the whole reason this is
+     * not simply `setUser`: typing a new name here while a refresh lands must not have the
+     * field replaced under the cursor. `saved` is left alone for the same reason.
+     */
+    const stop = onUserChange((next) => {
+ setUser(next)
+ const stored2 = next?.email ?? ""
+ const real2 = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(stored2)
+ if (!dirtyRef.current) {
+ setName(next?.name ?? "")
+ setUname(next?.username ?? (!real2 && stored2 ? stored2.toLowerCase() : ""))
+      }
+    })
+ return () => { clearTimeout(id); stop() }
   }, [])
 
   /**
@@ -200,6 +225,10 @@ function ProfilePanel() {
  const next = { name: r.name ?? name.trim(), username: r.username ?? null, email: r.email ?? user?.email, avatar_emoji: emoji || null, avatar_color: color || null, notify_sound: sound }
  updateUser(next)
  setUser((u) => (u ? { ...u, ...next } : u))
+      /* SAVED, SO NOTHING IS MID-EDIT ANY MORE. Without this the fields stay marked dirty
+         for the life of the page and a later refresh — an admin correcting the row from the
+         Users page while this tab is open — would be ignored by the very fields it moved. */
+ dirtyRef.current = false
  setSaved(true)
       // Let the topbar/sidebar pick up the new name + avatar.
  window.dispatchEvent(new CustomEvent("eg-user-changed"))
@@ -231,7 +260,7 @@ function ProfilePanel() {
           <span className="text-sm font-medium">{tl("settings", "Display name")}</span>
           <Input
  value={name}
- onChange={(e) => { setName(e.target.value); setSaved(false) }}
+ onChange={(e) => { dirtyRef.current = true; setName(e.target.value); setSaved(false) }}
  onKeyDown={(e) => { if (e.key === "Enter") save() }}
  placeholder={tl("settings", "Your name")}
  disabled={!user}
@@ -245,7 +274,7 @@ function ProfilePanel() {
           <span className="text-sm font-medium">{tl("settings", "Username")} <span className="font-normal text-muted-foreground">{tl("settings", "— optional, for signing in")}</span></span>
           <Input
  value={uname}
- onChange={(e) => { setUname(e.target.value); setSaved(false) }}
+ onChange={(e) => { dirtyRef.current = true; setUname(e.target.value); setSaved(false) }}
  onKeyDown={(e) => { if (e.key === "Enter") save() }}
  placeholder="yourstorename2026"
  title={tl("settings", "3–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.")}

@@ -124,6 +124,30 @@ export function setSession(token: string, user: User, remember = true) {
   }
 }
 
+/**
+ * WHO WANTS TO KNOW WHEN THE CACHED USER MOVES.
+ *
+ * `getUser()` is a snapshot read at render, so a component that read it at mount keeps the
+ * value it read — which is why an email or a role changed on the server stayed invisible
+ * until the next sign-in, even after the store underneath had been corrected. The `storage`
+ * event does not help: the browser fires it in OTHER tabs, never the one that wrote.
+ *
+ * So the store announces its own changes. Listeners are module-level rather than context,
+ * because every caller of getUser() is already reaching for a module-level function and a
+ * provider would only reach the subtree somebody remembered to wrap.
+ */
+type UserListener = (u: User | null) => void
+const userListeners = new Set<UserListener>()
+function announceUser() {
+  const u = getUser()
+  for (const fn of [...userListeners]) { try { fn(u) } catch { /* a listener must not break a write */ } }
+}
+/** Subscribe to cached-user changes. Returns the unsubscribe. */
+export function onUserChange(fn: UserListener): () => void {
+  userListeners.add(fn)
+  return () => { userListeners.delete(fn) }
+}
+
 // Merge fields into the cached user (e.g. after a profile update). Token unchanged.
 // Written back to whichever store actually holds the session, so a profile edit in a
 // non-persistent session doesn't silently create a persistent one.
@@ -132,7 +156,7 @@ export function updateUser(patch: Partial<User>) {
     const cur = getUser() ?? {}
     const next = JSON.stringify({ ...cur, ...patch })
     for (const s of stores()) {
-      if (s.getItem(TOKEN_KEY) != null) { s.setItem(USER_KEY, next); return }
+      if (s.getItem(TOKEN_KEY) != null) { s.setItem(USER_KEY, next); announceUser(); return }
     }
   } catch {
     /* ignore */
