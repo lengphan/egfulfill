@@ -1,24 +1,47 @@
-# egful — Etsy address sync (Chrome)
+# egful — Etsy orders (Chrome)
 
-Fills buyer addresses on orders egful already has, from the seller's own Etsy Shop
-Manager page, while the Etsy API address entitlement is pending.
+Brings a seller's Etsy orders into egful from their own Shop Manager page — items,
+quantities, variants, personalisation, the buyer's address — **without a connected shop**.
 
 ## The rule this extension exists under
 
-**Never scrape. Fill in only what the API will not give us. The shop still has to be
-connected.** (Owner, 2026-09-14.)
+**Never scrape. A reader reads the page the seller already opened; it never asks the
+marketplace for one.** (Owner, 2026-09-17, reversing the 2026-09-14 rule that connecting was
+not optional.)
 
-Orders arrive through Etsy's API, from a shop the seller connected. This extension adds
-**one field** that the API refuses to hand over — the buyer's street and postcode, withheld
-from apps on the restricted tier. It does not import orders, it cannot create one, and it
-must never grow into something that does.
+The line is about REQUESTS, not about fields, and it did not move. Reading more of a page the
+seller opened themselves changes nothing about the request profile, and that profile is the
+entire reason this approach is defensible. Adding a `fetch`, a click, or a "load the next
+page" would change it completely — that is the thing to refuse, forever.
 
-Making it read whole orders was costed and rejected: `line_id` is Etsy's own
-`transaction_id` and an invented one has already caused duplicate orders; the customer's
-uploaded artwork is a URL inside the transaction's variations, which is the actual job on a
-print-on-demand order; `sku` is a listing field rather than page text; and tracking cannot
-be pushed back without the connection's token. A scrape would also only be as current as the
-last time somebody had the tab open.
+Sellers work this way and need not connect a shop. **Admin and factory accounts still
+connect normally**, and Connect is still offered to sellers rather than removed: a connection
+is strictly better where it exists.
+
+## What a reader cannot do
+
+Stated here because it is easy to forget, and because each one is somebody's day:
+
+- **Tracking never goes back.** Pushing a tracking number to Etsy needs the shop's OAuth
+  token. An order that arrived this way carries `meta.reader`, and the server refuses the
+  push **by name** (`skipped: 'reader-order'`, `needsManual`) rather than failing generically.
+  The seller enters the number on Etsy themselves.
+- **Status is only as fresh as the last read.** A cancellation or refund on Etsy is invisible
+  until the seller opens the page again. Nothing may treat a reader order as
+  marketplace-confirmed.
+- **`sku` and artwork are best-effort.** A listing sku is not page text, and the customer's
+  uploaded file is only present when the page ships it in its own JSON.
+
+## How a line is identified, which is the part that must not drift
+
+`et-<transaction_id>` when Etsy's own page JSON carries it — then the line is
+indistinguishable from one the API sync wrote. Otherwise `rd-…`, **derived** from receipt +
+listing + position, so reading the same page twice produces the same ids and a second press
+of Sync writes nothing. A partial unique index on `(order_id, line_id)` enforces it.
+
+A derived id never wears `et-`/`sh-`/`tt-`: those mean "the platform said so", and an
+invented id has already let overlapping syncs duplicate whole orders (`ef2bf637`, 18 orders
+over-counted).
 
 ## What it does, and what it deliberately does not
 
