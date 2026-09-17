@@ -1260,42 +1260,77 @@ export default function OrderDetailPage() {
                                     </div>
                                   )
 
-                                  return (<>
-                                    {/* THE BLANK, called what this app calls it everywhere else —
-                                        the variant picker's own field is "Blank", and a summary
-                                        inventing a synonym for the thing the rest of the product
-                                        names one way is a second vocabulary to learn. It was
-                                        labelled with a FACE ("Front · included") while carrying
-                                        this price, which read as the cost of decorating the
-                                        front. */}
-                                    <div className="flex justify-between">
-                                      <dt className="pl-3 text-muted-foreground">{tl("order", "Blank")}</dt>
-                                      <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
-                                    </div>
-                                    {faceRows.map((r, j) => {
+                                  /**
+                                   * THE DISCOUNT IS SHOWN ON THE ROWS IT COMES OFF (owner,
+                                   * 2026-09-17): list price struck through, what you pay beside
+                                   * it, and the rate on the row.
+                                   *
+                                   * ONLY THE GOODS. subtotal is Σ(unitCost × qty) — the blank,
+                                   * the method and the surfaces — and the total adds design fees
+                                   * AFTER the deduction. So a design fee and shipping are never
+                                   * struck through: showing a rate against them would claim a
+                                   * discount the charge does not give.
+                                   *
+                                   * ROUNDING IS ABSORBED BY THE LAST GOODS ROW of the item, the
+                                   * same way the last item absorbs the order's. Each row takes
+                                   * its exact share of the ITEM's discount, which is itself an
+                                   * exact share of the order's — so the strikethroughs reconcile
+                                   * to the total however many rows they are spread over.
+                                   */
+                                  const goodsRows: { key: string; face: string | null; method: string; amount: number; hover?: string }[] = [
+                                    { key: 'blank', face: null, method: '', amount: blank * qty },
+                                    ...faceRows.map((r, j) => {
                                       const own = r.amount * qty
                                       const mf = at === j ? method * qty : 0
-                                      const total = own + mf
+                                      return {
+                                        key: `face-${j}`, face: r.face, method: r.method, amount: own + mf,
+                                        hover: mf > 0 && own > 0
+                                          ? `${usd(own)} ${tl("order", "extra surface")} + ${usd(mf)} ${r.method}`
+                                          : undefined,
+                                      }
+                                    }),
+                                  ]
+                                  const goodsSum = goodsRows.reduce((n, r) => n + r.amount, 0)
+                                  let taken = 0
+                                  const cut = goodsRows.map((r, j) => {
+                                    if (discOwn <= 0.005 || goodsSum <= 0) return 0
+                                    if (j === goodsRows.length - 1) return Math.max(0, Math.round((discOwn - taken) * 100) / 100)
+                                    const c = Math.round((r.amount / goodsSum) * discOwn * 100) / 100
+                                    taken += c
+                                    return c
+                                  })
+
+                                  return (<>
+                                    {goodsRows.map((r, j) => {
+                                      const off = cut[j]
+                                      const net = r.amount - off
                                       return (
-                                        <div key={`face-${i}-${j}`} className="flex justify-between">
-                                          <dt
-                                            className="pl-3 text-muted-foreground"
-                                            title={mf > 0 && own > 0
-                                              ? `${usd(own)} ${tl("order", "extra surface")} + ${usd(mf)} ${r.method}`
-                                              : undefined}
-                                          >
-                                            <span className="capitalize">{tl("sides", r.face)}</span>
-                                            {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}
+                                        <div key={`g-${i}-${j}`} className="flex justify-between gap-2">
+                                          <dt className="min-w-0 truncate pl-3 text-muted-foreground" title={r.hover}>
+                                            {r.face
+                                              ? (<><span className="capitalize">{tl("sides", r.face)}</span>
+                                                   {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}</>)
+                                              : tl("order", "Blank")}
+                                            {off > 0.005 && (
+                                              <span className="text-success tabular-nums"> · {dpct}% {tl("order", "off")}</span>
+                                            )}
                                           </dt>
                                           {/* INCLUDED IS A WORD, NOT A ZERO. "$0.00" beside the
                                               first face reads as a free extra rather than as the
-                                              face the garment price already covers. */}
+                                              face the blank's price already covers. */}
                                           <dd className="shrink-0 tabular-nums text-muted-foreground">
-                                            {total > 0.005 ? usd(total) : tl("order", "included")}
+                                            {r.amount <= 0.005
+                                              ? tl("order", "included")
+                                              : off > 0.005
+                                                ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
+                                                : usd(r.amount)}
                                           </dd>
                                         </div>
                                       )
-                                    }).flatMap((row, j) => [row, ...feesFor(faceRows[j].face).map((f, k) => feeRow(f, `fee-${i}-${j}-${k}`, faceRows[j].face))])}
+                                    }).flatMap((row, j) => {
+                                      const f = goodsRows[j].face
+                                      return f ? [row, ...feesFor(f).map((fe, k) => feeRow(fe, `fee-${i}-${j}-${k}`, f))] : [row]
+                                    })}
                                     {orphanFees.map((f, k) => feeRow(f, `fee-${i}-orphan-${k}`, null))}
                                     {/* SHIPPING, ON THE ITEM THAT CAUSED IT. The parcel is sized
                                         by the biggest thing in it, so one line carries the
@@ -1317,20 +1352,11 @@ export default function OrderDetailPage() {
                                         <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(shipOwn)}</dd>
                                       </div>
                                     )}
-                                    {/* THE DISCOUNT, BESIDE THE GOODS IT CAME OFF — with its rate,
-                                        because a deduction with no percentage beside it is a
-                                        number nobody can check. */}
-                                    {discOwn > 0.005 && (
-                                      <div className="flex justify-between">
-                                        <dt className="pl-3 text-muted-foreground">
-                                          {tl("order", "Discount")}
-                                          {dpct > 0 && (
-                                            <span className="text-muted-foreground/70 tabular-nums"> · {dpct}%</span>
-                                          )}
-                                        </dt>
-                                        <dd className="shrink-0 tabular-nums text-success">−{usd(discOwn)}</dd>
-                                      </div>
-                                    )}
+                                    {/* NO SEPARATE DISCOUNT ROW. It is struck through on the goods
+                                        rows above, which is where the money actually comes off —
+                                        a deduction at the bottom of the item said nothing about
+                                        WHICH of the rows above it was discounted, and sitting
+                                        below shipping it read as though shipping was too. */}
                                     {/* Only when no face could claim it — see `at` above. */}
                                     {method > 0.005 && at < 0 && (
                                       <div className="flex justify-between">

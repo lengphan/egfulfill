@@ -1403,6 +1403,7 @@ const vi: Dict = {
   "order.Discount": "Giảm giá",
   "order.extra in the box": "thêm vào kiện",
   "order.postage": "cước",
+  "order.off": "giảm",
   "order.Blank": "Phôi",
   "order.included": "đã bao gồm",
   "order.extra surface": "mặt in thêm",

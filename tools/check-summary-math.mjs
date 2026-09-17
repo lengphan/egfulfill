@@ -47,6 +47,22 @@ function run(name, lines, pct) {
     const discOwn = isLast
       ? Math.max(0, Math.round((volumeDiscount - shareBefore) * 100) / 100)
       : Math.round(goods * dRatio * 100) / 100
+    /* THE DISCOUNT IS NOW SPLIT AGAIN, across the goods ROWS within the item — blank plus one
+       per surface — with the last row absorbing that item's remainder. A second rounding on
+       top of the first, so it is checked on its own: the struck-through figures have to add
+       back up to the item's share or the rows and the heading disagree on screen. */
+    const rowAmounts = l.rows ?? [goods]
+    const rowsSum = rowAmounts.reduce((n, a) => n + a, 0)
+    let taken = 0
+    const cuts = rowAmounts.map((a, j) => {
+      if (discOwn <= 0.005 || rowsSum <= 0) return 0
+      if (j === rowAmounts.length - 1) return Math.max(0, Math.round((discOwn - taken) * 100) / 100)
+      const c = Math.round((a / rowsSum) * discOwn * 100) / 100
+      taken += c
+      return c
+    })
+    const cutSum = money(cuts.reduce((n, c) => n + c, 0))
+    if (Math.abs(cutSum - discOwn) > 0.005) { bad++; console.log(`  FAIL row discounts on line ${i} sum ${cutSum} != item ${discOwn}`) }
     sumHeadings = money(sumHeadings + goods + shipOwn - discOwn)
     sumShip = money(sumShip + shipOwn); sumDisc = money(sumDisc + discOwn)
   })
@@ -58,13 +74,16 @@ function run(name, lines, pct) {
 }
 
 run('two items, one unit each, 10%',
-  [{ unitCost: 25.46, qty: 1, shipFee: 6.99, extraFee: 2 }, { unitCost: 5.99, qty: 1, shipFee: 3.50, extraFee: 2 }], 10)
+  [{ unitCost: 25.46, qty: 1, shipFee: 6.99, extraFee: 2, rows: [17.46, 5, 3] },
+   { unitCost: 5.99, qty: 1, shipFee: 3.50, extraFee: 2, rows: [5.99, 0] }], 10)
 run('the DEARER line is second — postage must follow it',
   [{ unitCost: 5.99, qty: 1, shipFee: 3.50, extraFee: 2 }, { unitCost: 25.46, qty: 1, shipFee: 6.99, extraFee: 1.5 }], 0)
 run('multi-unit line carries its own extras',
   [{ unitCost: 12.00, qty: 3, shipFee: 8.00, extraFee: 2 }, { unitCost: 4.00, qty: 2, shipFee: 3.00, extraFee: 2 }], 5)
 run('a rate that does not divide cleanly — rounding must land somewhere',
-  [{ unitCost: 10.01, qty: 1, shipFee: 5, extraFee: 2 }, { unitCost: 10.01, qty: 1, shipFee: 5, extraFee: 2 }, { unitCost: 10.01, qty: 1, shipFee: 5, extraFee: 2 }], 7)
+  [{ unitCost: 10.01, qty: 1, shipFee: 5, extraFee: 2, rows: [3.33, 3.34, 3.34] },
+   { unitCost: 10.01, qty: 1, shipFee: 5, extraFee: 2, rows: [3.33, 3.34, 3.34] },
+   { unitCost: 10.01, qty: 1, shipFee: 5, extraFee: 2, rows: [3.33, 3.34, 3.34] }], 7)
 run('no discount at all',
   [{ unitCost: 9.99, qty: 1, shipFee: 4, extraFee: 2 }], 0)
 run('single item, many units',
