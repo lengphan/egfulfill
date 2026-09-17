@@ -23,7 +23,7 @@ const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 export type ItemSetupPatch = Omit<Parameters<typeof postItemSetup>[1], "line_id" | "sku">
 
 export function VariantPicker({
-  orderId, item, catalog, onSaved, dense,
+  orderId, item, catalog, onSaved, dense, hideMethod,
 }: {
   orderId: string
   item: OrderItem
@@ -47,6 +47,19 @@ export function VariantPicker({
    * see the container; the caller can.
    */
   dense?: boolean
+  /**
+   * DROP THE METHOD FIELD, for a surface that asks the same question better.
+   *
+   * The design canvas grew a per-FACE type picker — one hoodie is embroidered at the front
+   * and printed at the back — and kept this one, so two selects on one screen set what looks
+   * to a reader like the same thing. The face field is the sharper of the two: it names the
+   * surface it applies to, and its empty state already says what the line's method is and
+   * that it is being inherited.
+   *
+   * A prop rather than deleting the field: this picker is also the order row's, where a line
+   * DOES have one method and this is the only place to set it.
+   */
+  hideMethod?: boolean
 }) {
   const tl = useLabelT()
   const [busy, setBusy] = useState<string | null>(null)
@@ -200,9 +213,15 @@ export function VariantPicker({
         {/* No custom placeholder: the field names itself now, and "Blank" beside the
             Required flag says the same thing "Pick a blank…" did, in the same space the
             other three use. */}
+        {/* THE BLANK TAKES THE WHOLE ROW when the method field has moved out to per-surface
+            rows below (the design canvas). It is the longest value on the strip by far —
+            "10895 – OL102" plus a product name — and the one that gets truncated when it
+            shares a row. With three fields left, giving it the row also leaves colour and
+            size an even pair instead of stranding one of them beside a gap. */}
         <VariantField
           label={tl("variantPicker", "Blank")} value={blankLabel} required
           options={blankOptions}
+          className={hideMethod ? "col-span-2 sm:col-span-1" : undefined}
           disabled={busy === "blank"} onChange={pickBlank}
         />
         <VariantField
@@ -217,11 +236,13 @@ export function VariantPicker({
             orders/new can afford: this field is a quarter of a four-column strip, so
             "Method · None on this blank" truncated to "Method · …" — which says less than
             nothing, since the reason was the part that got cut. "Method · none" fits. */}
+        {!hideMethod && (
         <VariantField
           label={tl("variantPicker", "Method")} value={canon(item.print_type || "", methodList)} options={methodList}
           emptyLabel="none"
           disabled={busy === "printType"} onChange={(v) => save({ printType: v }, "printType")}
         />
+        )}
       </div>
 
       {/* Errors only — no transient "Saving…" line.

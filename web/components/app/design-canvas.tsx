@@ -1163,8 +1163,7 @@ export function DesignCanvasDialog({
    * and leaves any picture already on the face exactly where it is. Optimistic, because the
    * value is one word and a spinner on a dropdown reads as a failure; a refusal puts it back.
    */
- const setThisFaceMethod = async (v: string) => {
- const side = sideKey
+ const setFaceMethodFor = async (side: string, v: string) => {
  const before = faceMethod[side] ?? ""
  setFaceMethod((m) => ({ ...m, [side]: v }))
  setMethodBusy(true)
@@ -1185,6 +1184,28 @@ export function DesignCanvasDialog({
  setMethodBusy(false)
     }
   }
+  /**
+   * THE SURFACES THIS LINE IS ACTUALLY ABOUT (owner, 2026-09-17).
+   *
+   * One row per face, reading "Front · DTG printing", appended as surfaces come into play —
+   * rather than a single picker for whichever face happens to be selected, which said
+   * nothing about the others and left "why are there two methods" as the obvious question.
+   *
+   * IN PLAY means: it has artwork, or somebody has set its type. Plus the face currently
+   * SELECTED in the rail, always — otherwise clicking through to a bare face would give you
+   * nothing to set, and declaring "the back is embroidered before its picture exists" is a
+   * capability this screen deliberately has.
+   *
+   * Ordered by the product's own face order, never by when each was touched, so the list
+   * does not reshuffle under the cursor as methods are chosen.
+   */
+  const methodFaces = useMemo(() => {
+    const art = faceArt ?? {}
+    return faces
+      .map((f) => f.side)
+      .filter((sd) => sd === sideKey || !!art[sd]?.data || !!(faceMethod[sd] ?? "").trim())
+  }, [faces, sideKey, faceArt, faceMethod])
+
   /** What the SERVER holds for each face, so Save only sends what actually changed. */
  const [savedFaces, setSavedFaces] = useState<Record<string, { data: string; pos: Pos }>>({})
   /** Stash what is on screen back into the face it belongs to, before leaving it. */
@@ -1292,6 +1313,28 @@ export function DesignCanvasDialog({
   // One shared rule (lib/variant-resolve) — the thread module and the machine-file step
   // below both read it, so they cannot drift apart again.
  const isEmb = isEmbroidery(liveItem.print_type)
+  /**
+   * IS THERE A LOOSE FILE HERE AT ALL, or is this one already on the garment?
+   *
+   * `design_src` is described as the BUYER's upload off the marketplace, and on a channel
+   * order it is. But the sheet import writes the row's own artwork there too
+   * (`designSrc: it.designUrl` in import-orders-dialog) — so a seller who supplied the
+   * design themselves, in their own sheet, was shown a panel headed "Customer's file"
+   * offering to adopt a file that was already placed on the face behind it. Two wrong
+   * statements in one box: whose it is, and that anything needs doing.
+   *
+   * The test is not provenance, which this screen cannot see — it takes no order `source` —
+   * but whether the file is ALREADY ADOPTED. That is exact rather than a heuristic, and it
+   * happens to split the two cases cleanly: a sheet import places its artwork as it creates
+   * the line, and a marketplace upload arrives placed on nothing. So the panel keeps doing
+   * its original job — surfacing a file the floor would otherwise never see — and stops
+   * appearing once there is nothing left to decide.
+   *
+   * `faceArt === null` is "not loaded yet", not "no artwork" (see its declaration): treated
+   * as not-yet-known so the panel does not flash in and back out on every open.
+   */
+  const showCustomerFile = !!item.design_src && faceArt !== null
+    && !Object.values(faceArt).some((a) => a?.data && a.data === item.design_src)
  const [threads, setThreads] = useState<Thread[]>([])
  const [picking, setPicking] = useState(false)
   // The thread MAP: which colour covers which part. ALWAYS on now — it was behind a "Map"
@@ -3461,6 +3504,12 @@ export function DesignCanvasDialog({
               item={liveItem}
               catalog={catalog}
               dense
+              /* ONE METHOD CONTROL ON THIS SCREEN. The per-face type field below asks the
+                 same question about a named surface, and shows the line's own method as its
+                 empty state — so the line-level picker here was a second answer to one
+                 question. Kept on a single-face product, where that field is not rendered
+                 and this is the only place to say how the garment is decorated. */
+              hideMethod={faces.length > 1}
               onSaved={(patch) => {
                 if (patch) setVariantPatch((prev) => ({ ...(prev ?? {}), ...patch }))
                 onSaved?.()
@@ -3488,20 +3537,21 @@ export function DesignCanvasDialog({
             * FEE is gated instead, on the server, so declaring a surface never costs
             * anything until something is actually placed on it.
             */}
-          {!filesLocked && faces.length > 1 && (
+          {!filesLocked && faces.length > 1 && methodFaces.map((sd) => (
             <VariantField
+              key={sd}
               /* The face's own word, the way every other surface in the app says it —
                  tl("sides", …), never a hand-capitalised string. */
-              label={`${tl("sides", sideKey)} · ${tl("canvas", "type")}`}
-              value={faceMethod[sideKey] ?? ""}
+              label={`${tl("sides", sd)} · ${tl("canvas", "type")}`}
+              value={faceMethod[sd] ?? ""}
               options={faceMethodOptions}
               placeholder={lineMethod || tl("canvas", "Same as the line")}
               emptyLabel={lineMethod ? `${lineMethod} (${tl("canvas", "from the line")})` : undefined}
               disabled={methodBusy}
               compact
-              onChange={(v) => void setThisFaceMethod(v)}
+              onChange={(v) => void setFaceMethodFor(sd, v)}
             />
-          )}
+          ))}
           {/**
             * YOUR ARTWORK, ON SCREEN — the thing this window has never shown.
             *
@@ -3948,7 +3998,7 @@ export function DesignCanvasDialog({
  personalization note, with one click to adopt it as the design to place. */}
           </>)}
           {ctxTab === "design" && (<>
-        {(item.design_src || item.personalization) && (
+        {(showCustomerFile || item.personalization) && (
           /**
            * THE NOTE FIRST, THEN THE FILE.
            *
