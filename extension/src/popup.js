@@ -141,9 +141,10 @@ function statsLine(s, toSend) {
   const found = s.foundOnPage || 0
   const bad = found - (s.usable || 0)
   const ver = `v${chrome.runtime.getManifest().version}`
-  /* Short enough to sit on one line beside Disconnect \u2014 spelling out "addresses" pushed it
-     to two, and the panel above is already about addresses. The hover has the long form. */
-  if (found && bad > 0) return `${bad} of ${found} couldn\u2019t be read \u00b7 ${ver}`
+  /* Short enough to sit on one line beside Disconnect. "3 of 12 couldn\u2019t be read" was a
+     sentence where a count would do \u2014 and it described the reading rather than the
+     consequence, which is that those orders are not coming in. */
+  if (found && bad > 0) return `${bad} Can\u2019t Sync \u00b7 ${ver}`
   return ver
 }
 
@@ -157,10 +158,10 @@ function statsLine(s, toSend) {
  * rather than dropped: the same fact, in words that answer "where did this come from".
  */
 const SOURCE_WORDS = {
-  json: 'from Etsy\u2019s own order data',
-  card: 'from the order list',
-  'address-block': 'from the address panel',
-  text: 'from the page text',
+  json: 'Etsy Data',
+  card: 'Order List',
+  'address-block': 'Address Panel',
+  text: 'Page Text',
 }
 
 /* The full reading, for whoever is looking for it. Kept off the face of the panel and on
@@ -171,10 +172,10 @@ const SOURCE_WORDS = {
    real answer to "why didn't it pick up that order". */
 function statsTitle(s, toSend) {
   const found = s.foundOnPage || 0
-  const bits = [`${found} ${found === 1 ? 'order' : 'orders'} on this page`, `${toSend} to send`]
+  const bits = [`${found} ${found === 1 ? 'Order' : 'Orders'}`, `${toSend} To Send`]
   const bad = found - (s.usable || 0)
-  if (bad > 0) bits.push(`${bad} we couldn\u2019t read`)
-  if (s.how) bits.push(SOURCE_WORDS[s.how] || 'read from the page')
+  if (bad > 0) bits.push(`${bad} Can\u2019t Sync`)
+  if (s.how) bits.push(SOURCE_WORDS[s.how] || 'From The Page')
   return bits.join(' \u00b7 ')
 }
 
@@ -197,7 +198,7 @@ function paint({ line, note = '', button = null, peek = 0 }) {
   show($('open'), button === 'open')
   show($('peek'), peek > 0)
   if (peek > 0) {
-    $('peek').textContent = OPEN_PEEK ? 'Hide' : `Show the ${peek}`
+    $('peek').textContent = OPEN_PEEK ? 'Hide' : `Show ${peek}`
     show($('rows'), OPEN_PEEK)
   } else {
     OPEN_PEEK = false
@@ -248,7 +249,7 @@ async function scan() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab || !/^https:\/\/www\.etsy\.com\/your\/orders/.test(tab.url || '')) {
     ROWS = []; NEW_ORDERS = []
-    paint({ line: 'Not your orders page', note: 'Shop Manager → Orders & Shipping.', button: 'open' })
+    paint({ line: 'Wrong Page', note: 'Orders & Shipping', button: 'open' })
     /* The build still shows. It is the answer to "is my change loaded", and that question
        gets asked most often on the page where nothing else is happening. */
     $('stats').textContent = `v${chrome.runtime.getManifest().version}`
@@ -318,9 +319,12 @@ async function scan() {
    */
   if (!addressesOnPage.length && !receiptsOnPage.length) {
     ROWS = []; NEW_ORDERS = []
+    /* THE COUNT IS THE MESSAGE. "None could be read" and "No orders here" were two
+       sentences saying which of the two had happened; `12 Orders Can\u2019t Sync` says it AND
+       says how many are stranded, which is the number the seller actually needs. */
     paint((s.foundOnPage || 0) > 0
-      ? { line: 'None could be read', note: 'Usually non-US, or missing a street.' }
-      : { line: 'No orders here', note: 'Open your sold orders, or page back.' })
+      ? { line: `${s.foundOnPage} ${s.foundOnPage === 1 ? 'Order' : 'Orders'} Can\u2019t Sync` }
+      : { line: 'No Orders' })
     $('stats').textContent = statsLine(s, 0)
     $('stats').title = statsTitle(s, 0)
     return
@@ -364,13 +368,13 @@ async function scan() {
   drawRows()
 
   const bits = []
-  if (NEW_ORDERS.length) bits.push(`${NEW_ORDERS.length} new ${NEW_ORDERS.length === 1 ? 'order' : 'orders'}`)
-  if (ROWS.length) bits.push(`${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'}`)
+  if (NEW_ORDERS.length) bits.push(`${NEW_ORDERS.length} ${NEW_ORDERS.length === 1 ? 'Order' : 'Orders'}`)
+  if (ROWS.length) bits.push(`${ROWS.length} ${ROWS.length === 1 ? 'Address' : 'Addresses'}`)
   const peek = NEW_ORDERS.length + ROWS.length
 
   paint(peek
     ? { line: bits.join(' · '), button: 'sync', peek }
-    : { line: 'Nothing new here', note: 'Page back for older orders.' })
+    : { line: 'Nothing New' })
 
   /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
@@ -412,10 +416,10 @@ async function sync() {
            `skipped`, `notYours` — field names, and two of them are meaningless to whoever
            pressed the button. "skipped" in particular hides the only actionable fact in the
            whole reply: we could not read that order, so it is still sitting on Etsy. */
-        if (res.created) said.push(`${res.created} ${res.created === 1 ? 'order' : 'orders'} added`)
-        if (res.existed) said.push(`${res.existed} already in egful`)
-        if (res.skipped) said.push(`${res.skipped} we couldn\u2019t read`)
-        if (res.notYours) said.push(`${res.notYours} from another shop`)
+        if (res.created) said.push(`${res.created} ${res.created === 1 ? 'Order' : 'Orders'} Added`)
+        if (res.existed) said.push(`${res.existed} Already In`)
+        if (res.skipped) said.push(`${res.skipped} Can\u2019t Sync`)
+        if (res.notYours) said.push(`${res.notYours} Other Shop`)
         NEW_ORDERS = []
       } catch (e) { trouble = e.message }
     }
@@ -428,13 +432,13 @@ async function sync() {
         // What was just filled is no longer wanted, so a second press cannot double-send.
         WANTED = WANTED.filter((id) => !rows.some((r) => r.order_id === id))
         ROWS = []
-        if (res.updated) said.push(`${res.updated} ${res.updated === 1 ? 'address' : 'addresses'} filled in`)
-        if (res.alreadyHad) said.push(`${res.alreadyHad} already had an address`)
+        if (res.updated) said.push(`${res.updated} ${res.updated === 1 ? 'Address' : 'Addresses'} Filled`)
+        if (res.alreadyHad) said.push(`${res.alreadyHad} Already Had`)
       } catch (e) { trouble = trouble || e.message }
     }
 
     if (trouble) fail(trouble)
-    paint({ line: said.length ? said[0] : 'Nothing changed', note: said.slice(1).join(' · ') })
+    paint({ line: said.length ? said[0] : 'Nothing Changed', note: said.slice(1).join(' · ') })
   } finally {
     $('sync').textContent = 'Sync to egful'
     $('sync').disabled = false
