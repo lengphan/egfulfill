@@ -3297,7 +3297,14 @@ export function setItemMockup(orderId: string, body: { line_id?: string | null; 
     { method: "POST", body: JSON.stringify(body) },
   )
 }
-export function postOrderDesign(id: string, body: { sku: string; line_id?: string; /** Which face. Omitted = front, which is what the server assumes. */ side?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null
+export function postOrderDesign(id: string, body: { sku: string; line_id?: string; /** Which face. Omitted = front, which is what the server assumes. */ side?: string
+  /**
+   * The artwork. OPTIONAL only when `method` is present — a surface may be DECLARED before
+   * it is drawn ("the back is embroidered", picture to follow), and that save carries no
+   * bytes. Every other save must bring some, and the server still refuses one that does not.
+   * A method-only save deliberately leaves any artwork already on the face alone.
+   */
+  data?: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null
   /** The template this placement came from. Omitting it LEAVES any id already recorded
    *  alone — the server coalesces — so a routine re-save cannot erase the provenance. */
   template_id?: string | null

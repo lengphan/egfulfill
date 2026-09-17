@@ -17,9 +17,13 @@ import { FaceTile } from "@/components/app/face-tile"
 import { TabBar } from "@/components/app/tab-bar"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-picker"
+/* The SAME field the line's pickers use, not a second control that happens to look like one
+   — §4: a rule with no component is a wish, and a hand-rolled dropdown here is how the house
+   style stops applying to the one field that was added last. */
+import { VariantField } from "@/components/app/variant-field"
 import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
-import { resolveProduct, mockupFaces, isEmbroidery, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
+import { resolveProduct, mockupFaces, isEmbroidery, methodsOf, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
 import { designLabel } from "@/lib/design-id"
 import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
 import { printZoneOf, printSizeOf, outsideZone } from "@/lib/print-zone"
@@ -1120,6 +1124,67 @@ export function DesignCanvasDialog({
    */
  const [designNo, setDesignNo] = useState<number | null>(item.design_no ?? null)
  const [faceArt, setFaceArt] = useState<Record<string, FaceArt | null> | null>(null)
+  /**
+   * HOW EACH FACE IS DECORATED — a hoodie embroidered on the front and printed on the back.
+   *
+   * Absent means INHERIT the line's own method, which is what every face said before this
+   * existed and what a face that simply agrees still says. Never seeded with the line's
+   * value: a copy would turn "same as the line" into a decision, and changing the line would
+   * then stop moving the faces that never disagreed.
+   */
+ const [faceMethod, setFaceMethod] = useState<Record<string, string>>({})
+ const [methodBusy, setMethodBusy] = useState(false)
+  /**
+   * WHAT THE LINE IS DECORATED WITH — the value every face inherits until one disagrees.
+   *
+   * `liveItem` rather than `item` so a method just chosen in the pickers above is what the
+   * faces inherit, instead of the value the dialog opened with.
+   */
+ const lineMethod = String(liveItem.print_type || "").trim()
+  /**
+   * WHAT THIS BLANK CAN ACTUALLY BE DECORATED WITH — methodsOf, the same resolver the line's
+   * own picker uses, never a fixed list. A product is the authority on its own techniques
+   * (see variant-picker.tsx): offering eight here would let somebody put a method on a face
+   * that the catalogue never claimed, priced by a surcharge that may not exist and unmakeable
+   * on the floor. The line's own value is kept if the catalogue no longer lists it, so a face
+   * can always agree with its line.
+   */
+ const faceMethodOptions = useMemo(() => {
+ const own = methodsOf(resolveProduct(liveItem, catalog ?? []))
+ const list = own.length ? own : []
+ return lineMethod && !list.some((m) => m.toLowerCase() === lineMethod.toLowerCase())
+      ? [lineMethod, ...list]
+      : list
+  }, [liveItem, catalog, lineMethod])
+  /**
+   * SAVE THIS FACE'S TYPE. "" clears it back to inheriting the line.
+   *
+   * Sent WITHOUT artwork on purpose — the server treats a method-only save as a declaration
+   * and leaves any picture already on the face exactly where it is. Optimistic, because the
+   * value is one word and a spinner on a dropdown reads as a failure; a refusal puts it back.
+   */
+ const setThisFaceMethod = async (v: string) => {
+ const side = sideKey
+ const before = faceMethod[side] ?? ""
+ setFaceMethod((m) => ({ ...m, [side]: v }))
+ setMethodBusy(true)
+    try {
+ await postOrderDesign(orderId, {
+ sku: item.sku || item.name || "",
+        ...(item.line_id ? { line_id: item.line_id } : {}),
+ side,
+        /* "" is a real instruction — go back to inheriting — and null is how the column
+           says so. The server reads an empty string as "said nothing", so the clear has to
+           travel as an explicit null. */
+ method: v || null,
+      })
+ onSaved?.()
+    } catch {
+ setFaceMethod((m) => ({ ...m, [side]: before }))
+    } finally {
+ setMethodBusy(false)
+    }
+  }
   /** What the SERVER holds for each face, so Save only sends what actually changed. */
  const [savedFaces, setSavedFaces] = useState<Record<string, { data: string; pos: Pos }>>({})
   /** Stash what is on screen back into the face it belongs to, before leaving it. */
@@ -1601,6 +1666,11 @@ export function DesignCanvasDialog({
  seeded[sd] = src ? { data: src, pos: d.pos ? { x: d.pos.x, y: d.pos.y, w: d.pos.w, r: d.pos.r ?? 0 } : DEFAULT_POS, name: d.name ?? null, no: d.design_no ?? null } : null
           }
  setFaceArt(seeded)
+          /* Only what a face actually SAYS. A row with no method is a face that agrees with
+             its line, and recording that here would write the agreement back as a decision. */
+ const methods: Record<string, string> = {}
+ for (const [sd, d] of Object.entries(mine)) if (d.method) methods[sd] = String(d.method)
+ setFaceMethod(methods)
  const conf: Record<string, { data: string; pos: Pos }> = {}
  for (const [sd, a] of Object.entries(seeded)) if (a?.data) conf[sd] = { data: a.data, pos: a.pos }
  setSavedFaces(conf)
@@ -3275,6 +3345,41 @@ export function DesignCanvasDialog({
                 if (patch) setVariantPatch((prev) => ({ ...(prev ?? {}), ...patch }))
                 onSaved?.()
               }}
+            />
+          )}
+          {/**
+            * THIS FACE'S TYPE — the one decision the row of pickers above cannot make.
+            *
+            * Method sat beside Colour and Size as though it were a property of the garment,
+            * and it is not: one hoodie can be embroidered on the front and printed on the
+            * back. Colour and Size stay up there because they really are the whole line.
+            *
+            * The field follows the RAIL. Selecting a face selects what this edits, so the
+            * picture on screen and the technique under it are always the same surface —
+            * which is what "clicking each surface should change the type" asks for.
+            *
+            * UNSET IS A REAL AND COMMON STATE, and it is shown as the line's own method
+            * rather than as blank: a face that has never disagreed is decorated the way the
+            * line is, and printing nothing there would read as "nobody has decided" when
+            * somebody has. Clearing it goes back to inheriting.
+            *
+            * NOT GATED ON ARTWORK (owner, 2026-09-17): the back can be declared embroidered
+            * while its picture is still to come — the mini designer is how it arrives. The
+            * FEE is gated instead, on the server, so declaring a surface never costs
+            * anything until something is actually placed on it.
+            */}
+          {!filesLocked && faces.length > 1 && (
+            <VariantField
+              /* The face's own word, the way every other surface in the app says it —
+                 tl("sides", …), never a hand-capitalised string. */
+              label={`${tl("sides", sideKey)} · ${tl("canvas", "type")}`}
+              value={faceMethod[sideKey] ?? ""}
+              options={faceMethodOptions}
+              placeholder={lineMethod || tl("canvas", "Same as the line")}
+              emptyLabel={lineMethod ? `${lineMethod} (${tl("canvas", "from the line")})` : undefined}
+              disabled={methodBusy}
+              compact
+              onChange={(v) => void setThisFaceMethod(v)}
             />
           )}
           {/**

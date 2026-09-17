@@ -3789,10 +3789,25 @@ export function ordersRoutes(app, requireAuth) {
     const side = (req.body || {}).side
       ? (String((req.body || {}).side).trim().toLowerCase().slice(0, 24) || 'front')
       : 'front';
-    /* THE FACE'S OWN METHOD, or null for "same as the line". Stored verbatim in the same
-       label vocabulary order_items.print_type uses, so every reader that already normalises
-       one (methodCode in print-route.js, normTech on the client) reads the other unchanged. */
-    const method = String((req.body || {}).method || '').trim().slice(0, 40) || null;
+    /**
+     * THE FACE'S OWN METHOD — and, exactly like template_id below, ABSENT, EMPTY and SET are
+     * three different answers.
+     *
+     *  · absent  — the caller has nothing to say about how this face is decorated (the phone,
+     *              an older web build, any save made for an unrelated reason). KEEP what is
+     *              recorded, or saving a line would silently un-declare its surfaces.
+     *  · null/"" — "this face is decorated the way the LINE is". CLEAR it, so it goes back to
+     *              inheriting. Without this the field is one-way: a face could be given a
+     *              method and never given it back, which is the state most faces are in.
+     *  · a value — set it.
+     *
+     * Stored verbatim in the same label vocabulary order_items.print_type uses, so every
+     * reader that already normalises one (methodCode in print-route.js, normTech on the
+     * client) reads the other unchanged.
+     */
+    const rawMethod = (req.body || {}).method;
+    const methodSpoken = rawMethod !== undefined;
+    const method = String(rawMethod || '').trim().slice(0, 40) || null;
     // Artwork keys line-first (coalesce('L:'||line_id,'S:'||sku)), so a marketplace line whose
     // SKU is still unset attaches by line_id. Require DATA + a line identity, not specifically
     // a SKU — the old `!sku` check rejected exactly those lines with "sku and data required".
@@ -3808,7 +3823,10 @@ export function ordersRoutes(app, requireAuth) {
      * which is the same rule that has always applied to a line with no design yet. Recording
      * intent is free; printing is what is billed.
      */
-    const methodOnly = !data && !!method;
+    /* A save with no bytes is legal whenever it SPEAKS about the method — setting one, or
+       clearing one. `!!method` alone would refuse the clear, which is the half of the
+       control that puts a face back to inheriting. */
+    const methodOnly = !data && methodSpoken;
     if ((!data && !methodOnly) || (!sku && !lineId)) {
       return { error: 'data and (sku or line id) required' };
     }
@@ -3845,9 +3863,18 @@ export function ordersRoutes(app, requireAuth) {
      * outside design partner (Pink Design) can only be given a URL. When storage is off,
      * `data` keeps the inline base64 exactly as before.
      */
-    const raw = String(data);
-    let artHash = hashOf(raw), storedData = raw, storedKey = null;
-    if (/^data:/i.test(raw)) {
+    /**
+     * A DECLARATION CARRIES NO BYTES, AND MUST NOT MANUFACTURE ANY.
+     *
+     * `String(data)` on a method-only save yields the literal string "undefined" — a truthy,
+     * non-null value that is stored as the artwork, hashed, and handed a design number. It
+     * then walks straight through the fee gate, because that gate asks `data is not null`:
+     * declaring "the back is embroidered" would have charged for a print of the word
+     * undefined. Found by driving the real route, not by reading it.
+     */
+    const raw = methodOnly ? '' : String(data);
+    let artHash = methodOnly ? null : hashOf(raw), storedData = methodOnly ? null : raw, storedKey = null;
+    if (!methodOnly && /^data:/i.test(raw)) {
       if (storageEnabled()) {
         try {
           const parsed = fromDataUrl(raw);
@@ -3918,18 +3945,24 @@ export function ordersRoutes(app, requireAuth) {
          /* SAME RULE AS template_id ABOVE, and for the same reason: a client that knows
             nothing about per-face methods (the phone, an older web build) must not blank one
             by saving a line for an unrelated reason. $14 null keeps what is recorded. */
-         method=coalesce($14, order_designs.method),
+         /* $16 is "the caller spoke about the method at all" — same shape as $13 for
+            templates. A save that says nothing keeps what is there; a save that says null
+            puts the face back to inheriting the line. */
+         method=(case when $16 then $14 else order_designs.method end),
          art_hash=(case when $15 then excluded.art_hash else order_designs.art_hash end),
          art_phash=(case when $15 then coalesce(excluded.art_phash, order_designs.art_phash) else order_designs.art_phash end),
          /* $13 is "the caller spoke about templates at all" — see tplSpoken above. A save
             that says nothing keeps what is there; a save that says "" clears it. */
          template_id=(case when $13 then $12 else coalesce($12, order_designs.template_id) end), updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side, templateId, tplSpoken, method, !methodOnly]
+      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side, templateId, tplSpoken, method, !methodOnly, methodSpoken]
     );
     // The artwork now has a number, minted on first sight of these exact bytes and reused
     // every time they turn up again — see design-id.js. Handed back so the uploader sees it
     // immediately rather than on the next load.
-    const designNo = await designNoFor(artHash, req.params.id);
+    /* No artwork, no number. designNoFor mints against the BYTES, and a declaration has
+       none — handing one back would put a design id on a face with nothing on it, and the
+       same id on every other face declared that day. */
+    const designNo = artHash ? await designNoFor(artHash, req.params.id) : null;
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null, design_no: designNo } });
     return { ok: true, design_no: designNo, design_id: designLabel(designNo) };
   });
