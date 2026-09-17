@@ -1117,12 +1117,18 @@ export default function OrderDetailPage() {
                                 </div>
                                 {method > 0.005 && (
                                   <div className="flex justify-between">
-                                    {/* The ITEM's own print_type, not a suffix picked off the sku.
-                                        An order sku carries the method as a suffix and the item
-                                        carries it as a field; re-deriving it from the string would
-                                        be a second opinion about what this line is. */}
+                                    {/* THE METHOD THE MONEY IS FOR, not the line's column.
+                                        One surcharge is charged per line, at the DEAREST face's
+                                        technique (billingMethodOf) — so a garment printed front
+                                        and embroidered back is billed embroidery while
+                                        `print_type` still reads DTG. This row printed the
+                                        column, so the embroidery the seller chose and paid for
+                                        appeared as "DTG printing" and the fee looked missing.
+                                        `billedMethod` is sent for exactly this and nothing read
+                                        it; the column remains the fallback for a line frozen
+                                        before it existed. */}
                                     <dt className="pl-3 text-muted-foreground">
-                                      {(n > 0 ? items[n - 1]?.print_type : null) || "Print method"}
+                                      {l.billedMethod || (n > 0 ? items[n - 1]?.print_type : null) || "Print method"}
                                     </dt>
                                     <dd className="tabular-nums text-muted-foreground">{usd(method * qty)}</dd>
                                   </div>

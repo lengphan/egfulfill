@@ -3052,6 +3052,16 @@ export type OrderQuote = {
      *  from a list of the others. Computed by the same function as `sideFee` (sideBreakdown
      *  in server/src/pricing.js), so the explanation cannot disagree with the charge. */
     sideParts?: { included: string | null; parts: { face: string; amount: number }[] }
+    /** WHICH METHOD THE SURCHARGE IS FOR. One method fee is charged per line, at the DEAREST
+     *  face's technique (billingMethodOf in server/src/pricing.js) — so on a line printed
+     *  front and embroidered back, the money is embroidery's and the line's own `print_type`
+     *  column still says DTG. The summary labelled that row from the column and therefore
+     *  named one face while describing the other's charge. Sent by the server since the
+     *  mixed-method work landed; nothing read it. */
+    billedMethod?: string | null
+    /** Every technique actually on the garment, deduped — what the breakdown has to say when
+     *  a line is mixed. */
+    methods?: string[] | null
     /** What EVERY face would cost on this blank, printed or not — the designer's rail shows a
      *  price before anyone commits to a face, and it has to be the price the charge will use.
      *  Resolved by the same three tiers as sideParts (sideRates in server/src/pricing.js). */
