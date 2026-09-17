@@ -17,6 +17,7 @@ import { audit } from '../audit.js';
 import { isGrantEnabled } from './role_grants.js';
 import { designNoFor, designLabel, ensureDesignIds } from '../design-id.js';
 import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName, priceLines, computeTotals, feeSettings, methodAddOnsFor, matchProduct } from '../pricing.js';
+import { reclassifyFactoryOrders } from '../factory-orders.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll } from './factory_settings.js';
 import { orderCharges, refundOrder, chargeOrderFee } from './order_refunds.js';
@@ -1130,8 +1131,11 @@ export function ordersRoutes(app, requireAuth) {
   // One derivation, owner role, everywhere. A seller's own Etsy/Shopify shop stays false, so
   // their orders still show on their dashboard and are still charged for. Idempotent — the
   // where clause only touches rows whose flag disagrees.
-  q(`update orders set factory_order = exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller')
-      where factory_order is distinct from exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller')`).catch(() => {});
+  // It lives in factory-orders.js now, and it SAYS what it did. The statement used to sit
+  // here inline under a `.catch(() => {})`, so a run that failed was indistinguishable from a
+  // run that found nothing — and when a promoted account's 581 orders stayed misfiled, nothing
+  // anywhere said so. Same rule, same idempotence; it just reports.
+  reclassifyFactoryOrders('api start');
   // Composite design position {x,y,w,h} per line item — persisted so the mockup
   // overlay lands in the same spot on every board + the mobile app after a sync.
   // schema.sql already declares it for fresh DBs; this covers older ones.
