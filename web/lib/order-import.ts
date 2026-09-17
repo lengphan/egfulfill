@@ -1199,12 +1199,46 @@ export function applyTemplates(
   const out = orders.map((o) => ({
     ...o,
     items: o.items.map((it) => {
+      /**
+       * A TEMPLATE NAMED IN A PLACEMENT CELL IS STILL A TEMPLATE.
+       *
+       * `sides` carries one entry per placement, and a cell holding `TPL-12` sets that
+       * entry's `templateId` and leaves its `artwork` EMPTY — the reference is not a picture,
+       * and resolving it is this function's job. Nothing did. The import then dropped every
+       * such face on `if (!f.artwork) continue`, so two templates on two surfaces produced
+       * no artwork at all.
+       *
+       * Worse than "position 2 is ignored": a non-empty `sides` OUTRANKS the template's own
+       * faces downstream, so position 1's template was bypassed as well and the line arrived
+       * with nothing on it. Exactly the shape the comment three hundred lines up describes
+       * for the old Template ID column — parsed, and then dropped on the floor.
+       *
+       * Resolved per face and BEFORE the line-level template below, because these are the
+       * explicit statement: the seller named this design for this surface.
+       */
+      const sides = (it.sides ?? []).map((f) => {
+        const ref = String(f.templateId || "").trim()
+        if (!ref || f.artwork) return f
+        const k = tkey(ref)
+        if (!idx.has(k)) { unmatched.add(ref); return f }
+        const ft = idx.get(k)
+        if (!ft) { ambiguous.add(ref); return f }
+        applied++
+        /* THE TEMPLATE'S ARTWORK FOR THIS FACE, when it placed one there — a template drawn
+           front and back put different designs on each, and taking its main artwork for a
+           back placement would print the front's. Its own single artwork otherwise, which is
+           what a one-face template means by "this design". */
+        const own = (ft.sides || []).find((x) => x.side === f.side)
+        return { ...f, artwork: own?.artwork || ft.artwork || ft.composite || "" }
+      })
+      const withSides = sides.length ? { ...it, sides } : it
+
       const typed = String(it.templateId || "").trim()
-      if (!typed) return it
+      if (!typed) return withSides
       const key = tkey(typed)
-      if (!idx.has(key)) { unmatched.add(typed); return it }
+      if (!idx.has(key)) { unmatched.add(typed); return withSides }
       const t = idx.get(key)
-      if (!t) { ambiguous.add(typed); return it }
+      if (!t) { ambiguous.add(typed); return withSides }
       applied++
       /**
        * THE SHEET WINS, field by field.
@@ -1215,7 +1249,7 @@ export function applyTemplates(
        * wrong garment in a box.
        */
       return {
-        ...it,
+        ...withSides,
         blank: it.blank || t.blankSku || "",
         designUrl: it.designUrl || t.artwork || t.composite || "",
         // Carried through to the order write, which turns them into a real design row per
