@@ -1399,6 +1399,9 @@ const vi: Dict = {
   /* Said BEFORE a shop is connected — see the note in stores-manager.tsx. */
   "stores.Buyer addresses arrive separately.": "Địa chỉ người mua đến theo cách riêng.",
   "stores.Etsy does not release the street and postcode to our app, so orders import without them and cannot be shipped until they are filled in. Our browser extension reads them from your own Etsy orders page. Everything else — items, sizes, artwork, tracking back to Etsy — works from this connection.": "Etsy không cung cấp địa chỉ và mã bưu chính cho ứng dụng của chúng tôi, nên đơn hàng nhập về sẽ thiếu các thông tin này và chưa thể giao cho đến khi được điền vào. Tiện ích trình duyệt của chúng tôi đọc chúng từ chính trang đơn hàng Etsy của bạn. Mọi thứ khác — sản phẩm, kích cỡ, thiết kế, mã vận đơn gửi lại Etsy — đều hoạt động nhờ kết nối này.",
+  "order.Garment": "Sản phẩm",
+  "order.included": "đã bao gồm",
+  "order.extra surface": "mặt in thêm",
   "stores.You don't have to connect.": "Bạn không bắt buộc phải kết nối.",
   "stores.The egful browser extension brings your Etsy orders in from your own Shop Manager page — items, quantities and buyer addresses. Connecting adds automatic syncing and sends tracking back to Etsy, but Etsy still withholds buyer addresses from our app.": "Tiện ích trình duyệt egful đưa đơn hàng Etsy của bạn về từ chính trang Shop Manager của bạn — sản phẩm, số lượng và địa chỉ người mua. Kết nối sẽ thêm đồng bộ tự động và gửi mã vận đơn về Etsy, nhưng Etsy vẫn không cung cấp địa chỉ người mua cho ứng dụng của chúng tôi.",
   "stores.Coming soon": "Sắp có",

@@ -3051,7 +3051,12 @@ export type OrderQuote = {
      *  the base cost — named, because "why is the front not listed" is otherwise unanswerable
      *  from a list of the others. Computed by the same function as `sideFee` (sideBreakdown
      *  in server/src/pricing.js), so the explanation cannot disagree with the charge. */
-    sideParts?: { included: string | null; parts: { face: string; amount: number }[] }
+    sideParts?: {
+      included: string | null
+      /** The included face's own technique, when it has one. null = it inherits the line. */
+      includedMethod?: string | null
+      parts: { face: string; amount: number; method?: string | null }[]
+    }
     /** WHICH METHOD THE SURCHARGE IS FOR. One method fee is charged per line, at the DEAREST
      *  face's technique (billingMethodOf in server/src/pricing.js) — so on a line printed
      *  front and embroidered back, the money is embroidery's and the line's own `print_type`

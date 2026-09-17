@@ -1099,48 +1099,86 @@ export default function OrderDetailPage() {
                             </div>
                             {split && (
                               <>
-                                {/* NAMED AFTER THE FACE IT INCLUDES. "Blank" was the garment on
-                                    its own, which is not what the figure is: one printed face is
-                                    inside the base cost, and calling the row Blank left the
-                                    reader to work out why a three-face line lists only two
-                                    surcharges. sideParts.included already knows which face that
-                                    is, so the list reads as every face, with the first one
-                                    marked as already paid for. */}
-                                <div className="flex justify-between">
-                                  <dt className="pl-3 text-muted-foreground">
-                                    {l.sideParts?.included
-                                      ? <><span className="capitalize">{tl("sides", l.sideParts.included)}</span>
-                                          <span className="text-muted-foreground/70"> · included</span></>
-                                      : "Blank"}
-                                  </dt>
-                                  <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
-                                </div>
-                                {method > 0.005 && (
-                                  <div className="flex justify-between">
-                                    {/* THE METHOD THE MONEY IS FOR, not the line's column.
-                                        One surcharge is charged per line, at the DEAREST face's
-                                        technique (billingMethodOf) — so a garment printed front
-                                        and embroidered back is billed embroidery while
-                                        `print_type` still reads DTG. This row printed the
-                                        column, so the embroidery the seller chose and paid for
-                                        appeared as "DTG printing" and the fee looked missing.
-                                        `billedMethod` is sent for exactly this and nothing read
-                                        it; the column remains the fallback for a line frozen
-                                        before it existed. */}
-                                    <dt className="pl-3 text-muted-foreground">
-                                      {l.billedMethod || (n > 0 ? items[n - 1]?.print_type : null) || "Print method"}
-                                    </dt>
-                                    <dd className="tabular-nums text-muted-foreground">{usd(method * qty)}</dd>
-                                  </div>
-                                )}
-                                {parts.map((pt, j) => (
-                                  <div key={`face-${i}-${j}`} className="flex justify-between">
-                                    <dt className="pl-3 text-muted-foreground">
-                                      <span className="capitalize">{tl("sides", pt.face)}</span>
-                                    </dt>
-                                    <dd className="tabular-nums text-muted-foreground">{usd(pt.amount * qty)}</dd>
-                                  </div>
-                                ))}
+                                {/**
+                                  * WHICH SURFACE OF WHICH ITEM COST HOW MUCH (owner, 2026-09-17).
+                                  *
+                                  * This listed three unattributable things: a "Front · included"
+                                  * row carrying the GARMENT's price, a bare method fee, and each
+                                  * extra face with no technique beside it. So the one question a
+                                  * summary of a decorated garment has to answer — what did the
+                                  * back cost me, and for what — could not be answered from it.
+                                  *
+                                  * Now: the garment on its own line, then ONE LINE PER SURFACE
+                                  * naming its technique and its money.
+                                  *
+                                  * THE METHOD FEE RIDES WITH THE FACE THAT CAUSED IT. One
+                                  * surcharge is charged per line, at the DEAREST face's technique
+                                  * (billingMethodOf) — so it is not a property of the line in any
+                                  * way a reader can act on, and leaving it loose is what made the
+                                  * embroidery somebody chose look unbilled. Folded into the face
+                                  * whose method was billed; the hover still splits it, because a
+                                  * seller querying a charge needs the parts.
+                                  */}
+                                {(() => {
+                                  const billed = String(l.billedMethod || "").trim()
+                                  const lineMethod = (n > 0 ? items[n - 1]?.print_type : null) || ""
+                                  const inc = l.sideParts?.included ?? null
+                                  const incMethod = l.sideParts?.includedMethod || null
+                                  /* Every surface, the included one first — it is the face the
+                                     base cost already paid for and so belongs at the top of the
+                                     list, not missing from it. */
+                                  const faceRows: { face: string; method: string; amount: number }[] = [
+                                    ...(inc ? [{ face: inc, method: incMethod || lineMethod, amount: 0 }] : []),
+                                    ...parts.map((pt) => ({ face: pt.face, method: pt.method || lineMethod, amount: pt.amount })),
+                                  ]
+                                  /* WHERE THE SURCHARGE LANDS. The first face whose technique IS
+                                     the billed one; if nothing matches — an old line with no face
+                                     methods recorded — it stays on its own row rather than being
+                                     attached to a face we are guessing at. */
+                                  const at = billed
+                                    ? faceRows.findIndex((r) => r.method.toLowerCase() === billed.toLowerCase())
+                                    : -1
+                                  return (<>
+                                    {/* THE GARMENT, named as the garment. It was labelled with a
+                                        face ("Front · included") while carrying the blank's price,
+                                        which reads as the cost of decorating the front. */}
+                                    <div className="flex justify-between">
+                                      <dt className="pl-3 text-muted-foreground">{tl("order", "Garment")}</dt>
+                                      <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(blank * qty)}</dd>
+                                    </div>
+                                    {faceRows.map((r, j) => {
+                                      const own = r.amount * qty
+                                      const mf = at === j ? method * qty : 0
+                                      const total = own + mf
+                                      return (
+                                        <div key={`face-${i}-${j}`} className="flex justify-between">
+                                          <dt
+                                            className="pl-3 text-muted-foreground"
+                                            title={mf > 0 && own > 0
+                                              ? `${usd(own)} ${tl("order", "extra surface")} + ${usd(mf)} ${r.method}`
+                                              : undefined}
+                                          >
+                                            <span className="capitalize">{tl("sides", r.face)}</span>
+                                            {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}
+                                          </dt>
+                                          {/* INCLUDED IS A WORD, NOT A ZERO. "$0.00" beside the
+                                              first face reads as a free extra rather than as the
+                                              face the garment price already covers. */}
+                                          <dd className="shrink-0 tabular-nums text-muted-foreground">
+                                            {total > 0.005 ? usd(total) : tl("order", "included")}
+                                          </dd>
+                                        </div>
+                                      )
+                                    })}
+                                    {/* Only when no face could claim it — see `at` above. */}
+                                    {method > 0.005 && at < 0 && (
+                                      <div className="flex justify-between">
+                                        <dt className="pl-3 text-muted-foreground">{billed || lineMethod || "Print method"}</dt>
+                                        <dd className="tabular-nums text-muted-foreground">{usd(method * qty)}</dd>
+                                      </div>
+                                    )}
+                                  </>)
+                                })()}
                               </>
                             )}
                             {/* A FEE THAT BELONGS TO THIS ITEM SITS UNDER IT. Only when it covers

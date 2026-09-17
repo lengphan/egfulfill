@@ -449,7 +449,18 @@ function sideDetail(faces, fees, d) {
    * A per-product `sidePrice` still overrides everything, and a MAP overrides per face — the
    * number stays valid and means "every face", which is what every product carries today.
    */
-  const list = (Array.isArray(faces) ? faces : []).map((f) => String(f || '').toLowerCase()).filter(Boolean);
+  /* FACES ARRIVE AS NAMES OR AS {side, method} — priceLines hands objects, the lookbook and
+     quoteSpec hand names (see unitCostOf's note). The METHOD is kept here now, because the
+     summary has to say which surface of which item cost what, and a face's technique is half
+     of that sentence. Names-only callers get an empty method and the old behaviour exactly. */
+  const pairs = (Array.isArray(faces) ? faces : [])
+    .map((f) => (f && typeof f === 'object'
+      ? { side: String(f.side || '').toLowerCase(), method: String(f.method || '').trim() }
+      : { side: String(f || '').toLowerCase(), method: '' }))
+    .filter((f) => f.side);
+  const methodOf = new Map();
+  for (const f of pairs) if (f.method && !methodOf.has(f.side)) methodOf.set(f.side, f.method);
+  const list = pairs.map((f) => f.side);
   const uniq = [...new Set(list)];
   if (uniq.length < 2) return null;
   const ordered = uniq.slice().sort((a, b) => {
@@ -464,12 +475,20 @@ function sideDetail(faces, fees, d) {
   // ordered[0] is included in the base — charge everything after it.
   for (const face of ordered.slice(1)) {
     const rate = faceRate(face, ownMap, flat, fees);
-    if (rate > 0) parts.push({ face, amount: money(rate) });
+    /* The face's own technique when it has one, else null — NOT the line's. A face that says
+       nothing inherits, and the caller already knows the line's method; filling it in here
+       would make an inherited face indistinguishable from one somebody chose. */
+    if (rate > 0) parts.push({ face, amount: money(rate), method: methodOf.get(face) || null });
   }
   /* THE INCLUDED FACE IS NAMED TOO, at zero. A breakdown listing only what was charged
      leaves "why is the front not here" unanswered, and the answer — one face is in the base
      cost — is a pricing rule nobody can infer from a list of the others. */
-  return { included: ordered[0], parts, total: money(parts.reduce((n, p) => n + p.amount, 0)) };
+  return {
+    included: ordered[0],
+    includedMethod: methodOf.get(ordered[0]) || null,
+    parts,
+    total: money(parts.reduce((n, p) => n + p.amount, 0)),
+  };
 }
 
 /** The total, which is what a PRICE needs. Unchanged shape for every existing caller. */
@@ -488,7 +507,8 @@ export function sideAddOn(faces, fees, d) {
  */
 export function sideBreakdown(faces, fees, d) {
   const r = sideDetail(faces, fees, d);
-  return r ? { included: r.included, parts: r.parts } : { included: null, parts: [] };
+  return r ? { included: r.included, includedMethod: r.includedMethod, parts: r.parts }
+           : { included: null, includedMethod: null, parts: [] };
 }
 
 // Per-unit cost = the size's base price (else the product's base) + the print method's
@@ -1019,8 +1039,13 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                  sideFeeCharged: parts.base == null ? null : money(cost - parts.base - (parts.method || 0)),
                  /* WHICH face cost what, so the summary can name them instead of saying
                     "2 sides" and leaving the reader to guess which one carried the money. */
-                 sideParts: stamp ? { included: stamp.included ?? null, parts: stamp.sides || [] }
-                                  : sideBreakdown(faces, fees, (srow && srow.data) || null),
+                 sideParts: stamp ? { included: stamp.included ?? null,
+                                     /* A line stamped before this existed has no method on its
+                                        faces; null means "not recorded", and the summary falls
+                                        back to the billed method rather than inventing one. */
+                                     includedMethod: stamp.includedMethod ?? null,
+                                     parts: stamp.sides || [] }
+                                  : sideBreakdown(withMethods, fees, (srow && srow.data) || null),
                  /* WHAT EVERY face would cost on this blank, for the designer's rail — which
                     must quote the same number the charge will use. */
                  sideRates: sideRates(fees, (srow && srow.data) || null),
@@ -1263,6 +1288,7 @@ export async function freezeQuote(orderId, quote) {
         base: l.baseCost ?? null,
         method: money(l.methodFee || 0),
         included: l.sideParts?.included ?? null,
+        includedMethod: l.sideParts?.includedMethod ?? null,
         sides: l.sideParts?.parts ?? [],
         /* WHICH METHOD THE MONEY WAS FOR, stamped for exactly the reason the faces are. One
            surcharge is charged per line and a mixed line has more than one candidate, so
