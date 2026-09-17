@@ -51,6 +51,7 @@ export function VariantField({
  swatches,
  compact,
  className,
+ prefix,
  clearable = true,
 }: {
  label: string
@@ -67,6 +68,23 @@ export function VariantField({
  compact?: boolean
   /** Extra classes merged into the trigger (e.g. a height override for a form row). */
  className?: string
+  /**
+   * A WORD THAT STAYS VISIBLE WHEN THE VALUE ARRIVES.
+   *
+   * `label` deliberately lives INSIDE the field and is replaced the moment a value is picked
+   * (see the note below it) — which is right for Colour and Size, where the value names its
+   * own field: nobody reads "Navy/Tan" and wonders which attribute it is.
+   *
+   * It is wrong for a per-surface method. Two rows reading "Embroidery" and "DTG printing"
+   * say nothing about WHICH surface is which, and the field that would have told you goes
+   * away precisely when it has something to qualify. The prefix is for the case where the
+   * value is ambiguous without it, and it never disappears.
+   *
+   * Muted, so the value still reads as the thing you set and the face as the thing it
+   * belongs to. Use it sparingly: on a field whose value already names itself it is the
+   * caption row this component exists to have removed.
+   */
+ prefix?: string
   /**
    * Can this field go back to having no value?
    *
@@ -141,6 +159,14 @@ export function VariantField({
     >
       {swatches && value && (
         <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchHex(value) }} />
+      )}
+      {/* NOT shrink-0: on a narrow column the face name would hold its width and truncate the
+          method instead, which loses the half that changes. The value still gets flex-1, so
+          the face gives way first. */}
+      {prefix && (
+        <span className="min-w-0 truncate text-muted-foreground">
+          {prefix}<span className="text-muted-foreground/60"> · </span>
+        </span>
       )}
       <span className={cn("min-w-0 flex-1 truncate", unset && "text-muted-foreground")}>{shown}</span>
       {/* The required flag came off the caption row with everything else. It sits in the

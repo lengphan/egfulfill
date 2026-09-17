@@ -3540,8 +3540,15 @@ export function DesignCanvasDialog({
           {!filesLocked && faces.length > 1 && methodFaces.map((sd) => (
             <VariantField
               key={sd}
-              /* The face's own word, the way every other surface in the app says it —
+              /* THE FACE IS A PREFIX, NOT A LABEL. VariantField's label is swapped out for
+                 the value the moment one exists — correct for Colour, where "Navy/Tan" names
+                 its own field, and wrong here: two rows reading "Embroidery" and "DTG
+                 printing" say nothing about which surface is which, and the label that would
+                 have said so vanishes exactly when it is needed. The prefix stays.
+
+                 The face's own word, the way every other surface in the app says it —
                  tl("sides", …), never a hand-capitalised string. */
+              prefix={tl("sides", sd)}
               label={`${tl("sides", sd)} · ${tl("canvas", "type")}`}
               value={faceMethod[sd] ?? ""}
               options={faceMethodOptions}
