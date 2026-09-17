@@ -153,6 +153,21 @@ export function StoresManager() {
   // Admins get the full scope list per shop (the exact grants that shop authorised),
   // not just the count — useful for diagnosing "why can't we read X". Expanded per shop.
  const isAdmin = getUser()?.role === "admin"
+  /**
+   * WHO IS READING THE PRE-CONNECT DIALOG, because the honest answer differs by role.
+   *
+   * Staff connect a shop and get everything a connection gives — automatic syncing and
+   * tracking pushed back — minus the buyer address Etsy withholds. A SELLER does not have to
+   * connect at all any more (owner, 2026-09-17): the browser extension reads their own Shop
+   * Manager page and creates the orders. Telling a seller "connect, and by the way addresses
+   * arrive separately" is now the wrong first sentence — it presents the harder path as the
+   * only one.
+   *
+   * Connect is still OFFERED rather than removed. It is strictly better where a seller has
+   * it: orders arrive without anyone opening a tab, and tracking reaches the buyer through
+   * Etsy. Taking it away would also strand every seller already connected.
+   */
+ const isStaffUser = (getUser()?.role ?? "seller") !== "seller"
  const [openScopes, setOpenScopes] = useState<Set<string>>(new Set())
 
  const [shopDomain, setShopDomain] = useState("")
@@ -634,12 +649,17 @@ export function StoresManager() {
                 Etsy orders at all. The connection is what brings the order in and what
                 pushes tracking back; the extension patches the single field Etsy withholds.
                 Both are needed, so the honest move is to connect and say this. */}
-            {pending === "etsy" && (
+            {pending === "etsy" && (isStaffUser ? (
               <div className="mt-3 rounded-lg border border-hold/40 bg-hold/5 px-3 py-2 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">{tl("stores", "Buyer addresses arrive separately.")}</span>{" "}
                 {tl("stores", "Etsy does not release the street and postcode to our app, so orders import without them and cannot be shipped until they are filled in. Our browser extension reads them from your own Etsy orders page. Everything else — items, sizes, artwork, tracking back to Etsy — works from this connection.")}
               </div>
-            )}
+            ) : (
+              <div className="mt-3 rounded-lg border border-hold/40 bg-hold/5 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{tl("stores", "You don't have to connect.")}</span>{" "}
+                {tl("stores", "The egful browser extension brings your Etsy orders in from your own Shop Manager page — items, quantities and buyer addresses. Connecting adds automatic syncing and sends tracking back to Etsy, but Etsy still withholds buyer addresses from our app.")}
+              </div>
+            ))}
             {/* Already-synced shops: say the rule ONCE, up here, rather than repeating it on
  every greyed row. */}
             {syncedWindowFor(pending) !== null && (

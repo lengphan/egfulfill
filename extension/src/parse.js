@@ -310,6 +310,340 @@ function extractOrders(doc, wanted) {
   }
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   WHOLE RECEIPTS — items, money and the promise date, not just the address.
+   ══════════════════════════════════════════════════════════════════════════════
+
+   WHY THIS EXISTS. Until now the extension could only PATCH an order the API sync had
+   already created, so a seller with no connection got nothing at all. Sellers now work
+   without a connection (owner, 2026-09-17), which means this file has to be able to
+   describe an order well enough to MAKE one: what was bought, how many, which variant,
+   what the buyer typed, what it cost and when it was promised.
+
+   IT IS STILL A READER. Zero fetch, zero pagination, zero crawl, zero timers — the same
+   rule as everything above, and `tools/check-extension-parse.mjs` asserts it. The seller
+   opens their own Shop Manager page in their own session; we read the DOM that is already
+   there. Nothing about reading MORE of that page changes the request profile, and that
+   profile is the whole reason this approach is defensible. If you find yourself adding a
+   fetch, a click, or a "load the next page" here, stop: that is the line.
+
+   EMBEDDED JSON IS THE STRATEGY THAT MATTERS, and for items it is not a preference.
+   Etsy ships receipt state into a script tag with its own field names — `transactions`,
+   `transaction_id`, `listing_id`, `quantity`, `variations`. Two of those are load-bearing
+   and cannot be recovered from rendered text at any quality:
+
+     • `transaction_id` IS line identity (`et-<id>`). CLAUDE.md records that an INVENTED
+       line id let two overlapping syncs each write the whole line set and over-count 18
+       orders. When JSON gives us the real one we use it and the line is indistinguishable
+       from a synced line.
+     • `variations` is where a customer's uploaded artwork URL lives, and on a POD order
+       that URL is the job.
+
+   The DOM ladder below is a fallback, and it is honest about being one: a line it produces
+   carries a DERIVED id (`etl-…`, never `et-…`) so nothing downstream can mistake it for
+   Etsy's. Derived, not random — the same receipt read twice produces the same ids, which
+   is what makes pressing Sync a second time a no-op instead of a duplicate. */
+
+/** "$24.50", "24.50 USD", "US$1,204.00" → 24.5. Null when there is no number to find,
+ *  because 0 and "we couldn't read the total" are different facts and only one of them
+ *  should ever reach a money column. */
+function money(text) {
+  const m = String(text == null ? '' : text).replace(/,/g, '').match(/-?\d+(?:\.\d{1,2})?/)
+  if (!m) return null
+  const n = Number(m[0])
+  return Number.isFinite(n) ? n : null
+}
+
+/** Etsy's uploaded-file variations are URLs; personalisation is free text; everything else
+ *  (size, colour) is the variant. Same split the server's sync performs on the API shape —
+ *  kept identical ON PURPOSE so an extension-made line and a synced line are the same row.
+ *  If the sync's rule changes, change this with it. */
+function splitVariations(vars) {
+  let upload = null, personalization = null
+  const parts = []
+  for (const v of vars || []) {
+    const val = clean(v && (v.formatted_value ?? v.value ?? v))
+    const nm = String((v && (v.formatted_name ?? v.name)) || '').toLowerCase()
+    if (!val) continue
+    if (/^https?:\/\//i.test(val)
+      && (/upload|logo|file|image|photo|art|design/.test(nm)
+        || /\.(png|jpe?g|gif|webp|svg|pdf|ai|eps|psd|tiff?)(\?|$)/i.test(val))) {
+      upload = val
+    } else if (nm.indexOf('personaliz') !== -1) {
+      personalization = val
+    } else {
+      parts.push(val)
+    }
+  }
+  return { upload, personalization, variant: parts.join(', ') || '' }
+}
+
+/**
+ * A DERIVED line id, for when Etsy's own is not on the page.
+ *
+ * `rd-` (reader) and never `et-`: the prefix is a claim about PROVENANCE, and a derived id
+ * wearing the platform's prefix is a lie that survives into the database. The server's unique
+ * index covers both, so either kind is deduplicated; only one of them is Etsy's.
+ *
+ * IT IS PLATFORM-NEUTRAL ON PURPOSE. `line_id` is only ever unique WITHIN an order, and the
+ * order id already carries the platform (`etsy-…`, `shopify-…`). So one `rd-` prefix serves
+ * every marketplace a reader is ever written for, and the database index that enforces
+ * idempotency never has to grow a new arm per site.
+ *
+ * DETERMINISTIC, because the seller will press Sync again. Receipt + listing + the running
+ * count of that listing within the receipt is stable across reads, which is what makes a
+ * second press write nothing rather than a second set of lines.
+ */
+function derivedLineId(receiptId, listingId, nth) {
+  return `rd-${receiptId}-${listingId || 'x'}-${nth}`
+}
+
+function item({ line_id, listing_id, sku, name, qty, variant, personalization, unit_price, img, design_src }) {
+  return {
+    line_id: clean(line_id),
+    listing_id: clean(listing_id) || null,
+    sku: clean(sku) || null,
+    name: clean(name),
+    qty: Number(qty) > 0 ? Math.floor(Number(qty)) : 1,
+    variant: clean(variant) || null,
+    personalization: clean(personalization) || null,
+    unit_price: typeof unit_price === 'number' ? unit_price : null,
+    img: clean(img) || null,
+    design_src: clean(design_src) || null,
+  }
+}
+
+/* ── receipts from embedded JSON ───────────────────────────────────────────── */
+
+/** Etsy's money objects are `{amount: 2450, divisor: 100}` as often as they are numbers. */
+function jsonMoney(v) {
+  if (v == null) return null
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v === 'string') return money(v)
+  if (typeof v === 'object' && v.amount != null) {
+    const a = Number(v.amount), d = Number(v.divisor) || 100
+    return Number.isFinite(a) ? a / d : null
+  }
+  return null
+}
+
+/**
+ * Objects carrying a receipt id AND a transactions array are receipts. That pair is the
+ * test rather than the id alone, because an id on its own appears all over Etsy's page
+ * state — on shipping rows, on review prompts, on analytics payloads — and every one of
+ * those would produce an order with nothing in it.
+ */
+function harvestReceipts(node, out, depth = 0) {
+  if (!node || typeof node !== 'object' || depth > 8) return
+  if (Array.isArray(node)) { for (const n of node) harvestReceipts(n, out, depth + 1); return }
+
+  const id = node.receipt_id ?? node.receiptId
+  const trs = node.transactions ?? node.receipt_transactions
+  if (id != null && Array.isArray(trs) && trs.length) {
+    const receiptId = clean(id).replace(/[^0-9]/g, '')
+    if (receiptId) {
+      const seenListing = new Map()
+      const items = []
+      for (const t of trs) {
+        const listingId = clean(t.listing_id ?? t.listingId)
+        const nth = (seenListing.get(listingId) || 0) + 1
+        seenListing.set(listingId, nth)
+        const { upload, personalization, variant } = splitVariations(t.variations)
+        items.push(item({
+          /* REAL, so this line is identical to one the API sync would have written. */
+          line_id: t.transaction_id != null ? 'et-' + clean(t.transaction_id)
+            : derivedLineId(receiptId, listingId, nth),
+          listing_id: listingId,
+          sku: t.sku,
+          name: t.title ?? t.name ?? t.listing_title,
+          qty: t.quantity ?? t.qty ?? 1,
+          variant,
+          personalization: personalization || t.personalization,
+          unit_price: jsonMoney(t.price ?? t.unit_price),
+          img: t.image_url_fullxfull ?? t.listing_image_url ?? t.image,
+          design_src: upload,
+        }))
+      }
+      /* The promise date is the EARLIEST across the lines, exactly as the server computes
+         it from the API: a parcel that ships together is bound by the first promise, and
+         meeting the latest would already have broken that one. */
+      const shipBy = trs
+        .map((t) => Number(t.expected_ship_date ?? t.expectedShipDate))
+        .filter((n) => Number.isFinite(n) && n > 0)
+        .sort((a, b) => a - b)[0] || null
+      out.push({
+        order_id: receiptId,
+        buyer: clean(node.name ?? node.buyer_name ?? node.formatted_name),
+        buyer_email: clean(node.buyer_email) || null,
+        total: jsonMoney(node.grandtotal ?? node.total_price ?? node.grand_total),
+        ship_by: shipBy ? new Date(shipBy * 1000).toISOString() : null,
+        created_at: Number(node.create_timestamp ?? node.created_timestamp) > 0
+          ? new Date(Number(node.create_timestamp ?? node.created_timestamp) * 1000).toISOString() : null,
+        items,
+        _how: 'json',
+      })
+    }
+  }
+  for (const k of Object.keys(node)) harvestReceipts(node[k], out, depth + 1)
+}
+
+function receiptsFromJson(doc) {
+  const out = []
+  for (const el of doc.querySelectorAll('script')) {
+    const txt = el.textContent || ''
+    if (txt.length < 40 || !/receipt|transaction/i.test(txt)) continue
+    const start = txt.search(/[[{]/)
+    if (start < 0) continue
+    const end = Math.max(txt.lastIndexOf('}'), txt.lastIndexOf(']'))
+    if (end <= start) continue
+    try { harvestReceipts(JSON.parse(txt.slice(start, end + 1)), out) } catch { /* not JSON; next */ }
+  }
+  return out
+}
+
+/* ── receipts from the rendered cards ──────────────────────────────────────── */
+
+/**
+ * ITEMS OUT OF A CARD, when the page ships no usable JSON.
+ *
+ * ANCHORED ON THE LISTING LINK, because that is the one thing an order card cannot render
+ * without: every item is a link to `/listing/<id>`. Titles, prices and quantities all live
+ * in generated class names that change; the href does not.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT GUESS. There is no attempt to pull a variant, a
+ * personalisation or a per-line price out of surrounding text. On a card those sit in
+ * unlabelled lines beside the title, and a regex that is right most of the time here is
+ * worse than a blank: a wrong SIZE is a garment remade, and a wrong PERSONALISATION is a
+ * garment remade with somebody else's name on it. A missing variant is a picker a human
+ * fills in; an invented one is a parcel that gets returned. So the fallback carries the
+ * name and the quantity — which is what makes the order recognisable — and leaves the rest
+ * to the seller or to a later JSON read.
+ */
+function itemsFromCard(card, receiptId) {
+  const out = []
+  const seenListing = new Map()
+  const links = card.querySelectorAll('a[href*="/listing/"]')
+  for (const a of links) {
+    const href = String(a.getAttribute('href') || '')
+    const m = href.match(/\/listing\/(\d+)/)
+    if (!m) continue
+    const listingId = m[1]
+    const title = clean(a.textContent)
+    /* A thumbnail is also a link to the listing, and its text is empty. Skipping the
+       empty one rather than the second occurrence keeps the pairing right whichever
+       order Etsy renders them in. */
+    if (!title) continue
+    const nth = (seenListing.get(listingId) || 0) + 1
+    seenListing.set(listingId, nth)
+    out.push(item({
+      line_id: derivedLineId(receiptId, listingId, nth),
+      listing_id: listingId,
+      name: title,
+      /* Quantity is read from the card, not the link: "Qty: 2" renders as a sibling.
+         Absent means one, which is what an Etsy card omitting it means. */
+      qty: (clean(card.textContent).match(/(?:qty|quantity)[:\s]+(\d{1,3})/i) || [])[1] || 1,
+    }))
+  }
+  return out
+}
+
+function receiptsFromCards(doc) {
+  const out = []
+  const cards = doc.querySelectorAll(
+    '[data-order-id], [data-receipt-id], [class*="order-card"], [class*="orderCard"], li, article, section'
+  )
+  const seen = new Set()
+  for (const card of cards) {
+    const id = receiptIdOf(card)
+    if (!id || seen.has(id)) continue
+    if (card.querySelectorAll('[data-order-id], [data-receipt-id]').length > 1) continue
+    const items = itemsFromCard(card, id)
+    if (!items.length) continue
+    seen.add(id)
+    const text = clean(card.textContent)
+    out.push({
+      order_id: id,
+      buyer: '',
+      buyer_email: null,
+      /* "Order total $24.50" — anchored on the WORD, never on the first dollar sign in the
+         card, which is just as likely to be one item's price or a shipping charge. Absent
+         rather than wrong: the server leaves the total alone when this is null. */
+      total: money((text.match(/order total[^$\d-]{0,12}([$\d][\d.,]*)/i) || [])[1]),
+      ship_by: null,
+      created_at: null,
+      items,
+      _how: 'card',
+    })
+  }
+  return out
+}
+
+/* ── the second entry point ────────────────────────────────────────────────── */
+
+/**
+ * EVERY RECEIPT THIS PAGE CAN DESCRIBE WELL ENOUGH TO MAKE AN ORDER FROM.
+ *
+ * JSON wins over cards where both saw the same receipt — it carries real transaction ids,
+ * variants and artwork URLs, and a card carries a title and a count. The ADDRESS comes from
+ * the existing ladder rather than being re-derived here, because that ladder is the part
+ * that has been verified against a live page and there is no reason to have two readers of
+ * one fact (CLAUDE.md §"One question, one function").
+ *
+ * `wanted` is the receipt-id list OUR server says it does not have. Passing it is what keeps
+ * this honest at the same standard as the address path: the page is read, and everything we
+ * did not ask about is thrown away before anything leaves the browser.
+ */
+function extractReceipts(doc, wanted) {
+  const byId = new Map()
+  for (const r of receiptsFromCards(doc)) byId.set(r.order_id, r)
+  /* JSON second so it overwrites — it is strictly better wherever it is present. */
+  for (const r of receiptsFromJson(doc)) {
+    const prev = byId.get(r.order_id)
+    /* A JSON receipt with no lines is not an upgrade on a card that found two. */
+    if (prev && !r.items.length) continue
+    byId.set(r.order_id, r)
+  }
+
+  /* THE ADDRESS IS THE ADDRESS LADDER'S ANSWER, not a fourth opinion. */
+  const addrById = new Map()
+  for (const a of fromCards(doc)) addrById.set(a.order_id, a)
+  for (const a of fromEmbeddedJson(doc)) addrById.set(a.order_id, a)
+  for (const a of fromAddressBlocks(doc)) addrById.set(a.order_id, a)
+
+  let rows = [...byId.values()].filter((r) => r.order_id && r.items.length)
+  const found = rows.length
+  if (wanted && wanted.length) {
+    const keep = new Set(wanted.map(String))
+    rows = rows.filter((r) => keep.has(r.order_id))
+  }
+  for (const r of rows) {
+    const a = addrById.get(r.order_id)
+    /* Only an address the SERVER would accept is attached. A half-read one would be
+       written as a street-less address, which §"masked is not missing" says must not be
+       confused with an order Etsy is withholding. No address at all is the truthful shape:
+       the order still lands, and it lands visibly unshippable. */
+    r.address = a && isUsable(a)
+      ? { name: a.name, street: a.street, street2: a.street2, city: a.city, state: a.state, zip: a.zip, country: a.country }
+      : null
+    if (!r.buyer && a && a.name) r.buyer = a.name
+  }
+
+  return {
+    rows,
+    stats: {
+      foundOnPage: found,
+      matchedWanted: rows.length,
+      withAddress: rows.filter((r) => r.address).length,
+      items: rows.reduce((n, r) => n + r.items.length, 0),
+      /* WHICH STRATEGY ANSWERED, reported for the same reason it is on the address path:
+         "8 receipts, all read from cards" tells you the JSON shape moved, which is a real
+         degradation that would otherwise look like orders simply arriving thin. */
+      how: rows.length ? rows[0]._how : null,
+    },
+  }
+}
+
 /**
  * PUBLISHED ON A GLOBAL, NOT EXPORTED — and this is a rule of the platform rather than a
  * style choice. A content script listed in `content_scripts.js` is loaded as a CLASSIC
@@ -318,7 +652,9 @@ function extractOrders(doc, wanted) {
  * a page that otherwise looks fine, which sends you hunting through selectors for a fault
  * that is one keyword in a different file.
  *
- * parse.js is listed before content.js in the manifest, so this is already assigned by the
- * time anything reads it.
+ * IT LIVES AT THE VERY BOTTOM. Function declarations hoist, so this worked from the middle
+ * of the file too — right up until someone adds a `const` helper above it, at which point
+ * it throws on load and Chrome reports it three files away. The end of the file is the one
+ * position that cannot rot.
  */
-globalThis.EG_PARSE = { extractOrders, isUsable }
+globalThis.EG_PARSE = { extractOrders, extractReceipts, isUsable }

@@ -32,9 +32,9 @@ const SRC = readFileSync(join(ROOT, 'extension/src/parse.js'), 'utf8')
    drops such a file silently and the symptom appears three files away. */
 const globalThisShim = {}
 new Function('globalThis', SRC)(globalThisShim)
-const { extractOrders, isUsable } = globalThisShim.EG_PARSE || {}
-if (typeof extractOrders !== 'function') {
-  console.error('FAIL  parse.js did not publish EG_PARSE.extractOrders')
+const { extractOrders, extractReceipts, isUsable } = globalThisShim.EG_PARSE || {}
+if (typeof extractOrders !== 'function' || typeof extractReceipts !== 'function') {
+  console.error('FAIL  parse.js did not publish EG_PARSE.extractOrders + extractReceipts')
   process.exit(1)
 }
 
@@ -90,6 +90,10 @@ function node(tag, cls, text, kids = [], href = null) {
       const want = sel.replace(/^[.#]/, '')
       if (sel.startsWith('.')) return n._all((k) => (k._cls || '').split(/\s+/).includes(want))
       if (sel.includes('a[href*="order_id="]')) return n._all((k) => k._tag === 'a' && /order_id=/.test(k.href || ''))
+      if (sel.includes('a[href*="/listing/"]')) return n._all((k) => k._tag === 'a' && /\/listing\//.test(k.href || ''))
+      /* The broad card sweep. Returning the rows themselves is what the real selector does
+         on a real page — an order lives in a container that also holds its id link. */
+      if (sel.includes('data-order-id')) return n._all((k) => k._cls === 'order-card')
       return []
     },
     querySelector(sel) { return n.querySelectorAll(sel)[0] || null },
@@ -121,10 +125,10 @@ function orderRow(receipt, addr) {
   ])
 }
 
-function docOf(root) {
+function docOf(root, scripts = []) {
   return {
     querySelectorAll: (sel) => {
-      if (sel === 'script') return []
+      if (sel === 'script') return scripts.map((t) => ({ textContent: t }))
       return root.querySelectorAll(sel)
     },
   }
@@ -271,5 +275,168 @@ console.log('\nAPT — second-line is carried through')
   check('street2 is the apt', rows[0] && rows[0].street2, 'Apt 2B')
 }
 
-console.log(bad ? `\n${bad} failure(s).` : '\nParser holds, against markup captured from a live Etsy page.')
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   WHOLE RECEIPTS — the half that CREATES orders rather than patching them.
+
+   This is the higher-stakes half. A bad address fills one field on an order that already
+   exists; a bad receipt CREATES a job the factory will make. So what is checked here is
+   mostly about refusing: no items means no order, a derived id never wears the platform's
+   prefix, and reading the same page twice produces the same ids so a second press writes
+   nothing.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/** An item link inside an order card — the anchor the card strategy keys on. */
+function itemLink(listingId, title) {
+  return node('a', 'listing-link', title, [], `/listing/${listingId}/something`)
+}
+
+function card(receipt, kids) {
+  return node('div', 'order-card', null, [
+    node('a', null, `#${receipt}`, [], `/your/orders/sold?order_id=${receipt}`),
+    ...kids,
+  ])
+}
+
+console.log('\nRECEIPTS FROM ETSY JSON — the strategy that carries real line ids')
+{
+  const payload = JSON.stringify({
+    receipts: [{
+      receipt_id: 4172259915,
+      name: 'Nicole Barry',
+      grandtotal: { amount: 4250, divisor: 100 },
+      transactions: [
+        {
+          transaction_id: 3910022114, listing_id: 1699, title: 'Custom Embroidered Hoodie',
+          quantity: 2, sku: 'HOOD-BLK', price: { amount: 2125, divisor: 100 },
+          expected_ship_date: 1789000000,
+          variations: [
+            { formatted_name: 'Size', formatted_value: 'L' },
+            { formatted_name: 'Personalization', formatted_value: 'Dana' },
+            { formatted_name: 'Upload your logo', formatted_value: 'https://i.etsystatic.com/x/art.png' },
+          ],
+        },
+      ],
+    }],
+  })
+  const { rows, stats } = extractReceipts(docOf(node('div', 'list', null, []), [payload]), [])
+  const r = rows[0] || {}
+  const it = (r.items || [])[0] || {}
+  check('one receipt read', rows.length, 1)
+  check('receipt id', r.order_id, '4172259915')
+  check('buyer', r.buyer, 'Nicole Barry')
+  check('total from {amount,divisor}', r.total, 42.5)
+  check('product NAME is carried', it.name, 'Custom Embroidered Hoodie')
+  check('quantity is carried', it.qty, 2)
+  check('unit price', it.unit_price, 21.25)
+  check('sku when the page has it', it.sku, 'HOOD-BLK')
+  /* THE ONE THAT PREVENTS DUPLICATED ORDERS. Etsy's transaction_id IS line identity; an
+     invented id let two overlapping syncs each write the whole line set (CLAUDE.md). */
+  check('line id is ETSY OWN transaction id', it.line_id, 'et-3910022114')
+  check('size becomes the variant', it.variant, 'L')
+  check('personalization is split out', it.personalization, 'Dana')
+  /* The customer's uploaded file IS the job on a POD order — it must never end up
+     concatenated into the variant string. */
+  check('artwork URL is split out', it.design_src, 'https://i.etsystatic.com/x/art.png')
+  check('ship-by carried as ISO', r.ship_by, new Date(1789000000 * 1000).toISOString())
+  check('strategy reported', stats.how, 'json')
+}
+
+console.log('\nJSON WITHOUT TRANSACTIONS — an id alone is not a receipt')
+{
+  /* Etsy's page state mentions receipt ids all over — shipping rows, review prompts,
+     analytics. Every one of those would otherwise become an order with nothing in it. */
+  const payload = JSON.stringify({ shipping: { receipt_id: 4172259915, carrier: 'usps' } })
+  const { rows } = extractReceipts(docOf(node('div', 'list', null, []), [payload]), [])
+  check('no order invented from a bare id', rows.length, 0)
+}
+
+console.log('\nRECEIPTS FROM CARDS — the fallback, and what it refuses to guess')
+{
+  const page = docOf(node('div', 'list', null, [
+    card('4172003959', [itemLink('881', 'Monogrammed Tote Bag'), node('span', null, 'Qty: 3')]),
+  ]))
+  const { rows, stats } = extractReceipts(page, [])
+  const it = (rows[0] || {}).items[0] || {}
+  check('one receipt read', rows.length, 1)
+  check('product NAME is carried', it.name, 'Monogrammed Tote Bag')
+  check('quantity read off the card', it.qty, 3)
+  /* DERIVED, AND SAYING SO. `rd-` means "this came from a reader"; `et-` would claim it is
+     Etsy's own transaction id, which is a lie the database would keep forever. */
+  check('derived line id wears rd-', it.line_id, 'rd-4172003959-881-1')
+  check('a derived id NEVER wears the platform prefix', /^et-/.test(it.line_id), false)
+  check('no variant is guessed from card text', it.variant, null)
+  check('no personalization is guessed from card text', it.personalization, null)
+  check('strategy reported', stats.how, 'card')
+}
+
+console.log('\nTWO OF THE SAME LISTING — different jobs, different line ids')
+{
+  /* CLAUDE.md: two lines of the same sku are different jobs. If both collapsed onto one id
+     the second would be dropped by the server's ON CONFLICT and the buyer gets one garment. */
+  const page = docOf(node('div', 'list', null, [
+    card('4171990173', [itemLink('881', 'Tote Bag'), itemLink('881', 'Tote Bag')]),
+  ]))
+  const items = (extractReceipts(page, []).rows[0] || {}).items
+  check('both lines survive', items.length, 2)
+  check('and they are distinguishable', items[0].line_id !== items[1].line_id, true)
+}
+
+console.log('\nPRESSING SYNC TWICE — the same page must produce the same ids')
+{
+  /* Idempotency is enforced by a unique index on (order_id, line_id), which only helps if
+     the ids are stable. If they drifted, a second press would double every line. */
+  const build = () => docOf(node('div', 'list', null, [
+    card('4172003959', [itemLink('881', 'Tote Bag'), itemLink('902', 'Cap')]),
+  ]))
+  const a = extractReceipts(build(), []).rows[0].items.map((i) => i.line_id).join('|')
+  const b = extractReceipts(build(), []).rows[0].items.map((i) => i.line_id).join('|')
+  check('ids are deterministic across reads', a, b)
+}
+
+console.log('\nJSON BEATS THE CARD for the same receipt')
+{
+  const payload = JSON.stringify({
+    receipt_id: 4172003959,
+    transactions: [{ transaction_id: 77, listing_id: 881, title: 'Tote Bag', quantity: 1 }],
+  })
+  const page = docOf(node('div', 'list', null, [
+    card('4172003959', [itemLink('881', 'Tote Bag')]),
+  ]), [payload])
+  const it = extractReceipts(page, []).rows[0].items[0]
+  check('the real transaction id wins', it.line_id, 'et-77')
+}
+
+console.log('\nTHE WANTED FILTER — nothing we did not ask about leaves the browser')
+{
+  const page = docOf(node('div', 'list', null, [
+    card('4172003959', [itemLink('881', 'Tote Bag')]),
+    card('4171990173', [itemLink('902', 'Cap')]),
+  ]))
+  const { rows } = extractReceipts(page, ['4172003959'])
+  check('only the asked-for receipt survives', rows.length, 1)
+  check('and it is the right one', rows[0].order_id, '4172003959')
+}
+
+console.log('\nAN ADDRESS IS ATTACHED ONLY WHEN THE SERVER WOULD TAKE IT')
+{
+  /* A half-read address written into the column reads as "we have nothing to ship against",
+     which §4 says must not look like "the marketplace is withholding it". Neither is true of
+     a street we simply failed to parse, so the honest shape is no address at all. */
+  const good = docOf(node('div', 'list', null, [
+    node('div', 'order-card', null, [
+      node('a', null, '#4172259915', [], '/your/orders/sold?order_id=4172259915'),
+      itemLink('881', 'Tote Bag'),
+      addressBlock('Nicole Barry', '11522 Discovery Heights Cir', 'Anchorage', 'AK', '99515-2719'),
+    ]),
+  ]))
+  const r = extractReceipts(good, []).rows[0]
+  check('a good address rides along', r.address && r.address.street, '11522 Discovery Heights Cir')
+  check('and the buyer name comes with it', r.buyer, 'Nicole Barry')
+
+  const bare = docOf(node('div', 'list', null, [card('4171990173', [itemLink('902', 'Cap')])]))
+  check('no address means null, not a blank one', extractReceipts(bare, []).rows[0].address, null)
+}
+
+console.log(bad ? `\n${bad} failure(s).` : '\nParser holds: addresses against markup captured from a live Etsy page, receipts against Etsy\u2019s own JSON field names.')
 process.exit(bad ? 1 : 0)

@@ -932,6 +932,24 @@ async function pushMarketplaceTracking(order, tracking, carrier) {
    */
   const channel = marketplaceChannelOf(order);
   if (!channel || !tracking) return { skipped: 'not-applicable' };
+  /**
+   * AN ORDER THE BROWSER READER BROUGHT IN HAS NO TOKEN BEHIND IT.
+   *
+   * Sellers work without a connected shop (owner, 2026-09-17), so their orders arrive from
+   * the extension (routes/reader.js) and `platform_connections` holds nothing for them. The
+   * push below would resolve no connection and throw, which the catch turns into a generic
+   * "push failed" — and a generic failure on the one step the buyer is waiting for reads as
+   * a bug in our shipping rather than as the thing the seller has to go and do.
+   *
+   * So it is refused HERE, by name. `needsManual` is the fact the floor and the seller both
+   * need: the label is bought, the parcel is moving, and the number has to be entered on the
+   * marketplace by hand. Stopping before the request also means we never spend a call, or a
+   * rate-limit slot, asking a question we already know the answer to.
+   */
+  if (order && order.meta && order.meta.reader) {
+    return { channel, skipped: 'reader-order', needsManual: true,
+             why: 'This order came from the browser extension, not a connected shop — enter the tracking number on the marketplace yourself.' };
+  }
   if (process.env.MARKETPLACE_FULFILL_LIVE !== '1') return { channel, dryRun: true, wouldSend: { tracking, carrier } };
   try {
     if (channel === 'etsy') {
@@ -1340,6 +1358,27 @@ export function ordersRoutes(app, requireAuth) {
     .then(() => q(`create unique index if not exists order_items_platform_line_uq
                    on order_items (order_id, line_id)
                    where line_id ~ '^(sh|et|tt)-'`).catch(() => {}))
+    /**
+     * THE SAME PROTECTION FOR A DERIVED LINE ID, in its own index rather than by widening
+     * the one above — that index exists and `create unique index if not exists` would leave
+     * an existing one untouched, so a widened predicate here would silently do nothing on
+     * every deployment that already has it.
+     *
+     * `rd-` (reader) is the browser extension's line id for a line the marketplace's own page
+     * did not hand us a platform id for (extension/src/parse.js). It is DERIVED — receipt +
+     * listing + the running count of that listing on the receipt — so the same page read
+     * twice yields the same ids and a second press of Sync writes nothing. That property is
+     * only worth anything if the database enforces it, which is what this does.
+     *
+     * The prefix is deliberately NOT `et-`/`sh-`/`tt-`: those mean "this is the platform's
+     * own line id", and a derived id wearing one would be a lie that outlives whoever wrote
+     * it. It is also deliberately not per-platform: `line_id` is unique only WITHIN an order
+     * and the order id already carries the platform, so one prefix covers every marketplace
+     * a reader is ever written for and this index never grows an arm per site.
+     */
+    .then(() => q(`create unique index if not exists order_items_derived_line_uq
+                   on order_items (order_id, line_id)
+                   where line_id ~ '^rd-'`).catch(() => {}))
     /**
      * LINE IDENTITY. The primary key was (order_id, sku, kind), so two lines of the SAME
      * sku on one order shared ONE design row — attaching artwork to the second silently

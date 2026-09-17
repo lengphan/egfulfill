@@ -19,8 +19,19 @@ const show = (el, on) => { el.hidden = !on }
 
 let TOKEN = null
 let WANTED = []          // receipt ids OUR server says are missing an address
-let ROWS = []            // what the current page can actually supply
+let ROWS = []            // addresses the current page can supply for orders we already have
+let NEW_ORDERS = []      // whole orders the page describes that we do not have at all
 let OPEN_PEEK = false    // is the "what will be sent" list open? Dies with the popup.
+
+/**
+ * THE MARKETPLACE THIS BUILD CAN READ.
+ *
+ * One constant rather than `etsy` typed at four call sites, because the server route is
+ * platform-generic (`/api/reader/:platform/…`) and the day a second parser lands this is the
+ * line that moves. It is NOT a promise that other marketplaces work — a platform is only
+ * real once extension/src/parse.js can describe its page.
+ */
+const PLATFORM = 'etsy'
 
 function fail(msg) {
   const el = $('err')
@@ -185,26 +196,38 @@ function paint({ line, note = '', button = null, peek = 0 }) {
 function drawRows() {
   const ul = $('rows')
   ul.textContent = ''
-  for (const r of ROWS) {
+  const add = (title, detail) => {
     const li = document.createElement('li')
     const nm = document.createElement('div')
     nm.className = 'nm'
-    nm.textContent = r.name || `Order ${r.order_id}`
+    nm.textContent = title
     const ad = document.createElement('div')
     ad.className = 'ad'
-    const line = [r.street, r.street2, [r.city, r.state].filter(Boolean).join(' '), r.zip]
-      .filter(Boolean).join(', ')
-    ad.textContent = line
-    ad.title = line                       // the full thing for the one that is truncated
+    ad.textContent = detail
+    ad.title = detail                     // the full thing for the one that is truncated
     li.append(nm, ad)
     ul.appendChild(li)
+  }
+  /* NEW ORDERS FIRST — they are the larger claim. "We are about to create this" deserves to
+     be read before "we are about to fill in a street", and a seller checking this list is
+     almost always checking the creations. */
+  for (const r of NEW_ORDERS) {
+    /* THE ITEM NAMES, not a count. "2 items" is the shape of a row nobody can verify; the
+       titles are what let a seller recognise the order as theirs at a glance — which is the
+       entire reason this list can be opened. */
+    const names = r.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + i.name).join(' · ')
+    add(r.buyer || `Order ${r.order_id}`, names)
+  }
+  for (const r of ROWS) {
+    add(r.name || `Order ${r.order_id}`,
+      [r.street, r.street2, [r.city, r.state].filter(Boolean).join(' '), r.zip].filter(Boolean).join(', '))
   }
 }
 
 async function scan() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab || !/^https:\/\/www\.etsy\.com\/your\/orders/.test(tab.url || '')) {
-    ROWS = []
+    ROWS = []; NEW_ORDERS = []
     paint({ line: 'Not your orders page', note: 'Shop Manager → Orders & Shipping.', button: 'open' })
     /* The build still shows. It is the answer to "is my change loaded", and that question
        gets asked most often on the page where nothing else is happening. */
@@ -247,8 +270,13 @@ async function scan() {
         try {
           const p = globalThis.EG_PARSE
           if (!p) return { ok: false, error: 'parser did not load' }
+          /* BOTH READS, ONE INJECTION. They answer different questions — "what address does
+             this page hold" and "what order does this page describe" — and running them in
+             one pass means the popup compares two views of the SAME DOM. Two injections
+             could straddle a re-render and disagree about which orders are on screen. */
           const { rows, stats } = p.extractOrders(document, [])
-          return { ok: true, rows, stats }
+          const full = p.extractReceipts ? p.extractReceipts(document, []) : { rows: [], stats: {} }
+          return { ok: true, rows, stats: { ...stats, ...full.stats, usable: stats.usable }, receipts: full.rows }
         } catch (e) { return { ok: false, error: String((e && e.message) || e) } }
       },
     })
@@ -258,13 +286,18 @@ async function scan() {
   }
   if (!res || !res.ok) return fail((res && res.error) || 'Could not read that page.')
 
-  const onPage = res.rows || []
+  const addressesOnPage = res.rows || []
+  const receiptsOnPage = res.receipts || []
   const s = res.stats || {}
 
-  if (!onPage.length) {
-    ROWS = []
-    /* FOUND-BUT-UNREADABLE IS NOT AN EMPTY PAGE, and this said "no orders found here" for
-       both. §4: if a thing can't be READ versus doesn't EXIST, say which. */
+  /*
+   * NOTHING READABLE AT ALL. Kept distinct from "read it, and we already have all of it" —
+   * §4: if a thing can't be READ versus doesn't EXIST, say which. A seller staring at a page
+   * full of orders while this says "nothing here" needs to know which of the two it means,
+   * because only one of them is something they can act on.
+   */
+  if (!addressesOnPage.length && !receiptsOnPage.length) {
+    ROWS = []; NEW_ORDERS = []
     paint((s.foundOnPage || 0) > 0
       ? { line: 'None could be read', note: 'Usually non-US, or missing a street.' }
       : { line: 'No orders here', note: 'Open your sold orders, or page back.' })
@@ -273,30 +306,57 @@ async function scan() {
     return
   }
 
+  /*
+   * ASK ABOUT THE RECEIPTS ON SCREEN, never "what are you missing".
+   *
+   * Same reasoning as before and it now matters more: this decides what gets CREATED, so an
+   * unbounded "everything you don't have" would be a client inventing orders against a list
+   * it did not read. The seller's own page is the only source of receipt ids here.
+   */
+  const ids = [...new Set([...receiptsOnPage.map((r) => r.order_id), ...addressesOnPage.map((r) => r.order_id)])]
+  let known = new Set(), blankAddress = new Set()
   try {
-    const ask = await api('/api/etsy/addresses/missing', {
+    const ask = await api(`/api/reader/${PLATFORM}/known`, {
       method: 'POST',
-      body: JSON.stringify({ receipts: onPage.map((r) => r.order_id) }),
+      body: JSON.stringify({ receipts: ids }),
     })
-    WANTED = ask.receipts || []
+    known = new Set((ask.known || []).map(String))
+    blankAddress = new Set((ask.blankAddress || []).map(String))
   } catch (e) {
     return fail(e.message)
   }
 
-  const keep = new Set(WANTED.map(String))
-  ROWS = onPage.filter((r) => keep.has(r.order_id))
+  /*
+   * TWO DISJOINT PILES, and the split is what keeps each path doing the job it is good at.
+   *
+   *   • NEW_ORDERS — the page describes it and we have never seen it. These get CREATED,
+   *     address included, by the reader route.
+   *   • ROWS — we already hold the order and it has no address. These go through the
+   *     ADDRESS route, which is the one strategy verified against a live Shop Manager page.
+   *
+   * Disjoint by construction (`known` decides), so no receipt is written twice and the two
+   * counts on the panel always add up to what is about to happen.
+   */
+  NEW_ORDERS = receiptsOnPage.filter((r) => !known.has(String(r.order_id)))
+  ROWS = addressesOnPage.filter((r) => blankAddress.has(String(r.order_id)))
 
+  WANTED = [...blankAddress]
   drawRows()
-  paint(ROWS.length
-    ? { line: `${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'} to sync`,
-        button: 'sync', peek: ROWS.length }
-    : { line: 'All have addresses', note: 'Page back for older orders.' })
+
+  const bits = []
+  if (NEW_ORDERS.length) bits.push(`${NEW_ORDERS.length} new ${NEW_ORDERS.length === 1 ? 'order' : 'orders'}`)
+  if (ROWS.length) bits.push(`${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'}`)
+  const peek = NEW_ORDERS.length + ROWS.length
+
+  paint(peek
+    ? { line: bits.join(' · '), button: 'sync', peek }
+    : { line: 'Nothing new here', note: 'Page back for older orders.' })
 
   /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
      broken selector hides for weeks. */
-  $('stats').textContent = statsLine(s, ROWS.length)
-  $('stats').title = statsTitle(s, ROWS.length)
+  $('stats').textContent = statsLine(s, peek)
+  $('stats').title = statsTitle(s, peek)
 }
 
 async function start() {
@@ -306,26 +366,51 @@ async function start() {
   await scan()
 }
 
+/**
+ * CREATE, THEN FILL — in that order, and the order matters.
+ *
+ * The two piles are disjoint, so neither call can touch the other's receipts. But if the
+ * creation fails the addresses are still worth sending, and if the addresses fail the orders
+ * are already in. Running them in sequence and reporting BOTH outcomes is what keeps a
+ * half-success from reading as a total failure and sending someone to press it again.
+ */
 async function sync() {
-  if (!ROWS.length) return
+  if (!ROWS.length && !NEW_ORDERS.length) return
   $('sync').disabled = true
   $('sync').textContent = 'Syncing…'
+  const said = []
+  let trouble = ''
   try {
-    /* Send only the fields the endpoint reads. `_how` is a diagnostic this side and has no
-       business in a request body. */
-    const rows = ROWS.map(({ order_id, name, street, street2, city, state, zip, country }) =>
-      ({ order_id, name, street, street2, city, state, zip, country }))
-    const res = await api('/api/etsy/import-addresses', { method: 'POST', body: JSON.stringify({ rows }) })
-    // What was just filled is no longer wanted, so a second press cannot double-send.
-    WANTED = WANTED.filter((id) => !rows.some((r) => r.order_id === id))
-    ROWS = []
-    const rest = []
-    if (res.alreadyHad) rest.push(`${res.alreadyHad} already had one`)
-    if (res.notFound) rest.push(`${res.notFound} not in egful yet`)
-    if (res.skipped) rest.push(`${res.skipped} skipped`)
-    paint({ line: `${res.updated} synced`, note: rest.join(' · ') })
-  } catch (e) {
-    fail(e.message)
+    if (NEW_ORDERS.length) {
+      /* Send only what the route reads. `_how` is a diagnostic this side and has no business
+         in a request body. */
+      const orders = NEW_ORDERS.map(({ order_id, buyer, buyer_email, total, ship_by, created_at, address, items }) =>
+        ({ order_id, buyer, buyer_email, total, ship_by, created_at, address, items }))
+      try {
+        const res = await api(`/api/reader/${PLATFORM}/import`, { method: 'POST', body: JSON.stringify({ rows: orders }) })
+        if (res.created) said.push(`${res.created} ${res.created === 1 ? 'order' : 'orders'} created`)
+        if (res.existed) said.push(`${res.existed} already there`)
+        if (res.skipped) said.push(`${res.skipped} skipped`)
+        if (res.notYours) said.push(`${res.notYours} not yours`)
+        NEW_ORDERS = []
+      } catch (e) { trouble = e.message }
+    }
+
+    if (ROWS.length) {
+      const rows = ROWS.map(({ order_id, name, street, street2, city, state, zip, country }) =>
+        ({ order_id, name, street, street2, city, state, zip, country }))
+      try {
+        const res = await api('/api/etsy/import-addresses', { method: 'POST', body: JSON.stringify({ rows }) })
+        // What was just filled is no longer wanted, so a second press cannot double-send.
+        WANTED = WANTED.filter((id) => !rows.some((r) => r.order_id === id))
+        ROWS = []
+        if (res.updated) said.push(`${res.updated} ${res.updated === 1 ? 'address' : 'addresses'} filled`)
+        if (res.alreadyHad) said.push(`${res.alreadyHad} already had one`)
+      } catch (e) { trouble = trouble || e.message }
+    }
+
+    if (trouble) fail(trouble)
+    paint({ line: said.length ? said[0] : 'Nothing changed', note: said.slice(1).join(' · ') })
   } finally {
     $('sync').textContent = 'Sync to egful'
     $('sync').disabled = false
@@ -355,7 +440,7 @@ $('open').addEventListener('click', async () => {
 })
 $('peek').addEventListener('click', () => {
   OPEN_PEEK = !OPEN_PEEK
-  paint({ line: $('count').textContent, note: $('note').textContent, button: 'sync', peek: ROWS.length })
+  paint({ line: $('count').textContent, note: $('note').textContent, button: 'sync', peek: NEW_ORDERS.length + ROWS.length })
 })
 $('forget').addEventListener('click', async () => {
   await chrome.storage.local.remove(['token', 'who'])
