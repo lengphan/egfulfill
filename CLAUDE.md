@@ -682,27 +682,43 @@ hole. Team members resolve to `owner_id` via `effectiveSeller`.
   - 833–896 of the 4,081 styles are discontinued; browse hides them unless `?discontinued=1`.
 - **Payments** — `stripe.js`, `paypal.js`, `vietqr.js`, `topups.js`. **VietQR:** the top-up modal must render the **virtual-account `qrCode`** from `POST /api/vietqr/create-payment`. A locally built EMVCo QR is never synced back, so the poll never matches and money lands untracked. There is exactly one QR.
 - **Channels** — `etsy.js` (OAuth PKCE), `shopify.js`, `tiktok.js`, Google Sign-In. Null Etsy buyer addresses are Etsy's app-tier PII gate, **not** our bug.
-- **NEVER SCRAPE. THE API IS HOW AN ORDER ARRIVES, AND CONNECTING IS NOT OPTIONAL** (owner,
-  2026-09-14). An order comes from the channel's API, through a shop the seller connected.
-  A reader may fill in **only what that API refuses to give us**, never anything it would
-  have given us anyway, and never a field it gave us already.
-  - `extension/` is the one reader and the whole shape of it: it reads a page the seller
-    opened, makes **zero** requests to Etsy — no fetch, no pagination, no crawl, no worker,
-    no timer, asserted by `tools/check-extension-parse.mjs` — asks us *"of the receipts I can
-    see, which do you need?"*, and sends back **one field**. That is the ceiling, not a
-    starting point.
-  - **Replacing the sync with a scrape was costed and rejected.** Four things break, and the
-    first on its own is disqualifying: `line_id` is Etsy's `transaction_id` (`et-<id>`) and an
-    invented one already let overlapping syncs duplicate whole orders (`ef2bf637`, 18 orders
-    over-counted); the customer's uploaded artwork arrives as a URL inside `variations` and IS
-    the job on a POD order; `sku` is a listing field, not page text; and tracking cannot go
-    back without the connection's token (`etsy.js:844`). Status, cancellations and refunds
-    would only ever be as fresh as the last time someone had the tab open.
-  - So **the connection is not a convenience to design around.** Pausing Connect to push
-    sellers at the extension was tried on 2026-09-14 and reverted the same day: the extension
-    only ever UPDATEs orders that already exist (`applyAddressRows` never INSERTs), so no
-    connection means no orders at all. The warning about what Etsy withholds belongs in the
-    pre-connect dialog, which is where it now lives.
+- **NEVER SCRAPE — BUT A READER MAY NOW CREATE THE ORDER** (owner, 2026-09-17, reversing the
+  2026-09-14 rule that connecting was not optional). The distinction that survived the reversal
+  is the one that always mattered, and it is about REQUESTS, not about fields:
+  - **A SCRAPER ASKS THE MARKETPLACE FOR PAGES. A READER READS THE ONE ALREADY OPEN.**
+    `extension/` makes **zero** requests to Etsy — no fetch, no pagination, no crawl, no
+    worker, no timer, asserted by `tools/check-extension-parse.mjs`. That is the line, and it
+    did not move. Reading MORE of a page the seller opened themselves changes nothing about
+    the request profile, which is the entire reason this is defensible; adding a fetch, a
+    click or a "load the next page" would change it completely.
+  - **WHO USES WHICH PATH.** Sellers work through the extension and need not connect a shop.
+    **Admin and factory accounts still connect normally** — they can, and a connection is
+    strictly better where it exists. Connect is still OFFERED to sellers, not removed: taking
+    it away would strand everyone already connected.
+  - **`server/src/routes/reader.js`** is where a read becomes an order. Platform-generic
+    (`/api/reader/:platform/…`), so Walmart or Amazon is a parser plus a `PLATFORMS` entry,
+    never a second copy of that file. Gate: `tools/check-reader-import.mjs`, which boots the
+    real Fastify app against a throwaway Postgres rather than mocking it.
+  - **IT FILLS GAPS AND NEVER OVERWRITES** (§2.6). A seller re-reads pages holding orders they
+    have already worked on, so a hand-typed address, a corrected quantity and an advanced
+    stage all survive a re-read. Status and factory stage are never written by that file.
+  - **LINE IDENTITY IS STILL SACRED.** `et-<transaction_id>` when the page's own JSON carries
+    it; otherwise `rd-…`, DERIVED from receipt + listing + position so a second press of Sync
+    writes nothing, with its own partial unique index. A derived id must never wear `et-`/
+    `sh-`/`tt-`: those mean "the platform said so", and an invented one already let overlapping
+    syncs duplicate whole orders (`ef2bf637`, 18 orders over-counted).
+  - **WHAT A READER CANNOT DO, AND MUST SAY RATHER THAN DISCOVER.** Tracking needs the shop's
+    OAuth token, so `pushMarketplaceTracking` refuses a reader order **by name**
+    (`skipped: 'reader-order'`, `needsManual`) instead of throwing a generic "push failed" on
+    the one step the buyer is waiting for — the seller enters the number on the marketplace
+    themselves. Status, cancellations and refunds are only as fresh as the last time a tab was
+    open. `sku` and artwork are best-effort. Orders carry `meta.reader` so any surface can say
+    so; **nothing built on that flag may treat a reader order as marketplace-confirmed.**
+  - **THE CARD FALLBACK REFUSES TO GUESS.** When the page ships no usable JSON the reader
+    carries a name and a quantity and nothing else — no variant, no personalisation scraped
+    out of unlabelled text. A wrong size is a garment remade; a wrong personalisation is a
+    garment remade with somebody else's name on it. A blank a human fills is cheaper than a
+    confident invention.
 
 ### Auth
 Sign-in accepts an **email or a username**. Usernames exclude `@`, which is what keeps
