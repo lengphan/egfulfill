@@ -178,7 +178,11 @@ export function VariantField({
           method instead, which loses the half that changes. The value still gets flex-1, so
           the face gives way first. */}
       {prefix && (
-        <span className="min-w-0 truncate text-muted-foreground">
+        /* CAPITALISED IN CSS, not in JS. Face names come through tl("sides", …) as the app's
+           own lowercase keys, and every other surface that prints one does it this way
+           (the order summary's rows, for one). toUpperCase() on the first character is the
+           version that mangles a locale whose casing rules are not English. */
+        <span className="min-w-0 truncate capitalize text-muted-foreground">
           {prefix}<span className="text-muted-foreground/60"> · </span>
         </span>
       )}

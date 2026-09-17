@@ -3010,6 +3010,11 @@ export type OrderDesignFee = {
   amount: number | null
   /** Staff typed this figure instead of taking the tier's list price. */
   overridden?: boolean
+  /** WHICH SURFACE the work is on. A design fee is per DESIGN, not per face — the same
+   *  picture front and back is digitised once — so the row cannot be derived from a face and
+   *  has to be told. Empty for designs written before a side was recorded, and the summary
+   *  then prints the bare label exactly as it used to. */
+  sides?: string[] | null
   status: "charged" | "estimated" | "tbd"
   /** Every line this ONE fee covers. Both fees pay for work done once — a file is checked
    *  once however many items carry it, a picture is digitised once — so lines sharing a

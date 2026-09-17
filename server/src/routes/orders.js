@@ -4289,7 +4289,29 @@ export function ordersRoutes(app, requireAuth) {
                  where d.order_id = i.order_id
                    and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
                    and coalesce(d.method, '') <> ''
-              ), '{}') as face_methods
+              ), '{}') as face_methods,
+              /**
+               * WHICH SURFACE EACH DESIGN SITS ON, paired with the design itself.
+               *
+               * A design fee is per DESIGN, not per face — the same picture front and back is
+               * digitised once — so the row could not say which surface it came from, and a
+               * seller looking at a bare "Design fee" has no way to connect it to the work.
+               * Pairing side with the key lets the row name only the faces it is actually
+               * billing for, which matters because a group's keys can be split across two
+               * fees when a design is shared between lines.
+               *
+               * The separator is a pipe: art_hash is hex and storage_key is a path, neither
+               * of which contains one. Faces with no side recorded are left out rather than
+               * guessed at as the front.
+               */
+              coalesce((select array_agg(distinct p order by p) from (
+                 select d.side || '|' || coalesce(d.art_hash, d.storage_key, left(d.data, 64)) as p
+                   from order_designs d
+                  where d.order_id = i.order_id
+                    and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
+                    and (d.data is not null or d.storage_key is not null)
+                    and coalesce(d.side, '') <> ''
+              ) ps), '{}') as design_faces
          from order_items i where i.order_id = $1`,
       [orderId]).then((r) => r.rows).catch(() => []);
   }
@@ -4331,6 +4353,20 @@ export function ordersRoutes(app, requireAuth) {
   function imageKeysOf(r) {
     return Array.isArray(r.image_keys) ? r.image_keys.filter(Boolean) : [];
   }
+  /** design key -> the face it sits on, from the `side|key` pairs the query builds. A design
+   *  on two faces keeps the first; the fee is one job either way and naming both would say
+   *  the work happened twice. */
+  function facePairsOf(r) {
+    const out = new Map();
+    for (const p of (Array.isArray(r.design_faces) ? r.design_faces : [])) {
+      const i = String(p || '').indexOf('|');
+      if (i <= 0) continue;
+      const side = String(p).slice(0, i);
+      const key = String(p).slice(i + 1);
+      if (key && !out.has(key)) out.set(key, side);
+    }
+    return out;
+  }
 
   async function computeDesignFees(orderId) {
     const fees = await readAll().catch(() => ({}));
@@ -4359,9 +4395,14 @@ export function ordersRoutes(app, requireAuth) {
       if (!tier) continue;
       const key = `${tier}|${designKeyOf(r, tier)}`;
       const g = groups.get(key);
-      if (g) { g.lines.push(r); if (r.design_charged_at) g.charged = true; continue; }
+      if (g) {
+        g.lines.push(r);
+        if (r.design_charged_at) g.charged = true;
+        for (const [k, v] of facePairsOf(r)) if (!g.faces.has(k)) g.faces.set(k, v);
+        continue;
+      }
       groups.set(key, { tier, lines: [r], charged: !!r.design_charged_at, quote: r.design_quote_status,
-                        keys: imageKeysOf(r) });
+                        keys: imageKeysOf(r), faces: facePairsOf(r) });
     }
     const items = []; let total = 0;
     /**
@@ -4388,6 +4429,10 @@ export function ordersRoutes(app, requireAuth) {
        */
       if (g.tier === 'supplied' && !g.charged) continue;
       let label, amount;
+      /* WHICH SURFACE THE WORK IS ON. Empty when the designs carry no side, which is every
+         row written before faces existed — the UI prints a bare "Design fee" then, exactly as
+         it did, rather than naming a face nobody recorded. */
+      let sides = [...new Set([...g.faces.values()])];
       if (g.tier === 'supplied') { label = 'Check fee'; amount = CHECK; }
       else if (g.tier === 'complex') {
         label = 'Complex design fee';
@@ -4401,6 +4446,10 @@ export function ordersRoutes(app, requireAuth) {
         billable.forEach((k) => seen.add(k));
         const n = g.keys.length ? billable.length : 1;
         if (!n) continue;
+        /* ONLY THE FACES THIS FEE IS FOR. `billable` is what this group adds that no earlier
+           group has been charged for, so naming every face on the group would attribute work
+           to a surface somebody else's row already paid for. */
+        sides = [...new Set(billable.map((k) => g.faces.get(k)).filter(Boolean))];
         label = n > 1 ? `Design fee · ${n} designs` : 'Design fee';
         amount = STD * n;
       }
@@ -4426,6 +4475,10 @@ export function ordersRoutes(app, requireAuth) {
       items.push({
         line_id: first.line_id || null, sku: first.sku || null, name,
         tier: g.tier, label, amount, status,
+        /** The face(s) this fee's work is on, so the summary can say "Front · Design fee"
+         *  instead of leaving a bare figure with nothing to connect it to. Empty for designs
+         *  written before a side was recorded. */
+        sides,
         /** Staff typed this figure rather than taking the tier's list price — the row says
          *  so, so an unusual number is not mistaken for a pricing bug. */
         overridden,

@@ -217,11 +217,17 @@ export function VariantPicker({
             rows below (the design canvas). It is the longest value on the strip by far —
             "10895 – OL102" plus a product name — and the one that gets truncated when it
             shares a row. With three fields left, giving it the row also leaves colour and
-            size an even pair instead of stranding one of them beside a gap. */}
+            size an even pair instead of stranding one of them beside a gap.
+
+            PLAIN col-span-2, NOT `col-span-2 sm:col-span-1`. The dense grid is two columns at
+            EVERY width — the `sm:` track list only applies when dense is off — so the sm
+            override silently handed the row back above 640px, which is every desktop. The
+            blank sat half-width beside the colour exactly where it was supposed to own the
+            row, and the fix looked applied on a phone and absent on the screen people use. */}
         <VariantField
           label={tl("variantPicker", "Blank")} value={blankLabel} required
           options={blankOptions}
-          className={hideMethod ? "col-span-2 sm:col-span-1" : undefined}
+          className={hideMethod ? "col-span-2" : undefined}
           disabled={busy === "blank"} onChange={pickBlank}
         />
         <VariantField

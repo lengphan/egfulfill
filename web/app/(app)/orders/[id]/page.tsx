@@ -1084,9 +1084,21 @@ export default function OrderDetailPage() {
                           (l.line_id && x.line_id === l.line_id)
                           || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
                         const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.name || l.sku || "Item")
-                        /* A single-part line needs no breakdown — a heading and one row under it
-                           restating the same figure is the repetition, not a clarification. */
-                        const split = method > 0.005 || parts.length > 0
+                        /**
+                         * EVERY ITEM BREAKS DOWN THE SAME WAY (owner, 2026-09-17).
+                         *
+                         * This was "a single-part line needs no breakdown — a heading and one
+                         * row restating the same figure is repetition, not clarification",
+                         * which was true when the only row would have been the blank. It is
+                         * the wrong trade now: one item listing Blank, its faces and its
+                         * design fee while the next lists nothing reads as MISSING
+                         * information, not as an absence of it, and the reader cannot tell
+                         * whether item 2 has no extras or simply failed to load them.
+                         *
+                         * A repeated figure is a cost worth paying for that: it is legible at
+                         * a glance and wrong about nothing.
+                         */
+                        const split = method > 0.005 || parts.length > 0 || blank > 0.005
                         return (
                           <Fragment key={`line-${i}`}>
                             <div className="flex justify-between">
@@ -1192,7 +1204,21 @@ export default function OrderDetailPage() {
                               .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
                               .map((f, j) => (
                                 <div key={`fee-${i}-${j}`} className="flex justify-between">
-                                  <dt className="pl-3 text-muted-foreground">{f.label}</dt>
+                                  {/* THE SURFACE THE WORK IS ON, in front of the fee, so the row
+                                      reads like the face rows above it — "Front · Design fee".
+                                      A bare "Design fee" beside a figure gave a seller nothing
+                                      to connect the charge to. Absent when no side was recorded
+                                      (designs written before faces existed), and the label then
+                                      stands alone exactly as it did. */}
+                                  <dt className="pl-3 text-muted-foreground">
+                                    {(f.sides ?? []).length > 0 && (
+                                      <span className="capitalize">
+                                        {(f.sides ?? []).map((sd) => tl("sides", sd)).join(", ")}
+                                        <span className="text-muted-foreground/60"> · </span>
+                                      </span>
+                                    )}
+                                    {f.label}
+                                  </dt>
                                   {isStaff
                                     ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
                                     : <dd className="tabular-nums text-muted-foreground">{f.amount == null ? <span className="italic">To Be Determined</span> : usd(f.amount)}</dd>}
