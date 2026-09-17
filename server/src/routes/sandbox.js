@@ -436,7 +436,21 @@ export function sandboxRoutes(app, requireAuth) {
   app.get('/api/v1/products', async (req, reply) => {
     const k = await requireKey(req, reply, { scope: 'products.read' }); if (k.error) return k;
     try {
-      const r = await q('select id, sku, name, type, method, price, base_price from catalog_products order by name limit 200');
+      /**
+       * `id` IS NOT PUBLISHED, BECAUSE IT NAMES OUR SUPPLIER — §2.9.
+       *
+       * catalog_products.id carries the import's provenance prefix: `SS-9182`,
+       * `SANMAR-108085`, `OTTO-…`. Measured on the live catalogue, 21 of 28 rows name a
+       * supplier outright, so every partner holding a key could read where our blanks come
+       * from and buy the same garment without us. This route's own note used to say
+       * "nothing here is sensitive" — true of the columns somebody thought about, and false
+       * of the identifier beside them. That is the shape §2.9 warns about: the leak is
+       * rarely a field called `supplier`.
+       *
+       * `sku` stays, and is the handle: POST /api/v1/orders resolves `product_id || sku`
+       * against the same column, so nothing a partner can do with the catalogue is lost.
+       */
+      const r = await q('select sku, name, type, method, price, base_price from catalog_products order by name limit 200');
       /**
        * MONEY AS NUMBERS, because that is what the documented sample shows.
        *
@@ -716,7 +730,16 @@ export function sandboxRoutes(app, requireAuth) {
         },
         _note: 'Shipping is the fulfilment charge for this basket, not a live carrier rate. Nothing was created and nothing was charged.',
       };
-    } catch (e) { reply.code(500); return { error: String((e && e.message) || e), mode: k.mode }; }
+    } catch (e) {
+      /* THE STACK GOES TO THE LOG, because without it this is undiagnosable from outside.
+         This route answered `{"error":"Cannot read properties of undefined (reading
+         'length')"}` for EVERY payload while the same functions, called directly with the
+         same data in the same container, returned a correct quote — and the one thing that
+         would have said where, the stack, was being discarded here. The partner still gets
+         only the message; we get the frame. */
+      req.log.error({ err: e }, 'GET quote failed');
+      reply.code(500); return { error: String((e && e.message) || e), mode: k.mode };
+    }
   });
 
   /**
