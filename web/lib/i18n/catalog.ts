@@ -3971,6 +3971,7 @@ const vi: Dict = {
   "productPage.Printing methods": "Phương pháp in",
   "productPage.Print methods": "Phương pháp in",
   "productPage.Placement": "Vị trí in",
+  "productPage.Blank": "Phôi",
   "productPage.per extra side": "mỗi mặt in thêm",
   "productPage.File guidelines": "Yêu cầu tệp",
   "productPage.Embroidery": "Thêu",

@@ -359,6 +359,42 @@ export default function ProductDetailPage() {
               pricedSides.length > 1 ? pricedSides.map((sd) => tl("sides", sd)).join(" + ") : null,
             ].filter(Boolean).join(" · ")}
           </div>
+          {/**
+            * WHAT THE FIGURE IS MADE OF — the same two rows the order's Summary shows, in the
+            * same words.
+            *
+            * One number moved by four pickers is a number you cannot check. The blank's own
+            * price is the thing people most want out of this page, and there was no way to
+            * see it: deselecting the method is not offered (a product without one is not a
+            * thing), so the technique's surcharge was welded into the headline with nothing
+            * saying how much of it that was.
+            *
+            * `Blank` and `Front · Embroidery` are deliberately the Summary's own vocabulary.
+            * A seller reading a quote and then a product page should not have to learn that
+            * two screens call the same money by different names.
+            *
+            * Only when there IS a surcharge: on a blank whose method costs nothing, the two
+            * rows would restate the headline twice and say nothing.
+            */}
+          {methodFee(selMethod?.key, selMethod?.label) > 0 && (
+            <dl className="max-w-xs space-y-0.5 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">{tl("productPage", "Blank")}</dt>
+                <dd className="tabular-nums text-muted-foreground">
+                  {usd(selSize ? priceOfSize(selSize) : priceOf(product))}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="min-w-0 truncate text-muted-foreground">
+                  <span className="capitalize">{tl("sides", pricedSides[0])}</span>
+                  {selMethod?.label && <span className="text-muted-foreground/70"> · {selMethod.label}</span>}
+                </dt>
+                <dd className="tabular-nums text-muted-foreground">
+                  {usd(methodFee(selMethod?.key, selMethod?.label))}
+                </dd>
+              </div>
+            </dl>
+          )}
           <ShippingFees
  first={shipFee || shipFirstFee(product, fees?.shipBands)}
  extra={fees?.shipExtra ?? 0}
