@@ -654,9 +654,16 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, opening
  * question — but it is NOT "the best sellers on Etsy", and the label says Est. because the
  * numbers are a model, not reported figures.
  */
+/* SORTABLE BY EVERY FIGURE THE CARD PRINTS. It had two of the four, so "show me the most
+   viewed" — near enough the first question anybody asks a research grid — could only be
+   answered by reading. Same estimates the tiles draw, so the order on screen and the numbers
+   on the cards can never disagree. */
 const CLIENT_SORTS: Record<string, (l: EtsyListing) => number> = {
  best: (l) => estFor(l).sold24,
  revenue: (l) => estFor(l).revenue,
+ views: (l) => estFor(l).views24,
+ totalsold: (l) => estFor(l).totalSold,
+ favorites: (l) => l.num_favorers ?? 0,
 }
 
 const PAGE_SIZE = 100
@@ -997,6 +1004,22 @@ export function SpyDeckView() {
  const [maxPrice, setMaxPrice] = useState("")
  const [minSold, setMinSold] = useState("")
  const [minFav, setMinFav] = useState("")
+  /**
+   * THE OTHER THREE TILES ON THE CARD.
+   *
+   * Every card prints four numbers — views a day, sold a day, revenue all time, sold all
+   * time — and only one of them could be filtered on. So the grid answered "what is selling"
+   * and then made you read a hundred cards to find it, which is the job the numbers were put
+   * there to do. A figure a page displays and cannot filter by is a figure you scan for.
+   *
+   * ESTIMATES, EVERY ONE, and the labels keep the card's own `~` so a threshold is never
+   * read as a measurement. Three more minimums rather than a scoring model: somebody hunting
+   * products already knows what "good" means this week, and a weight nobody can see is worse
+   * than a number they typed.
+   */
+ const [minViews, setMinViews] = useState("")
+ const [minRevenue, setMinRevenue] = useState("")
+ const [minTotal, setMinTotal] = useState("")
   // RECENCY, and it has to be client-side. /listings/active takes keywords, taxonomy,
   // price, sort and paging — there is no created-after parameter to send, so the only
   // thing in the whole query that expressed "now" was sort_on=created, which reorders
@@ -1054,17 +1077,29 @@ export function SpyDeckView() {
  const applyClientFilters = useCallback((list: EtsyListing[]) => {
  const ms = Number(minSold) || 0
  const mf = Number(minFav) || 0
+ const mv = Number(minViews) || 0
+ const mr = Number(minRevenue) || 0
+ const mt = Number(minTotal) || 0
  const days = Number(listedIn) || 0
- if (!ms && !mf && !days) return list
+ if (!ms && !mf && !mv && !mr && !mt && !days) return list
     // A listing with NO creation date fails the recency filter rather than passing it.
     // estFor treats a missing date as 45 days old, which is a reasonable default for an
     // estimate and a wrong one for a filter: it would quietly let undated listings through
     // as "new". A filter that cannot verify the claim must not make it.
  const after = days ? (Date.now() / 1000) - days * 86400 : 0
- return list.filter((l) => (!ms || estFor(l).sold24 >= ms)
-      && (!mf || (l.num_favorers ?? 0) >= mf)
-      && (!days || ((l.created ?? 0) > after)))
-  }, [minSold, minFav, listedIn])
+    /* estFor ONCE PER LISTING, not once per threshold. It is pure and cheap, but this runs
+       over every card on every keystroke in any of six fields, and calling it four times in
+       one predicate is four times the work for one answer. */
+ return list.filter((l) => {
+ const e = estFor(l)
+ return (!ms || e.sold24 >= ms)
+        && (!mv || e.views24 >= mv)
+        && (!mr || e.revenue >= mr)
+        && (!mt || e.totalSold >= mt)
+        && (!mf || (l.num_favorers ?? 0) >= mf)
+        && (!days || ((l.created ?? 0) > after))
+    })
+  }, [minSold, minFav, minViews, minRevenue, minTotal, listedIn])
 
   // Paging for every grid. Hooks can't be conditional, so all four are declared up
   // front; only the active tab's is rendered.
@@ -1438,6 +1473,9 @@ export function SpyDeckView() {
                     {/* Ranked from what has been fetched, not from Etsy — see CLIENT_SORTS. */}
                     <option value="best">{tl("spydeck", "Est. best sellers")}</option>
                     <option value="revenue">{tl("spydeck", "Est. revenue")}</option>
+                    <option value="views">{tl("spydeck", "Est. most viewed")}</option>
+                    <option value="totalsold">{tl("spydeck", "Est. sold, all time")}</option>
+                    <option value="favorites">{tl("spydeck", "Most favorited")}</option>
                     <option value="newest">{tl("spydeck", "Newest")}</option>
                     <option value="price_asc">{tl("spydeck", "Price: low → high")}</option>
                     <option value="price_desc">{tl("spydeck", "Price: high → low")}</option>
@@ -1455,6 +1493,19 @@ export function SpyDeckView() {
                 <FilterField label={tl("spydeck", "Min favorites")}>
                   <Input value={minFav} onChange={(e) => setMinFav(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
+                {/* THE REMAINING THREE TILES. `~` in the label, exactly as the card prints it:
+                    these are modelled from favourites, price and listing age, and a filter on
+                    an estimate must not read as a filter on a measurement. The hint carries the
+                    period so "Min sold" cannot be mistaken for the daily one above it. */}
+                <FilterField label={tl("spydeck", "Min ~views/day")}>
+                  <Input value={minViews} onChange={(e) => setMinViews(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
+                </FilterField>
+                <FilterField label={tl("spydeck", "Min ~revenue ($)")} hint={tl("spydeck", "all time")}>
+                  <Input value={minRevenue} onChange={(e) => setMinRevenue(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
+                </FilterField>
+                <FilterField label={tl("spydeck", "Min ~sold")} hint={tl("spydeck", "all time")}>
+                  <Input value={minTotal} onChange={(e) => setMinTotal(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
+                </FilterField>
                 <FilterField label={tl("spydeck", "Listed within")}>
                   <select value={listedIn} onChange={(e) => setListedIn(e.target.value)} className="eg-select eg-control pr-8">
                     <option value="">{tl("spydeck", "Any age")}</option>
@@ -1467,7 +1518,10 @@ export function SpyDeckView() {
                 <div className="col-span-2 flex items-center gap-2 sm:col-span-3 lg:col-span-7">
                   <Button size="sm" onClick={() => run()} disabled={!query.trim() && !hasFilter}>{tl("spydeck", "Apply filters")}</Button>
                   <button
- onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav(""); setListedIn("") }}
+ /* EVERY FIELD IN THE ROW, or Reset becomes a control that leaves some of the
+                   filtering in place — which reads as the grid ignoring the button. Three were
+                   added above; they are cleared here in the same commit deliberately. */
+ onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav(""); setMinViews(""); setMinRevenue(""); setMinTotal(""); setListedIn("") }}
  className="text-xs font-medium text-muted-foreground hover:text-foreground"
                   >
                     {tl("spydeck", "Reset")}
