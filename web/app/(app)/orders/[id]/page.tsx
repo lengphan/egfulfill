@@ -1404,7 +1404,18 @@ export default function OrderDetailPage() {
                                       const net = r.amount - off
                                       return (
                                         <div key={`g-${i}-${j}`} className="flex justify-between gap-2">
-                                          <dt className="min-w-0 truncate pl-3 text-muted-foreground" title={r.hover}>
+                                          {/* WHY A ROW READS "in the blank", on the row itself.
+                                              It states a pricing rule — one face is inside the
+                                              blank's price and the rest are charged — that nobody
+                                              can infer from a list of the others, and it was
+                                              asked about twice. */}
+                                          <dt
+                                            className="min-w-0 truncate pl-3 text-muted-foreground"
+                                            title={r.hover
+                                              || (r.surfaceFree && r.face
+                                                ? tl("order", "The blank's price covers one face; each extra face is charged.")
+                                                : undefined)}
+                                          >
                                             {r.face
                                               ? (<><span className="capitalize">{tl("sides", r.face)}</span>
                                                    {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}</>)
@@ -1430,9 +1441,9 @@ export default function OrderDetailPage() {
                                             */}
                                           <dd className="shrink-0 tabular-nums text-muted-foreground">
                                             {r.amount <= 0.005
-                                              ? tl("order", "included")
+                                              ? tl("order", "in the blank")
                                               : r.surfaceFree && (r.methodFee ?? 0) > 0.005
-                                                ? (<>{tl("order", "included")}{" + "}{off > 0.005
+                                                ? (<>{tl("order", "in the blank")}{" + "}{off > 0.005
                                                     ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
                                                     : usd(r.amount)}</>)
                                                 : off > 0.005

@@ -1425,6 +1425,8 @@ const vi: Dict = {
   "order.first item": "sản phẩm đầu",
   "order.additional item": "sản phẩm thêm",
   "order.additional items": "sản phẩm thêm",
+  "order.in the blank": "trong giá phôi",
+  "order.The blank's price covers one face; each extra face is charged.": "Giá phôi đã gồm một mặt in; mỗi mặt thêm sẽ tính phí.",
   "order.Blank": "Phôi",
   "order.included": "đã bao gồm",
   "order.extra surface": "mặt in thêm",
