@@ -12,6 +12,16 @@ import { VariantField } from "@/components/app/variant-field"
 // Sizes are the ladder every apparel blank in the catalogue draws from; methods are the
 // canonical list, so this can't drift from what pricing recognises.
 const FALLBACK_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "OS"]
+/**
+ * THE WORD FOR "NO PRINT", and it is not stored.
+ *
+ * `print_type` stays EMPTY for a blank — that is precisely what the server tests (costPartsOf's
+ * isBlankLine), and writing a sentinel like "Blank" into the column would set print_type, fail
+ * that test, and price the line at the PRINTED base cost while the field said Blank. The label
+ * exists only on screen.
+ */
+const BLANK_LABEL = "Blank"
+
 const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 
 // The per-line variant picker: Blank · Colour · Size · Method. Marketplace orders arrive
@@ -23,7 +33,7 @@ const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 export type ItemSetupPatch = Omit<Parameters<typeof postItemSetup>[1], "line_id" | "sku">
 
 export function VariantPicker({
-  orderId, item, catalog, onSaved, dense, hideMethod,
+  orderId, item, catalog, onSaved, dense, hideMethod, faceMethods,
 }: {
   orderId: string
   item: OrderItem
@@ -60,6 +70,19 @@ export function VariantPicker({
    * DOES have one method and this is the only place to set it.
    */
   hideMethod?: boolean
+  /**
+   * THE TECHNIQUES THIS LINE'S FACES DECLARE, when the caller can see them.
+   *
+   * A line is priced as a bare garment only when it names no method AND NO FACE NAMES ONE
+   * (costPartsOf's isBlankLine). This picker cannot see faces, so without being told it would
+   * offer "Blank" on a line whose back says Embroidery — and the field would read Blank while
+   * the charge came out printed.
+   *
+   * UNDEFINED MEANS "NOT KNOWN", NOT "NONE". A caller that cannot answer gets the behaviour
+   * this field always had: an empty method shows the placeholder and Blank is not offered.
+   * Claiming a price on a state we cannot see is the failure this prop exists to prevent.
+   */
+  faceMethods?: string[]
 }) {
   const tl = useLabelT()
   const [busy, setBusy] = useState<string | null>(null)
@@ -144,6 +167,27 @@ export function VariantPicker({
    * fallbacks: those are free choices that don't decide how the thing gets made.
    */
   const methodList = keep(item.print_type || "", product ? methodOpts : FALLBACK_METHODS)
+  /**
+   * BLANK IS AN OPTION, NOT AN ABSENCE (owner, 2026-09-18).
+   *
+   * The server prices a line as a bare garment when it names NO method and no face names one
+   * (costPartsOf's isBlankLine), taking the size's own `blank` column. Until now the only way
+   * to reach that was to clear the field — which is also what "nobody has decided yet" looks
+   * like, so the two states were indistinguishable to the person setting them and to anyone
+   * reading the line afterwards.
+   *
+   * Naming it makes the choice sayable. Offered only when this product actually prices a blank
+   * for the line's size: a Blank option on a product with no blank price quotes the PRINTED
+   * base cost, which is the more expensive kind of wrong.
+   */
+  const blankPriced = (() => {
+    if (!faceMethods) return false                       // not known — see the prop's note
+    if (faceMethods.some((m) => String(m || "").trim())) return false
+    const tiers = product?.sizePrices ?? []
+    if (!tiers.length) return false
+    const own = item.size ? tiers.find((t) => t.size === item.size) : null
+    return (Number((own ?? tiers[0])?.blank) || 0) > 0
+  })()
 
   // Keep a blank the catalog no longer lists so an existing line can't silently lose it.
   const blankOptions = useMemo(() => {
@@ -244,9 +288,19 @@ export function VariantPicker({
             nothing, since the reason was the part that got cut. "Method · none" fits. */}
         {!hideMethod && (
         <VariantField
-          label={tl("variantPicker", "Method")} value={canon(item.print_type || "", methodList)} options={methodList}
+          label={tl("variantPicker", "Method")}
+          /* AN EMPTY METHOD ON A BLANK-PRICED PRODUCT *IS* A BLANK — the server will charge it
+             as one. Showing the placeholder there would leave the field silent about a price
+             that is already decided, which is the opposite of what an empty field means
+             everywhere else on this strip. */
+          value={item.print_type ? canon(item.print_type, methodList) : (blankPriced ? BLANK_LABEL : "")}
+          /* BLANK FIRST. It is the one option that is not a technique, and a reader scanning a
+             list of techniques for "none of these" finds it faster at the top than buried
+             after Sublimation. */
+          options={blankPriced ? [BLANK_LABEL, ...methodList] : methodList}
           emptyLabel="none"
-          disabled={busy === "printType"} onChange={(v) => save({ printType: v }, "printType")}
+          disabled={busy === "printType"}
+          onChange={(v) => save({ printType: v === BLANK_LABEL ? "" : v }, "printType")}
         />
         )}
       </div>
