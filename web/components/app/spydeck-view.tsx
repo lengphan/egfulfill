@@ -735,6 +735,38 @@ const SEED_NICHES: { text: string; weight: number }[] = [
 ]
 
 // One labelled filter control.
+/**
+ * A BAND, NOT A FLOOR — two boxes under one label.
+ *
+ * A minimum alone answers "is this big enough", and on a research grid that is only half the
+ * question: a listing doing $5.1M is not a product you can go and compete with, it is a
+ * reason not to. The useful shape is a BRACKET — busy enough to prove the niche, small
+ * enough to enter — and that needs a ceiling as well as a floor.
+ *
+ * One FilterField per figure rather than two, so four brackets cost the same four columns the
+ * four minimums did and the row does not grow.
+ */
+function RangeField({ label, hint, min, max, onMin, onMax, prefix }: {
+  label: string; hint?: string; min: string; max: string
+  onMin: (v: string) => void; onMax: (v: string) => void
+  /** "$" on revenue — shown once, on the pair, rather than in both placeholders. */
+  prefix?: string
+}) {
+  const clean = (v: string) => v.replace(/[^0-9]/g, "")
+  return (
+    <FilterField label={label} hint={hint}>
+      <div className="flex items-center gap-1">
+        {prefix ? <span className="shrink-0 text-xs text-muted-foreground">{prefix}</span> : null}
+        <Input value={min} onChange={(e) => onMin(clean(e.target.value))} placeholder="Min" className="h-9 min-w-0 px-2" inputMode="numeric" />
+        {/* An en dash, not the word "to": the pair reads as one value at a glance and the
+            glyph costs four pixels where a word costs a column. */}
+        <span className="shrink-0 text-xs text-muted-foreground/60">–</span>
+        <Input value={max} onChange={(e) => onMax(clean(e.target.value))} placeholder="Max" className="h-9 min-w-0 px-2" inputMode="numeric" />
+      </div>
+    </FilterField>
+  )
+}
+
 function FilterField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
  return (
     <label className="flex flex-col gap-1">
@@ -1088,6 +1120,14 @@ export function SpyDeckView() {
  const [minViews, setMinViews] = useState("")
  const [minRevenue, setMinRevenue] = useState("")
  const [minTotal, setMinTotal] = useState("")
+  /* The ceilings. Empty means no ceiling, exactly as empty means no floor — so a band with
+     one end filled in behaves like the minimum did, and nothing about an existing search
+     changes shape. */
+ const [maxViews, setMaxViews] = useState("")
+ const [maxSold, setMaxSold] = useState("")
+ const [maxTotal, setMaxTotal] = useState("")
+ const [maxRevenue, setMaxRevenue] = useState("")
+ const [maxFav, setMaxFav] = useState("")
   // RECENCY, and it has to be client-side. /listings/active takes keywords, taxonomy,
   // price, sort and paging — there is no created-after parameter to send, so the only
   // thing in the whole query that expressed "now" was sort_on=created, which reorders
@@ -1192,7 +1232,16 @@ export function SpyDeckView() {
  const mr = Number(minRevenue) || 0
  const mt = Number(minTotal) || 0
  const days = Number(listedIn) || 0
- if (!ms && !mf && !mv && !mr && !mt && !days) return list
+    /* A BLANK CEILING IS INFINITY, NOT ZERO. `Number("") || 0` would read an empty Max as
+       "nothing above zero" and hide every card, which is the one way a range control can be
+       worse than no control at all. */
+ const xv = Number(maxViews) || Infinity
+ const xs = Number(maxSold) || Infinity
+ const xt = Number(maxTotal) || Infinity
+ const xr = Number(maxRevenue) || Infinity
+ const xf = Number(maxFav) || Infinity
+ const capped = [xv, xs, xt, xr, xf].some((n) => n !== Infinity)
+ if (!ms && !mf && !mv && !mr && !mt && !days && !capped) return list
     // A listing with NO creation date fails the recency filter rather than passing it.
     // estFor treats a missing date as 45 days old, which is a reasonable default for an
     // estimate and a wrong one for a filter: it would quietly let undated listings through
@@ -1203,14 +1252,16 @@ export function SpyDeckView() {
        one predicate is four times the work for one answer. */
  return list.filter((l) => {
  const e = estFor(l)
- return (!ms || e.sold24 >= ms)
-        && (!mv || e.views24 >= mv)
-        && (!mr || e.revenue >= mr)
-        && (!mt || e.totalSold >= mt)
-        && (!mf || (l.num_favorers ?? 0) >= mf)
+ const fav = l.num_favorers ?? 0
+ return (!ms || e.sold24 >= ms) && e.sold24 <= xs
+        && (!mv || e.views24 >= mv) && e.views24 <= xv
+        && (!mr || e.revenue >= mr) && e.revenue <= xr
+        && (!mt || e.totalSold >= mt) && e.totalSold <= xt
+        && (!mf || fav >= mf) && fav <= xf
         && (!days || ((l.created ?? 0) > after))
     })
-  }, [minSold, minFav, minViews, minRevenue, minTotal, listedIn])
+  }, [minSold, minFav, minViews, minRevenue, minTotal, listedIn,
+      maxViews, maxSold, maxTotal, maxRevenue, maxFav])
 
   // Paging for every grid. Hooks can't be conditional, so all four are declared up
   // front; only the active tab's is rendered.
@@ -1634,14 +1685,25 @@ export function SpyDeckView() {
                   <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="eg-select eg-control pr-8">
                     <option value="relevance">{tl("spydeck", "Relevance")}</option>
                     {/* Ranked from what has been fetched, not from Etsy — see CLIENT_SORTS. */}
-                    {/* SAME FOUR, SAME ORDER, one label each. "Est." stays on the modelled
-                        ones: a sort is chosen from a closed list where four words cost
-                        nothing, and here it is the only place the word can appear at all. */}
-                    <option value="views">{tl("spydeck", "Est. views/day")}</option>
-                    <option value="best">{tl("spydeck", "Est. sold/day")}</option>
-                    <option value="totalsold">{tl("spydeck", "Est. sold, all time")}</option>
-                    <option value="revenue">{tl("spydeck", "Est. revenue")}</option>
-                    <option value="favorites">{tl("spydeck", "Most favorited")}</option>
+                    {/**
+                      * ONLY SORTS ETSY ACTUALLY PERFORMS (owner, 2026-09-18).
+                      *
+                      * Four "Est." entries used to sit here, and they were the two-kinds-in-one
+                      * -control problem a layer deeper than the field row: this select lives in
+                      * the "Search Etsy" group, where every other control changes what Etsy
+                      * RETURNS — and those four only reordered the 400 already fetched. The
+                      * code's own note admitted what that produced: "the best sellers among the
+                      * most relevant 400", which is a real answer wearing the clothes of a
+                      * bigger one.
+                      *
+                      * The bands replace them and do it better. A sort says which end to start
+                      * reading; a band says which listings are worth reading at all — and the
+                      * ceiling is the half a sort could never express, because the $5.1M listing
+                      * is not a competitor, it is a reason to pick a different niche.
+                      *
+                      * CLIENT_SORTS is kept and still wired: restoring an ordering control is a
+                      * line, and it would belong in the narrow group beside the bands, not here.
+                      */}
                     <option value="newest">{tl("spydeck", "Newest")}</option>
                     <option value="price_asc">{tl("spydeck", "Price: low → high")}</option>
                     <option value="price_desc">{tl("spydeck", "Price: high → low")}</option>
@@ -1685,7 +1747,8 @@ export function SpyDeckView() {
                         <span className="font-medium text-foreground">{narrowed.shown.toLocaleString()} {tl("spydeck", "shown")}</span>
                       </span>
                       <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline"
-                        onClick={() => { setMinViews(""); setMinSold(""); setMinTotal(""); setMinRevenue(""); setMinFav(""); setListedIn("") }}>
+                        onClick={() => { setMinViews(""); setMinSold(""); setMinTotal(""); setMinRevenue(""); setMinFav(""); setListedIn("")
+                          setMaxViews(""); setMaxSold(""); setMaxTotal(""); setMaxRevenue(""); setMaxFav("") }}>
                         {tl("spydeck", "Clear")}
                       </button>
                     </span>
@@ -1702,24 +1765,19 @@ export function SpyDeckView() {
                     NO `~` HERE EITHER. It is the same claim the card makes, and the card now
                     makes it once, above the tiles. Repeating an abbreviation of it on every
                     field would put more hedge in this row than there are numbers. */}
-                <FilterField label={tl("spydeck", "Min views")} hint={tl("spydeck", "per day")}>
-                  <Input value={minViews} onChange={(e) => setMinViews(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
-                </FilterField>
-                <FilterField label={tl("spydeck", "Min sold")} hint={tl("spydeck", "per day")}>
-                  <Input value={minSold} onChange={(e) => setMinSold(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
-                </FilterField>
-                <FilterField label={tl("spydeck", "Min sold")} hint={tl("spydeck", "all time")}>
-                  <Input value={minTotal} onChange={(e) => setMinTotal(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
-                </FilterField>
-                <FilterField label={tl("spydeck", "Min revenue ($)")} hint={tl("spydeck", "all time")}>
-                  <Input value={minRevenue} onChange={(e) => setMinRevenue(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
-                </FilterField>
+                <RangeField label={tl("spydeck", "Views")} hint={tl("spydeck", "per day")}
+                  min={minViews} max={maxViews} onMin={setMinViews} onMax={setMaxViews} />
+                <RangeField label={tl("spydeck", "Sold")} hint={tl("spydeck", "per day")}
+                  min={minSold} max={maxSold} onMin={setMinSold} onMax={setMaxSold} />
+                <RangeField label={tl("spydeck", "Sold")} hint={tl("spydeck", "all time")}
+                  min={minTotal} max={maxTotal} onMin={setMinTotal} onMax={setMaxTotal} />
+                <RangeField label={tl("spydeck", "Revenue")} hint={tl("spydeck", "all time")} prefix="$"
+                  min={minRevenue} max={maxRevenue} onMin={setMinRevenue} onMax={setMaxRevenue} />
                 {/* Favourites is the one REPORTED number Etsy gives us, and the only reason
                     the four above can be estimated at all. It sits after them because it is
                     the input, not the outcome. */}
-                <FilterField label={tl("spydeck", "Min favorites")}>
-                  <Input value={minFav} onChange={(e) => setMinFav(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
-                </FilterField>
+                <RangeField label={tl("spydeck", "Favorites")}
+                  min={minFav} max={maxFav} onMin={setMinFav} onMax={setMaxFav} />
                 <FilterField label={tl("spydeck", "Listed within")}>
                   <select value={listedIn} onChange={(e) => setListedIn(e.target.value)} className="eg-select eg-control pr-8">
                     <option value="">{tl("spydeck", "Any age")}</option>
@@ -1739,7 +1797,8 @@ export function SpyDeckView() {
                   <button
  /* EVERY FIELD IN BOTH GROUPS, or Reset becomes a control that leaves some of the
                    filtering in place — which reads as the grid ignoring the button. */
- onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav(""); setMinViews(""); setMinRevenue(""); setMinTotal(""); setListedIn("") }}
+ onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav(""); setMinViews(""); setMinRevenue(""); setMinTotal(""); setListedIn("")
+                     setMaxViews(""); setMaxSold(""); setMaxTotal(""); setMaxRevenue(""); setMaxFav("") }}
  className="text-xs font-medium text-muted-foreground hover:text-foreground"
                   >
                     {tl("spydeck", "Reset")}
