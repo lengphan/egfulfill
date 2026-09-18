@@ -684,7 +684,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // NEWEST 20, re-ordered oldest-first for the model. `order by created_at asc limit 20`
     // takes the OLDEST 20 — see the note on the auto-reply query below.
     const hist = await q(
-      `select sender_role, body, meta from (
+      `select sender_role, body, meta, attachment, id from (
          select sender_role, body, meta, attachment, created_at, id from order_messages
           where order_id=$1
           order by created_at desc, id desc limit 20
@@ -857,7 +857,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // nothing said why. Order desc to take the recent window, then restore chronological
     // order, because toMessages() builds the transcript in sequence.
     const hist = await q(
-      `select sender_role, body, meta from (
+      `select sender_role, body, meta, attachment, id from (
          select sender_role, body, meta, attachment, created_at, id from order_messages
           where order_id=$1
             and not coalesce((meta->>'internal')::boolean, false)
@@ -913,7 +913,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
           order by created_at desc, id desc limit 50
        ) t order by t.created_at asc, t.id asc`, [threadId]);
     const hist = await q(
-      `select sender_role, body, meta from (
+      `select sender_role, body, meta, attachment, id from (
          select sender_role, body, meta, attachment, created_at, id from order_messages
           where order_id=$1 and not coalesce((meta->>'note')::boolean, false)
           order by created_at desc, id desc limit 20
