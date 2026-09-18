@@ -1,7 +1,8 @@
 "use client"
 
+import { useLightbox } from "@/components/app/image-lightbox"
 import { useLabelT, useT } from "@/lib/i18n"
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley, Paperclip, X, FileText, ImageSquare, FilmSlate } from "@phosphor-icons/react"
 import { DictateButton } from "@/components/app/dictate-button"
 import { Button } from "@/components/ui/button"
@@ -46,6 +47,29 @@ const convoIcon = (kind: Convo["kind"] | undefined, size = 16) => {
  if (kind === "staff") return <UsersThree size={size} weight="duotone" />
  if (kind === "announce") return <Megaphone size={size} weight="duotone" />
  return <Package size={size} weight="duotone" /> // inbox: a seller's channel
+}
+
+/**
+ * A PICTURE ZOOMS, A FILE OPENS — one wrapper so the bubble does not branch twice.
+ *
+ * Module scope, not inside the page: `react-hooks/static-components` forbids a component
+ * declared in render, and one declared there is a fresh type every pass, which remounts the
+ * image and re-fetches it on each keystroke in the composer.
+ */
+function Wrap({ zoom, href, className, children }: {
+  zoom: (() => void) | null
+  href: string
+  className: string
+  children: ReactNode
+}) {
+  if (zoom) {
+    return (
+      <button type="button" onClick={zoom} className={className + " cursor-zoom-in text-left"}>
+        {children}
+      </button>
+    )
+  }
+  return <a href={href} target="_blank" rel="noreferrer" className={className}>{children}</a>
 }
 
 export default function ChatPage() {
@@ -105,6 +129,9 @@ export default function ChatPage() {
      them, so this stacks them: pick again and it appends.
      Capped at the same 8 the assistant will actually look at (support_ai.js MAX_IMAGES), so
      the composer never accepts a tenth picture the model is going to drop. */
+  /* The app's one lightbox — six surfaces had grown their own before it existed, so this
+     imports rather than adds a seventh. */
+ const lightbox = useLightbox()
  const MAX_PENDING = 8
  const [pendingAtts, setPendingAtts] = useState<ChatAttachment[]>([])  // staged attachments
 
@@ -1098,7 +1125,16 @@ export default function ChatPage() {
                             )
                           }
  return (
-                            <a href={att.url} target="_blank" rel="noreferrer" className={"relative block w-fit " + (m.text ? "mt-1.5" : "")}>
+                            /* A PICTURE ZOOMS, A FILE OPENS. Tapping a photo used to hand
+                               the raw file to a new tab, which loses the thread and shows
+                               the image on a blank white page at whatever size the browser
+                               felt like. A pdf has nowhere to zoom to, so that keeps the
+                               anchor. */
+                            <Wrap
+ zoom={isImg ? () => lightbox.open(att.url, att.name || null) : null}
+ href={att.url}
+ className={"relative block w-fit " + (m.text ? "mt-1.5" : "")}
+                            >
                               {isImg ? (
                                 <>
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1125,7 +1161,7 @@ export default function ChatPage() {
                                   <FileText size={14} weight="duotone" />{att.name || "file"}
                                 </span>
                               )}
-                            </a>
+                            </Wrap>
                           )
                         })()}
                       </div>
@@ -1294,7 +1330,8 @@ export default function ChatPage() {
                 <div className="group relative" key={att.url}>
                   {att.mime?.startsWith("image/") ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={att.url} alt={att.name} className="size-16 rounded-lg border border-border object-cover" />
+                    <img src={att.url} alt={att.name} onClick={() => lightbox.open(att.url, att.name || null)}
+ className="size-16 cursor-zoom-in rounded-lg border border-border object-cover" />
                   ) : (
                     <div className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted/50 px-1">
                       <FileText size={18} weight="duotone" className="text-muted-foreground" />
@@ -1464,6 +1501,8 @@ export default function ChatPage() {
     </div>
 
     {isStaffUser && !isDesigner && <SupportHoursEditor open={hoursOpen} onOpenChange={setHoursOpen} isAdmin={isAdmin} onSaved={setOffice} />}
+    {/* Portals to the body, so it sits above the composer and any dialog this opened from. */}
+    {lightbox.node}
     </>
   )
 }
