@@ -302,11 +302,31 @@ function costPartsOf(row, item, fees, faces = null) {
    * a real positive number. Products with no blank price behave exactly as they did, which
    * is what keeps this from silently repricing the whole catalogue the day it ships.
    */
-  /* A BLANK IS A GARMENT NOBODY DECORATED, and that is now two questions rather than one.
-     The line's own column can be empty while a FACE names a method — an import where every
-     Type sits in a placement block and the row-level column is gone — and reading only the
-     line would have charged the bare-blank price for an embroidered hoodie. */
-  const isBlankLine = !String(item.print_type || '').trim() && !faceMethods.length;
+  /**
+   * A BLANK IS SAID, NOT INFERRED (owner, 2026-09-18).
+   *
+   * This read an EMPTY method as "no print wanted", which conflated two states that are not
+   * the same and price differently:
+   *
+   *   · nobody has decided yet  — every marketplace line arrives like this (§5: only the
+   *                               factory's own picks pre-fill), and it WILL be printed
+   *   · this is a bare garment  — a real product we sell, at the size's own `blank` price
+   *
+   * So an imported Etsy hoodie destined for embroidery quoted the BARE GARMENT price on any
+   * product that had one — an under-charge that grew more likely the moment Blank became a
+   * first-class option and people started filling those columns in.
+   *
+   * `print_type = 'BLANK'` is now the only way to say it, and nothing else in the pipeline
+   * has to learn the word: methodAddOn finds no surcharge key for it and returns 0,
+   * isEmbroidery does not match it, and normalizeMethods leaves it alone. An undecided line
+   * falls through to the base cost, which is the safe direction to be wrong in.
+   *
+   * THE FACE CHECK STAYS. A line's own column can be empty while a FACE names a method — an
+   * import where every Type sits in a placement block — and a line whose back says Embroidery
+   * is not a blank whatever its own column says.
+   */
+  const isBlankLine = String(item.print_type || '').trim().toUpperCase() === 'BLANK'
+    && !faceMethods.length;
   if (isBlankLine && tier && tier.blank != null) {
     const bl = num(tier.blank);
     if (bl != null && bl > 0) base = bl;

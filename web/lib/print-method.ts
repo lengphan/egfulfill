@@ -56,6 +56,13 @@ const METHOD_TABLE: (PrintMethod & { re: RegExp; offered?: boolean })[] = [
   // because products and orders in the database already say "Sublimation", and a technique
   // deleted outright stops normalising, which turns a real method into a junk key and
   // loses it from the line it is printed on. Recognise everything; offer what we do.
+  /* NO PRINT AT ALL — a real thing we sell, and the one entry here that is not a technique.
+     RECOGNISED, NOT OFFERED, exactly like the two below it: a line stores `print_type = Blank`
+     to say it carries no decoration (costPartsOf's isBlankLine), so every reader has to
+     normalise the word rather than print "BLANK" at whatever casing it was typed in. It is out
+     of PRODUCT_METHODS because it is not something a product is printed WITH, and it earns no
+     surcharge: methodAddOn finds no method_blank key and returns 0. */
+  { key: "blank", label: "Blank", re: /^\s*blank\s*$/ },
   { key: "sub", label: "Sublimation", re: /sublim|\bdye\b|\bsub\b/ },
   { key: "vnl", label: "Vinyl", re: /vinyl|htv|\bvnl\b/ },
 ]

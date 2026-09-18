@@ -13,12 +13,15 @@ import { VariantField } from "@/components/app/variant-field"
 // canonical list, so this can't drift from what pricing recognises.
 const FALLBACK_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "OS"]
 /**
- * THE WORD FOR "NO PRINT", and it is not stored.
+ * THE WORD FOR "NO PRINT", AND IT IS STORED.
  *
- * `print_type` stays EMPTY for a blank — that is precisely what the server tests (costPartsOf's
- * isBlankLine), and writing a sentinel like "Blank" into the column would set print_type, fail
- * that test, and price the line at the PRINTED base cost while the field said Blank. The label
- * exists only on screen.
+ * `print_type = 'BLANK'` is how a line says it carries no decoration — the only way, since
+ * costPartsOf stopped inferring it from an empty column. Empty now means "nobody has decided",
+ * which is what every marketplace line arrives as and what must NOT be priced as a bare
+ * garment.
+ *
+ * Nothing else in the pipeline has to learn the word: methodAddOn finds no surcharge key for
+ * it and returns 0, isEmbroidery does not match it, and normalizeMethods leaves it alone.
  */
 const BLANK_LABEL = "Blank"
 
@@ -289,18 +292,16 @@ export function VariantPicker({
         {!hideMethod && (
         <VariantField
           label={tl("variantPicker", "Method")}
-          /* AN EMPTY METHOD ON A BLANK-PRICED PRODUCT *IS* A BLANK — the server will charge it
-             as one. Showing the placeholder there would leave the field silent about a price
-             that is already decided, which is the opposite of what an empty field means
-             everywhere else on this strip. */
-          value={item.print_type ? canon(item.print_type, methodList) : (blankPriced ? BLANK_LABEL : "")}
+          /* EMPTY IS "NOT DECIDED", and shows the placeholder like every other field here. A
+             blank is a CHOICE and reads as its own word. */
+          value={canon(item.print_type || "", blankPriced ? [BLANK_LABEL, ...methodList] : methodList)}
           /* BLANK FIRST. It is the one option that is not a technique, and a reader scanning a
              list of techniques for "none of these" finds it faster at the top than buried
              after Sublimation. */
           options={blankPriced ? [BLANK_LABEL, ...methodList] : methodList}
           emptyLabel="none"
           disabled={busy === "printType"}
-          onChange={(v) => save({ printType: v === BLANK_LABEL ? "" : v }, "printType")}
+          onChange={(v) => save({ printType: v === BLANK_LABEL ? BLANK_LABEL : v }, "printType")}
         />
         )}
       </div>
