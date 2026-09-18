@@ -1475,9 +1475,14 @@ export default function OrderDetailPage() {
                                               rate. "Shipping" against both figures made the
                                               smaller one look like an unexplained second charge. */}
                                           {tl("order", "Shipping")}
+                                          {/* "additional" alone: the row already says Shipping and
+                                              sits under an item, so "item" was the third time one
+                                              line named the same thing. No plural either — the
+                                              figure covers however many units this line adds, and
+                                              a count that changes nothing is a word to read. */}
                                           <span className="text-muted-foreground/70"> · {isShipLine
                                             ? tl("order", "first item")
-                                            : qty > 1 ? tl("order", "additional items") : tl("order", "additional item")}</span>
+                                            : tl("order", "additional")}</span>
                                         </dt>
                                         <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(shipOwn)}</dd>
                                       </div>

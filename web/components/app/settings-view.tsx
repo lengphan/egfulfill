@@ -2117,8 +2117,8 @@ function PlatformPanel() {
 
         <p className="mb-3 text-xs text-muted-foreground">{tl("settings", "Added to the base cost per unit. A product can override this for its own methods.")}</p>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <MoneyField label={tl("settings", "DTG printing")} value={bands.method_dtg ?? ""} onChange={(v) => setBand("method_dtg", v)} />
-          <MoneyField label={tl("settings", "DTF printing")} value={bands.method_dtf ?? ""} onChange={(v) => setBand("method_dtf", v)} />
+          <MoneyField label={tl("settings", "DTG")} value={bands.method_dtg ?? ""} onChange={(v) => setBand("method_dtg", v)} />
+          <MoneyField label={tl("settings", "DTF")} value={bands.method_dtf ?? ""} onChange={(v) => setBand("method_dtf", v)} />
           <MoneyField label={tl("settings", "Embroidery")} value={bands.method_emb ?? ""} onChange={(v) => setBand("method_emb", v)} />
           <MoneyField label={tl("settings", "Appliqué")} value={bands.method_apl ?? ""} onChange={(v) => setBand("method_apl", v)} />
           <MoneyField label={tl("settings", "Laser")} value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />

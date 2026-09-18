@@ -11,7 +11,7 @@ import { getCatalogProducts, getDesignFees, getProductTypes, type CatalogProduct
 import { ShippingFees } from "@/components/shipping-fees"
 import { shipFirstFee } from "@/lib/ship-band"
 import { sizesOf, methodsOf, sidesOf, setTypeMockups } from "@/lib/variant-resolve"
-import { normalizeMethods } from "@/lib/print-method"
+import { PRODUCT_METHODS, normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
 import { framingStyle } from "@/lib/product-framing"
 import { swatchBg } from "@/lib/color-swatch"
@@ -89,7 +89,10 @@ function galleryOf(p: CatalogProduct): string[] {
  */
 function techsOf(p: CatalogProduct): { key: string; label: string }[] {
  const out = normalizeMethods(methodsOf(p))
- return out.length ? out : [{ key: "dtg", label: "DTG printing" }]
+  /* THE TABLE'S OWN LABEL, not a literal. This spelled "DTG printing" out by hand, so the
+     moment the vocabulary changed this page alone kept the old word — the second-copy failure
+     print-method.ts exists to have ended. */
+ return out.length ? out : [PRODUCT_METHODS.find((m) => m.key === "dtg") ?? { key: "dtg", label: "DTG" }]
 }
 
 export default function ProductDetailPage() {

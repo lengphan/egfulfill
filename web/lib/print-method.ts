@@ -32,13 +32,25 @@ export type PrintMethod = { key: string; label: string }
  *
  * Every entry has a matching `method_*` surcharge in factory_settings KEYS. Keep in step.
  */
+/*
+ * THE LABEL IS THE TECHNIQUE'S NAME, NOTHING ELSE (owner, 2026-09-18).
+ *
+ * "DTG printing" and "DTF printing" carried a word the other six did not — nobody writes
+ * "Embroidery stitching" or "Laser engraving engraving" — and on a per-surface row it read
+ * twice over: "Front · DTG printing" under a heading about printing, beside "Back ·
+ * Embroidery". The acronym already ends in the word: Direct To Garment.
+ *
+ * SAFE BY CONSTRUCTION, and the note above says why: matching is by KEY everywhere, and `re`
+ * still recognises every wording already in the database. A label is what reads best; it has
+ * never been what anything compares.
+ */
 const METHOD_TABLE: (PrintMethod & { re: RegExp; offered?: boolean })[] = [
-  { key: "dtf", label: "DTF printing", re: /dtf/, offered: true },
-  { key: "dtg", label: "DTG printing", re: /dtg|direct to garment/, offered: true },
+  { key: "dtf", label: "DTF", re: /dtf/, offered: true },
+  { key: "dtg", label: "DTG", re: /dtg|direct to garment/, offered: true },
   { key: "emb", label: "Embroidery", re: /emb|embroid/, offered: true },
   { key: "apl", label: "Appliqué", re: /appliqu|\bapl\b/, offered: true },
   { key: "lsr", label: "Laser", re: /laser|\blsr\b|engrav/, offered: true },
-  { key: "scr", label: "Screen print", re: /screen|\bscr\b/, offered: true },
+  { key: "scr", label: "Screen", re: /screen|\bscr\b/, offered: true },
   // RECOGNISED, NOT OFFERED — the same standing UV has below.
   // We don't sell these two, so they come out of every picker; they stay in the table
   // because products and orders in the database already say "Sublimation", and a technique
