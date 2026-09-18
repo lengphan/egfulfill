@@ -203,6 +203,10 @@ export default function ProductDetailPage() {
    * size, so the one figure on the page was true for some of them and not the rest. */
  const tierOf = (sz: string) => product.sizePrices?.find((t) => t.size === sz)
  const priceOfSize = (sz: string) => Number(tierOf(sz)?.price ?? 0) || priceOf(product)
+  /** The bare garment's own price for a size — the `blank` column, which the server prefers
+   *  over the base cost on a line that names no method (costPartsOf). Mirrored here so the
+   *  figure on this page is the figure that gets charged. */
+ const blankOfSize = (sz: string) => Number(tierOf(sz)?.blank ?? 0) || 0
  const status = product.status ?? "Active"
  const techs = techsOf(product)
  const shipFee = Number(product.shippingFee ?? product.shipping_fee ?? 0) || 0
@@ -211,7 +215,26 @@ export default function ProductDetailPage() {
   /** The chosen variant, first-of-each until something is pressed. */
  const selColor = pickColor && colors.includes(pickColor) ? pickColor : colors[0] ?? null
  const selSize = pickSize && sizes.includes(pickSize) ? pickSize : sizes[0] ?? null
- const selMethod = techs.find((t) => t.key === pickMethod) ?? techs[0] ?? null
+  /**
+   * BLANK IS A CHOICE ON THE METHOD ROW (owner, 2026-09-18).
+   *
+   * A garment with no print is a real thing we sell, and the server has priced it all along —
+   * costPartsOf takes the size's own `blank` column when the line names NO method and no face
+   * names one either. It was simply unreachable: the state existed and nothing on any screen
+   * offered it, so "where do I put the blank option" had no answer.
+   *
+   * It belongs among the methods because it IS the answer to "how is this decorated" — none —
+   * and not among the sizes, where it would have to be lit alongside one (a blank garment still
+   * has a size, and `blank` is a price PER size).
+   *
+   * Offered only when the product actually prices one. A chip that quotes the printed base cost
+   * while calling itself Blank is worse than no chip.
+   */
+ const blankTiers = (product.sizePrices ?? []).some((t) => (Number(t.blank) || 0) > 0)
+ const BLANK_KEY = "__blank"
+ const selMethod = pickMethod === BLANK_KEY ? null
+    : (techs.find((t) => t.key === pickMethod) ?? techs[0] ?? null)
+ const isBlank = blankTiers && pickMethod === BLANK_KEY
   /** The method's add-on — the product's own figure, else the platform's, else nothing.
    *  Mirrors methodAddOn in server/src/pricing.js: product override first, then fees. */
  const methodFee = (key: string | null | undefined, label?: string) => {
@@ -233,7 +256,12 @@ export default function ProductDetailPage() {
      any number of faces — it is what the ORDER's Summary charges, where the faces are actually
      known — and removing it would leave the two prices computed by different rules. */
  const sidesAdd = sideFee > 0 ? sideFee * Math.max(0, pricedSides.length - 1) : 0
- const unitList = (selSize ? priceOfSize(selSize) : priceOf(product)) + methodFee(selMethod?.key, selMethod?.label) + sidesAdd
+  /* A BLANK IS THE GARMENT AND NOTHING ELSE: no method surcharge, and no surface — there is
+     no printed face to charge for. Falls back to the base cost only if this size has no blank
+     price of its own, which `blankTiers` has already made unreachable from the chip. */
+ const unitList = isBlank
+    ? ((selSize ? blankOfSize(selSize) : 0) || (selSize ? priceOfSize(selSize) : priceOf(product)))
+    : (selSize ? priceOfSize(selSize) : priceOf(product)) + methodFee(selMethod?.key, selMethod?.label) + sidesAdd
 
  return (
     <div className="space-y-5">
@@ -356,10 +384,14 @@ export default function ProductDetailPage() {
               move it, and a price with no variant named beside it is the ambiguity this
               replaced. */}
           <div className="text-sm text-muted-foreground">
-            {[selColor, selSize, selMethod?.label,
+            {[selColor, selSize,
+              /* A BLANK NAMES ITSELF. Falling through to selMethod would print the technique
+                 the chip row happens to have first, describing a decoration this garment does
+                 not carry — and the price beside it would not match. */
+              isBlank ? tl("productPage", "Blank") : selMethod?.label,
               // The faces only when there is more than one — "Front" beside every product
               // is a word that never varies, and the price only moves at two.
-              pricedSides.length > 1 ? pricedSides.map((sd) => tl("sides", sd)).join(" + ") : null,
+              !isBlank && pricedSides.length > 1 ? pricedSides.map((sd) => tl("sides", sd)).join(" + ") : null,
             ].filter(Boolean).join(" · ")}
           </div>
           {/* NO BREAKDOWN HERE (owner, 2026-09-18). A Base cost / Front · Embroidery split was
@@ -475,16 +507,27 @@ export default function ProductDetailPage() {
                   three screens from the other two (owner's call, 2026-09-07). */}
               <div>
                 <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {tl("productPage", "Print methods")} ({techs.length})
+                  {tl("productPage", "Print methods")} ({techs.length + (blankTiers ? 1 : 0)})
                 </div>
                 <div className="flex flex-wrap gap-1.5">
+                  {blankTiers && (
+                    <button
+ type="button"
+ key={BLANK_KEY}
+ aria-pressed={isBlank}
+ onClick={() => setPickMethod(BLANK_KEY)}
+ className={CHIP + (isBlank ? CHIP_ON : CHIP_OFF)}
+                    >
+                      {tl("productPage", "Blank")}
+                    </button>
+                  )}
                   {techs.map((t) => (
                     <button
  type="button"
  key={t.key}
- aria-pressed={t.key === selMethod?.key}
+ aria-pressed={!isBlank && t.key === selMethod?.key}
  onClick={() => setPickMethod(t.key)}
- className={CHIP + (t.key === selMethod?.key ? CHIP_ON : CHIP_OFF)}
+ className={CHIP + (!isBlank && t.key === selMethod?.key ? CHIP_ON : CHIP_OFF)}
                     >
                       {t.label}
                     </button>
@@ -511,7 +554,9 @@ export default function ProductDetailPage() {
                 * nothing to choose, and an inert row of one chip is a control that cannot be
                 * used.
                 */}
-              {typesLoaded && sides.length > 1 && (
+              {/* NOT ON A BLANK. There is no printed face to place anything on, and a live
+                  placement row beside a price that ignores it is a control that does nothing. */}
+              {typesLoaded && !isBlank && sides.length > 1 && (
                 <div>
                   <div className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <span>{tl("productPage", "Placement")} ({sides.length})</span>
