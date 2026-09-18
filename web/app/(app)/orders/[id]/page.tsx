@@ -1204,6 +1204,21 @@ export default function OrderDetailPage() {
                            percentage. A rate rounded for display and then re-applied is how a
                            breakdown ends up a cent away from the total it is breaking down. */
                         const goods = (Number(l.unitCost) || 0) * qty
+                        /**
+                         * THE ITEM'S OWN DESIGN FEES COUNT TOWARDS ITS HEADING.
+                         *
+                         * They are listed under the item — a fee covering exactly one line
+                         * belongs to it — but were left out of the figure above them, so the
+                         * rows added up to two dollars more than the heading they sat under.
+                         * Precisely the defect the shipping and discount split was careful to
+                         * avoid: a breakdown whose parts do not reach its own total.
+                         *
+                         * A fee covering SEVERAL items is not here and must not be — it stays
+                         * at order level, where it names them all and is counted once.
+                         */
+                        const ownFees = (designFees?.items ?? [])
+                          .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
+                          .reduce((t, f) => t + (Number(f.amount) || 0), 0)
                         const dRatio = (Number(quote?.subtotal) || 0) > 0
                           ? (Number(quote?.volumeDiscount) || 0) / (Number(quote?.subtotal) || 0) : 0
                         const isLast = i === lines.length - 1
@@ -1249,7 +1264,7 @@ export default function OrderDetailPage() {
                                   would no longer be the sum of its own children — and a
                                   breakdown whose parts do not reach its total is worse than one
                                   that never broke the figure down. Σ(headings) is quote.total. */}
-                              <dd className="shrink-0 tabular-nums">{usd(goods + shipOwn - discOwn)}</dd>
+                              <dd className="shrink-0 tabular-nums">{usd(goods + shipOwn - discOwn + ownFees)}</dd>
                             </div>
                             {split && (
                               <>
@@ -1355,13 +1370,18 @@ export default function OrderDetailPage() {
                                    * exact share of the order's — so the strikethroughs reconcile
                                    * to the total however many rows they are spread over.
                                    */
-                                  const goodsRows: { key: string; face: string | null; method: string; amount: number; hover?: string }[] = [
+                                  const goodsRows: { key: string; face: string | null; method: string; amount: number; surfaceFree?: boolean; methodFee?: number; hover?: string }[] = [
                                     { key: 'blank', face: null, method: '', amount: blank * qty },
                                     ...faceRows.map((r, j) => {
                                       const own = r.amount * qty
                                       const mf = at === j ? method * qty : 0
                                       return {
                                         key: `face-${j}`, face: r.face, method: r.method, amount: own + mf,
+                                        /* IS THE SURFACE ITSELF FREE? One face is inside the
+                                           blank's price, and that is true whether or not the
+                                           line's technique carries a surcharge. */
+                                        surfaceFree: own <= 0.005,
+                                        methodFee: mf,
                                         hover: mf > 0 && own > 0
                                           ? `${usd(own)} ${tl("order", "extra surface")} + ${usd(mf)} ${r.method}`
                                           : undefined,
@@ -1393,15 +1413,31 @@ export default function OrderDetailPage() {
                                               <span className="text-success tabular-nums"> · {dpct}% {tl("order", "off")}</span>
                                             )}
                                           </dt>
-                                          {/* INCLUDED IS A WORD, NOT A ZERO. "$0.00" beside the
-                                              first face reads as a free extra rather than as the
-                                              face the blank's price already covers. */}
+                                          {/**
+                                            * INCLUDED IS A WORD, NOT A ZERO. "$0.00" beside the
+                                            * first face reads as a free extra rather than as the
+                                            * face the blank's price already covers.
+                                            *
+                                            * AND IT IS STILL TRUE WHEN THE FACE CARRIES THE
+                                            * METHOD FEE. One face is inside the blank's price;
+                                            * the technique's surcharge is a separate fact about
+                                            * the same surface. Printing "$5.00" alone answered
+                                            * the second and silently dropped the first, so the
+                                            * included face of an embroidered line looked like it
+                                            * was being charged for while the DTG line beside it
+                                            * read "included" — two rows describing the same rule
+                                            * and appearing to disagree.
+                                            */}
                                           <dd className="shrink-0 tabular-nums text-muted-foreground">
                                             {r.amount <= 0.005
                                               ? tl("order", "included")
-                                              : off > 0.005
-                                                ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
-                                                : usd(r.amount)}
+                                              : r.surfaceFree && (r.methodFee ?? 0) > 0.005
+                                                ? (<>{tl("order", "included")}{" + "}{off > 0.005
+                                                    ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
+                                                    : usd(r.amount)}</>)
+                                                : off > 0.005
+                                                  ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
+                                                  : usd(r.amount)}
                                           </dd>
                                         </div>
                                       )
@@ -1422,10 +1458,15 @@ export default function OrderDetailPage() {
                                             ? `${usd(Number(l.shipFee) || 0)} ${tl("order", "postage")} + ${usd(shipExtra)} × ${qty - 1}`
                                             : undefined}
                                         >
+                                          {/* WHICH HALF OF THE POSTAGE THIS IS. One line carries
+                                              the parcel — the box is sized by the biggest thing
+                                              in it — and every other unit adds only its extra
+                                              rate. "Shipping" against both figures made the
+                                              smaller one look like an unexplained second charge. */}
                                           {tl("order", "Shipping")}
-                                          {!isShipLine && (
-                                            <span className="text-muted-foreground/70"> · {tl("order", "extra in the box")}</span>
-                                          )}
+                                          <span className="text-muted-foreground/70"> · {isShipLine
+                                            ? tl("order", "first item")
+                                            : qty > 1 ? tl("order", "additional items") : tl("order", "additional item")}</span>
                                         </dt>
                                         <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(shipOwn)}</dd>
                                       </div>
