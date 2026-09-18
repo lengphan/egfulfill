@@ -405,11 +405,41 @@ async function accountContext(sellerId) {
 }
 
 // Map the stored thread into alternating Claude messages (seller=user, others=assistant).
+/** An attachment we can hand to the model as something to LOOK at. Images only, on a
+ *  public http(s) url — /api/support/asset/:name is served without auth precisely so a
+ *  browser can render it, which is the same reason the API can fetch it. */
+const VIEWABLE = /^image\/(png|jpe?g|gif|webp)$/i;
+function imageBlock(att) {
+  if (!att || typeof att !== 'object') return null;
+  const url = String(att.url || '');
+  if (!/^https?:\/\//i.test(url)) return null;
+  if (!VIEWABLE.test(String(att.mime || ''))) return null;
+  return { type: 'image', source: { type: 'url', url } };
+}
+/* A ceiling, because a long thread of photos is the one way this call gets expensive
+   without anyone deciding to spend: the newest images are the ones being talked about. */
+const MAX_IMAGES = 8;
+
 function toMessages(rows) {
   const out = [];
+  /* NEWEST FIRST when deciding what still fits, so a thread with twenty photos sends the
+     ones the conversation is actually about rather than the twenty oldest. */
+  const keep = new Set();
+  for (let i = rows.length - 1; i >= 0 && keep.size < MAX_IMAGES; i--) {
+    if (rows[i].sender_role === 'seller' && imageBlock(rows[i].attachment)) keep.add(rows[i].id);
+  }
   for (const m of rows) {
     let text = String(m.body || '').trim();
-    if (!text) continue;
+    const img = (m.sender_role === 'seller' && keep.has(m.id)) ? imageBlock(m.attachment) : null;
+    /*
+     * AN IMAGE WITH NO CAPTION IS STILL A MESSAGE.
+     *
+     * This dropped every bodiless row, and an attachment posted on its own has no body —
+     * so a seller who attached a photo and asked "can you see the image I just attached?"
+     * was told no, truthfully: the picture never left the database. The column was not
+     * even SELECTed, so there was nothing to send either way.
+     */
+    if (!text && !img) continue;
     const role = (m.sender_role === 'seller') ? 'user' : 'assistant';
     /*
      * A GENERATED IMAGE is stored as an assistant row whose body is the PROMPT — that is
@@ -419,9 +449,22 @@ function toMessages(rows) {
      * had been describing a tee. Label it instead, so the transcript says what happened.
      */
     if (m.meta && m.meta.image) text = `(generated an image: ${text})`;
+    /* The picture goes BEFORE its caption — the documented order for image blocks, and the
+       one that reads correctly when the caption refers to "this". */
+    const blocks = img ? [img, ...(text ? [{ type: 'text', text }] : [])] : null;
     const last = out[out.length - 1];
-    if (last && last.role === role) last.content += '\n' + text;
-    else out.push({ role, content: text });
+    if (last && last.role === role) {
+      /* Merging a same-role run: once anything in it is blocks, all of it is. */
+      if (blocks || Array.isArray(last.content)) {
+        if (!Array.isArray(last.content)) last.content = [{ type: 'text', text: last.content }];
+        if (blocks) last.content.push(...blocks);
+        else last.content.push({ type: 'text', text });
+      } else {
+        last.content += '\n' + text;
+      }
+    } else {
+      out.push({ role, content: blocks || text });
+    }
   }
   while (out.length && out[0].role !== 'user') out.shift();
   return out;
@@ -640,7 +683,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // takes the OLDEST 20 — see the note on the auto-reply query below.
     const hist = await q(
       `select sender_role, body, meta from (
-         select sender_role, body, meta, created_at, id from order_messages
+         select sender_role, body, meta, attachment, created_at, id from order_messages
           where order_id=$1
           order by created_at desc, id desc limit 20
        ) t order by t.created_at asc, t.id asc`, [threadId]);
@@ -813,7 +856,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // order, because toMessages() builds the transcript in sequence.
     const hist = await q(
       `select sender_role, body, meta from (
-         select sender_role, body, meta, created_at, id from order_messages
+         select sender_role, body, meta, attachment, created_at, id from order_messages
           where order_id=$1
             and not coalesce((meta->>'internal')::boolean, false)
           order by created_at desc, id desc limit 20
@@ -867,7 +910,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
        ) t order by t.created_at asc, t.id asc`, [threadId]);
     const hist = await q(
       `select sender_role, body, meta from (
-         select sender_role, body, meta, created_at, id from order_messages
+         select sender_role, body, meta, attachment, created_at, id from order_messages
           where order_id=$1 and not coalesce((meta->>'note')::boolean, false)
           order by created_at desc, id desc limit 20
        ) t order by t.created_at asc, t.id asc`, [threadId]);
