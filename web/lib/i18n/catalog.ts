@@ -2012,6 +2012,9 @@ const vi: Dict = {
   "designMaker.Added text lands in the middle of the print area. Select it on the canvas to change the words, size and colour — the controls are on the right, with the rest of the layer.": "Chữ vừa thêm sẽ nằm giữa vùng in. Chọn nó trên khung vẽ để đổi nội dung, cỡ và màu — các tuỳ chỉnh nằm bên phải, cùng với phần còn lại của lớp.",
 
   // ── Product editor (staff) ────────────────────────────────────────────────
+  "product.What this size costs as a bare garment. This is the base of every price now: the placement charge and the method are added on top.": "Giá áo trơn của cỡ này. Đây là gốc của mọi mức giá: phí vị trí in và kỹ thuật in được cộng thêm.",
+  "product.Only used where this size has no Blank price. Set Blank instead — the garment, the placement and the method are priced separately now.": "Chỉ dùng khi cỡ này chưa có giá Phôi. Hãy đặt giá Phôi — giá áo, vị trí in và kỹ thuật in nay được tính riêng.",
+  "product.Base cost ($) · legacy": "Giá gốc ($) · cũ",
   "product.above its blank price — that gap is the print, and it is what a placement is worth now that no face is free.": "so với giá phôi — phần chênh đó chính là chi phí in, và là mức một vị trí in đáng giá khi không còn mặt nào miễn phí.",
   "product.This product's base cost sits": "Giá gốc của sản phẩm này cao hơn",
   "product.Charge for printing the": "Phí in mặt",

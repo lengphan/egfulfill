@@ -325,12 +325,32 @@ function costPartsOf(row, item, fees, faces = null) {
    * import where every Type sits in a placement block — and a line whose back says Embroidery
    * is not a blank whatever its own column says.
    */
-  const isBlankLine = String(item.print_type || '').trim().toUpperCase() === 'BLANK'
-    && !faceMethods.length;
-  if (isBlankLine && tier && tier.blank != null) {
-    const bl = num(tier.blank);
-    if (bl != null && bl > 0) base = bl;
-  }
+  /**
+   * THE GARMENT'S OWN PRICE IS THE BASE, for every line (owner, 2026-09-18).
+   *
+   * The model is three separate numbers now and nothing is bundled into another:
+   *
+   *     price = blank  +  Σ per face ( placement + that face's method )
+   *
+   * `blank` is the garment. `sidePrice` is what printing a face is worth. `methodPrices` is
+   * what the technique adds. Base cost used to carry the garment AND one print AND the print's
+   * whole margin in one figure, which is why nobody could read margin off a line without
+   * knowing which face had been free — the thing this set out to fix.
+   *
+   * A BLANK LINE NEEDS NO SPECIAL CASE ANY MORE, which is how you can tell the model is right:
+   * it is simply a line with no printed face and no technique, so it lands on `blank` and stops
+   * there. `isBlankLine` existed only because base cost included a print that a bare garment
+   * had to be rescued from.
+   *
+   * MEASURED BEFORE SHIPPING, because this reprices real products: of 28 catalogue rows, 5
+   * carry a blank price and 3 already carry a placement charge. The other 23 have no blank
+   * price and fall straight through to the ladder below, priced exactly as they were — so the
+   * change can only reach products somebody has deliberately begun pricing this way.
+   */
+  if (tier && tier.blank != null) { const bl = num(tier.blank); if (bl != null && bl > 0) base = bl; }
+  /* LEGACY, and the only reason base cost is still read at all: a product nobody has given a
+     blank price to has no other statement of what the garment costs. It errs HIGH — it still
+     contains a print — which is the safe direction while the catalogue is migrated. */
   if (base == null && tier && tier.price != null) { const p = num(tier.price); if (p != null && p > 0) base = p; }
   if (base == null && tier && tier.cost != null) { const c = num(tier.cost); if (c != null && c > 0) base = c + markup; }
   /**

@@ -1749,7 +1749,11 @@ export function ProductEditorDialog({
  question ("how many 3XL?") this row is already asking. Held per SIZE now,
  so the sku is EG-1001-L rather than EG-1001-L-BLK. */}
                 <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
-                  <span /><span>{tl("product", "Product cost ($)")}</span><span>{tl("product", "Base cost ($)")}</span><span title={tl("product", "What this size costs undecorated — charged when a line carries no print method")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
+                  <span /><span>{tl("product", "Product cost ($)")}</span>{/* BASE COST IS LEGACY, and the header says so rather than sitting there looking equal to
+       the others. It is read only when a size has NO blank price: the garment is `Blank`, the
+       print is the placement charge, and the technique is its own surcharge — three separate
+       numbers, none bundled into another. A size with a blank price never reads this. */}
+                  <span title={tl("product", "Only used where this size has no Blank price. Set Blank instead — the garment, the placement and the method are priced separately now.")}>{tl("product", "Base cost ($) · legacy")}</span><span title={tl("product", "What this size costs as a bare garment. This is the base of every price now: the placement charge and the method are added on top.")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
                   {/* WEIGHT IS PER SIZE, which is the whole reason it is a column here. A 3XL
  crewneck runs several ounces over an S, and postage is priced in bands
                       (4 / 8 / 12 / 15.999oz, then 1lb), so one size can sit a band above
