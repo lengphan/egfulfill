@@ -225,6 +225,10 @@ export default function ProductDetailPage() {
   /** What each ADDITIONAL face adds. Mirrors sideAddOn in server/src/pricing.js — the first
    *  print is inside the base cost, so only faces 2, 3, 4 are charged. */
  const sideFee = Number(fees?.sideFee ?? 0) || 0
+  /* ALWAYS ZERO NOW, and deliberately kept rather than deleted: placement is single-select on
+     this page, so there is never a second face to charge for. The formula stays correct for
+     any number of faces — it is what the ORDER's Summary charges, where the faces are actually
+     known — and removing it would leave the two prices computed by different rules. */
  const sidesAdd = sideFee > 0 ? sideFee * Math.max(0, pricedSides.length - 1) : 0
  const unitList = (selSize ? priceOfSize(selSize) : priceOf(product)) + methodFee(selMethod?.key, selMethod?.label) + sidesAdd
 
@@ -477,22 +481,30 @@ export default function ProductDetailPage() {
                   ))}
                 </div>
               </div>
-              {/* PLACEMENT — the fourth input to the price, and the only multi-select here.
-                  Colour, size and method are choices BETWEEN options; a garment can carry a
-                  front AND a back, and the second face is what costs. Shown only when the
-                  blank has more than one: a single-face product has nothing to choose, and
-                  an inert row of one chip is a control that cannot be used.
-                  The fee lives ON the heading, never under the chips — §4: a control
-                  explains itself in its label, and prose under a control is a defect. */}
+              {/**
+                * PLACEMENT — ONE FACE AT A TIME (owner, 2026-09-18).
+                *
+                * It was the only multi-select on this card, on the reasoning that a garment can
+                * carry a front AND a back and the second face is what costs. True of an ORDER,
+                * and the wrong question for this page: what is being asked here is "what does
+                * this combination cost", and a multi-select answers a different one — the price
+                * of a bundle — by adding a per-side fee onto a figure the other three pickers
+                * had each contributed one choice to.
+                *
+                * So it matches colour, size and method now: pick a face, see that face's price
+                * in combination with them. The extra-side fee is an ORDER-time charge for a
+                * second surface, and it is quoted there, on the order's own Summary where the
+                * faces are actually known. Quoting it here priced something nobody had asked
+                * for yet.
+                *
+                * Shown only when the blank has more than one face: a single-face product has
+                * nothing to choose, and an inert row of one chip is a control that cannot be
+                * used.
+                */}
               {typesLoaded && sides.length > 1 && (
                 <div>
                   <div className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <span>{tl("productPage", "Placement")} ({sides.length})</span>
-                    {sideFee > 0 && (
-                      <span className="normal-case tracking-normal text-foreground">
-                        {usd(sideFee)} {tl("productPage", "per extra side")}
-                      </span>
-                    )}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {sides.map((sd) => {
@@ -502,15 +514,11 @@ export default function ProductDetailPage() {
                           type="button"
                           key={sd}
                           aria-pressed={on}
-                          onClick={() => {
-                            const now = pricedSides.includes(sd)
-                              ? pricedSides.filter((x) => x !== sd)
-                              : [...pricedSides, sd]
-                            // NEVER EMPTY. A garment is printed somewhere — clearing the last
-                            // face would quote a blank nobody ordered, so the press is simply
-                            // refused rather than silently re-adding a different one.
-                            if (now.length) setPickSides(now)
-                          }}
+                          /* NEVER EMPTY, and now that is free: picking replaces rather than
+                             toggles, so there is no press that can clear the last face and
+                             quote a blank nobody ordered. Pressing the live one is a no-op,
+                             which is how the other three pickers behave. */
+                          onClick={() => setPickSides([sd])}
                           className={CHIP + (on ? CHIP_ON : CHIP_OFF) + " capitalize"}
                         >
                           {tl("sides", sd)}
