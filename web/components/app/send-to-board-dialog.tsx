@@ -27,13 +27,17 @@ import { useLabelT } from "@/lib/i18n"
  * separate way in here would be a second path to the same table with its own bugs.
  */
 export function SendToBoardDialog({
-  open, onOpenChange, orderId, sku, lineId, itemName, artworkUrl, lineImage, printType, onSent,
+  open, onOpenChange, orderId, sku, lineId, side, itemName, artworkUrl, lineImage, printType, onSent,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   orderId: string
   sku: string
   lineId?: string | null
+  /** THE FACE this card is for. Cards are one per face — a front and a back are two jobs a
+   *  designer does separately — and createDesignCard has always accepted it. Omitted means a
+   *  card for the whole line, which predates faces and is still valid. */
+  side?: string | null
   itemName?: string | null
   artworkUrl?: string | null
   lineImage?: string | null
@@ -89,6 +93,9 @@ export function SendToBoardDialog({
         data: image || undefined,
         sku: sku || undefined,
         col: "incoming",
+        /* Lower-cased like every other reader of a face name, so 'Front' and 'front' cannot
+           become two surfaces on one board. */
+        side: side ? String(side).toLowerCase() : undefined,
         /* Undefined when nobody picked, NOT a default band: a card priced by omission is how
            someone gets paid Standard for a digitise. Unbanded pays the flat fallback and the
            board shows it as unpriced until a human says otherwise. */

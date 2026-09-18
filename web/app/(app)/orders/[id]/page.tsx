@@ -18,7 +18,8 @@ import { deleteOrderItem } from "@/lib/api"
 import { refundOrder } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { OrderAdjustPanel } from "@/components/app/order-adjust-panel"
-import { sendLineToBoard, boardArtworkFor } from "@/lib/design-board"
+import { boardArtworkFor } from "@/lib/design-board"
+import { SendToBoardDialog } from "@/components/app/send-to-board-dialog"
 import { canvasReadableSrc } from "@/lib/thread-match"
 import { variantOf } from "@/lib/order-format"
 import { EmptyState } from "@/components/app/empty-state"
@@ -49,6 +50,7 @@ import {
  sidesForLine,
  ALL_SIDES,
  getOrderDesigns,
+ getDesignReuse,
  getDesignFiles,
  type DesignFileRow,
  getOrderMessages,
@@ -454,33 +456,38 @@ export default function OrderDetailPage() {
    *  human confirms; auto-attaching one is how another seller's work reaches this order. */
  const [boardReuse, setBoardReuse] = useState<{ key: string; exact: ReuseMatch[]; similar: ReuseMatch[] } | null>(null)
 
-  /** Which row is open for editing, and what is in it. One at a time: the panel is a list,
-   *  and two open forms in a list is a form nobody finishes. */
- const [boardDraft, setBoardDraft] = useState<{ key: string; title: string; brief: string } | null>(null)
+  /**
+   * WHICH LINE AND FACE THE SEND DIALOG IS OPEN FOR.
+   *
+   * SendToBoardDialog ALREADY EXISTS and already does all of this — an editable title, a
+   * brief that lands at specs.description (the same field the board's own editor patches),
+   * band pills, and a read-only list of what the line is carrying. I built an inline form
+   * here without grepping for it first, which is §2.2 exactly: "Grep before adding a
+   * component". The inline one is gone; this opens the real one.
+   */
+ const [boardSend, setBoardSend] = useState<{ item: OrderItem; side: string | null } | null>(null)
 
- const sendToBoard = async (it: OrderItem, side: string | null, force = false) => {
+  /**
+   * ASK BEFORE SPENDING A DESIGNER, THEN OPEN THE REAL DIALOG.
+   *
+   * The reuse check happens HERE rather than inside SendToBoardDialog, because it is the
+   * question you want answered BEFORE writing a brief, not after. §6: a perceptual match
+   * SUGGESTS and a human confirms, so hits are shown and `force` is the human saying send it
+   * anyway. The lookup is an optimisation — a failure never blocks the send.
+   */
+ const beginSend = async (it: OrderItem, side: string | null, force = false) => {
  const key = `${it.line_id || it.sku || it.name || ""}|${side ?? ""}`
- setBoardBusy(key); setBoardNote(null)
+ setBoardNote(null)
+ if (force || !it.sku) { setBoardReuse(null); setBoardSend({ item: it, side }); return }
+ setBoardBusy(key)
     try {
- const art = (side ? sidesForLine(designSides, it)?.[side]?.data : null) || boardArtworkFor(designs, it)
- const r = await sendLineToBoard({ id: String(id), customer: order?.customer ?? null }, it,
-        { art, force, side,
- title: boardDraft?.key === key ? boardDraft.title : undefined,
- brief: boardDraft?.key === key ? boardDraft.brief : undefined })
- if (r.status === "no-art") {
- setBoardNote({ ok: false, text: tl("order", "That line has no saved artwork yet, so there is nothing to digitise.") })
- return
-      }
- if (r.status === "reuse") { setBoardReuse({ key, exact: r.exact, similar: r.similar }); return }
- if (r.status === "error") { setBoardNote({ ok: false, text: r.message }); return }
+ const r = await getDesignReuse(String(id), it.sku, it.line_id ?? undefined)
+ if (r && (r.exact.length || r.similar.length)) { setBoardReuse({ key, exact: r.exact, similar: r.similar }); return }
+    } catch { /* the lookup is an optimisation — never block the send on it */ }
+    finally { setBoardBusy(null) }
  setBoardReuse(null)
- setBoardNote({ ok: true, text: r.status === "duplicate"
-        ? tl("order", "Already on the board.") : tl("order", "Sent to the designer board.") })
- setBoardDraft(null)
- reloadBoard()
-    } finally { setBoardBusy(null) }
+ setBoardSend({ item: it, side })
   }
-
 
   // The quote is fetched HERE rather than inside the submit button because two places
   // render it: the Summary card (the breakdown) and the confirm dialog (the amount).
@@ -2477,6 +2484,28 @@ export default function OrderDetailPage() {
             * need a designer", and a list of cards can only answer it by omission. A line that
             * cannot be sent says WHY on its own row rather than offering a button that refuses.
             */}
+          {/* THE DIALOG THAT ALREADY EXISTED. It carries the band pills and the read-only
+              list of what the line holds as well as the title and brief — everything the
+              inline form here was a thinner copy of. */}
+          {boardSend && (
+            <SendToBoardDialog
+              open
+              onOpenChange={(v) => { if (!v) setBoardSend(null) }}
+              orderId={String(id)}
+              sku={boardSend.item.sku || ""}
+              lineId={boardSend.item.line_id}
+              side={boardSend.side}
+              itemName={boardSend.item.name}
+              artworkUrl={(boardSend.side ? sidesForLine(designSides, boardSend.item)?.[boardSend.side]?.data : null)
+                || boardArtworkFor(designs, boardSend.item) || null}
+              lineImage={boardSend.item.img}
+              printType={boardSend.item.print_type}
+              onSent={() => {
+ setBoardNote({ ok: true, text: tl("order", "Sent to the designer board.") })
+ reloadBoard(); reloadDesigns()
+              }}
+            />
+          )}
           {isStaff && (
           <div className={detailTab === "board" ? "space-y-5" : "hidden"}>
             <SectionCard title={tl("order", "Designer board")}>
@@ -2508,7 +2537,6 @@ export default function OrderDetailPage() {
                     const art = (side ? sidesForLine(designSides, it)?.[side]?.data : null) || boardArtworkFor(designs, it)
                     const busy = boardBusy === key
                     const hits = boardReuse?.key === key ? boardReuse : null
-                    const draft = boardDraft?.key === key ? boardDraft : null
                     return (
                       <div key={key} className="py-3">
                         <div className="flex items-center gap-3">
@@ -2537,45 +2565,13 @@ export default function OrderDetailPage() {
                             ? <span className="shrink-0 text-xs text-muted-foreground">{tl("order", "On the board")}{card.col ? ` · ${card.col}` : ""}</span>
                             : !art
                               ? <span className="shrink-0 text-xs text-muted-foreground">{tl("order", "No artwork yet")}</span>
-                              : draft
-                                ? null
-                                : (
-                                  <Button size="sm" variant="outline" disabled={busy}
-                                    onClick={() => setBoardDraft({ key, title: it.name || it.sku || "", brief: "" })}>
-                                    {tl("order", "Send to board")}
-                                  </Button>
-                                )}
+                              : (
+                                <Button size="sm" variant="outline" disabled={busy}
+                                  onClick={() => void beginSend(it, side)}>
+                                  {tl("order", "Send to board")}
+                                </Button>
+                              )}
                         </div>
-                        {/* NAME IT BEFORE IT GOES. A marketplace title is a keyword list —
-                            "Custom Apron with Embroidered Name, Heavy Duty Cotton, Personalised
-                            Kitchen…" — and a board card wearing one is unreadable at the size a
-                            board is read at. The raw title is the default, not the only option,
-                            and the brief is written HERE because this is the moment the sender
-                            is looking at the artwork. */}
-                        {draft && (
-                          <div className="mt-2 space-y-2 rounded-lg border border-border p-3">
-                            <Input
-                              value={draft.title}
-                              onChange={(e) => setBoardDraft({ ...draft, title: e.target.value })}
-                              placeholder={tl("order", "Card name")}
-                            />
-                            <Textarea
-                              value={draft.brief}
-                              onChange={(e) => setBoardDraft({ ...draft, brief: e.target.value })}
-                              placeholder={tl("order", "What the designer needs to know")}
-                              rows={2}
-                            />
-                            <div className="flex gap-2">
-                              <Button size="sm" disabled={busy || !draft.title.trim()}
-                                onClick={() => void sendToBoard(it, side)}>
-                                {busy ? tl("order", "Sending…") : tl("order", "Send to board")}
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setBoardDraft(null)}>
-                                {tl("order", "Cancel")}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
                         {/* WE MAY HAVE MADE THIS ALREADY. Shown, never acted on (§6) — and the
                             seller is never told whose it was, only that a file exists. */}
                         {hits && (
@@ -2590,7 +2586,7 @@ export default function OrderDetailPage() {
                             </div>
                             <div className="mt-2 flex gap-2">
                               <Button size="sm" variant="outline" disabled={busy}
-                                onClick={() => void sendToBoard(it, side, true)}>
+                                onClick={() => void beginSend(it, side, true)}>
                                 {tl("order", "Send anyway")}
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => setBoardReuse(null)}>
