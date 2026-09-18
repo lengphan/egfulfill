@@ -1224,6 +1224,20 @@ export function SpyDeckView() {
   }, [applyClientFilters, results, sortSel])
  const trendingPaged = usePaged(trendingList, 24)
  const resultsPaged = usePaged(resultsList, 24)
+  /**
+   * HOW MANY ARE HERE, AND HOW MANY SURVIVED — the two numbers that were never on screen
+   * together.
+   *
+   * The pager says "Showing 1-4 of 4", which is true of the FILTERED list and silent about
+   * the 408 it is hiding, so a strict threshold reads as "Etsy found four". `on` is what
+   * decides whether any of this is worth saying: with nothing filtering, loaded and shown are
+   * the same number and printing both twice is noise.
+   */
+ const narrowed = useMemo(() => {
+ const total = results?.length ?? 0
+ const shown = resultsList.length
+ return { total, shown, on: total !== shown }
+  }, [results, resultsList])
  const savedPaged = usePaged(saved, 24)
  const uploadedPaged = usePaged(uploaded, 24)
 
@@ -1587,7 +1601,29 @@ export function SpyDeckView() {
             </div>
 
             {canFilter && showFilters && (
-              <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-7">
+              /**
+               * TWO GROUPS, BECAUSE THERE ARE TWO KINDS OF CONTROL HERE AND THEY WERE WEARING
+               * ONE FACE.
+               *
+               * Four of these ask ETSY for different listings and only take effect when Search
+               * is pressed; six HIDE rows that are already loaded and take effect as you type.
+               * Identical boxes in one ten-across row, so nothing said which was which — and
+               * "Min sold" appeared twice, separated only by a hint, because the two halves of
+               * the row had no reason to sit apart.
+               *
+               * The alignment falls out of the split rather than being patched: four fields and
+               * six fields both divide evenly, where ten in a seven-column grid left a short
+               * row and four dead cells.
+               */
+              <div className="mt-3 flex flex-col gap-3">
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <div className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {tl("spydeck", "Search Etsy")}
+                  <span className="ml-1.5 font-normal normal-case tracking-normal text-muted-foreground/70">
+                    {tl("spydeck", "applies when you press Search")}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <FilterField label={tl("spydeck", "Category")}>
                   <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select eg-control pr-8">
                     <option value="">{tl("spydeck", "All")}</option>
@@ -1617,6 +1653,45 @@ export function SpyDeckView() {
                 <FilterField label={tl("spydeck", "Max price ($)")}>
                   <Input value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={tl("spydeck", "Any")} className="h-9" inputMode="decimal" />
                 </FilterField>
+                </div>
+              </div>
+
+              {/**
+                * WHAT IS ALREADY HERE, NARROWED. Instant, because the rows are in the browser.
+                *
+                * These can never become server-side and that is worth saying in the label
+                * rather than leaving it to be discovered: Etsy reports no views, no sales and
+                * no revenue, so the four figures are modelled from favourites and listing age.
+                * A threshold on them can only ever be applied to what has been fetched.
+                */}
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {tl("spydeck", "Narrow what is loaded")}
+                    <span className="ml-1.5 font-normal normal-case tracking-normal text-muted-foreground/70">
+                      {tl("spydeck", "instant — no new search")}
+                    </span>
+                  </span>
+                  {/* THE COUNT THE OLD ROW NEVER SHOWED. "Showing 1-4 of 4" is true of the
+                      FILTERED list and silent about the 408 it is hiding, so a strict threshold
+                      read as "Etsy found four". Both numbers, side by side, and Clear appears
+                      only when something is actually filtering — a reset button that is always
+                      lit is furniture. */}
+                  {narrowed.on && (
+                    <span className="flex items-center gap-2 text-2xs text-muted-foreground">
+                      <span className="tabular-nums">
+                        {narrowed.total.toLocaleString()} {tl("spydeck", "loaded")}
+                        <span className="text-muted-foreground/60"> · </span>
+                        <span className="font-medium text-foreground">{narrowed.shown.toLocaleString()} {tl("spydeck", "shown")}</span>
+                      </span>
+                      <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline"
+                        onClick={() => { setMinViews(""); setMinSold(""); setMinTotal(""); setMinRevenue(""); setMinFav(""); setListedIn("") }}>
+                        {tl("spydeck", "Clear")}
+                      </button>
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 {/* THE FOUR MINIMUMS, IN THE CARD'S OWN ORDER — views, sold today, sold all
                     time, revenue. The controls and the tiles are the same four figures, so
                     reading down a card and reading along this row land in the same place;
@@ -1654,19 +1729,23 @@ export function SpyDeckView() {
                     <option value="730">{tl("spydeck", "Last 2 years")}</option>
                   </select>
                 </FilterField>
-                <div className="col-span-2 flex items-center gap-2 sm:col-span-3 lg:col-span-7">
+                </div>
+                {/* RESET SITS WITH THE GROUPS IT RESETS, and the sentence that used to explain
+                    which half did what is gone — the two headings say it now, each above the
+                    fields it governs. That sentence was §4's own example: prose under a control
+                    explaining controls that are already on screen. */}
+                <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-3">
                   <Button size="sm" onClick={() => run()} disabled={!query.trim() && !hasFilter}>{tl("spydeck", "Apply filters")}</Button>
                   <button
- /* EVERY FIELD IN THE ROW, or Reset becomes a control that leaves some of the
-                   filtering in place — which reads as the grid ignoring the button. Three were
-                   added above; they are cleared here in the same commit deliberately. */
+ /* EVERY FIELD IN BOTH GROUPS, or Reset becomes a control that leaves some of the
+                   filtering in place — which reads as the grid ignoring the button. */
  onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav(""); setMinViews(""); setMinRevenue(""); setMinTotal(""); setListedIn("") }}
  className="text-xs font-medium text-muted-foreground hover:text-foreground"
                   >
                     {tl("spydeck", "Reset")}
                   </button>
-                  <span className="ml-auto text-xs text-muted-foreground">{tl("spydeck", "Category, price & sort search Etsy; sold/day, favorites & age filter results live.")}</span>
                 </div>
+              </div>
               </div>
             )}
           </div>
@@ -1807,42 +1886,50 @@ export function SpyDeckView() {
  reads "Page 1 / 1", and three seconds later the count jumps — which looks like
  a glitch rather than the second half of the search arriving. It also stops
  anyone concluding, again, that this is all Etsy has. */}
+
+          {/**
+            * THE PAGER FETCHES — there is no second control any more (owner, 2026-09-18).
+            *
+            * A "Load more · 400 so far" button beside a pager that already walks those 400 is
+            * two controls for one idea, and the button was the wrong one: results that are
+            * HERE belong in the page numbers, not behind a press.
+            *
+            * So the pager is offered ONE page past what is loaded while Etsy may still have
+            * more, and landing on it fetches the next block. That is not a liberty — it is the
+            * shape CLAUDE.md §2.8 names in as many words: "Incremental loading is an EVENT — a
+            * click on a page one past what is loaded. A click cannot recur on its own." The
+            * bug it warns about is the same fetch driven by an EFFECT watching `page >=
+            * pageCount`, which is true at page 1 of 1 and re-fires on the state its own fetch
+            * wrote. This is a handler on a human press, and `exhausted` — set only when Etsy
+            * answers short — is what removes the extra page at the true end.
+            */}
+          <Pagination
+            page={resultsPaged.page}
+            pageCount={resultsPaged.pageCount + (exhausted || loading ? 0 : 1)}
+            perPage={resultsPaged.perPage}
+            total={resultsPaged.total}
+            start={resultsPaged.start}
+            onPage={(n) => {
+              if (n > resultsPaged.pageCount) {
+                /* The page past the end is the ASK. Stay where you are while it loads — moving
+                   to a page that does not exist yet would blank the grid, and the rows arrive
+                   in a moment anyway. */
+                if (!loadingMore) void loadMore()
+                return
+              }
+              resultsPaged.setPage(n)
+            }}
+            onPerPage={resultsPaged.setPerPage}
+            perPageOptions={[24, 48, 96]}
+          />
+          {/* ONE loading line, under the pager that triggered it. The old "Fetching more
+              results…" strip above the grid said the same thing in a second place. */}
           {loadingMore && (
-            <p className="px-5 pb-2 text-xs text-muted-foreground" role="status" aria-live="polite">
+            <p className="px-5 pb-3 text-center text-xs text-muted-foreground" role="status" aria-live="polite">
               <CircleNotch size={12} className="mr-1 inline animate-spin" />
-              {tl("spydeck", "Fetching more results…")}
+              {tl("spydeck", "Fetching more from Etsy…")}
             </p>
           )}
-          {/**
-            * MORE OF ETSY, ON PURPOSE.
-            *
-            * The pager walks what is LOADED; this asks for more to load. Those are different
-            * questions and they were the same control, which is how "Page 2 / 2" came to mean
-            * "that is all Etsy has" when it only ever meant "that is all we fetched".
-            *
-            * Says how many are held, so the number the button is about is on screen beside it
-            * — and when Etsy has answered short it becomes a plain line saying so, rather than
-            * a control that looks pressable and does nothing.
-            */}
-          {searched && !loading && (results?.length ?? 0) > 0 && (
-            <div className="flex items-center justify-center gap-3 px-5 pb-3">
-              {exhausted ? (
-                <span className="text-xs text-muted-foreground">
-                  {tl("spydeck", "That is everything Etsy returned for this search")}
-                  <span className="text-muted-foreground/60"> · {(results?.length ?? 0).toLocaleString()}</span>
-                </span>
-              ) : (
-                <Button size="sm" variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
-                  {loadingMore
-                    ? <><CircleNotch size={13} className="animate-spin" />{tl("spydeck", "Loading…")}</>
-                    : <>{tl("spydeck", "Load more results")}
-                        <span className="font-normal text-muted-foreground"> · {(results?.length ?? 0).toLocaleString()} {tl("spydeck", "so far")}</span>
-                      </>}
-                </Button>
-              )}
-            </div>
-          )}
-          <Pagination page={resultsPaged.page} pageCount={resultsPaged.pageCount} perPage={resultsPaged.perPage} total={resultsPaged.total} start={resultsPaged.start} onPage={resultsPaged.setPage} onPerPage={resultsPaged.setPerPage} perPageOptions={[24, 48, 96]} />
           </>
         )}
       </SectionCard>
