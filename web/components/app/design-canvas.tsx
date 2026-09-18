@@ -1676,12 +1676,20 @@ export function DesignCanvasDialog({
  const surfaceFiles = useMemo(() => lineFiles.filter((f) => f.side === sideKey), [lineFiles, sideKey])
  const itemFiles = useMemo(() => lineFiles.filter((f) => !f.side), [lineFiles])
   /**
-   * WHAT THE BADGE COUNTS — everything the tab will show, which is both groups plus the
-   * artwork on this face. It moves as you click the rail, because the surface half of it
-   * does; that is the whole reason a count belongs here rather than a line-wide total, which
-   * read identically on every face and taught the reader that the tabs ignore the rail.
+   * WHAT THE BADGE COUNTS — exactly what the tab shows, which is the only thing a badge is
+   * allowed to count.
+   *
+   * The artwork term was `artFaces.some(f => f.side === sideKey) ? 1 : 0` — one, if the face
+   * you are LOOKING at has a picture. But the panel renders `artFaces.map(...)`: every face
+   * that has one. So a line with a front and a back listed two rows under a badge reading 1,
+   * and three surfaces still read 1. The two halves had drifted: the count was written when
+   * the list was per-face, the list grew to cover the garment, and nothing connected them.
+   *
+   * `surfaceFiles` stays per-face on purpose — a file pinned to another face is deliberately
+   * out of scope here (see its note above) — so the badge keeps moving with the rail. It just
+   * no longer under-reports the artwork, which is the half that does not move.
    */
- const fileCount = surfaceFiles.length + itemFiles.length + (artFaces.some((f) => f.side === sideKey) ? 1 : 0)
+ const fileCount = surfaceFiles.length + itemFiles.length + artFaces.length
   /**
    * IS THE SURFACE IN FRONT OF YOU STITCHED?
    *
