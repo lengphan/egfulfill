@@ -39,6 +39,7 @@ import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
  getOrders,
  getOrder,
@@ -453,12 +454,19 @@ export default function OrderDetailPage() {
    *  human confirms; auto-attaching one is how another seller's work reaches this order. */
  const [boardReuse, setBoardReuse] = useState<{ key: string; exact: ReuseMatch[]; similar: ReuseMatch[] } | null>(null)
 
- const sendToBoard = async (it: OrderItem, force = false) => {
- const key = it.line_id || it.sku || it.name || ""
+  /** Which row is open for editing, and what is in it. One at a time: the panel is a list,
+   *  and two open forms in a list is a form nobody finishes. */
+ const [boardDraft, setBoardDraft] = useState<{ key: string; title: string; brief: string } | null>(null)
+
+ const sendToBoard = async (it: OrderItem, side: string | null, force = false) => {
+ const key = `${it.line_id || it.sku || it.name || ""}|${side ?? ""}`
  setBoardBusy(key); setBoardNote(null)
     try {
+ const art = (side ? sidesForLine(designSides, it)?.[side]?.data : null) || boardArtworkFor(designs, it)
  const r = await sendLineToBoard({ id: String(id), customer: order?.customer ?? null }, it,
-        { art: boardArtworkFor(designs, it), force })
+        { art, force, side,
+ title: boardDraft?.key === key ? boardDraft.title : undefined,
+ brief: boardDraft?.key === key ? boardDraft.brief : undefined })
  if (r.status === "no-art") {
  setBoardNote({ ok: false, text: tl("order", "That line has no saved artwork yet, so there is nothing to digitise.") })
  return
@@ -468,6 +476,7 @@ export default function OrderDetailPage() {
  setBoardReuse(null)
  setBoardNote({ ok: true, text: r.status === "duplicate"
         ? tl("order", "Already on the board.") : tl("order", "Sent to the designer board.") })
+ setBoardDraft(null)
  reloadBoard()
     } finally { setBoardBusy(null) }
   }
@@ -2481,12 +2490,25 @@ export default function OrderDetailPage() {
                 ? <EmptyState icon={Package} title={tl("order", "No lines on this order")} />
                 : (
                 <div className="divide-y divide-border">
-                  {items.map((it, ix) => {
-                    const key = it.line_id || it.sku || it.name || String(ix)
-                    const card = cardForLine(boardCards, { line_id: it.line_id, sku: it.sku })
-                    const art = boardArtworkFor(designs, it)
+                  {items.flatMap((it, ix) => {
+                    /**
+                     * ONE ROW PER FACE, because a card is per face — a front and a back are two
+                     * jobs a designer does separately, and a single row could only ever send one
+                     * of them. A line whose faces we do not know yet still gets one row, sent
+                     * without a side, which is the card shape that predates faces and is still
+                     * valid.
+                     */
+                    const faces = Object.keys(sidesForLine(designSides, it) ?? {})
+                    const rows: (string | null)[] = faces.length ? faces : [null]
+                    return rows.map((side) => {
+                    const key = `${it.line_id || it.sku || it.name || String(ix)}|${side ?? ""}`
+                    const card = (boardCards ?? []).find((c) =>
+                      (it.line_id ? c.line_id === it.line_id : !c.line_id && c.sku === it.sku)
+                      && (side ? String(c.side || "").toLowerCase() === side : true))
+                    const art = (side ? sidesForLine(designSides, it)?.[side]?.data : null) || boardArtworkFor(designs, it)
                     const busy = boardBusy === key
                     const hits = boardReuse?.key === key ? boardReuse : null
+                    const draft = boardDraft?.key === key ? boardDraft : null
                     return (
                       <div key={key} className="py-3">
                         <div className="flex items-center gap-3">
@@ -2500,8 +2522,13 @@ export default function OrderDetailPage() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{it.name || it.sku || tl("order", "Line")}</div>
+                            {/* THE FACE, THEN THE GARMENT. `variantOf` already ends with the
+                                method, so appending print_type printed it twice — a row reading
+                                "EMB · EMB", which says one thing and looks like a fault. */}
                             <div className="truncate text-xs text-muted-foreground">
-                              {[variantOf(it), it.print_type].filter(Boolean).join(" · ") || "—"}
+                              {side && <span className="capitalize">{tl("sides", side)}</span>}
+                              {side && variantOf(it) ? " · " : ""}
+                              {variantOf(it)}
                             </div>
                           </div>
                           {/* THREE STATES, AND THEY ARE NOT THE SAME. On the board already;
@@ -2510,13 +2537,45 @@ export default function OrderDetailPage() {
                             ? <span className="shrink-0 text-xs text-muted-foreground">{tl("order", "On the board")}{card.col ? ` · ${card.col}` : ""}</span>
                             : !art
                               ? <span className="shrink-0 text-xs text-muted-foreground">{tl("order", "No artwork yet")}</span>
-                              : (
-                                <Button size="sm" variant="outline" disabled={busy}
-                                  onClick={() => void sendToBoard(it)}>
-                                  {busy ? tl("order", "Sending…") : tl("order", "Send to board")}
-                                </Button>
-                              )}
+                              : draft
+                                ? null
+                                : (
+                                  <Button size="sm" variant="outline" disabled={busy}
+                                    onClick={() => setBoardDraft({ key, title: it.name || it.sku || "", brief: "" })}>
+                                    {tl("order", "Send to board")}
+                                  </Button>
+                                )}
                         </div>
+                        {/* NAME IT BEFORE IT GOES. A marketplace title is a keyword list —
+                            "Custom Apron with Embroidered Name, Heavy Duty Cotton, Personalised
+                            Kitchen…" — and a board card wearing one is unreadable at the size a
+                            board is read at. The raw title is the default, not the only option,
+                            and the brief is written HERE because this is the moment the sender
+                            is looking at the artwork. */}
+                        {draft && (
+                          <div className="mt-2 space-y-2 rounded-lg border border-border p-3">
+                            <Input
+                              value={draft.title}
+                              onChange={(e) => setBoardDraft({ ...draft, title: e.target.value })}
+                              placeholder={tl("order", "Card name")}
+                            />
+                            <Textarea
+                              value={draft.brief}
+                              onChange={(e) => setBoardDraft({ ...draft, brief: e.target.value })}
+                              placeholder={tl("order", "What the designer needs to know")}
+                              rows={2}
+                            />
+                            <div className="flex gap-2">
+                              <Button size="sm" disabled={busy || !draft.title.trim()}
+                                onClick={() => void sendToBoard(it, side)}>
+                                {busy ? tl("order", "Sending…") : tl("order", "Send to board")}
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setBoardDraft(null)}>
+                                {tl("order", "Cancel")}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                         {/* WE MAY HAVE MADE THIS ALREADY. Shown, never acted on (§6) — and the
                             seller is never told whose it was, only that a file exists. */}
                         {hits && (
@@ -2531,7 +2590,7 @@ export default function OrderDetailPage() {
                             </div>
                             <div className="mt-2 flex gap-2">
                               <Button size="sm" variant="outline" disabled={busy}
-                                onClick={() => void sendToBoard(it, true)}>
+                                onClick={() => void sendToBoard(it, side, true)}>
                                 {tl("order", "Send anyway")}
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => setBoardReuse(null)}>
@@ -2542,6 +2601,7 @@ export default function OrderDetailPage() {
                         )}
                       </div>
                     )
+                    })
                   })}
                 </div>
               )}

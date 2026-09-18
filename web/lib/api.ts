@@ -3900,6 +3900,12 @@ export type DesignCard = {
    * back to the old flat `designer_payout` rather than being re-priced without anyone asking.
    */
   band?: "easy" | "standard" | "complex" | null
+  /** The FACE this card is for. Cards are one per face; a front and a back are two cards and
+   *  two jobs. Null is a card for the whole line, which predates faces and is still valid. */
+  side?: string | null
+  /** The card's own spec sheet. `description` is the designer's brief — the same field the
+   *  board's card editor patches. */
+  specs?: Record<string, unknown> | null
   pay_status?: string | null
   credited?: boolean // designer paid once on approval — guards against double-credit
   priority?: string | null

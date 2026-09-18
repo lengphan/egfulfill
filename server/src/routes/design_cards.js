@@ -975,8 +975,8 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
            (id, order_id, sku, design_id, title, col, type, product, priority, due,
             assignee, claimed_by, payment, pay_status, is_emb, emb_file_name, thumb,
             thumb_ref, files, specs, notes, history, checklist, vendor, vendor_ref, line_id,
-            claimed_id, band)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
+            claimed_id, band, side)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
          on conflict (id) do update set
            order_id=excluded.order_id, sku=excluded.sku, design_id=excluded.design_id,
            title=excluded.title, col=excluded.col, type=excluded.type, product=excluded.product,
@@ -987,6 +987,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
            notes=excluded.notes, history=excluded.history, checklist=excluded.checklist,
            vendor=excluded.vendor, vendor_ref=excluded.vendor_ref, line_id=excluded.line_id,
            claimed_id=excluded.claimed_id, band=excluded.band,
+           /* THE FACE. The column has existed since cards became per-surface and
+              /api/design_cards/new has always written it, but this upsert — the one every
+              "send to board" goes through — left it out of both lists, so a card sent from an
+              order was silently side-less however carefully the sender had named the face. */
+           side=excluded.side,
            updated_at=now()`,
         [c.id, c.order_id || null, c.sku || null, c.design_id || null, c.title || null,
          c.col || 'incoming', c.type || null, c.product || null, c.priority || 'normal', c.due || null,
@@ -1003,7 +1008,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
             state, and the next load would show it unbanded again with nothing having failed.
             Only the three known values; anything else is NULL, which means "not priced". */
          ['easy', 'standard', 'complex'].includes(String(c.band || '').toLowerCase())
-           ? String(c.band).toLowerCase() : null]
+           ? String(c.band).toLowerCase() : null,
+         /* Lower-cased like every other reader of a face name, so 'Front' and 'front' cannot
+            become two surfaces. Absent stays null — a card for the whole line is a real thing
+            and must not be forced onto a face. */
+         c.side ? String(c.side).toLowerCase() : null]
       );
     }
     // Cast explicitly. design_cards.id is bigint, but node-pg returns bigint as a STRING,

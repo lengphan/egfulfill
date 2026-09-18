@@ -57,15 +57,36 @@ export function boardArtworkFor(
 }
 
 /** Is this line already on the board? Line first, sku as the pre-line_id fallback. */
-export function onBoard(cards: DesignCard[] | undefined, orderId: string, it: OrderItem): DesignCard | undefined {
+export function onBoard(
+  cards: DesignCard[] | undefined,
+  orderId: string,
+  it: OrderItem,
+  /** Match a FACE when one is given. Omit to ask "is this line on the board at all". */
+  side?: string | null,
+): DesignCard | undefined {
+  const want = side ? String(side).toLowerCase() : null
   return (cards ?? []).find((c) =>
-    c.order_id === orderId && (it.line_id ? c.line_id === it.line_id : !c.line_id && c.sku === it.sku))
+    c.order_id === orderId
+    && (it.line_id ? c.line_id === it.line_id : !c.line_id && c.sku === it.sku)
+    && (want ? String(c.side || "").toLowerCase() === want : true))
 }
 
 export async function sendLineToBoard(
   order: { id: string; customer?: { name?: string | null } | null },
   it: OrderItem,
-  opts: { art: string; force?: boolean } ,
+  opts: {
+    art: string
+    force?: boolean
+    /** The FACE this card is for. Cards are one per face — sending a front and a back makes
+     *  two — and a line-wide card (no side) is still a real thing, so absent stays absent. */
+    side?: string | null
+    /** What the sender chose to call it, and what they want done. A marketplace title is a
+     *  keyword list ("Custom Apron with Embroidered Name, Heavy Duty Cotton, Personalised…"),
+     *  which is unreadable on a board card — so the sender can name it, and the raw title is
+     *  only the default. */
+    title?: string
+    brief?: string
+  },
 ): Promise<BoardSendResult> {
   const art = opts.art
   if (!art) return { status: "no-art" }
@@ -81,10 +102,18 @@ export async function sendLineToBoard(
 
   try {
     const cards = await getDesignCards().catch(() => [])
-    if (onBoard(cards ?? [], order.id, it)) return { status: "duplicate" }
+    /* PER FACE. A front and a back are two jobs a designer does separately, so the duplicate
+       check is scoped to the side as well — otherwise sending the back would report the front
+       already there and nothing would be created. */
+    if (onBoard(cards ?? [], order.id, it, opts.side)) return { status: "duplicate" }
     const card: DesignCard = {
       id: Date.now(), order_id: order.id, sku: it.sku || undefined, line_id: it.line_id,
-      title: it.name || it.sku || "Design", product: variantOf(it),
+      side: opts.side || undefined,
+      title: (opts.title || "").trim() || it.name || it.sku || "Design",
+      /* The brief lands at specs.description — the same field the board's own card editor
+         patches, so the two are one field rather than two that agree by luck. */
+      specs: opts.brief?.trim() ? { description: opts.brief.trim() } : undefined,
+      product: variantOf(it),
       /* The ARTWORK, not the listing photo — a designer needs to see the file they are
          digitising, not a product shot. */
       type: it.print_type || undefined, thumb: art || null,
