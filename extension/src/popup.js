@@ -217,16 +217,33 @@ function paint({ line, note = '', button = null, peek = 0 }) {
 function drawRows() {
   const ul = $('rows')
   ul.textContent = ''
-  const add = (title, detail) => {
+  /**
+   * THE ORDER NUMBER LEADS, because it is the thing being matched.
+   *
+   * The row used to be `buyer` over `item titles`, with the receipt number shown ONLY when
+   * there was no buyer name — so the one value a seller is checking against Etsy was the one
+   * value usually missing. It is an identifier, which makes it a VALUE and not a caption: it
+   * gets read digit by digit, so it carries the 14px step and tabular figures, while the name
+   * beside it is a label and stays at 12.
+   */
+  const add = (id, who, detail) => {
     const li = document.createElement('li')
-    const nm = document.createElement('div')
-    nm.className = 'nm'
-    nm.textContent = title
+    const head = document.createElement('div')
+    const num = document.createElement('span')
+    num.className = 'id'
+    num.textContent = '#' + id
+    head.appendChild(num)
+    if (who) {
+      const nm = document.createElement('span')
+      nm.className = 'who'
+      nm.textContent = who
+      head.appendChild(nm)
+    }
     const ad = document.createElement('div')
     ad.className = 'ad'
     ad.textContent = detail
     ad.title = detail                     // the full thing for the one that is truncated
-    li.append(nm, ad)
+    li.append(head, ad)
     ul.appendChild(li)
   }
   /* NEW ORDERS FIRST — they are the larger claim. "We are about to create this" deserves to
@@ -236,11 +253,21 @@ function drawRows() {
     /* THE ITEM NAMES, not a count. "2 items" is the shape of a row nobody can verify; the
        titles are what let a seller recognise the order as theirs at a glance — which is the
        entire reason this list can be opened. */
-    const names = r.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + i.name).join(' · ')
-    add(r.buyer || `Order ${r.order_id}`, names)
+    /* THE SKU AND THE VARIANT, not the title. Measured on this shop: the titles are
+       near-identical across orders ("Custom Apron with Name, Personalized Kitchen Apron,
+       Cafe Barista…"), so the line that gets clipped was the least distinguishing thing on
+       screen — two different orders read the same. The sku is short and the variant is what
+       actually differs, so both survive the truncation the title never did. Title stays as
+       the fallback for a line carrying neither, and the full text is still on hover. */
+    const names = r.items.map((i) => {
+      const qty = i.qty > 1 ? `${i.qty}× ` : ''
+      const label = i.sku || i.name
+      return qty + label + (i.variant ? ` · ${i.variant}` : '')
+    }).join('   ·   ')
+    add(r.order_id, r.buyer, names)
   }
   for (const r of ROWS) {
-    add(r.name || `Order ${r.order_id}`,
+    add(r.order_id, r.name,
       [r.street, r.street2, [r.city, r.state].filter(Boolean).join(' '), r.zip].filter(Boolean).join(', '))
   }
 }
