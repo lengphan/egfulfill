@@ -522,8 +522,20 @@ export function ImportOrdersDialog({
 
   const templateOutcome = useMemo(() => {
     if (!records || !templates) return null
-    // COUNTED PER TEMPLATE, not per row — one row can name five.
-    const typed = records.reduce((n, r) => n + (r._valid ? templateRefsOn(r as unknown as Record<string, unknown>).length : 0), 0)
+    /**
+     * BOTH NUMBERS IN THE SAME UNIT, which is the whole reason this read "3 of 2 lines".
+     *
+     * `typed` counted template REFERENCES — deliberately, because one row can name five —
+     * while `applied` comes back from applyTemplates counting LINES. A ratio of lines over
+     * references has no meaning, and the sentence around it called both of them lines, so it
+     * could and did print a numerator larger than its denominator.
+     *
+     * Lines on both sides: a row that names five templates is still one line being set up
+     * from a template, which is what the sentence is actually about. The five references are
+     * still each reported individually when one of them fails to match — that is what
+     * `unmatched` is for, and it was never the count's job.
+     */
+    const typed = records.filter((r) => r._valid && templateRefsOn(r as unknown as Record<string, unknown>).length > 0).length
     if (!typed) return null
     const r = applyTemplates(groupToOrders(records, resolveArtwork), templates)
     return { typed, applied: r.applied, unmatched: r.unmatched, ambiguous: r.ambiguous }
@@ -1080,7 +1092,15 @@ export function ImportOrdersDialog({
                     discarded, so the honest thing now is to say what it applied — and to
                     name anything it couldn't find while the sheet is still open and a typo
                     is one edit away. */}
-                {templateOutcome && (
+                {/* ONLY WHEN THERE IS SOMETHING TO SAY (owner, 2026-09-18).
+                    "3 of 3 lines will take their blank and artwork from a saved template" is
+                    the import reporting that it did the thing it was asked to do — a subtitle
+                    under a control, which §4 names as a defect, and two of them stacked above
+                    a table that already says OK on every row. What is NOT noise is a template
+                    id that matches nothing: that is a refusal carrying its reason, and it is
+                    the only thing in this dialog that catches a typo while the sheet is still
+                    open. So the all-clear goes and the problem stays. */}
+                {templateOutcome && (templateOutcome.unmatched.length > 0 || templateOutcome.ambiguous.length > 0 || templatesFailed) && (
                   <div className={"flex items-start gap-2 border-b border-border px-4 py-2 text-xs "
                     + (templateOutcome.unmatched.length || templateOutcome.ambiguous.length || templatesFailed
                       ? "bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
@@ -1102,7 +1122,8 @@ export function ImportOrdersDialog({
                 )}
                 {/* AND FOR THE ARTWORK REFERENCES, its own row for the same reason as the
                     stitch files below: a different library, a different column to go and fix. */}
-                {artworkOutcome && !artworkOutcome.pending && (
+                {/* Same rule, same reason — see the template row above. */}
+                {artworkOutcome && !artworkOutcome.pending && artworkOutcome.unknown.length > 0 && (
                   <div className={"flex items-start gap-2 border-b border-border px-4 py-2 text-xs "
                     + (artworkOutcome.unknown.length
                       ? "bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
@@ -1121,7 +1142,10 @@ export function ImportOrdersDialog({
                     joining the template one: they resolve against different libraries and
                     fail for different reasons, and one sentence covering both would have to
                     be vague about which column to go and fix. */}
-                {machineOutcome && (
+                {/* And the third one, on the same rule. Three all-clear bars stacked over a
+                    table whose every row already reads OK is the shape the owner pointed at;
+                    leaving one of the three behind would just make it look arbitrary. */}
+                {machineOutcome && (machineOutcome.unknown.length > 0 || machineOutcome.wrongMethod.length > 0 || machineOutcome.failed) && (
                   <div className={"flex items-start gap-2 border-b border-border px-4 py-2 text-xs "
                     + (machineOutcome.unknown.length || machineOutcome.wrongMethod.length || machineOutcome.failed
                       ? "bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
