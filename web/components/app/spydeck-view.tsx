@@ -772,6 +772,25 @@ export function SpyDeckView() {
   // so it must read as "more coming" and never as "still searching" — a spinner over a
   // full grid says the results you are looking at are not real yet.
  const [loadingMore, setLoadingMore] = useState(false)
+  /**
+   * GOING DEEPER IS A CLICK, AND THE SEARCH REMEMBERS ITSELF SO IT CAN BE ONE.
+   *
+   * A search fetched 400 at most and stopped, and when Etsy's first page came back short the
+   * continuation never fired at all — so "embroidered" could end at 96 listings with a pager
+   * reading Page 2 / 2, which is the grid claiming to have reached the end of Etsy.
+   *
+   * Depth is not free and the reason is written down at MAX_PAGES: the app keystring is OURS,
+   * shared by every seller, and ORDER SYNC spends the same daily allowance. So the default
+   * stays cheap and the extra pages are asked for deliberately, by someone who has looked at
+   * what came back and wants more of it.
+   *
+   * A BUTTON, NEVER AN EFFECT (CLAUDE.md §2.8). Incremental loading driven by a condition the
+   * fetch's own result can re-satisfy is the bug that took a machine down; a click cannot
+   * recur on its own. `exhausted` is set from the ONE thing that actually means the end —
+   * a request answering with fewer rows than it asked for — never from a page count.
+   */
+ const [lastShape, setLastShape] = useState<Record<string, unknown> | null>(null)
+ const [exhausted, setExhausted] = useState(false)
  const [error, setError] = useState<string | null>(null)
  const [searched, setSearched] = useState("")
  const [view, setView] = useState<"trending" | "search" | "saved" | "uploaded" | "account" | "stores">("trending")
@@ -1100,6 +1119,45 @@ export function SpyDeckView() {
   }, [entitled])
 
   // Client-side filters applied to whatever grid is shown.
+  /**
+   * ANOTHER BLOCK OF THE SAME SEARCH — on a click, from the end of what is already loaded.
+   *
+   * `offset` is the length of what we hold, so it continues rather than re-fetching, and the
+   * de-dupe on listing_id means an overlap at the seam adds nothing twice. It asks with the
+   * search's OWN shape (`lastShape`), not the current filter row: changing a category and
+   * pressing this would otherwise mix two searches into one grid.
+   *
+   * It cannot re-enter itself — there is no effect watching a length, and the guard is
+   * `loadingMore` rather than a derived condition. That is the §2.8 rule stated as code.
+   */
+ const loadMore = useCallback(async () => {
+ if (loadingMore || exhausted || !searched || !lastShape) return
+ const mine = runSeq.current
+ setLoadingMore(true)
+    try {
+ const have = results ?? []
+ const more = await searchEtsy(searched, { ...lastShape, pages: EXTRA_PAGES, offset: have.length })
+ const extra = more.results ?? []
+ if (runSeq.current !== mine) return           // a new search started while this was in flight
+ if (extra.length) {
+ setResults((prev) => {
+ const base = prev ?? []
+ const seen = new Set(base.map((x) => String(x.listing_id)))
+ return [...base, ...extra.filter((x) => !seen.has(String(x.listing_id)))]
+        })
+      }
+      /* THE END IS ETSY ANSWERING SHORT, and nothing else. Not "the page count stopped
+         growing" — under a filter that can be true while there is plenty left, which is the
+         exact shape of the loader that took a machine down. */
+ if (extra.length < PAGE_SIZE * EXTRA_PAGES) setExhausted(true)
+    } catch {
+      /* Leave `exhausted` alone: a failed call is not an empty Etsy, and the button should
+         still be there to press again. */
+    } finally {
+ setLoadingMore(false)
+    }
+  }, [loadingMore, exhausted, searched, lastShape, results])
+
  const applyClientFilters = useCallback((list: EtsyListing[]) => {
  const ms = Number(minSold) || 0
  const mf = Number(minFav) || 0
@@ -1232,6 +1290,12 @@ export function SpyDeckView() {
     // Claimed BEFORE the try so the catch can check it too: a failed run must not blank a
     // search that has already replaced it.
  const mine = ++runSeq.current
+    /* A NEW SEARCH HAS NOT RUN OUT — it has not started. Left over from the last one, this
+       would hide Load more on a query that has plenty left, and the failure is silent: the
+       grid simply looks shallower than Etsy is. Cleared at the TOP so an error on the way
+       down cannot leave the previous search's ceiling in place. */
+ setExhausted(false)
+ setLastShape(null)
  try {
  const sortMap: Record<string, { sort?: string; sortOrder?: string }> = {
  relevance: {}, newest: { sort: "created" }, price_asc: { sort: "price", sortOrder: "asc" }, price_desc: { sort: "price", sortOrder: "desc" },
@@ -1275,6 +1339,12 @@ export function SpyDeckView() {
  setResults(firstRows)
  setSearched(q)
  setLoading(false)
+      /* The shape this search was run with, kept so Load more can continue THIS query rather
+         than whatever the filter row happens to say by then — changing a filter and pressing
+         it would otherwise append rows from a different search into these results. */
+ setLastShape(shape)
+      /* A short first page is the end, said by Etsy rather than inferred. */
+ setExhausted(firstRows.length < PAGE_SIZE)
 
       // Nothing more to ask for when Etsy already returned a short page.
  if (firstRows.length >= PAGE_SIZE) {
@@ -1293,6 +1363,10 @@ export function SpyDeckView() {
  return [...base, ...extra.filter((x) => !seen.has(String(x.listing_id)))]
             })
           }
+          /* Fewer than asked for means Etsy has run out — the only honest end signal. A
+             failed call is NOT that, so the catch below leaves `exhausted` alone and the
+             button stays available to try again. */
+ if (runSeq.current === mine && extra.length < PAGE_SIZE * EXTRA_PAGES) setExhausted(true)
         } catch { /* the first page is a real result — a failed continuation must not erase it */ }
  finally { setLoadingMore(false) }
       }
@@ -1711,6 +1785,35 @@ export function SpyDeckView() {
               <CircleNotch size={12} className="mr-1 inline animate-spin" />
               {tl("spydeck", "Fetching more results…")}
             </p>
+          )}
+          {/**
+            * MORE OF ETSY, ON PURPOSE.
+            *
+            * The pager walks what is LOADED; this asks for more to load. Those are different
+            * questions and they were the same control, which is how "Page 2 / 2" came to mean
+            * "that is all Etsy has" when it only ever meant "that is all we fetched".
+            *
+            * Says how many are held, so the number the button is about is on screen beside it
+            * — and when Etsy has answered short it becomes a plain line saying so, rather than
+            * a control that looks pressable and does nothing.
+            */}
+          {searched && !loading && (results?.length ?? 0) > 0 && (
+            <div className="flex items-center justify-center gap-3 px-5 pb-3">
+              {exhausted ? (
+                <span className="text-xs text-muted-foreground">
+                  {tl("spydeck", "That is everything Etsy returned for this search")}
+                  <span className="text-muted-foreground/60"> · {(results?.length ?? 0).toLocaleString()}</span>
+                </span>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
+                  {loadingMore
+                    ? <><CircleNotch size={13} className="animate-spin" />{tl("spydeck", "Loading…")}</>
+                    : <>{tl("spydeck", "Load more results")}
+                        <span className="font-normal text-muted-foreground"> · {(results?.length ?? 0).toLocaleString()} {tl("spydeck", "so far")}</span>
+                      </>}
+                </Button>
+              )}
+            </div>
           )}
           <Pagination page={resultsPaged.page} pageCount={resultsPaged.pageCount} perPage={resultsPaged.perPage} total={resultsPaged.total} start={resultsPaged.start} onPage={resultsPaged.setPage} onPerPage={resultsPaged.setPerPage} perPageOptions={[24, 48, 96]} />
           </>
