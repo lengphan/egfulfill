@@ -1986,7 +1986,7 @@ export function SpyDeckView() {
           {loadingMore && (
             <p className="px-5 pb-3 text-center text-xs text-muted-foreground" role="status" aria-live="polite">
               <CircleNotch size={12} className="mr-1 inline animate-spin" />
-              {tl("spydeck", "Fetching more from Etsy…")}
+              {tl("spydeck", "Loading more from Etsy…")}
             </p>
           )}
           </>

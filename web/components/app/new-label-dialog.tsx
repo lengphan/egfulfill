@@ -554,7 +554,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  made this so hard to place. "Preparing…" is also simply the truth in the
  second before anything can happen. */}
             <div className="text-xs text-muted-foreground">
-              {printStage.at === "fetching" && tl("label", "Fetching the label…")}
+              {printStage.at === "fetching" && tl("label", "Loading the label…")}
               {printStage.at === "rendering" && tl("label", "Preparing the label…")}
               {printStage.at === "printing" && tl("label", "Opening the print dialog…")}
               {printStage.at === "done" && tl("label", "Sent to the printer.")}

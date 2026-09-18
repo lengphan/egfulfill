@@ -2817,7 +2817,7 @@ export function OrdersHub() {
  mark here that says something the word cannot, which is
  that the fetch is still running. */}
                                   {ttLabel === o.id && <CircleNotch size={14} className="animate-spin" />}
-                                  {ttLabel === o.id ? tl("ui", "Fetching…") : tl("ui", "TikTok label")}
+                                  {ttLabel === o.id ? tl("ui", "Loading…") : tl("ui", "TikTok label")}
                                 </DropdownMenuItem>
                               )}
                               {/* Only printable once a blank is chosen — the barcode is the

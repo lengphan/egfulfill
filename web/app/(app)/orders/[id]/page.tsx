@@ -3015,7 +3015,7 @@ export default function OrderDetailPage() {
                         {ttLabelBusy
                           ? <CircleNotch size={12} className="animate-spin" />
  : <FileArrowDown size={12} weight="bold" />}
-                        {ttLabelBusy ? "Fetching…" : "TikTok label"}
+                        {ttLabelBusy ? "Loading…" : "TikTok label"}
                       </button>
                       {/* TikTok's own wording, not a generic failure — the reason is usually
  actionable ("no package on TikTok yet"). */}
