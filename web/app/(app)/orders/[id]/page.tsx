@@ -427,6 +427,22 @@ export default function OrderDetailPage() {
    * each cost something — refusing a card with no artwork rather than failing silently, and
    * asking whether we have already made this file before spending a designer on it.
    */
+  /**
+   * WHAT THE FILES BADGE COUNTS — everything that tab lists, which is the only thing a badge
+   * may count.
+   *
+   * It counted `dfiles` alone: the machine and design files uploaded against the order. But
+   * the tab renders SellerDesignFiles, which lists the ARTWORK already on the order as well —
+   * so an order carrying a front and a back and no stitch file showed no badge at all while
+   * the tab underneath it was full. Exactly the drift the canvas's own Files badge had, from
+   * the same cause: the count names one source and the panel grew a second.
+   *
+   * Artwork is counted per FACE, because that is how the tab lists it — a front and a back are
+   * two things to look at, not one design with two halves.
+   */
+ const fileTabCount = dfiles.length
+    + Object.values(designSides).reduce((n, faces) => n + Object.keys(faces ?? {}).length, 0)
+
  const reloadBoard = useCallback(() => {
  if (!isStaff || !id) return
  getOrderDesignCards(String(id)).then((r) => setBoardCards(r ?? [])).catch(() => setBoardCards([]))
@@ -2013,7 +2029,7 @@ export default function OrderDetailPage() {
             onChange={goTab}
             items={[
               { id: "items" as const, label: "Items", count: items.length },
-              { id: "files" as const, label: "Files", count: dfiles.length || undefined },
+              { id: "files" as const, label: "Files", count: fileTabCount || undefined },
               /* STAFF ONLY. Sending work to a designer is factory business, and §6 is blunt
                  about the reason: a seller must never learn their design was used by another
                  seller, which is precisely what the reuse check on the way to the board
