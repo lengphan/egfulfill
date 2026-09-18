@@ -98,8 +98,9 @@ function estFor(l: EtsyListing) {
  return { totalSold, sold24, views24, revenue, trending }
 }
 
-/** Why every figure on a result card carries a `~`. Shown on hover; one sentence, because
- *  a person who is about to trust "$6.3K revenue" deserves to know where it came from. */
+/** Why the stat block is captioned "Estimated". Shown on hover — on the caption and on every
+ *  tile under it — as one sentence, because a person about to trust "$6.3K revenue" deserves
+ *  to know where it came from. */
 const EST_WHY = "Estimated from favourites and how long the listing has been up — Etsy's API does not report views, sales or revenue."
 
 // A labelled stat box — bold value on top, small label + time-window below.
@@ -108,12 +109,25 @@ const EST_WHY = "Estimated from favourites and how long the listing has been up 
 // four of the six boxes on a result card are arithmetic on favourites and age (see estFor).
 // They were printed as bare figures under the word "all time", which reads as a measurement
 // of history rather than a guess about it — and people quote a revenue figure they believe
-// is real. The `~` marks every derived value, and `title` carries the reason, which is where
-// CLAUDE.md §4 puts an explanation rather than in a sentence under the control.
+// is real.
+//
+// THE MARK MOVED, IT DID NOT GO (owner, 2026-09-18). It was a `~` on each of the four
+// figures, which is four hedges per card and four hundred on a screen, against a grid whose
+// entire job is comparing those figures. The block is captioned "Estimated" once instead, and
+// `est` still routes `title` onto every tile — so the claim is made where it is READ rather
+// than abbreviated where it is scanned, which is where CLAUDE.md §4 puts an explanation
+// anyway. `est` therefore still is not decoration: it is what carries the sentence.
 function StatBox({ label, sub, value, est, estTitle }: { label: string; sub?: string; value: string; est?: boolean; estTitle?: string }) {
  return (
     <div className="rounded-lg bg-muted/60 px-2 py-2 text-center leading-none" title={est ? estTitle : undefined}>
-      <div className="truncate text-base font-bold tabular-nums">{est ? "~" : ""}{value}</div>
+      {/* NO `~` ON THE FIGURE ANY MORE (owner, 2026-09-18). A tilde on all four numbers of
+          every card is eight characters of hedge per tile and 400 of them on a screen, and it
+          made the one thing the grid is for — comparing figures — harder to read than the
+          hedge was worth. The claim is not dropped, it MOVES: the block is captioned
+          "Estimated" once, and every tile still carries EST_WHY on its hover, which is the
+          full sentence about what these are derived from. Said once, where it is read, rather
+          than abbreviated four times where it is scanned. */}
+      <div className="truncate text-base font-bold tabular-nums">{value}</div>
       <div className="mt-1 text-2xs font-medium text-muted-foreground">
         {label}{sub ? <span className="text-muted-foreground/60"> · {sub}</span> : null}
       </div>
@@ -547,11 +561,23 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, opening
 
           {/* Estimate boxes — Views/Sold (24h) + Revenue/Sold (all time). Every one of the
               four is derived, never measured, and every one says so with a `~`. */}
-          <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+          {/* ATTENTION → CONVERSION → VOLUME → MONEY, and money last because it is the
+              conclusion the other three build to. Revenue used to sit third, between the two
+              "sold" figures, so the eye crossed a currency to get from one count to the
+              matching one and the two periods never lined up. Same order in the filter row
+              and the sort menu, so the card and the controls read the same way round. */}
+          <div className="mt-2.5 flex items-center justify-between">
+            {/* Plain, like the tile labels beside it — this card is memoised and sits outside
+                the translator's scope, and every other word in it is already literal. */}
+            <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground/70" title={EST_WHY}>
+              Estimated
+            </span>
+          </div>
+          <div className="mt-1 grid grid-cols-2 gap-1.5">
             <StatBox est estTitle={EST_WHY} label="Views" sub="24h" value={fmtK(e.views24)} />
             <StatBox est estTitle={EST_WHY} label="Sold" sub="24h" value={fmtK(e.sold24)} />
-            <StatBox est estTitle={EST_WHY} label="Revenue" sub="all time" value={moneyK(e.revenue)} />
             <StatBox est estTitle={EST_WHY} label="Sold" sub="all time" value={fmtK(e.totalSold)} />
+            <StatBox est estTitle={EST_WHY} label="Revenue" sub="all time" value={moneyK(e.revenue)} />
           </div>
 
           {/* Keyword tags (up to 13) — click to research the term, or copy them all. */}
@@ -1471,10 +1497,13 @@ export function SpyDeckView() {
                   <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="eg-select eg-control pr-8">
                     <option value="relevance">{tl("spydeck", "Relevance")}</option>
                     {/* Ranked from what has been fetched, not from Etsy — see CLIENT_SORTS. */}
-                    <option value="best">{tl("spydeck", "Est. best sellers")}</option>
-                    <option value="revenue">{tl("spydeck", "Est. revenue")}</option>
-                    <option value="views">{tl("spydeck", "Est. most viewed")}</option>
+                    {/* SAME FOUR, SAME ORDER, one label each. "Est." stays on the modelled
+                        ones: a sort is chosen from a closed list where four words cost
+                        nothing, and here it is the only place the word can appear at all. */}
+                    <option value="views">{tl("spydeck", "Est. views/day")}</option>
+                    <option value="best">{tl("spydeck", "Est. sold/day")}</option>
                     <option value="totalsold">{tl("spydeck", "Est. sold, all time")}</option>
+                    <option value="revenue">{tl("spydeck", "Est. revenue")}</option>
                     <option value="favorites">{tl("spydeck", "Most favorited")}</option>
                     <option value="newest">{tl("spydeck", "Newest")}</option>
                     <option value="price_asc">{tl("spydeck", "Price: low → high")}</option>
@@ -1487,24 +1516,33 @@ export function SpyDeckView() {
                 <FilterField label={tl("spydeck", "Max price ($)")}>
                   <Input value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={tl("spydeck", "Any")} className="h-9" inputMode="decimal" />
                 </FilterField>
-                <FilterField label={tl("spydeck", "Min sold/day")}>
-                  <Input value={minSold} onChange={(e) => setMinSold(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
-                </FilterField>
-                <FilterField label={tl("spydeck", "Min favorites")}>
-                  <Input value={minFav} onChange={(e) => setMinFav(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
-                </FilterField>
-                {/* THE REMAINING THREE TILES. `~` in the label, exactly as the card prints it:
-                    these are modelled from favourites, price and listing age, and a filter on
-                    an estimate must not read as a filter on a measurement. The hint carries the
-                    period so "Min sold" cannot be mistaken for the daily one above it. */}
-                <FilterField label={tl("spydeck", "Min ~views/day")}>
+                {/* THE FOUR MINIMUMS, IN THE CARD'S OWN ORDER — views, sold today, sold all
+                    time, revenue. The controls and the tiles are the same four figures, so
+                    reading down a card and reading along this row land in the same place;
+                    ordering them differently is how somebody types a number into the wrong
+                    box. `hint` carries the period rather than the label, so "Min sold" is not
+                    two different fields spelled the same way.
+
+                    NO `~` HERE EITHER. It is the same claim the card makes, and the card now
+                    makes it once, above the tiles. Repeating an abbreviation of it on every
+                    field would put more hedge in this row than there are numbers. */}
+                <FilterField label={tl("spydeck", "Min views")} hint={tl("spydeck", "per day")}>
                   <Input value={minViews} onChange={(e) => setMinViews(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
-                <FilterField label={tl("spydeck", "Min ~revenue ($)")} hint={tl("spydeck", "all time")}>
+                <FilterField label={tl("spydeck", "Min sold")} hint={tl("spydeck", "per day")}>
+                  <Input value={minSold} onChange={(e) => setMinSold(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
+                </FilterField>
+                <FilterField label={tl("spydeck", "Min sold")} hint={tl("spydeck", "all time")}>
+                  <Input value={minTotal} onChange={(e) => setMinTotal(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
+                </FilterField>
+                <FilterField label={tl("spydeck", "Min revenue ($)")} hint={tl("spydeck", "all time")}>
                   <Input value={minRevenue} onChange={(e) => setMinRevenue(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
-                <FilterField label={tl("spydeck", "Min ~sold")} hint={tl("spydeck", "all time")}>
-                  <Input value={minTotal} onChange={(e) => setMinTotal(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
+                {/* Favourites is the one REPORTED number Etsy gives us, and the only reason
+                    the four above can be estimated at all. It sits after them because it is
+                    the input, not the outcome. */}
+                <FilterField label={tl("spydeck", "Min favorites")}>
+                  <Input value={minFav} onChange={(e) => setMinFav(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
                 <FilterField label={tl("spydeck", "Listed within")}>
                   <select value={listedIn} onChange={(e) => setListedIn(e.target.value)} className="eg-select eg-control pr-8">
