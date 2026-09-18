@@ -865,11 +865,13 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // SAY WHY. Both of these are deliberate no-ops, and both used to return a bare flag the
     // client rendered as nothing — so "the assistant declined to answer" and "the assistant is
     // broken" looked identical on screen, which is exactly how this became undiagnosable.
-    // `reason` is for a human: toMessages() drops bodiless rows, so an image posted with no
-    // caption disappears from the model's view and the last turn it can see is our own reply.
+    // `reason` is for a human. It used to say "attachments without a caption are not
+    // readable, so add a line of text" — true when toMessages() dropped bodiless rows, and
+    // false since it stopped: an image posted on its own IS a user turn now, so it no longer
+    // trips this guard and telling someone to add a caption sent them to do busywork.
     if (!messages.length) return { ok: false, empty: true, reason: 'no readable messages in this thread yet' };
     if (messages[messages.length - 1].role !== 'user') {
-      return { ok: true, skipped: true, reason: 'the last thing in this thread is my own reply — attachments without a caption are not readable, so add a line of text' };
+      return { ok: true, skipped: true, reason: 'the last thing in this thread is my own reply, so there is nothing new to answer' };
     }
 
     let text = '';
@@ -918,11 +920,13 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     // SAY WHY. Both of these are deliberate no-ops, and both used to return a bare flag the
     // client rendered as nothing — so "the assistant declined to answer" and "the assistant is
     // broken" looked identical on screen, which is exactly how this became undiagnosable.
-    // `reason` is for a human: toMessages() drops bodiless rows, so an image posted with no
-    // caption disappears from the model's view and the last turn it can see is our own reply.
+    // `reason` is for a human. It used to say "attachments without a caption are not
+    // readable, so add a line of text" — true when toMessages() dropped bodiless rows, and
+    // false since it stopped: an image posted on its own IS a user turn now, so it no longer
+    // trips this guard and telling someone to add a caption sent them to do busywork.
     if (!messages.length) return { ok: false, empty: true, reason: 'no readable messages in this thread yet' };
     if (messages[messages.length - 1].role !== 'user') {
-      return { ok: true, skipped: true, reason: 'the last thing in this thread is my own reply — attachments without a caption are not readable, so add a line of text' };
+      return { ok: true, skipped: true, reason: 'the last thing in this thread is my own reply, so there is nothing new to answer' };
     }
     const notes = noteRows.rows.map((r) => String(r.body || '').trim()).filter(Boolean);
     const system = DESK_SYSTEM + (notes.length

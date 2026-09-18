@@ -100,7 +100,13 @@ export default function ChatPage() {
  const [office, setOffice] = useState<SupportAvailability | null>(null)
  const [hoursOpen, setHoursOpen] = useState(false)  // staff: support-hours editor dialog
  const [emojiOpen, setEmojiOpen] = useState(false)  // composer emoji picker
- const [pendingAtt, setPendingAtt] = useState<ChatAttachment | null>(null)  // staged attachment
+  /* A LIST, NOT A SLOT. Picking a second file used to overwrite the first, silently — the
+     thumbnail swapped and the earlier upload was simply gone. Every chat people know stacks
+     them, so this stacks them: pick again and it appends.
+     Capped at the same 8 the assistant will actually look at (support_ai.js MAX_IMAGES), so
+     the composer never accepts a tenth picture the model is going to drop. */
+ const MAX_PENDING = 8
+ const [pendingAtts, setPendingAtts] = useState<ChatAttachment[]>([])  // staged attachments
 
   /*
    * WHAT A FOLLOW-UP CONTINUES FROM.
@@ -353,17 +359,36 @@ export default function ChatPage() {
     })
   }
   // Pick + upload an attachment (image downsized first). Held as `pendingAtt` until send.
- const onAttach = async (file: File | undefined) => {
- if (!file) return
- if (file.size > MAX_ATTACHMENT_BYTES) { setAiNote("That file is over 25MB — pick a smaller one."); return }
+ const onAttach = async (files: FileList | null) => {
+ const picked = Array.from(files || [])
+ if (!picked.length) return
+    /* ROOM FIRST, so we never upload bytes we are about to refuse. */
+ const room = MAX_PENDING - pendingAtts.length
+ if (room <= 0) { setAiNote(`You can attach ${MAX_PENDING} files at a time.`); return }
+ const take = picked.slice(0, room)
+ const tooMany = picked.length - take.length
  setAttaching(true); setAiNote(null)
+ try {
+ const done: ChatAttachment[] = []
+ const failed: string[] = []
+ for (const file of take) {
+ if (file.size > MAX_ATTACHMENT_BYTES) { failed.push(`${file.name} is over 25MB`); continue }
  try {
  const dataUrl = await fileToUploadUrl(file)
  const r = await uploadChatAttachment(dataUrl, file.name)
  if (r.error || !r.url) throw new Error(r.error || "Upload failed")
- setPendingAtt({ url: r.url, name: r.name || file.name, mime: r.mime, size: r.size })
-    } catch (e) {
- setAiNote(e instanceof Error ? e.message : "Couldn't attach that file.")
+ done.push({ url: r.url, name: r.name || file.name, mime: r.mime, size: r.size })
+        } catch { failed.push(file.name) }
+      }
+      /* APPEND. Functional, because several uploads finish against a list that has moved. */
+ if (done.length) setPendingAtts((prev) => [...prev, ...done].slice(0, MAX_PENDING))
+      /* SAY WHICH ONE FAILED. "Couldn't attach that file" on a pick of five names none of
+         them, and the rest DID attach — so a silent partial success looked like a total one. */
+ const notes = [
+        failed.length ? `Couldn't attach ${failed.join(", ")}.` : "",
+        tooMany > 0 ? `${MAX_PENDING} files at a time — ${tooMany} not added.` : "",
+      ].filter(Boolean)
+ if (notes.length) setAiNote(notes.join(" "))
     } finally { setAttaching(false); if (attachRef.current) attachRef.current.value = "" }
   }
 
@@ -404,8 +429,7 @@ export default function ChatPage() {
  e.preventDefault()
  dragDepth.current = 0; setDragging(false)
  if (signedOut || !activeId || readOnly) return
- const file = e.dataTransfer.files?.[0]
- if (file) void onAttach(file)
+ if (e.dataTransfer.files?.length) void onAttach(e.dataTransfer.files)
   }
 
   // Insert an emoji at the caret (or replacing a selection), then refocus after it.
@@ -543,7 +567,7 @@ export default function ChatPage() {
  if (!gen || !text) return
  setSending(true); setAiNote(null)
  try {
- const attached = attachedImageName(pendingAtt)
+ const attached = attachedImageName(pendingAtts[0] ?? null)   // generation borrows the FIRST
  if (gen.mode === "image") {
         /*
          * WHAT THE MODEL ACTUALLY SEES. An attachment staged in the composer is the most
@@ -568,7 +592,7 @@ export default function ChatPage() {
  setAiNote(r.error || "That didn't work.")
  return
         }
- setInput(""); setPendingAtt(null)
+ setInput(""); setPendingAtts([])
         // Back to auto: the render that just landed is the newest picture in the thread, so
         // the next prompt continues from IT. A ✕ applies to the render it was pressed for,
         // not to the rest of the session.
@@ -592,7 +616,7 @@ export default function ChatPage() {
  if (!r.ok || !r.jobId) { setInput(text); setAiNote(r.error || "That didn't work."); return }
         // Consumed — it is in the job now, and leaving it staged would silently ride along
         // on whatever is generated next.
- setInput(""); setPendingAtt(null)
+ setInput(""); setPendingAtts([])
  setVideoAt(nowMs())
         // Matches the server's 12-minute abandon ceiling, plus slack for the upload.
  setTimeout(() => setVideoAt(null), 13 * 60 * 1000)
@@ -613,19 +637,39 @@ export default function ChatPage() {
     // generation always needs words even though a plain message doesn't.
  if (gen) { await generateFromComposer(text); return }
     // A message may be just an attachment (no text), so allow either.
- if ((!text && !pendingAtt) || !activeId || sending) return
+ if ((!text && !pendingAtts.length) || !activeId || sending) return
  setSending(true)
  setInput(""); setMention(null)
- const att = pendingAtt; setPendingAtt(null)
+ const atts = pendingAtts; setPendingAtts([])
  const clientId = `c-${cidBase.current}-${cidSeq.current++}`
     // Staff post as 'staff' ONLY when answering SOMEONE ELSE's support thread — that's what
     // lets the seller see a named teammate replied. But on their OWN "Ask EGFUL" thread
     // the staffer is the ASKER, so they post as 'seller'; otherwise the AI mapper reads it as
     // an assistant turn and never answers (the regression this fixes).
  const myRole = (isStaffUser && activeId !== supportId) ? "staff" : "seller"
- setMessages((prev) => [...(prev ?? []), { id: clientId, role: myRole, by: myName, text, ts: nowMs(), attachment: att ?? undefined }])
+    /*
+     * ONE ROW PER FILE, AND THE QUESTION GOES LAST.
+     *
+     * `order_messages.attachment` holds ONE object, and every reader in the app, the boards
+     * and the phone is written against that shape — so several pictures are several rows
+     * rather than a column change that would need all of them rewritten at once.
+     *
+     * The text rides on the LAST row so the transcript reads pictures-then-question, which
+     * is the order the model is given them in (support_ai.js puts the image before its
+     * caption) and the order the sentence assumes when it says "these".
+     */
+ const rows = atts.length
+      ? atts.map((a, i) => ({ text: i === atts.length - 1 ? text : "", attachment: a }))
+      : [{ text, attachment: null as ChatAttachment | null }]
+ setMessages((prev) => [...(prev ?? []), ...rows.map((r, i) => ({
+ id: `${clientId}-${i}`, role: myRole, by: myName, text: r.text, ts: nowMs(), attachment: r.attachment ?? undefined,
+    }))])
  try {
- await postOrderMessage(activeId, text, { clientId, by: myName, role: myRole, attachment: att })
+ for (let i = 0; i < rows.length; i++) {
+        /* Sequential, not Promise.all: the thread is ordered by insert and a race would
+           scramble the pictures relative to the question that refers to them. */
+ await postOrderMessage(activeId, rows[i].text, { clientId: `${clientId}-${i}`, by: myName, role: myRole, attachment: rows[i].attachment })
+      }
  await load()
       /**
        * ANSWERED — so the badge goes now, not at the next poll.
@@ -1145,12 +1189,6 @@ export default function ChatPage() {
                 * version of the same message. Not a control and not prose under one: it is a
                 * state of the conversation, which is the one thing this column is for.
                 */}
-              {isSupport && !aiTyping && !streaming && messages && messages.length > 0
-                && (messages[messages.length - 1].me ?? messages[messages.length - 1].role === "seller") && (
-                <div className="mx-auto max-w-sm px-3 text-center text-xs text-muted-foreground">
-                  {tl("chat", "Sent — a representative will reply here. Keep typing if there is more.")}
-                </div>
-              )}
               {/* SAID BEFORE THE PRESS, while the composer is armed to generate.
                   JPEG is the only format this API returns and it has no alpha, so a prompt
  asking for a removed background does not fail — it comes back with a grey
@@ -1231,7 +1269,7 @@ export default function ChatPage() {
  complaint this whole change came from. Not drawn when the composer already has
  an attachment, because that thumbnail is right underneath and saying it twice
  would imply two pictures are going. */}
-            {carried && !pendingAtt && (
+            {carried && !pendingAtts.length && (
               <div className="flex items-center gap-2 p-2 pb-0">
                 <div className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1247,25 +1285,31 @@ export default function ChatPage() {
                 <span className="text-2xs text-muted-foreground">{tl("chat", "editing this")}</span>
               </div>
             )}
-            {pendingAtt && (
+            {pendingAtts.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 pb-0">
-                <div className="group relative">
-                  {pendingAtt.mime?.startsWith("image/") ? (
+                {/* Keyed by URL: the upload route mints a unique name per file, so it is the
+                    stable identity here — an index key would move the × onto the wrong
+                    thumbnail the moment one is removed. */}
+                {pendingAtts.map((att) => (
+                <div className="group relative" key={att.url}>
+                  {att.mime?.startsWith("image/") ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={pendingAtt.url} alt={pendingAtt.name} className="size-16 rounded-lg border border-border object-cover" />
+                    <img src={att.url} alt={att.name} className="size-16 rounded-lg border border-border object-cover" />
                   ) : (
                     <div className="flex size-16 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted/50 px-1">
                       <FileText size={18} weight="duotone" className="text-muted-foreground" />
-                      <span className="w-full truncate text-center text-2xs text-muted-foreground">{pendingAtt.name}</span>
+                      <span className="w-full truncate text-center text-2xs text-muted-foreground">{att.name}</span>
                     </div>
                   )}
                   <button
- onClick={() => setPendingAtt(null)} aria-label={tl("chat", "Remove attachment")}
+ onClick={() => setPendingAtts((prev) => prev.filter((x) => x.url !== att.url))}
+ aria-label={tl("chat", "Remove attachment")}
  className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background transition-colors hover:bg-foreground"
                   >
                     <X size={11} weight="bold" />
                   </button>
                 </div>
+                ))}
                 {/* Named, not "used as a reference" for both — a still that will be animated
  and a reference the image borrows from are different jobs, and the armed
  mode is what decides which one this picture is about to do. An explicitly
@@ -1358,7 +1402,7 @@ export default function ChatPage() {
  autoArm={false}
                 />
               )}
-              <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />
+              <input ref={attachRef} type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files)} />
               <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={() => attachRef.current?.click()}
  disabled={signedOut || !activeId || readOnly || attaching} aria-label={tl("chat", "Attach a file")}>
                 {attaching ? <CircleNotch size={16} className="animate-spin" /> : <Paperclip size={17} />}
@@ -1406,7 +1450,7 @@ export default function ChatPage() {
  size={gen ? "sm" : "icon"}
  className={gen ? "h-9 shrink-0 gap-1.5 rounded-lg px-3" : "size-9 rounded-full"}
  onClick={send}
- disabled={signedOut || !activeId || readOnly || (!input.trim() && !(pendingAtt && !gen)) || sending}
+ disabled={signedOut || !activeId || readOnly || (!input.trim() && !(pendingAtts.length && !gen)) || sending}
               >
                 {sending && gen ? <CircleNotch size={15} className="animate-spin" />
  : gen ? (gen.mode === "image" ? <ImageSquare size={15} weight="fill" /> : <FilmSlate size={15} weight="fill" />)
