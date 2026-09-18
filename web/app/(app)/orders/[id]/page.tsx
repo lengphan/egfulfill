@@ -1296,8 +1296,20 @@ export default function OrderDetailPage() {
                                   /* Every surface, the included one first — it is the face the
                                      base cost already paid for and so belongs at the top of the
                                      list, not missing from it. */
+                                  /**
+                                   * EVERY FACE IS CHARGED (owner, 2026-09-18), so there is no
+                                   * free face to name and no rule to explain beside it.
+                                   *
+                                   * `inc` IS STILL READ, and must be: a CHARGED line's stamp
+                                   * carries the face that was inside the blank when it was
+                                   * billed. Dropping the row would rewrite what somebody was
+                                   * told they paid — "recorded history never changes silently".
+                                   * A live quote sets no `included`, so the row simply stops
+                                   * appearing on everything priced from here on.
+                                   */
                                   const faceRows: { face: string; method: string; amount: number }[] = [
-                                    ...(inc ? [{ face: inc, method: incMethod || lineMethod, amount: 0 }] : []),
+                                    ...(inc && !parts.some((pt) => pt.face === inc)
+                                      ? [{ face: inc, method: incMethod || lineMethod, amount: 0 }] : []),
                                     ...parts.map((pt) => ({ face: pt.face, method: pt.method || lineMethod, amount: pt.amount })),
                                   ]
                                   /* WHERE THE SURCHARGE LANDS. The first face whose technique IS

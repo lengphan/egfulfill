@@ -437,14 +437,22 @@ export function sideRates(fees, d) {
 
 function sideDetail(faces, fees, d) {
   /**
-   * ONE FACE IS INCLUDED, the rest are charged — and WHICH one is included has to be
-   * deterministic or the same line prices two ways.
+   * EVERY FACE IS CHARGED (owner, 2026-09-18). One used to be inside the blank's price.
    *
-   * PRICED_SIDES order decides it, so the front is the free one wherever a line has a front,
-   * and a back-only line is charged nothing extra exactly as it was before. The alternative —
-   * "the first one recorded" — is order_designs insertion order, which is when somebody
-   * happened to upload, not a fact about the garment. That is the same bug the shipping rate
-   * had when it took lines[0].
+   * The exception was defensible and it cost more than it saved: the summary had to name a
+   * face at zero and then explain WHY — a pricing rule nobody can infer from a list of the
+   * others — and margin on a line could not be read off its own rows without knowing which
+   * surface was the free one. One rule reconciles against the order page and against profit
+   * without a footnote.
+   *
+   * WHAT THIS CHANGES: a one-face line now carries a surface charge where it carried none.
+   * Charged orders are untouched — unit_cost and cost_parts are stamped at submit and this
+   * never re-reads them — so history keeps the price it was billed at, which is the only
+   * behaviour §"recorded history never changes silently" allows.
+   *
+   * PRICED_SIDES order still decides the ORDER of the parts, so a breakdown lists faces the
+   * same way every time rather than in order_designs insertion order — which is when somebody
+   * happened to upload, not a fact about the garment.
    *
    * A per-product `sidePrice` still overrides everything, and a MAP overrides per face — the
    * number stays valid and means "every face", which is what every product carries today.
@@ -462,7 +470,7 @@ function sideDetail(faces, fees, d) {
   for (const f of pairs) if (f.method && !methodOf.has(f.side)) methodOf.set(f.side, f.method);
   const list = pairs.map((f) => f.side);
   const uniq = [...new Set(list)];
-  if (uniq.length < 2) return null;
+  if (!uniq.length) return null;
   const ordered = uniq.slice().sort((a, b) => {
     const ia = PRICED_SIDES.indexOf(a); const ib = PRICED_SIDES.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
@@ -472,23 +480,18 @@ function sideDetail(faces, fees, d) {
   const ownMap = own && typeof own === 'object' ? own : null;
   const flat = (ownFlat != null && ownFlat > 0 ? ownFlat : num(fees && fees.method_side)) || 0;
   const parts = [];
-  // ordered[0] is included in the base — charge everything after it.
-  for (const face of ordered.slice(1)) {
+  // EVERY face is charged — see the note at the top of this function.
+  for (const face of ordered) {
     const rate = faceRate(face, ownMap, flat, fees);
     /* The face's own technique when it has one, else null — NOT the line's. A face that says
        nothing inherits, and the caller already knows the line's method; filling it in here
        would make an inherited face indistinguishable from one somebody chose. */
     if (rate > 0) parts.push({ face, amount: money(rate), method: methodOf.get(face) || null });
   }
-  /* THE INCLUDED FACE IS NAMED TOO, at zero. A breakdown listing only what was charged
-     leaves "why is the front not here" unanswered, and the answer — one face is in the base
-     cost — is a pricing rule nobody can infer from a list of the others. */
-  return {
-    included: ordered[0],
-    includedMethod: methodOf.get(ordered[0]) || null,
-    parts,
-    total: money(parts.reduce((n, p) => n + p.amount, 0)),
-  };
+  /* NO INCLUDED FACE ANY MORE, so none is named. `included` stays absent rather than null-ed
+     out of habit: a CHARGED order's stamp still carries the face it had, and the summary reads
+     the stamp for those — what somebody was billed does not change because the rule did. */
+  return { parts, total: money(parts.reduce((n, p) => n + p.amount, 0)) };
 }
 
 /** The total, which is what a PRICE needs. Unchanged shape for every existing caller. */
@@ -507,7 +510,10 @@ export function sideAddOn(faces, fees, d) {
  */
 export function sideBreakdown(faces, fees, d) {
   const r = sideDetail(faces, fees, d);
-  return r ? { included: r.included, includedMethod: r.includedMethod, parts: r.parts }
+  /* `included` is UNDEFINED on a live breakdown now — no face is. It is still a field on the
+     shape because a CHARGED line's stamp carries the face it had when it was billed, and the
+     summary renders that one from the stamp; a live quote simply never sets it. */
+  return r ? { included: r.included ?? null, includedMethod: r.includedMethod ?? null, parts: r.parts }
            : { included: null, includedMethod: null, parts: [] };
 }
 

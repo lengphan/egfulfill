@@ -2143,7 +2143,7 @@ function PlatformPanel() {
             />
           </div>
           <p className="mb-2 mt-4 text-xs text-muted-foreground">
-            {tl("settings", "One face is included in the base. Set a face to charge it its own rate instead of the figure above; leave it blank to use that figure.")}
+            {tl("settings", "Every printed face is charged. Set a face to charge it its own rate instead of the figure above; leave it blank to use that figure.")}
           </p>
           <div className="grid gap-4 sm:grid-cols-4 lg:grid-cols-8">
             {ALL_SIDES.map((face) => (
