@@ -2423,7 +2423,15 @@ export function ProductEditorDialog({
                       </label>
                       {/* Only where it can be charged. A price on a face this blank does not
                           offer is a number that can never apply — pricing.js would never read
-                          it — so it is not a field, it is a question nobody asked. */}
+                          it — so it is not a field, it is a question nobody asked.
+
+                          WHAT TO PUT HERE, now that no face is free: the charge for printing
+                          THIS face, margin included. The base cost used to carry that margin
+                          because one face came with it; on a product priced under the old rule
+                          the honest starting figure is (base cost − blank price) for one face.
+                          Left empty it falls back to the flat rate below, then to Settings —
+                          which on a product whose margin still sits in the base cost means
+                          selling the print for the platform default. */}
                       {offered && (
                         <div className="flex items-center gap-1.5">
                           <span className="shrink-0 text-2xs text-muted-foreground">+</span>
@@ -2440,7 +2448,7 @@ export function ProductEditorDialog({
                                "this one charges the default" rather than "this one is free" —
                                the same precedence sideAddOn applies. */
                             placeholder={sideOv ? sideOv : tl("product", "default")}
-                            aria-label={`${tl("product", "Extra charge for the")} ${sd}`}
+                            aria-label={`${tl("product", "Charge for printing the")} ${sd}`}
                             className="h-7 px-2 text-right text-xs tabular-nums"
                           />
                         </div>
@@ -2512,14 +2520,44 @@ export function ProductEditorDialog({
                 the DEFAULT the Placement tiles fall back to: a face with its own number uses
                 that, a face without one uses this, and a product with neither uses Settings.
                 Its own row now, under the methods it is not a member of. */}
+            {/**
+              * WHAT THE OLD BASE COST WAS HIDING.
+              *
+              * One face used to be inside the base cost, so a product priced under that rule
+              * carries its whole print margin there — the gap between what the garment costs
+              * undecorated and what it sells for decorated. Now that every face is charged,
+              * that gap is what a placement should cost, and nobody can be expected to work it
+              * out per product by subtracting two columns in another tab.
+              *
+              * A SUGGESTION, NOT AN AUTOFILL. It is arithmetic on figures somebody else set
+              * under a rule that has changed, and typing it in silently would reprice the
+              * product without a decision. The first size is used because pricing.js falls
+              * back to it for any size left blank — same figure, same precedence.
+              */}
+            {(() => {
+              const first = Object.values(tiers).find((t) => Number(t.price) > 0 && Number(t.blank) > 0)
+              const gap = first ? Number(first.price) - Number(first.blank) : 0
+              if (!(gap > 0)) return null
+              return (
+                <p className="pt-1 text-2xs text-muted-foreground">
+                  {tl("product", "This product's base cost sits")} <span className="tabular-nums text-foreground">${gap.toFixed(2)}</span>{" "}
+                  {tl("product", "above its blank price — that gap is the print, and it is what a placement is worth now that no face is free.")}
+                </p>
+              )
+            })()}
             <label className="flex items-center gap-2 pt-1">
-              <span className="shrink-0 text-xs text-muted-foreground">{tl("product", "Each additional placement")}</span>
+              {/* "EACH PLACEMENT", not "each ADDITIONAL" (owner, 2026-09-18). One face used to be
+                  inside the base cost and this was the charge for the ones after it. Every face
+                  is charged now, so "additional" describes a rule that no longer exists — and
+                  on a one-face product it read as a number that would never apply, when in fact
+                  it is the only surface charge that line will ever carry. */}
+              <span className="shrink-0 text-xs text-muted-foreground">{tl("product", "Each placement")}</span>
               <Input
                 value={sideOv}
                 onChange={(e) => setSideOv(e.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder={`$${(Number(fees?.method_side) || 0).toFixed(2)}`}
                 inputMode="decimal"
-                aria-label={tl("product", "Extra placement charge for this product")}
+                aria-label={tl("product", "Placement charge for this product")}
                 className="h-8 w-24 text-right text-xs tabular-nums"
               />
               {/* WHAT IT DOES NOT COVER, in one clause — the tiles above can each carry

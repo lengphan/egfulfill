@@ -2012,6 +2012,11 @@ const vi: Dict = {
   "designMaker.Added text lands in the middle of the print area. Select it on the canvas to change the words, size and colour — the controls are on the right, with the rest of the layer.": "Chữ vừa thêm sẽ nằm giữa vùng in. Chọn nó trên khung vẽ để đổi nội dung, cỡ và màu — các tuỳ chỉnh nằm bên phải, cùng với phần còn lại của lớp.",
 
   // ── Product editor (staff) ────────────────────────────────────────────────
+  "product.above its blank price — that gap is the print, and it is what a placement is worth now that no face is free.": "so với giá phôi — phần chênh đó chính là chi phí in, và là mức một vị trí in đáng giá khi không còn mặt nào miễn phí.",
+  "product.This product's base cost sits": "Giá gốc của sản phẩm này cao hơn",
+  "product.Charge for printing the": "Phí in mặt",
+  "product.Placement charge for this product": "Phí vị trí in cho sản phẩm này",
+  "product.Each placement": "Mỗi vị trí in",
   "product.Gildan, Bella+Canvas…": "Gildan, Bella+Canvas…",
   "product.S&S Activewear, a local shop, Alibaba…": "S&S Activewear, một cửa hàng địa phương, Alibaba…",
   "product.Heavyweight Hoodie": "Áo hoodie dày",
