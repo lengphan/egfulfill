@@ -5,9 +5,10 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, CheckCircle, Storefront, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
+import { MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, CheckCircle, Storefront, CircleNotch, Package, Trash, FunnelSimple, User as UserIcon } from "@phosphor-icons/react"
 import { ThumbFill } from "@/components/app/thumb"
 import { TabBar } from "@/components/app/tab-bar"
+import { EmptyState } from "@/components/app/empty-state"
 import { SearchField } from "@/components/app/search-field"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -1284,6 +1285,10 @@ export function SpyDeckView() {
    * decides whether any of this is worth saying: with nothing filtering, loaded and shown are
    * the same number and printing both twice is noise.
    */
+  /** Is anything in the narrow group set? Read by the pre-search state, which has no results
+   *  of its own to compare and so cannot use `narrowed`. */
+ const narrowFiltersOn = !!(minViews || maxViews || minSold || maxSold || minTotal || maxTotal
+    || minRevenue || maxRevenue || minFav || maxFav || listedIn)
  const narrowed = useMemo(() => {
  const total = results?.length ?? 0
  const shown = resultsList.length
@@ -1916,6 +1921,24 @@ export function SpyDeckView() {
             </span>
             <div className="font-medium">{tl("spydeck", "Research the competition")}</div>
             <div className="max-w-xs text-sm text-muted-foreground">{tl("spydeck", "Search any keyword to spy live Etsy listings — price, views and favorites, with the standouts flagged")} <span className="font-medium text-rose-600">{tl("spydeck", "Trending")}</span>{tl("spydeck", ". Heart the winners to save them.")}</div>
+            {/**
+              * A BAND WITH NO SEARCH IS A REASONABLE THING TO WANT AND A DEAD END HERE, so it
+              * gets pointed somewhere it works instead of sitting on a blank tab.
+              *
+              * "Show me everything on Etsy doing 15 a day" cannot be asked: Etsy reports no
+              * sales, so that figure is OUR estimate from favourites and listing age, and
+              * there is no parameter to send. Nothing to search means nothing to narrow.
+              *
+              * Trending is the version that does exist — a keyword-free pool built daily
+              * across rotating niches and ranked by that same estimate — and these bands
+              * already filter it, which is why this is one button rather than a feature.
+              */}
+            {narrowFiltersOn && (
+              <Button size="sm" variant="outline" onClick={() => setView("trending")}>
+                <TrendUp size={14} weight="bold" />
+                {tl("spydeck", "Apply these to Trending instead")}
+              </Button>
+            )}
           </div>
         ) : loading ? (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1925,6 +1948,34 @@ export function SpyDeckView() {
           </div>
         ) : results.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">{tl("spydeck", "No listings found. Try another keyword.")}</div>
+        ) : resultsList.length === 0 ? (
+          /**
+           * ETSY FOUND PLENTY — THE FILTERS HID ALL OF IT, and the grid was saying neither.
+           *
+           * The guard above reads `results`, the UNFILTERED list, so 400 loaded made it false
+           * and the page fell through to a grid mapping an empty array: a blank rectangle
+           * under a working search. §4 forbids exactly that — "no empty state that looks
+           * identical to a broken feature; if a thing can't be read versus doesn't exist, say
+           * which" — and here it was the third case, neither, which reads as the worst of the
+           * two.
+           *
+           * The numbers are the answer, so they are the line: 400 came back, none of them
+           * clear the band you set. The way out is the same Clear the narrow group carries,
+           * because being told what happened without being able to undo it is half an answer.
+           */
+          <EmptyState
+            icon={FunnelSimple}
+            title={`${narrowed.total.toLocaleString()} ${tl("spydeck", "listings loaded, none match your filters")}`}
+            note={tl("spydeck", "Widen a range — or clear them and look at everything that came back.")}
+            action={(
+              <Button size="sm" variant="outline" onClick={() => {
+                setMinViews(""); setMinSold(""); setMinTotal(""); setMinRevenue(""); setMinFav(""); setListedIn("")
+                setMaxViews(""); setMaxSold(""); setMaxTotal(""); setMaxRevenue(""); setMaxFav("")
+              }}>
+                {tl("spydeck", "Clear filters")}
+              </Button>
+            )}
+          />
         ) : (
           <>
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
