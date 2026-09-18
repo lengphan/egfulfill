@@ -694,6 +694,29 @@ const CLIENT_SORTS: Record<string, (l: EtsyListing) => number> = {
 
 const PAGE_SIZE = 100
 const EXTRA_PAGES = 3
+/**
+ * WHAT ONE "LOAD MORE" FETCHES — five pages, 500 listings (owner, 2026-09-18).
+ *
+ * Deliberately NOT the same number as EXTRA_PAGES, and the split is the point. The automatic
+ * continuation runs on EVERY search whether anyone wanted depth or not, so it stays at three;
+ * this one only runs when somebody has looked at the grid and asked for more, so it can be
+ * the largest a single request is allowed to be.
+ *
+ * FIVE IS THE SERVER'S OWN CEILING — MAX_PAGES in routes/etsy.js — so this asks for exactly
+ * as much as one call can carry and no more. Above it the clamp would hand back five anyway,
+ * and a number that is quietly trimmed is worse than one that admits its limit.
+ */
+const MORE_PAGES = 5
+/**
+ * AND ETSY'S OWN FLOOR UNDER ALL OF IT: `offset` maxes out at 50,000 on the v3 listing
+ * endpoints (limit maxes at 100, which is why PAGE_SIZE is what it is).
+ *
+ * So depth is bounded by Etsy long before it is bounded by patience — about a hundred
+ * presses. Checked here rather than discovered as an error halfway down a research session:
+ * past the cap the button stops and says the search is finished, which is true, instead of
+ * failing and inviting another press.
+ */
+const ETSY_MAX_OFFSET = 50000
 
 // Curated popular POD niches for the discovery cloud (before a search). Weight = heat.
 const SEED_NICHES: { text: string; weight: number }[] = [
@@ -1132,11 +1155,12 @@ export function SpyDeckView() {
    */
  const loadMore = useCallback(async () => {
  if (loadingMore || exhausted || !searched || !lastShape) return
+ if ((results?.length ?? 0) >= ETSY_MAX_OFFSET) { setExhausted(true); return }
  const mine = runSeq.current
  setLoadingMore(true)
     try {
  const have = results ?? []
- const more = await searchEtsy(searched, { ...lastShape, pages: EXTRA_PAGES, offset: have.length })
+ const more = await searchEtsy(searched, { ...lastShape, pages: MORE_PAGES, offset: have.length })
  const extra = more.results ?? []
  if (runSeq.current !== mine) return           // a new search started while this was in flight
  if (extra.length) {
@@ -1149,7 +1173,10 @@ export function SpyDeckView() {
       /* THE END IS ETSY ANSWERING SHORT, and nothing else. Not "the page count stopped
          growing" — under a filter that can be true while there is plenty left, which is the
          exact shape of the loader that took a machine down. */
- if (extra.length < PAGE_SIZE * EXTRA_PAGES) setExhausted(true)
+ if (extra.length < PAGE_SIZE * MORE_PAGES) setExhausted(true)
+      /* ...and Etsy will not serve past its offset cap, so stop at the edge rather than
+         spending a call to be refused at it. */
+ if (have.length + extra.length >= ETSY_MAX_OFFSET) setExhausted(true)
     } catch {
       /* Leave `exhausted` alone: a failed call is not an empty Etsy, and the button should
          still be there to press again. */
