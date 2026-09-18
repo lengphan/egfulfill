@@ -217,6 +217,13 @@ function receiptIdOf(card) {
     const m = String(link.getAttribute('href') || '').match(/(?:order_id=|receipt[_/-]?)(\d{6,})/i)
     if (m) return m[1]
   }
+  /* The Orders page hangs the receipt number on a custom element's `name` — neither a data-
+     attribute nor a link, and the most stable hook that page offers. */
+  const cb = card.querySelector && card.querySelector('clg-checkbox[name]')
+  if (cb) {
+    const v = String(cb.getAttribute('name') || '')
+    if (/^\d{6,}$/.test(v)) return v
+  }
   for (const attr of ['data-order-id', 'data-receipt-id', 'data-orderid']) {
     const v = card.getAttribute && card.getAttribute(attr)
     if (v && /^\d{6,}$/.test(v)) return v
@@ -277,7 +284,7 @@ function fromCards(doc) {
   /* Broad on purpose. Etsy's class names are generated and change; what stays true is that
      an order lives in some container that also holds a link carrying its id. */
   const cards = doc.querySelectorAll(
-    '[data-order-id], [data-receipt-id], [class*="order-card"], [class*="orderCard"], li, article, section'
+    '[data-order-id], [data-receipt-id], [class*="order-card"], [class*="orderCard"], [class*="panel-body-row"], li, article, section'
   )
   const seen = new Set()
   for (const card of cards) {
@@ -286,6 +293,10 @@ function fromCards(doc) {
     // Skip a container that merely WRAPS other cards — it would attribute the first
     // address it finds to whichever id it happened to match first.
     if (card.querySelectorAll('[data-order-id], [data-receipt-id]').length > 1) continue
+    /* A container holding SEVERAL orders is not a card. Counting the checkbox hook too is what
+       keeps the order-group <section> — which wraps every order on the page — from being read
+       as one enormous card. `.panel-body-row` above is the real row; this is its guard. */
+    if (card.querySelectorAll('clg-checkbox[name]').length > 1) continue
 
     /* textContent, NOT innerText. The Ship-to panel renders collapsed, and innerText omits
        hidden elements — which is exactly why this fallback returned nothing on a page that
@@ -546,6 +557,20 @@ function receiptsFromJson(doc) {
  *   "Size: L"  in one element          -> matched inline
  *   "Size" then "L" in two elements    -> matched as an adjacent pair
  */
+/**
+ * A LINK THAT STANDS FOR ONE ITEM, in either of the two shapes Etsy uses.
+ *
+ * `/listing/<id>` is the shape this parser was written against. The Orders page ALSO renders
+ * `/transaction/<id>`, and that is the better one: the number in it IS Etsy's transaction_id,
+ * which is line identity (`et-<id>`) — the thing CLAUDE.md records an invented id getting
+ * wrong, at a cost of 18 over-counted orders. A page that offers it is a page we can read
+ * without deriving anything.
+ */
+const ITEM_LINK = 'a[href*="/listing/"], a[href*="/transaction/"]'
+/* Labels that are neither a variant nor personalisation but still belong on the line. They
+   are read through the same bare-label path, which is deliberately narrow: only a label we
+   RECOGNISE may pair with the next chunk, or any two adjacent strings become a variant. */
+const ITEM_FIELD_LABEL = /^(qty|quantity|sku)$/i
 const VARIANT_LABEL = /^(size|colou?r|style|material|type|design|font|scent|flavou?r|length|width|finish|placement|fabric)$/i
 const PERSONALIZATION_LABEL = /^personali[sz]ation$/i
 
@@ -578,7 +603,7 @@ function labelledPairs(el) {
        two adjacent strings would otherwise become a variant, which is the guessing this is
        supposed to avoid. */
     const bare = chunks[i].replace(/:$/, '').trim()
-    if ((VARIANT_LABEL.test(bare) || PERSONALIZATION_LABEL.test(bare)) && chunks[i + 1]) {
+    if ((VARIANT_LABEL.test(bare) || PERSONALIZATION_LABEL.test(bare) || ITEM_FIELD_LABEL.test(bare)) && chunks[i + 1]) {
       pairs.push([bare, chunks[i + 1]])
       i++
     }
@@ -597,7 +622,7 @@ function itemBox(link, doc) {
   let n = link.parentElement
   let best = link
   for (let up = 0; up < 6 && n; up++, n = n.parentElement) {
-    if (n.querySelectorAll('a[href*="/listing/"]').length > 1) break
+    if (n.querySelectorAll(ITEM_LINK).length > 1) break
     best = n
   }
   return best
@@ -627,27 +652,39 @@ function listingImage(box) {
 function itemsFromCard(card, receiptId) {
   const out = []
   const seenListing = new Map()
-  const links = card.querySelectorAll('a[href*="/listing/"]')
+  const links = card.querySelectorAll(ITEM_LINK)
   for (const a of links) {
     const href = String(a.getAttribute('href') || '')
-    const m = href.match(/\/listing\/(\d+)/)
-    if (!m) continue
-    const listingId = m[1]
+    const listingId = (href.match(/\/listing\/(\d+)/) || [])[1] || ''
+    /* ETSY'S OWN LINE ID, when the page gives it. `/transaction/<id>` carries the same number
+       the API calls transaction_id, so a line read here is indistinguishable from a synced
+       one instead of carrying a derived id nothing can reconcile. */
+    const txId = (href.match(/\/transaction\/(\d+)/) || [])[1] || ''
+    if (!listingId && !txId) continue
+    const key = listingId || txId
+    /* THE TITLE IS NOT ALWAYS THE LINK'S TEXT. On the Orders page the anchor wraps only the
+       thumbnail, so textContent is empty and the title rides on the `title` attribute (the
+       img's alt carries it too). Reading text alone skipped every item on that page while
+       reporting nothing — the silent shape this file exists to avoid. */
+    const img = a.querySelector('img')
     const title = clean(a.textContent)
-    /* A thumbnail is also a link to the listing, and its text is empty. Skipping the empty
-       one rather than the second occurrence keeps the pairing right whichever order Etsy
-       renders them in. */
+      || clean(a.getAttribute('title'))
+      || clean(img && img.getAttribute('alt'))
     if (!title) continue
-    const nth = (seenListing.get(listingId) || 0) + 1
-    seenListing.set(listingId, nth)
+    const nth = (seenListing.get(key) || 0) + 1
+    seenListing.set(key, nth)
 
     const box = itemBox(a, card)
-    let qty = 1, personalization = null
+    let qty = 1, personalization = null, sku = null
     const vparts = []
     for (const [label, value] of labelledPairs(box)) {
       if (/^(qty|quantity)$/i.test(label)) {
         const n = parseInt(value, 10)
         if (n > 0) qty = n
+      } else if (/^sku$/i.test(label)) {
+        /* The seller's own code for the line, rendered as a labelled pair on this page and
+           dropped entirely before — `item()` has always had a field for it. */
+        sku = value
       } else if (PERSONALIZATION_LABEL.test(label)) {
         personalization = value
       } else if (VARIANT_LABEL.test(label)) {
@@ -666,8 +703,11 @@ function itemsFromCard(card, receiptId) {
     }
 
     out.push(item({
-      line_id: derivedLineId(receiptId, listingId, nth),
-      listing_id: listingId,
+      /* Etsy's id when we have it, ours when we do not — and the two are visibly different
+         (`et-` vs `rd-`) so nothing downstream can mistake a derived line for a real one. */
+      line_id: txId ? `et-${txId}` : derivedLineId(receiptId, listingId, nth),
+      listing_id: listingId || null,
+      sku,
       name: title,
       qty,
       variant: vparts.join(', ') || null,
@@ -681,13 +721,17 @@ function itemsFromCard(card, receiptId) {
 function receiptsFromCards(doc) {
   const out = []
   const cards = doc.querySelectorAll(
-    '[data-order-id], [data-receipt-id], [class*="order-card"], [class*="orderCard"], li, article, section'
+    '[data-order-id], [data-receipt-id], [class*="order-card"], [class*="orderCard"], [class*="panel-body-row"], li, article, section'
   )
   const seen = new Set()
   for (const card of cards) {
     const id = receiptIdOf(card)
     if (!id || seen.has(id)) continue
     if (card.querySelectorAll('[data-order-id], [data-receipt-id]').length > 1) continue
+    /* A container holding SEVERAL orders is not a card. Counting the checkbox hook too is what
+       keeps the order-group <section> — which wraps every order on the page — from being read
+       as one enormous card. `.panel-body-row` above is the real row; this is its guard. */
+    if (card.querySelectorAll('clg-checkbox[name]').length > 1) continue
     const items = itemsFromCard(card, id)
     if (!items.length) continue
     seen.add(id)

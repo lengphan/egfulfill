@@ -126,10 +126,20 @@ function node(tag, cls, text, kids = [], href = null, attrs = {}) {
       if (sel === 'img') return n._all((k) => k._tag === 'img')
       if (sel.startsWith('.')) return n._all((k) => (k._cls || '').split(/\s+/).includes(want))
       if (sel.includes('a[href*="order_id="]')) return n._all((k) => k._tag === 'a' && /order_id=/.test(k.href || ''))
-      if (sel.includes('a[href*="/listing/"]')) return n._all((k) => k._tag === 'a' && /\/listing\//.test(k.href || ''))
+      /* BOTH item-link shapes. parse.js asks for `/listing/` and `/transaction/` in ONE
+         selector, and a shim that answered only the first would let a page whose items are
+         transaction-linked pass this gate while failing on the real site — which is exactly
+         how the Orders page went unread. */
+      if (sel.includes('a[href*="/listing/"]') || sel.includes('a[href*="/transaction/"]')) {
+        return n._all((k) => k._tag === 'a' && (
+          (sel.includes('/listing/') && /\/listing\//.test(k.href || '')) ||
+          (sel.includes('/transaction/') && /\/transaction\//.test(k.href || ''))))
+      }
+      /* The Orders page's id hook: a custom element whose `name` IS the receipt number. */
+      if (sel.includes('clg-checkbox[name]')) return n._all((k) => k._tag === 'clg-checkbox' && k.getAttribute('name'))
       /* The broad card sweep. Returning the rows themselves is what the real selector does
          on a real page — an order lives in a container that also holds its id link. */
-      if (sel.includes('data-order-id')) return n._all((k) => k._cls === 'order-card')
+      if (sel.includes('data-order-id')) return n._all((k) => k._cls === 'order-card' || /panel-body-row/.test(k._cls || ''))
       return []
     },
     querySelector(sel) { return n.querySelectorAll(sel)[0] || null },
@@ -327,6 +337,26 @@ function itemLink(listingId, title) {
   return node('a', 'listing-link', title, [], `/listing/${listingId}/something`)
 }
 
+/** One line as the ORDERS page renders it: the anchor wraps the thumbnail only, so the title
+ *  rides on `title=`, and the number in the href is Etsy's real transaction_id. */
+function txItem(txId, title, pairs = []) {
+  return node('div', 'flag', null, [
+    node('a', null, '', [node('img', null, '', [], null, {})], `/transaction/${txId}`, { title }),
+    node('ul', 'list-unstyled', null, pairs.flatMap(([label, value]) => [
+      node('span', 'text-gray-lighter', label),
+      node('span', 'strong', value),
+    ])),
+  ])
+}
+
+/** The Orders page's row: no data-order-id anywhere, the id on a clg-checkbox `name`. */
+function txCard(receipt, kids) {
+  return node('div', 'panel-body-row has-hover-state', null, [
+    node('clg-checkbox', null, '', [], null, { name: receipt }),
+    ...kids,
+  ])
+}
+
 function card(receipt, kids) {
   return node('div', 'order-card', null, [
     node('a', null, `#${receipt}`, [], `/your/orders/sold?order_id=${receipt}`),
@@ -489,6 +519,37 @@ console.log('\nTWO OF THE SAME LISTING — different jobs, different line ids')
   const items = (extractReceipts(page, []).rows[0] || {}).items
   check('both lines survive', items.length, 2)
   check('and they are distinguishable', items[0].line_id !== items[1].line_id, true)
+}
+
+console.log('\nTHE ORDERS PAGE — no listing links, no data- attributes, no JSON')
+{
+  /* CAPTURED FROM THE LIVE PAGE, 2026-09-18. This shape read as ZERO orders and the popup
+     said "1 order can't sync" — the failure mode this file exists to catch:
+
+       • the row is a plain <div class="panel-body-row">, so the card sweep (li/article/
+         section/data-order-id) never saw it and only the <section> wrapping EVERY order
+         matched, collapsing the page into one card;
+       • items link to `/transaction/<id>`, not `/listing/<id>`;
+       • that anchor wraps only the thumbnail, so its textContent is EMPTY and the title
+         is on `title=` — which the old `if (!title) continue` discarded.
+
+     The transaction id is the prize: it IS Etsy's line identity, so a line read from this
+     page is `et-…`, indistinguishable from a synced one, rather than a derived `rd-…`. */
+  const page = docOf(node('div', 'list', null, [
+    txCard('4177514714', [txItem('5220514664', 'Custom Apron with Name', [
+      ['Quantity', '1'], ['SKU', 'LA3'], ['Color', 'Blue'],
+      ['Personalization', 'Suzie,Pink Thread,Font#9,Position 1'],
+    ])]),
+  ]))
+  const row = extractReceipts(page, []).rows[0] || {}
+  const it = (row.items || [])[0] || {}
+  check('the row is found at all', row.order_id, '4177514714')
+  check('the line carries ETSY\'s id, not a derived one', it.line_id, 'et-5220514664')
+  check('the title comes off the attribute', it.name, 'Custom Apron with Name')
+  check('the sku is kept', it.sku, 'LA3')
+  check('the quantity is read', it.qty, 1)
+  check('the variant survives with its label', it.variant, 'Color: Blue')
+  check('personalisation is not lost', it.personalization, 'Suzie,Pink Thread,Font#9,Position 1')
 }
 
 console.log('\nPRESSING SYNC TWICE — the same page must produce the same ids')
