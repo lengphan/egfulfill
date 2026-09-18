@@ -349,9 +349,7 @@ async function scan() {
     /* THE COUNT IS THE MESSAGE. "None could be read" and "No orders here" were two
        sentences saying which of the two had happened; `12 Orders Can\u2019t Sync` says it AND
        says how many are stranded, which is the number the seller actually needs. */
-    paint((s.foundOnPage || 0) > 0
-      ? { line: `${s.foundOnPage} ${s.foundOnPage === 1 ? 'order' : 'orders'} can\u2019t sync` }
-      : { line: 'No orders' })
+    paint({ line: `0 orders found` })
     $('stats').textContent = statsLine(s, 0)
     $('stats').title = statsTitle(s, 0)
     return
@@ -411,19 +409,26 @@ async function scan() {
   WANTED = [...blankAddress]
   drawRows()
 
-  const bits = []
-  if (NEW_ORDERS.length) bits.push(`${NEW_ORDERS.length} ${NEW_ORDERS.length === 1 ? 'order' : 'orders'}`)
-  if (ROWS.length) bits.push(`${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'}`)
+  /*
+   * ONE ROW, AND THE BUTTON CARRIES THE VERB.
+   *
+   * This line used to read "2 orders · 1 address" over "8 on page · 5 already here · 1
+   * unreadable" — a count of nouns with no verb, above a tally that never said where "here"
+   * was, which read as history rather than as something about to happen. Both were the
+   * extension narrating its own bookkeeping.
+   *
+   * "3 orders found" is what a person says out loud, and popup.html's own rule already had
+   * the answer: the line says what is TRUE, the button says what to DO about it. So the
+   * split between creating an order and filling an address does not belong on screen —
+   * it is the same press either way, and the result list says which happened afterwards.
+   */
   const peek = NEW_ORDERS.length + ROWS.length
-  const cant = stranded.length ? `${stranded.length} can’t sync` : ''
+  const found = `${peek} ${peek === 1 ? 'order' : 'orders'} found`
 
-  paint(peek
-    /* The stranded count rides as the note rather than the line: something IS ready to send,
-       and that is what the button is for. It still gets said. */
-    ? { line: bits.join(' · '), note: cant, button: 'sync', peek }
-    : stranded.length
-      ? { line: `${stranded.length} ${stranded.length === 1 ? 'order' : 'orders'} can’t sync` }
-      : { line: 'Nothing new' })
+  /* Zero is still "0 orders found" and not "Nothing new": the same sentence whatever the
+     number, so the panel never changes shape on you. What could NOT be read is reported by
+     statsLine in the footer, beside Rescan — which is the thing you press about it. */
+  paint(peek ? { line: found, button: 'sync', peek } : { line: found })
 
   /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
@@ -489,7 +494,7 @@ async function sync() {
     if (trouble) fail(trouble)
     paint({ line: said.length ? said[0] : 'Nothing changed', note: said.slice(1).join(' · ') })
   } finally {
-    $('sync').textContent = 'Sync to egful'
+    $('sync').textContent = 'Sync'
     $('sync').disabled = false
   }
 }

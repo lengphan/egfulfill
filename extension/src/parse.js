@@ -743,9 +743,21 @@ function receiptsFromCards(doc) {
       /* "Order total $24.50" — anchored on the WORD, never on the first dollar sign in the
          card, which is just as likely to be one item's price or a shipping charge. Absent
          rather than wrong: the server leaves the total alone when this is null. */
-      total: money((text.match(/order total[^$\d-]{0,12}([$\d][\d.,]*)/i) || [])[1]),
-      ship_by: null,
-      created_at: null,
+      /* TWO ANCHORS, because the Orders page never says "order total". It renders
+         `1 item,` immediately followed by the money, so the count is the anchor there —
+         still a WORD and not the first dollar sign in the card, which is as likely to be a
+         shipping charge or one line's price. Absent rather than wrong: the server leaves
+         the total alone when this is null. */
+      total: money((text.match(/order total[^$\d-]{0,12}([$\d][\d.,]*)/i) || [])[1])
+        ?? money((text.match(/\d+\s*items?,\s*([$\d][\d.,]*)/i) || [])[1]),
+      /* THE PROMISE DATE, which is not decoration: lateness is judged against Etsy's
+         expected ship date and `overdue_days` is only the fallback, so an order imported
+         without one is an order the floor cannot see running late. The page prints it as
+         "Ship by Sep 22, 2026"; the server parses whatever Date.parse accepts and stores
+         null when it cannot, so a misread costs nothing. */
+      ship_by: (text.match(/ship\s*by[:\s]+([A-Z][a-z]{2,8}\s+\d{1,2},\s*\d{4})/i) || [])[1] || null,
+      created_at: (text.match(/ordered[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i)
+                || text.match(/ordered[:\s]+([A-Z][a-z]{2,8}\s+\d{1,2},\s*\d{4})/i) || [])[1] || null,
       items,
       _how: 'card',
     })
