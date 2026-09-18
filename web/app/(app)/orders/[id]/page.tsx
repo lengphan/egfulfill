@@ -1431,7 +1431,18 @@ export default function OrderDetailPage() {
                                             {r.face
                                               ? (<><span className="capitalize">{tl("sides", r.face)}</span>
                                                    {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}</>)
-                                              : tl("order", "Blank")}
+                                              /* "BASE COST", NOT "BLANK" — the name was taken.
+                                                 The product editor prices four columns per size:
+                                                 Product cost, BASE COST, BLANK and Shipping, and
+                                                 its `Blank` is the bare garment with no print —
+                                                 a different number (6.00 against this row's 17.46
+                                                 on the same size). This row is unitCost − method
+                                                 − sides, which is the Base cost column exactly,
+                                                 so it takes that column's name. Two unrelated
+                                                 figures under one word, on two screens a seller
+                                                 reads together, is how a price stops being
+                                                 checkable. */
+                                              : tl("order", "Base cost")}
                                             {off > 0.005 && (
                                               <span className="text-success tabular-nums"> · {dpct}% {tl("order", "off")}</span>
                                             )}

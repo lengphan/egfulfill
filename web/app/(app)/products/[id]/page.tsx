@@ -382,7 +382,7 @@ export default function ProductDetailPage() {
           {methodFee(selMethod?.key, selMethod?.label) > 0 && (
             <dl className="max-w-xs space-y-0.5 text-sm">
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">{tl("productPage", "Blank")}</dt>
+                <dt className="text-muted-foreground">{tl("productPage", "Base cost")}</dt>
                 <dd className="tabular-nums text-muted-foreground">
                   {usd(selSize ? priceOfSize(selSize) : priceOf(product))}
                 </dd>
