@@ -594,7 +594,12 @@ export default function ChatPage() {
  if (!gen || !text) return
  setSending(true); setAiNote(null)
  try {
- const attached = attachedImageName(pendingAtts[0] ?? null)   // generation borrows the FIRST
+    /* EVERY staged picture is a reference, not just the first.
+       The composer took one attachment when this was written, so `pendingAtts[0]` was the
+       whole list. It stacks now — and a person who attaches three photos and asks for a
+       prompt has said, as plainly as the UI allows, that all three are the brief. The route
+       takes up to 14 (support_ai.js slices there), so the client was the narrow end. */
+ const attachedNames = pendingAtts.map((a) => attachedImageName(a)).filter((n): n is string => !!n)
  if (gen.mode === "image") {
         /*
          * WHAT THE MODEL ACTUALLY SEES. An attachment staged in the composer is the most
@@ -605,7 +610,7 @@ export default function ChatPage() {
          * "start from nothing" — and the reason the ✕ exists, because otherwise a thread
          * with any picture in it could never render a blank page again.
          */
- const refs = [attached, carried?.name].filter((n): n is string => !!n)
+ const refs = [...attachedNames, carried?.name].filter((n): n is string => !!n)
  const uniq = Array.from(new Set(refs))
  const r = await generateDeskImage({
  prompt: text, aspectRatio: gen.ratio, imageSize: gen.size, model: gen.model,
@@ -638,7 +643,7 @@ export default function ChatPage() {
  const r = await generateDeskVideo({
  prompt: text, aspectRatio: gen.ratio, resolution: gen.resolution,
  durationSeconds: gen.seconds, model: gen.model,
- imageName: gen.imageName ?? attached ?? undefined,
+ imageName: gen.imageName ?? attachedNames[0] ?? undefined,
         })
  if (!r.ok || !r.jobId) { setInput(text); setAiNote(r.error || "That didn't work."); return }
         // Consumed — it is in the job now, and leaving it staged would silently ride along
