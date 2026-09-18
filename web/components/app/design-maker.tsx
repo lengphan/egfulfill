@@ -891,7 +891,7 @@ export function DesignMaker() {
               <DropdownMenuItem onClick={saveToLibrary} title={tl("designMaker", "A flattened picture you can place on anything. Does not reopen.")}>
                 <ImageSquare size={14} weight="bold" /> {tl("designMaker", "Save to Artwork")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={saveAsTemplate} title={tl("designMaker", "The layers, the blank and the print area, every side. Reopens in the editor.")}>
+              <DropdownMenuItem onClick={saveAsTemplate} title={tl("designMaker", "The layers, the blank and the print area, every placement. Reopens in the editor.")}>
                 <Stack size={14} weight="bold" /> {tl("designMaker", "Save as Template")}
               </DropdownMenuItem>
             </DropdownMenuContent>

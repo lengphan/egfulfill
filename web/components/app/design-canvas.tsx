@@ -495,7 +495,7 @@ export function DesignStage({
  onPointerDown={(e) => e.stopPropagation()}
       >
         {onCopy && (
-          <button type="button" onClick={onCopy} title={copyLabel ?? tl("canvas", "Copy to the other sides")} aria-label={copyLabel ?? tl("canvas", "Copy to the other sides")} className={stripBtn}>
+          <button type="button" onClick={onCopy} title={copyLabel ?? tl("canvas", "Copy to the other placements")} aria-label={copyLabel ?? tl("canvas", "Copy to the other placements")} className={stripBtn}>
             <Copy size={stripIcon} weight="bold" />
           </button>
         )}
@@ -1667,7 +1667,7 @@ export function DesignCanvasDialog({
    * `filesForLine` has already narrowed the order's files to this GARMENT. The rung under it
    * was in the data all along (design_file_data.side, "NULL means the whole line") and no
    * reader used it, so a front logo and a back design sat in one undifferentiated list and
-   * the panel printed "every face" about both — an assertion the row never made.
+   * the panel printed "every placement" about both — an assertion the row never made.
    *
    * A file pinned to ANOTHER face is not shown here. That is the point of a scope: the order
    * page's Files tab is the flat everything-view, this window is the garment, and this group
@@ -3452,7 +3452,7 @@ export function DesignCanvasDialog({
                   count: faceIsEmb ? (Object.keys(picks).length || undefined) : undefined,
                   disabled: !faceIsEmb,
                   title: faceIsEmb ? undefined
-                    : tl("canvas", "Threads are for stitching. This surface is printed — set its type to Embroidery and they come back.") },
+                    : tl("canvas", "Threads are for stitching. This placement is printed — set its type to Embroidery and they come back.") },
                 /* BOARD IS STAFF-ONLY, and the tab has to know it. Sending a line to the
                    design board is a factory act — the route is gated, so a seller who opened
                    this tab got the panel, filled in the tier and the note, pressed Send and
@@ -3466,7 +3466,7 @@ export function DesignCanvasDialog({
                      printed surface — the image IS the print file. So the tab refuses with its
                      reason rather than opening a panel whose Send could only be meaningless. */
                   title: faceIsEmb ? undefined
-                    : tl("canvas", "The design board is for digitising. This surface is printed, so there is nothing to send.") }] : []),
+                    : tl("canvas", "The design board is for digitising. This placement is printed, so there is nothing to send.") }] : []),
               ] : []),
             ]}
           />
@@ -3842,7 +3842,7 @@ export function DesignCanvasDialog({
                 The order page's Files tab stays the flat everything-view; this window is one
                 garment, and the first group is the surface in front of you. */}
             {([
-              [surfaceFiles, `${tl("sides", sideKey)} · ${tl("canvas", "this surface")}`],
+              [surfaceFiles, `${tl("sides", sideKey)} · ${tl("canvas", "this placement")}`],
               /* Named for what it IS, not for what it is not: a size chart or a customer's
                  reference photo belongs to the garment however many faces it has. */
               [itemFiles, tl("canvas", "Whole item")],
@@ -3867,7 +3867,7 @@ export function DesignCanvasDialog({
                        line-scoped group can still honestly claim to be. */
                     note: dlBusy === f.designId
                       ? "Working…"
-                      : [fileRoleLabel(f.kind), !f.side && artFaces.length > 1 ? tl("canvas", "every face") : null]
+                      : [fileRoleLabel(f.kind), !f.side && artFaces.length > 1 ? tl("canvas", "every placement") : null]
                           .filter(Boolean).join(" · "),
                     /* NO status here. FileRow's "uploading" prints "Uploading…" under the
                        name, and this row is DOWNLOADING — the same spinner would be saying
@@ -4185,7 +4185,7 @@ export function DesignCanvasDialog({
                       <button
  type="button"
  onClick={() => setSkip((m) => ({ ...m, [row.side]: !off }))}
- title={off ? tl("canvas", "Include this face") : tl("canvas", "Leave this face out")}
+ title={off ? tl("canvas", "Include this placement") : tl("canvas", "Leave this placement out")}
  aria-pressed={off}
  className="eg-tap shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
                       >
@@ -4221,7 +4221,7 @@ export function DesignCanvasDialog({
                   : boardCard
                     ? [tl("canvas", "Sent"), boardCard.lane_label || boardCard.col, boardCard.claimed_by]
                         .filter(Boolean).join(" · ")
-                    : tl("canvas", "Nothing new to send — add artwork or a face and this comes back")}
+                    : tl("canvas", "Nothing new to send — add artwork or a placement and this comes back")}
               >
                 {/* THREE WORDS, and no count. The list directly above already shows what is
                     going, one row each — putting the number in the label as well is the same

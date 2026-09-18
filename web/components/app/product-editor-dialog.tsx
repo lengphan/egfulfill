@@ -125,7 +125,7 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={src} alt="" className="pointer-events-none size-full object-contain p-[1%]" />
         ) : (
-          <span className="grid size-full place-items-center text-xs text-muted-foreground">{tl("product", "No photo for this side")}</span>
+          <span className="grid size-full place-items-center text-xs text-muted-foreground">{tl("product", "No photo for this placement")}</span>
         )}
         <div
  onPointerDown={(e) => start(e, "move")}
@@ -1186,7 +1186,7 @@ export function ProductEditorDialog({
  /* THE MAP WHEN THERE IS ONE, else the flat number — matching sideAddOn's own precedence
      so what is saved is what is charged. A map with a single face in it is still a map: the
      faces left out fall to fees.side_<face> and then to the platform flat rate, which is the
-     behaviour the "Each additional side" box describes. */
+     behaviour the "Each placement" box describes. */
  sidePrice: (() => {
  const out: Record<string, number> = {}
  for (const [k, v] of Object.entries(sidePrices)) { const n = Number(v); if (n > 0) out[k] = n }
@@ -2352,7 +2352,7 @@ export function ProductEditorDialog({
  two controls sharing one corner is a mis-click waiting to happen. */}
                       <div className="absolute -left-1.5 -top-1.5 z-10 flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/side:opacity-100">
                         <label
- title={tl("product", "Upload a photo for this side")}
+ title={tl("product", "Upload a photo for this placement")}
  className="grid size-6 cursor-pointer place-items-center rounded-full bg-foreground/75 text-background"
                         >
                           <UploadSimple size={12} weight="bold" />
@@ -2365,7 +2365,7 @@ export function ProductEditorDialog({
                         {/* A real select, visually hidden over its own icon — keeps keyboard
  and screen-reader behaviour while the icon is what you click. */}
                         <label
- title={tl("product", "Use one of this product's photos for this side")}
+ title={tl("product", "Use one of this product's photos for this placement")}
  className="relative grid size-6 cursor-pointer place-items-center rounded-full bg-foreground/75 text-background"
                         >
                           <ImageIcon size={12} weight="bold" />
@@ -2404,7 +2404,7 @@ export function ProductEditorDialog({
                           The tick was a separate checkbox list headed "Faces", eight rows
                           above the eight pictures it controlled — so turning a sleeve on
                           meant finding it in one place and its photo in another. And a price
-                          per face did not exist here at all: one "Each additional side" box
+                          per face did not exist here at all: one "Each placement" box
                           in another section, while pricing.js's sideAddOn has read a per-face
                           map the whole time. Measured: back $3.50 beside sleeve $1.50 prices
                           correctly today; only the typing was missing. */}
@@ -2452,7 +2452,7 @@ export function ProductEditorDialog({
                                "this one charges the default" rather than "this one is free" —
                                the same precedence sideAddOn applies. */
                             placeholder={sideOv ? sideOv : tl("product", "default")}
-                            aria-label={`${tl("product", "Charge for printing the")} ${sd}`}
+                            aria-label={`${tl("product", "Charge for printing the placement")} ${sd}`}
                             className="h-7 px-2 text-right text-xs tabular-nums"
                           />
                         </div>
@@ -2545,7 +2545,7 @@ export function ProductEditorDialog({
               return (
                 <p className="pt-1 text-2xs text-muted-foreground">
                   {tl("product", "This product's base cost sits")} <span className="tabular-nums text-foreground">${gap.toFixed(2)}</span>{" "}
-                  {tl("product", "above its blank price — that gap is the print, and it is what a placement is worth now that no face is free.")}
+                  {tl("product", "above its blank price — that gap is the print, and it is what a placement is worth now that none is free.")}
                 </p>
               )
             })()}

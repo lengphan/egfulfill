@@ -1395,7 +1395,7 @@ export default function OrderDetailPage() {
                                         surfaceFree: own <= 0.005,
                                         methodFee: mf,
                                         hover: mf > 0 && own > 0
-                                          ? `${usd(own)} ${tl("order", "extra surface")} + ${usd(mf)} ${r.method}`
+                                          ? `${usd(own)} ${tl("order", "extra placement")} + ${usd(mf)} ${r.method}`
                                           : undefined,
                                       }
                                     }),
@@ -1425,7 +1425,7 @@ export default function OrderDetailPage() {
                                             className="min-w-0 truncate pl-3 text-muted-foreground"
                                             title={r.hover
                                               || (r.surfaceFree && r.face
-                                                ? tl("order", "The blank's price covers one face; each extra face is charged.")
+                                                ? tl("order", "This order was charged when one placement came inside the blank's price. Every placement is charged now.")
                                                 : undefined)}
                                           >
                                             {r.face

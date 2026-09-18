@@ -217,7 +217,7 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{r.name}</div>
           </div>
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium capitalize text-foreground/70" title={tl("designFiles", "Which face this artwork is on")}>
+          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium capitalize text-foreground/70" title={tl("designFiles", "Which placement this artwork is on")}>
             {r.side}
           </span>
           {/* DOWNLOAD, matching the machine-file row — WORD ALONE, and for the same reason

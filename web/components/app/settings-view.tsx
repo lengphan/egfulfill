@@ -1913,11 +1913,11 @@ function PlatformPanel() {
         </div>
       </Fold>
 
-      <Fold title={tl("settings", "Positions / Design Surfaces")} status={`${types.length} types`}>
+      <Fold title={tl("settings", "Placements")} status={`${types.length} types`}>
         <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "Sides and outlines are set once per category and inherited by every product in it — define four faces on Headwear and fifty hats get them without fifty uploads. The outlines are positioning aids for the Design Maker only; they never appear as a product’s catalog image.")}
+          {tl("settings", "Placements and outlines are set once per category and inherited by every product in it — define four placements on Headwear and fifty hats get them without fifty uploads. The outlines are positioning aids for the Design Maker only; they never appear as a product’s catalog image.")}
         </p>
         <div className="space-y-2">
           {types.map((t, i) => {
@@ -1945,7 +1945,7 @@ function PlatformPanel() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1">
-                  <span className="mr-1 eg-label text-muted-foreground">{tl("settings", "Sides")}</span>
+                  <span className="mr-1 eg-label text-muted-foreground">{tl("settings", "Placements")}</span>
                   {ALL_SIDES.map((sd) => {
  const on = sides.includes(sd)
  return (
@@ -2138,12 +2138,12 @@ function PlatformPanel() {
         <div className="mt-4 border-t border-border pt-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <MoneyField
- label={tl("settings", "Each additional side")}
+ label={tl("settings", "Each placement")}
  value={bands.method_side ?? ""} onChange={(v) => setBand("method_side", v)}
             />
           </div>
           <p className="mb-2 mt-4 text-xs text-muted-foreground">
-            {tl("settings", "Every printed face is charged. Set a face to charge it its own rate instead of the figure above; leave it blank to use that figure.")}
+            {tl("settings", "Every placement is charged. Set a placement to charge it its own rate instead of the figure above; leave it blank to use that figure.")}
           </p>
           <div className="grid gap-4 sm:grid-cols-4 lg:grid-cols-8">
             {ALL_SIDES.map((face) => (
