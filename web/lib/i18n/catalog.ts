@@ -65,6 +65,7 @@ const en: Dict = {
   "apiEndpointDesc.Register an https endpoint to be notified on. Returns a signing secret ONCE — store it. Omit `events` to receive all of them. Every delivery carries X-EG-Event and X-EG-Signature (sha256=<hex>), an HMAC-SHA256 of the raw body using that secret; compare it in constant time before trusting a payload.": "Register an https endpoint to be notified on. Returns a signing secret ONCE — store it. Omit `events` to receive all of them. Every delivery carries X-EG-Event and X-EG-Signature (sha256=<hex>), an HMAC-SHA256 of the raw body using that secret; compare it in constant time before trusting a payload.",
   "apiEndpointDesc.The last 100 attempts for one endpoint — status code, error and attempt count. Deliveries retry three times with backoff and give up on a non-retryable 4xx, so this is where a missed notification is explained.": "The last 100 attempts for one endpoint — status code, error and attempt count. Deliveries retry three times with backoff and give up on a non-retryable 4xx, so this is where a missed notification is explained.",
   "topup.Description not returned": "Description not returned",
+  "canvas.No print": "Không in",
   "canvas.Your product photo": "Your product photo",
   "canvas.Our product photo": "Our product photo",
   "canvas.The backdrop the artwork sits on": "The backdrop the artwork sits on",

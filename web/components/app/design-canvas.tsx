@@ -24,6 +24,7 @@ import { VariantField } from "@/components/app/variant-field"
 import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery, methodsOf, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
+import { postItemSetup } from "@/lib/api"
 import { designLabel } from "@/lib/design-id"
 import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
 import { printZoneOf, printSizeOf, outsideZone } from "@/lib/print-zone"
@@ -1312,6 +1313,45 @@ export function DesignCanvasDialog({
   // threads, so the factory knows which cones to load. Re-runs when the design changes.
   // One shared rule (lib/variant-resolve) — the thread module and the machine-file step
   // below both read it, so they cannot drift apart again.
+  /**
+   * "NO PRINT" ON A MULTI-PLACEMENT PRODUCT.
+   *
+   * The line-level Method field is hidden here once a product has more than one placement —
+   * the per-placement rows below replace it. But "no print" is a statement about the LINE, not
+   * about a placement, so hiding that field took the only way of saying it away on exactly the
+   * products where somebody might: open a four-placement apron and there was no route to a
+   * bare garment at all.
+   *
+   * A checkbox, not a seventh entry in a method list: it is one binary fact about the whole
+   * garment, and listing it beside DTG and Embroidery would put it back in the per-placement
+   * vocabulary it is not part of.
+   *
+   * Offered only where the product prices a blank. A "No print" that quotes the PRINTED base
+   * cost is the more expensive kind of wrong.
+   */
+ const blankPriced = useMemo(() => {
+ const tiers = product?.sizePrices ?? []
+ if (!tiers.length) return false
+ const own = liveItem.size ? tiers.find((t) => t.size === liveItem.size) : null
+    return (Number((own ?? tiers[0])?.blank) || 0) > 0
+  }, [product, liveItem.size])
+ const isNoPrint = /^\s*(blank|no[\s-]*print)\s*$/i.test(String(liveItem.print_type || ""))
+ const [noPrintBusy, setNoPrintBusy] = useState(false)
+ const setNoPrint = async (on: boolean) => {
+ setNoPrintBusy(true)
+    try {
+      /* THE SAME WRITER THE ORDER ROW USES, so the two cannot disagree about what the line
+         says — the argument that put the variant pickers on this screen in the first place. */
+ await postItemSetup(orderId, {
+        ...(item.line_id ? { line_id: item.line_id } : { sku: item.sku }),
+ printType: on ? "No print" : "",
+      })
+ setVariantPatch((prev) => ({ ...(prev ?? {}), printType: on ? "No print" : "" }))
+ onSaved?.()
+    } catch { /* the checkbox springs back on the next render from liveItem */ }
+    finally { setNoPrintBusy(false) }
+  }
+
  const isEmb = isEmbroidery(liveItem.print_type)
   /**
    * IS THERE A LOOSE FILE HERE AT ALL, or is this one already on the garment?
@@ -3545,7 +3585,21 @@ export function DesignCanvasDialog({
             * FEE is gated instead, on the server, so declaring a surface never costs
             * anything until something is actually placed on it.
             */}
-          {!filesLocked && faces.length > 1 && methodFaces.map((sd) => (
+          {/* ABOVE the per-placement rows, because it is about the line and they are about one
+              placement each. Ticking it hides them: there is nothing to print on. */}
+          {!filesLocked && faces.length > 1 && blankPriced && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={isNoPrint}
+                disabled={noPrintBusy}
+                onChange={(e) => void setNoPrint(e.target.checked)}
+                className="size-4 accent-primary"
+              />
+              <span className="font-medium text-foreground">{tl("canvas", "No print")}</span>
+            </label>
+          )}
+          {!filesLocked && !isNoPrint && faces.length > 1 && methodFaces.map((sd) => (
             <VariantField
               key={sd}
               /* THE FACE IS A PREFIX, NOT A LABEL. VariantField's label is swapped out for
