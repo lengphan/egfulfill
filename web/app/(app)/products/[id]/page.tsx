@@ -231,7 +231,7 @@ export default function ProductDetailPage() {
    * while calling itself Blank is worse than no chip.
    */
  const blankTiers = (product.sizePrices ?? []).some((t) => (Number(t.blank) || 0) > 0)
- const BLANK_KEY = "Blank"   // the word a line stores; see print-method.ts
+ const BLANK_KEY = "No print"   // the word a line stores; see print-method.ts
  const selMethod = pickMethod === BLANK_KEY ? null
     : (techs.find((t) => t.key === pickMethod) ?? techs[0] ?? null)
  const isBlank = blankTiers && pickMethod === BLANK_KEY
@@ -518,7 +518,7 @@ export default function ProductDetailPage() {
  onClick={() => setPickMethod(BLANK_KEY)}
  className={CHIP + (isBlank ? CHIP_ON : CHIP_OFF)}
                     >
-                      {tl("productPage", "Blank")}
+                      {tl("productPage", "No print")}
                     </button>
                   )}
                   {techs.map((t) => (

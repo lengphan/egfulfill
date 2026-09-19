@@ -3518,10 +3518,6 @@ export function DesignCanvasDialog({
                  question. Kept on a single-face product, where that field is not rendered
                  and this is the only place to say how the garment is decorated. */
               hideMethod={faces.length > 1}
-              /* WHAT THE FACES SAY, so the picker can tell a blank from an undecided line. A
-                 face that says nothing inherits and contributes nothing here — which is exactly
-                 the set costPartsOf tests. */
-              faceMethods={Object.values(faceMethod).filter(Boolean) as string[]}
               onSaved={(patch) => {
                 if (patch) setVariantPatch((prev) => ({ ...(prev ?? {}), ...patch }))
                 onSaved?.()

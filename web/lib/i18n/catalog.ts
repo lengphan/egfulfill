@@ -3973,6 +3973,7 @@ const vi: Dict = {
   "poItems.Import the SanMar catalogue first, or search for a style.": "Hãy nhập danh mục SanMar trước, hoặc tìm theo tên kiểu.",
   "poItems.Sync the Otto Cap catalog first, or search for a style.": "Hãy đồng bộ danh mục Otto Cap trước, hoặc tìm theo tên kiểu.",
   "poItems.recorded as the supplier code for this variant — so what arrives can be booked onto the right shelf.": "được ghi nhận làm mã nhà cung cấp cho phiên bản này — để hàng về được xếp đúng kệ.",
+  "productPage.No print": "Không in",
   "productPage.Products": "Sản phẩm",
   "productPage.Back to products": "Quay lại danh sách sản phẩm",
   "productPage.Product not found": "Không tìm thấy sản phẩm",

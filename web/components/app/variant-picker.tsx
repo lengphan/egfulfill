@@ -23,7 +23,7 @@ const FALLBACK_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "
  * Nothing else in the pipeline has to learn the word: methodAddOn finds no surcharge key for
  * it and returns 0, isEmbroidery does not match it, and normalizeMethods leaves it alone.
  */
-const BLANK_LABEL = "Blank"
+const BLANK_LABEL = "No print"
 
 const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 
@@ -36,7 +36,7 @@ const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 export type ItemSetupPatch = Omit<Parameters<typeof postItemSetup>[1], "line_id" | "sku">
 
 export function VariantPicker({
-  orderId, item, catalog, onSaved, dense, hideMethod, faceMethods,
+  orderId, item, catalog, onSaved, dense, hideMethod,
 }: {
   orderId: string
   item: OrderItem
@@ -73,19 +73,6 @@ export function VariantPicker({
    * DOES have one method and this is the only place to set it.
    */
   hideMethod?: boolean
-  /**
-   * THE TECHNIQUES THIS LINE'S FACES DECLARE, when the caller can see them.
-   *
-   * A line is priced as a bare garment only when it names no method AND NO FACE NAMES ONE
-   * (costPartsOf's isBlankLine). This picker cannot see faces, so without being told it would
-   * offer "Blank" on a line whose back says Embroidery — and the field would read Blank while
-   * the charge came out printed.
-   *
-   * UNDEFINED MEANS "NOT KNOWN", NOT "NONE". A caller that cannot answer gets the behaviour
-   * this field always had: an empty method shows the placeholder and Blank is not offered.
-   * Claiming a price on a state we cannot see is the failure this prop exists to prevent.
-   */
-  faceMethods?: string[]
 }) {
   const tl = useLabelT()
   const [busy, setBusy] = useState<string | null>(null)
@@ -184,8 +171,15 @@ export function VariantPicker({
    * base cost, which is the more expensive kind of wrong.
    */
   const blankPriced = (() => {
-    if (!faceMethods) return false                       // not known — see the prop's note
-    if (faceMethods.some((m) => String(m || "").trim())) return false
+    /* THE FACE GATE IS GONE WITH THE RULE IT GUARDED. It existed because costPartsOf's
+       isBlankLine required that no placement declare a method — and that branch no longer
+       exists: the blank price is the base of EVERY line now, so "No print" changes nothing
+       about how the garment is priced. It only records that the line is undecorated.
+
+       Keeping the gate meant the option vanished on any line with a placement method set —
+       which is most of them — so the control the owner asked for was invisible on the screens
+       where it would be used. A dead guard is worse than no guard: it hides a feature and
+       looks like the feature was never built. */
     const tiers = product?.sizePrices ?? []
     if (!tiers.length) return false
     const own = item.size ? tiers.find((t) => t.size === item.size) : null
