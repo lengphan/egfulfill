@@ -231,6 +231,14 @@ type Tier = { price: string; shipping: string; cost: string; blank: string; weig
  *
  * So the shape lives in ONE place. A field added to Tier lands here and reaches every
  * construction site, instead of every site needing to remember it. */
+/** The size table's columns. ONE definition, because the header row and the value rows are
+ *  separate elements and a column added to one and not the other is a table that lines up
+ *  until somebody scrolls. Base cost is dropped when no size still needs it. */
+const SIZE_GRID = (withBase: boolean) =>
+  withBase
+    ? "grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
+    : "grid-cols-[3rem_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
+
 const EMPTY_TIER: Tier = { price: "", shipping: "", cost: "", blank: "", weightOz: "" }
 function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
  const out: Record<string, Tier> = {}
@@ -539,6 +547,21 @@ export function ProductEditorDialog({
   // Per-size price tiers, held as strings so a half-typed "12." doesn't round-trip
   // through Number and fight the input. Empty = no override for that size.
  const [tiers, setTiers] = useState<Record<string, Tier>>({})
+  /**
+   * DOES ANY SIZE STILL NEED BASE COST?
+   *
+   * Only sizes actually on the product count — an unadded size has no tier and no opinion. A
+   * product where every size carries a Blank price never reads base cost again, so the column
+   * comes off the table rather than sitting there labelled "legacy": a field that cannot
+   * affect the price is not clarified by a caption, it is a box somebody has to decide to
+   * ignore on every visit.
+   *
+   * It survives while ANY size still lacks a Blank price, because there it is the only
+   * statement of what the garment costs and dropping it would leave that size unpriceable.
+   */
+ const showBaseCost = useMemo(
+    () => sizes.length === 0 || sizes.some((s) => !(Number(tiers[s]?.blank) > 0)),
+    [sizes, tiers])
   // Bulk-fill the whole size table in one go. Base can be a flat $ or a % markup over each
   // size's own product cost (so a pricier 3XL still lands a proportional base); shipping is
   // always a flat $. Writes into the editable rows — nothing is charged until you Save.
@@ -1748,12 +1771,28 @@ export function ProductEditorDialog({
  the only place in this form asking for a second dimension, to answer a
  question ("how many 3XL?") this row is already asking. Held per SIZE now,
  so the sku is EG-1001-L rather than EG-1001-L-BLK. */}
-                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
-                  <span /><span>{tl("product", "Product cost ($)")}</span>{/* BASE COST IS LEGACY, and the header says so rather than sitting there looking equal to
-       the others. It is read only when a size has NO blank price: the garment is `Blank`, the
-       print is the placement charge, and the technique is its own surcharge — three separate
-       numbers, none bundled into another. A size with a blank price never reads this. */}
-                  <span title={tl("product", "Only used where this size has no Blank price. Set Blank instead — the garment, the placement and the method are priced separately now.")}>{tl("product", "Base cost ($) · legacy")}</span><span title={tl("product", "What this size costs as a bare garment. This is the base of every price now: the placement charge and the method are added on top.")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
+                {/* A size with no Blank price still has nothing else to price the garment
+                    from, so the column survives until every size has one — which is also the
+                    moment the product has finished migrating. */}
+                {/**
+                  * BASE COST IS ONLY SHOWN WHERE IT IS STILL READ.
+                  *
+                  * Labelling it "legacy" and leaving it there was the wrong answer: a field
+                  * that can never affect the price is not clarified by a caption, it is just a
+                  * box somebody has to decide to ignore on every visit. On a product whose
+                  * sizes all carry a Blank price, pricing.js never looks at this column at all
+                  * — the garment is Blank, the print is the placement charge, the technique is
+                  * its own surcharge.
+                  *
+                  * It stays for the products that have no Blank price yet, because there it is
+                  * the ONLY statement of what the garment costs and removing it would leave
+                  * them unpriceable. So the column disappears exactly when it stops mattering,
+                  * which is also the moment a product finishes migrating.
+                  */}
+                <div className={`mt-2 grid ${SIZE_GRID(showBaseCost)} gap-2 text-xs text-muted-foreground`}>
+                  <span /><span>{tl("product", "Product cost ($)")}</span>{showBaseCost && (
+                    <span title={tl("product", "Only read where a size has no Blank price. Set Blank instead — the garment, the placement and the method are priced separately now.")}>{tl("product", "Base cost ($)")}</span>
+                  )}<span title={tl("product", "What this size costs as a bare garment. This is the base of every price now: the placement charge and the method are added on top.")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
                   {/* WEIGHT IS PER SIZE, which is the whole reason it is a column here. A 3XL
  crewneck runs several ounces over an S, and postage is priced in bands
                       (4 / 8 / 12 / 15.999oz, then 1lb), so one size can sit a band above
@@ -1773,7 +1812,7 @@ export function ProductEditorDialog({
  setTiers((p) => ({ ...p, [s]: { ...EMPTY_TIER, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
  return (
                     <Fragment key={s}>
-                    <div className="grid grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem] items-center gap-2">
+                    <div className={`grid ${SIZE_GRID(showBaseCost)} items-center gap-2`}>
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
  value={t?.cost ?? ""}
