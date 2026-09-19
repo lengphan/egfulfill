@@ -1771,6 +1771,14 @@ export function ProductEditorDialog({
  the only place in this form asking for a second dimension, to answer a
  question ("how many 3XL?") this row is already asking. Held per SIZE now,
  so the sku is EG-1001-L rather than EG-1001-L-BLK. */}
+                {/* WHY AN EMPTY BLANK MATTERS, said once under the table rather than as a
+                    tooltip nobody hovers. "No print" is offered on a line only when the chosen
+                    garment prices one — a bare-garment option that quoted the PRINTED base cost
+                    would be the expensive kind of wrong — so an empty column here is the reason
+                    that option is missing three screens away, and nothing else connects the
+                    two. An empty state may carry one sentence (§4); this is a populated screen,
+                    so it earns its place by being the only statement of a rule that is
+                    otherwise invisible. */}
                 {/* A size with no Blank price still has nothing else to price the garment
                     from, so the column survives until every size has one — which is also the
                     moment the product has finished migrating. */}
@@ -1792,7 +1800,7 @@ export function ProductEditorDialog({
                 <div className={`mt-2 grid ${SIZE_GRID(showBaseCost)} gap-2 text-xs text-muted-foreground`}>
                   <span /><span>{tl("product", "Product cost ($)")}</span>{showBaseCost && (
                     <span title={tl("product", "Only read where a size has no Blank price. Set Blank instead — the garment, the placement and the method are priced separately now.")}>{tl("product", "Base cost ($)")}</span>
-                  )}<span title={tl("product", "What this size costs as a bare garment. This is the base of every price now: the placement charge and the method are added on top.")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
+                  )}<span title={tl("product", "What this size costs as a bare garment. This is the base of every price now — the placement charge and the method are added on top — and a size with no Blank price cannot be ordered undecorated: \"No print\" is not offered on it.")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
                   {/* WEIGHT IS PER SIZE, which is the whole reason it is a column here. A 3XL
  crewneck runs several ounces over an S, and postage is priced in bands
                       (4 / 8 / 12 / 15.999oz, then 1lb), so one size can sit a band above
