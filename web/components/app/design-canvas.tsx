@@ -1326,7 +1326,7 @@ export function DesignCanvasDialog({
    * garment, and listing it beside DTG and Embroidery would put it back in the per-placement
    * vocabulary it is not part of.
    *
-   * Offered only where the product prices a blank. A "No print" that quotes the PRINTED base
+   * Offered only where the product prices a blank. A "Blank Only" that quotes the PRINTED base
    * cost is the more expensive kind of wrong.
    */
  const blankPriced = useMemo(() => {
@@ -1344,9 +1344,9 @@ export function DesignCanvasDialog({
          says — the argument that put the variant pickers on this screen in the first place. */
  await postItemSetup(orderId, {
         ...(item.line_id ? { line_id: item.line_id } : { sku: item.sku }),
- printType: on ? "No print" : "",
+ printType: on ? "Blank Only" : "",
       })
- setVariantPatch((prev) => ({ ...(prev ?? {}), printType: on ? "No print" : "" }))
+ setVariantPatch((prev) => ({ ...(prev ?? {}), printType: on ? "Blank Only" : "" }))
  onSaved?.()
     } catch { /* the checkbox springs back on the next render from liveItem */ }
     finally { setNoPrintBusy(false) }
@@ -3596,7 +3596,7 @@ export function DesignCanvasDialog({
                 onChange={(e) => void setNoPrint(e.target.checked)}
                 className="size-4 accent-primary"
               />
-              <span className="font-medium text-foreground">{tl("canvas", "No print")}</span>
+              <span className="font-medium text-foreground">{tl("canvas", "Blank Only")}</span>
             </label>
           )}
           {!filesLocked && !isNoPrint && faces.length > 1 && methodFaces.map((sd) => (

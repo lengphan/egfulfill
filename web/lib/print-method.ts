@@ -62,7 +62,7 @@ const METHOD_TABLE: (PrintMethod & { re: RegExp; offered?: boolean })[] = [
      normalise the word rather than print "BLANK" at whatever casing it was typed in. It is out
      of PRODUCT_METHODS because it is not something a product is printed WITH, and it earns no
      surcharge: methodAddOn finds no method_blank key and returns 0. */
-  { key: "blank", label: "No print", re: /^\s*(blank|no[\s-]*print)\s*$/ },
+  { key: "blank", label: "Blank Only", re: /^\s*(blank(\s*only)?|no[\s-]*print)\s*$/ },
   { key: "sub", label: "Sublimation", re: /sublim|\bdye\b|\bsub\b/ },
   { key: "vnl", label: "Vinyl", re: /vinyl|htv|\bvnl\b/ },
 ]

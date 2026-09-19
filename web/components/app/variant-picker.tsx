@@ -23,7 +23,7 @@ const FALLBACK_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "
  * Nothing else in the pipeline has to learn the word: methodAddOn finds no surcharge key for
  * it and returns 0, isEmbroidery does not match it, and normalizeMethods leaves it alone.
  */
-const BLANK_LABEL = "No print"
+const BLANK_LABEL = "Blank Only"
 
 const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 
@@ -173,7 +173,7 @@ export function VariantPicker({
   const blankPriced = (() => {
     /* THE FACE GATE IS GONE WITH THE RULE IT GUARDED. It existed because costPartsOf's
        isBlankLine required that no placement declare a method — and that branch no longer
-       exists: the blank price is the base of EVERY line now, so "No print" changes nothing
+       exists: the blank price is the base of EVERY line now, so "Blank Only" changes nothing
        about how the garment is priced. It only records that the line is undecorated.
 
        Keeping the gate meant the option vanished on any line with a placement method set —
