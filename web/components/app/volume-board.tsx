@@ -81,7 +81,12 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
           className="absolute top-0 whitespace-nowrap text-xs font-semibold text-primary"
           style={{ left: `${pos}%`, transform: pos < 8 ? "translateX(0)" : pos > 92 ? "translateX(-100%)" : "translateX(-50%)" }}
         >
-          {units.toLocaleString()} {units === 1 ? "unit" : "units"}
+          {/* SHIPPED, and the word is load-bearing. unitsByPeriod counts rows with a
+              shipped_at in this month — an order placed today contributes nothing until it
+              goes out. Without the word, "0 units" beside a 100-unit order that was just
+              placed reads as a bar that is broken rather than one that is waiting, which is
+              exactly the question it produced. */}
+          {units.toLocaleString()} {units === 1 ? "unit" : "units"} {tl("volumeBoard", "shipped")}
         </div>
 
         <div className="relative h-2 rounded-full bg-muted">
@@ -146,8 +151,8 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
       <p className="mt-5 text-sm leading-relaxed">
         {running?.next && running.unitsToNext != null ? (
           <>
-            <span className="font-semibold tabular-nums">{running.unitsToNext.toLocaleString()}</span> more
-            {" "}{tl("volumeBoard", "this month earns")} <span className="font-semibold">{running.next.pct}% off</span> in{" "}
+            {tl("volumeBoard", "Ship")} <span className="font-semibold tabular-nums">{running.unitsToNext.toLocaleString()}</span>
+            {" "}{tl("volumeBoard", "more this month for")} <span className="font-semibold">{running.next.pct}% off</span> in{" "}
             {monthShort(running.appliesTo)}.
           </>
         ) : running && running.pct > 0 ? (

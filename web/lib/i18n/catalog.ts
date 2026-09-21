@@ -206,6 +206,9 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "volumeBoard.shipped": "đã giao",
+  "volumeBoard.Ship": "Giao",
+  "volumeBoard.more this month for": "sản phẩm nữa trong tháng này để được",
   "product.Blank price": "Giá phôi",
   "product.Blank price over product cost, for every size": "Giá phôi cộng trên giá nhập, cho mọi cỡ",
   "import.— not embroidered.": "— mặt này không thêu.",
