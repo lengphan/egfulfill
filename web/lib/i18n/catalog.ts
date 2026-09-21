@@ -4551,6 +4551,7 @@ const vi: Dict = {
 
   // ── Shared chrome: bells, banners, pickers, confirms ──────────────────────
   "activityFeed.Loading…": "Đang tải…",
+  "activityFeed.from": "từ",
   "activityFeed.Nothing recorded yet.": "Chưa ghi nhận gì.",
   "alibabaStatus.Connected": "Đã kết nối",
   "alibabaStatus.Connect Alibaba": "Kết nối Alibaba",

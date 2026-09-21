@@ -134,6 +134,11 @@ export function OrderHistory({ orderId, items = [], startOpen = false }: {
           rows={rows}
           resolveLine={resolveLine}
           variant="bare"
+          /* Runs collapsed, actor on a band, strict time order — see THE GROUPED FEED in
+             activity-feed. This is the caller the measurement was taken on: the median
+             order here is one person on one day, and the worst is 104 rows of which 36
+             are one autosave run. */
+          grouped
           empty="Nothing recorded for this order yet — changes from here on will appear."
         />
       </div>
