@@ -819,6 +819,24 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         [k, Array.isArray(v) ? await Promise.all(v.map(byAddress)) : v]));
       out.colorGallery = Object.fromEntries(e);
     }
+    // side_mockups is the THIRD field to arrive after this function was written, and it
+    // arrived the same way the other two did: uploaded as a data: URL and never slimmed.
+    // Measured 2026-09-21 — 5 of its 12 stored values were base64, 736KB between them, which
+    // was 71% of the whole /api/catalog_products response (1.0MB for 34 products) and one
+    // product carried 560KB of it on its own. That list is fetched by the orders hub, the
+    // products page, the publish page and the design surfaces, so the cost was paid on
+    // nearly every screen in the app.
+    //
+    // Both spellings, because every reader takes both — variant-resolve.ts, the product
+    // page and sellerSafe all merge `{...side_mockups, ...sideMockups}`. Slimming only the
+    // one the editor happens to write would leave the other as the same hole through a
+    // different name, which is exactly how colorGallery came to be missed.
+    for (const key of ['side_mockups', 'sideMockups']) {
+      const m = out[key];
+      if (!m || typeof m !== 'object' || Array.isArray(m)) continue;
+      const e = await Promise.all(Object.entries(m).map(async ([k, v]) => [k, await byAddress(v)]));
+      out[key] = Object.fromEntries(e);
+    }
     return out;
   }
 
@@ -2216,6 +2234,17 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const e = await Promise.all(Object.entries(out.colorGallery).map(async ([k, v]) =>
         [k, Array.isArray(v) ? await Promise.all(v.map(back)) : v]));
       out.colorGallery = Object.fromEntries(e);
+    }
+    // THE OTHER HALF, and it is not optional. slimImages now rewrites side_mockups, and the
+    // products UI POSTs whole product objects straight back — so without this the very next
+    // save would store /api/catalog/img/<hash> as the record and the blank's line drawings
+    // would be gone, which is precisely the fault this function exists to undo. Adding the
+    // slim without the fatten is worse than adding neither.
+    for (const key of ['side_mockups', 'sideMockups']) {
+      const m = out[key];
+      if (!m || typeof m !== 'object' || Array.isArray(m)) continue;
+      const e = await Promise.all(Object.entries(m).map(async ([k, v]) => [k, await back(v)]));
+      out[key] = Object.fromEntries(e);
     }
     return out;
   }
