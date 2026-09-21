@@ -606,11 +606,30 @@ export default function ProductDetailPage() {
                           type="button"
                           key={sd}
                           aria-pressed={on}
-                          /* NEVER EMPTY, and now that is free: picking replaces rather than
-                             toggles, so there is no press that can clear the last face and
-                             quote a blank nobody ordered. Pressing the live one is a no-op,
-                             which is how the other three pickers behave. */
-                          onClick={() => setPickSides([sd])}
+                          /**
+                           * MULTI-SELECT AGAIN (owner, 2026-09-21), reversing the single-select
+                           * above — and the reason is the one the note above did not have:
+                           * "sellers can be having a few placements per item, so they would like
+                           * to know how its added up". A seller printing a front AND a back is
+                           * pricing that garment, not two garments, and the page could not show
+                           * them the figure they were about to be charged.
+                           *
+                           * NEVER EMPTY, which single-select got for free and this has to earn:
+                           * deselecting the last face would quote a printed garment with nothing
+                           * printed on it — a price nobody could order at. The last one on is a
+                           * no-op, exactly as pressing the live chip was before.
+                           *
+                           * KEPT IN THE PRODUCT'S OWN FACE ORDER, not click order, so the price
+                           * line reads "Front + Back" however it was picked. Two sellers picking
+                           * the same faces must not see them written two different ways.
+                           */
+                          onClick={() => setPickSides((prev) => {
+                            const cur = (prev ?? pricedSides).filter((x) => sides.includes(x))
+                            const on2 = cur.includes(sd)
+                            if (on2 && cur.length === 1) return cur
+                            const next = on2 ? cur.filter((x) => x !== sd) : [...cur, sd]
+                            return sides.filter((x) => next.includes(x))
+                          })}
                           className={CHIP + (on ? CHIP_ON : CHIP_OFF) + " capitalize"}
                         >
                           {tl("sides", sd)}
