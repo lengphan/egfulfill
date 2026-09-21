@@ -19,7 +19,7 @@
 // (orders.html), which would have billed a seller their own gross on every synced
 // order. Cost comes from the catalog's base_price, never from the order's revenue.
 import { q } from './db.js';
-import { shippingBandOf, SETTING_DEFAULTS } from './routes/factory_settings.js';
+import { shippingBandOf, SETTING_DEFAULTS, PRICED_SIDES, PLACEMENT_KEYS } from './routes/factory_settings.js';
 // `tierFor` is ALIASED. pricing.js already has a tierFor — the price tier for a SIZE —
 // and importing volume's under the same name is a redeclaration: the module throws at
 // IMPORT time, so Fastify never listens and every /api/* route 502s, not just this one.
@@ -36,8 +36,11 @@ const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
  * the INCLUDED one when a line prints several. A ninth added there needs one here; the two
  * lists are checked against each other by tools/check-faces.mjs.
  */
-export const PRICED_SIDES = ['front', 'back', 'left', 'right', 'sleeve', 'hood', 'inside', 'wrap'];
-const SIDE_KEYS = PRICED_SIDES.map((s) => `side_${s}`);
+/* DEFINED WHERE THE WRITER IS, and re-exported here so every existing importer is unchanged.
+   Two lists is what made the per-face grid dead: this file read `side_<face>` while
+   factory_settings' KEYS never contained them, so Settings posted the values and the write
+   loop skipped every one. A key that can be read is now writable by construction. */
+export { PRICED_SIDES, METHOD_KEYS } from './routes/factory_settings.js';
 
 // The per-band shipping and per-method surcharge keys, so a settings change is a pricing
 // change without a deploy. Defaults come from factory_settings so the admin screen and
@@ -61,7 +64,17 @@ const FEE_KEYS = [
    * never opened the new grid prices exactly as it did yesterday, and no existing order moves
    * by a cent. A face only costs its own rate once somebody sets one.
    */
-  ...SIDE_KEYS,
+  ...PLACEMENT_KEYS,
+  /**
+   * PER TECHNIQUE, because a printed back is not an embroidered back.
+   *
+   * A placement billed one flat figure however the face was decorated, so a second DTG pass
+   * on a garment already loaded cost the same as a fresh hooping — which is what made "front
+   * and back" on a printed tee read as far too expensive (owner, 2026-09-21).
+   *
+   * UNSET FALLS THROUGH to the per-face rate and then to method_side, exactly as the per-face
+   * grid does, so a floor that never opens these boxes prices as it did yesterday.
+   */
   'base_markup',
 ];
 export async function feeSettings() {
@@ -462,12 +475,45 @@ function costPartsOf(row, item, fees, faces = null) {
  * that: telling a seller +$3.00 on a face that actually adds $5.00 is worse than telling
  * them nothing, because they are quoted a price and then meet a different one.
  */
-function faceRate(face, ownMap, flat, fees) {
+/**
+ * A PLACEMENT'S PRICE DEPENDS ON HOW THE FACE IS DECORATED (owner, 2026-09-21).
+ *
+ * One flat figure billed an embroidered back and a DTG-printed back the same, and they are
+ * not the same work: the printed one is a second pass on a garment already loaded, the
+ * embroidered one is a fresh hooping with somebody standing there. So "front and back" on a
+ * printed tee was charged at embroidery money, which is what the owner reported as the
+ * pricing feeling far too high on extra faces.
+ *
+ * COUNTING DID NOT CHANGE — every face still bills once. Only what each one costs does.
+ *
+ * The ladder, first answer wins:
+ *
+ *   ownMap[face]        this PRODUCT, this FACE      a hoodie's back
+ *   ownMap[METHOD]      this PRODUCT, this TECHNIQUE embroidery on this blank
+ *   fees.side_<face>    platform, this FACE          a sleeve everywhere
+ *   fees.side_<method>  platform, this TECHNIQUE     every DTG placement
+ *   flat                method_side                  what everything did before
+ *
+ * FACE BEATS METHOD, because it is the more specific statement about this garment — a sleeve
+ * is awkward whatever is put on it. And an UNSET rate still falls through to the flat one, so
+ * a floor that never opens the new boxes prices exactly as it did yesterday and no existing
+ * order moves by a cent.
+ *
+ * `> 0` at every rung for the same reason the rest of this file uses it: zero is an empty
+ * field, not a price. A genuinely free placement is what the flat rate at 0 is for.
+ */
+function faceRate(face, ownMap, flat, fees, mkey) {
   const perProduct = ownMap ? num(ownMap[face]) : null;
+  if (perProduct != null && perProduct > 0) return perProduct;
+  /* Both spellings: methodPrices is keyed EMB/DTG and a sidePrice map is hand-typed, so a
+     lower-case `dtg` beside a `back` is the likelier thing for somebody to write. */
+  const ownMethod = ownMap && mkey ? (num(ownMap[mkey]) ?? num(ownMap[String(mkey).toLowerCase()])) : null;
+  if (ownMethod != null && ownMethod > 0) return ownMethod;
   const perPlatform = num(fees && fees[`side_${face}`]);
-  return (perProduct != null && perProduct > 0) ? perProduct
-    : (perPlatform != null && perPlatform > 0) ? perPlatform
-    : flat;
+  if (perPlatform != null && perPlatform > 0) return perPlatform;
+  const platMethod = mkey ? num(fees && fees[`side_${String(mkey).toLowerCase()}`]) : null;
+  if (platMethod != null && platMethod > 0) return platMethod;
+  return flat;
 }
 
 /**
@@ -477,20 +523,25 @@ function faceRate(face, ownMap, flat, fees) {
  * have, which is what a picker has to show. Same resolver, so the number on the tile is the
  * number on the invoice.
  */
-export function sideRates(fees, d) {
+export function sideRates(fees, d, lineMethod = null) {
   const own = d ? d.sidePrice : null;
   const ownMap = own && typeof own === 'object' ? own : null;
   const ownFlat = num(own);
   const flat = (ownFlat != null && ownFlat > 0 ? ownFlat : num(fees && fees.method_side)) || 0;
+  /* THE LINE'S TECHNIQUE, because that is what an unplaced face would be decorated with. The
+     rail must quote the number the invoice will charge, and a placement's price now depends
+     on the method — quoting the flat rate on a DTG tile and billing embroidery is exactly the
+     mismatch this function's own note forbids. */
+  const mkey = methodKey(lineMethod);
   const out = {};
   for (const face of PRICED_SIDES) {
-    const r = faceRate(face, ownMap, flat, fees);
+    const r = faceRate(face, ownMap, flat, fees, mkey);
     if (r > 0) out[face] = money(r);
   }
   return out;
 }
 
-function sideDetail(faces, fees, d) {
+function sideDetail(faces, fees, d, lineMethod = null) {
   /**
    * EVERY FACE IS CHARGED (owner, 2026-09-18). One used to be inside the blank's price.
    *
@@ -537,7 +588,10 @@ function sideDetail(faces, fees, d) {
   const parts = [];
   // EVERY face is charged — see the note at the top of this function.
   for (const face of ordered) {
-    const rate = faceRate(face, ownMap, flat, fees);
+    /* THE FACE'S OWN TECHNIQUE, else the LINE's. A face that says nothing is decorated the
+       way the line is, which is the same inheritance every other reader of this column uses —
+       and getting it wrong here is a wrong PRICE now that the rate follows the method. */
+    const rate = faceRate(face, ownMap, flat, fees, methodKey(methodOf.get(face) || lineMethod));
     /* The face's own technique when it has one, else null — NOT the line's. A face that says
        nothing inherits, and the caller already knows the line's method; filling it in here
        would make an inherited face indistinguishable from one somebody chose. */
@@ -550,8 +604,8 @@ function sideDetail(faces, fees, d) {
 }
 
 /** The total, which is what a PRICE needs. Unchanged shape for every existing caller. */
-export function sideAddOn(faces, fees, d) {
-  const r = sideDetail(faces, fees, d);
+export function sideAddOn(faces, fees, d, lineMethod = null) {
+  const r = sideDetail(faces, fees, d, lineMethod);
   return r ? r.total : 0;
 }
 
@@ -563,8 +617,8 @@ export function sideAddOn(faces, fees, d) {
  * how a breakdown and a charge come to disagree about one line (CLAUDE.md §5). One function
  * decides; this is the other shape of its answer.
  */
-export function sideBreakdown(faces, fees, d) {
-  const r = sideDetail(faces, fees, d);
+export function sideBreakdown(faces, fees, d, lineMethod = null) {
+  const r = sideDetail(faces, fees, d, lineMethod);
   /* `included` is UNDEFINED on a live breakdown now — no face is. It is still a field on the
      shape because a CHARGED line's stamp carries the face it had when it was billed, and the
      summary renders that one from the stamp; a live quote simply never sets it. */
@@ -576,18 +630,20 @@ export function sideBreakdown(faces, fees, d) {
 // add-on. Mirrors productUnitPrice in eg-design-tools.js, which is what the boards show
 // the seller — if these two disagree, the quote lies about the price on screen.
 function unitCostOf(row, item, fees, faces = ['front']) {
-  /* TWO QUESTIONS, TWO SHAPES. costPartsOf needs the METHOD on each face; sideAddOn needs
-     the face NAMES and nothing else. `faces` may arrive as either — priceLines hands objects,
-     the lookbook and quoteSpec hand names — so the names are taken here rather than assumed.
-     Handing objects straight to sideAddOn is not a type error, it is a silent zero: every
-     name comes back "[object Object]", no face matches PRICED_SIDES, and the extra-face
-     charge quietly disappears from every order on the platform. */
-  const names = (Array.isArray(faces) ? faces : []).map((f) => (f && typeof f === 'object' ? f.side : f));
+  /* THE METHODS TRAVEL WITH THE FACES NOW, and this used to strip them.
+     The old note said sideAddOn "needs the face NAMES and nothing else" and mapped the
+     objects down to strings — true when a placement cost one flat figure, and wrong the
+     moment its rate began depending on the technique: every face would have resolved with no
+     method and fallen to the flat rate, so the TOTAL charged the flat one while the
+     breakdown beside it charged per method. A total that disagrees with its own parts is the
+     defect §5 is about. sideDetail normalises names and pairs alike, so handing it whatever
+     the caller has is safe — and callers with names only (the lookbook, quoteSpec) still
+     resolve through the line's own method below. */
   // The method surcharge sits ON TOP of the base cost, never inside it — so changing
   // the markup never silently changes what embroidery adds. The per-side charge sits on
   // top of both, for the same reason.
   const { base, method } = costPartsOf(row, item, fees, faces);
-  return base == null ? null : base + method + sideAddOn(names, fees, (row && row.data) || null);
+  return base == null ? null : base + method + sideAddOn(faces, fees, (row && row.data) || null, item && item.print_type);
 }
 
 /**
@@ -793,15 +849,29 @@ export function billingMethodOf(methods, d, fees) {
   return best;
 }
 
+/**
+ * THE SURCHARGE KEY FOR A TECHNIQUE LABEL — "Embroidery" → EMB, "DTG printing" → DTG.
+ *
+ * Lifted out of methodAddOn because the PLACEMENT price needs the same answer now: what a
+ * face costs to decorate depends on how it is decorated, and a second copy of this ladder is
+ * how one of them quietly stops recognising a label the picker offers.
+ *
+ * Keep in step with normTech() in web/lib/print-method.ts — the picker offers these labels,
+ * so every one of them must resolve to a key that has a surcharge.
+ */
+export function methodKey(printType) {
+  const tech = String(printType || '').toUpperCase();
+  if (!tech) return null;
+  return /EMB/.test(tech) ? 'EMB' : /DTF/.test(tech) ? 'DTF' : /APL|APPLIQ/.test(tech) ? 'APL'
+       : /LSR|LASER|ENGRAV/.test(tech) ? 'LSR' : /SCR|SCREEN/.test(tech) ? 'SCR'
+       : /SUBLIM|\bDYE\b/.test(tech) ? 'SUB' : /VINYL|\bHTV\b|\bVNL\b/.test(tech) ? 'VNL'
+       : /DTG|DIRECT/.test(tech) ? 'DTG' : tech;
+}
+
 function methodAddOn(d, printType, fees) {
   const tech = String(printType || '').toUpperCase();
   if (!tech) return 0;
-  // Keep in step with normTech() in web/lib/print-method.ts — the picker offers these
-  // labels, so every one of them must resolve to a key that has a surcharge.
-  const k = /EMB/.test(tech) ? 'EMB' : /DTF/.test(tech) ? 'DTF' : /APL|APPLIQ/.test(tech) ? 'APL'
-          : /LSR|LASER|ENGRAV/.test(tech) ? 'LSR' : /SCR|SCREEN/.test(tech) ? 'SCR'
-          : /SUBLIM|\bDYE\b/.test(tech) ? 'SUB' : /VINYL|\bHTV\b|\bVNL\b/.test(tech) ? 'VNL'
-          : /DTG|DIRECT/.test(tech) ? 'DTG' : tech;
+  const k = methodKey(printType);
   // A product may override the surcharge for its own method mix.
   if (d.methodPrices) {
     const mp = num(d.methodPrices[k] != null ? d.methodPrices[k] : d.methodPrices[tech]);
@@ -1095,7 +1165,11 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                     this column existed has no stamp and falls through to the live computation,
                     which is exactly what it did before. */
                  sideFee: stamp ? money((stamp.sides || []).reduce((n, p) => n + (Number(p.amount) || 0), 0))
-                                : money(sideAddOn(faces, fees, (srow && srow.data) || null)),
+                                /* withMethods, NOT `faces`: the names alone lose each face's
+                                   technique, and the rate now depends on it — the total would
+                                   price at the flat rate while sideParts below priced per
+                                   method, and the two would disagree on the same line. */
+                                : money(sideAddOn(withMethods, fees, (srow && srow.data) || null, it.print_type)),
                  /**
                   * WHAT THE ARTWORK ON THE GARMENT WOULD COST TODAY — always live, never the stamp.
                   *
@@ -1114,7 +1188,7 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                   * This is the other half of the sentence — what it WOULD cost — so the two can
                   * finally be compared and the difference named.
                   */
-                 sideFeeNow: money(sideAddOn(faces, fees, (srow && srow.data) || null)),
+                 sideFeeNow: money(sideAddOn(withMethods, fees, (srow && srow.data) || null, it.print_type)),
                  /**
                   * WHAT THE EXTRA FACES ACTUALLY CONTRIBUTED TO THE PRICE THIS LINE CARRIES,
                   * as against what they would cost if it were quoted today.
@@ -1140,10 +1214,14 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                                         back to the billed method rather than inventing one. */
                                      includedMethod: stamp.includedMethod ?? null,
                                      parts: stamp.sides || [] }
-                                  : sideBreakdown(withMethods, fees, (srow && srow.data) || null),
+                                  : sideBreakdown(withMethods, fees, (srow && srow.data) || null, it.print_type),
                  /* WHAT EVERY face would cost on this blank, for the designer's rail — which
                     must quote the same number the charge will use. */
-                 sideRates: sideRates(fees, (srow && srow.data) || null),
+                 /* THE LINE'S OWN METHOD, not the billed one. This answers "what would a
+                    face cost if I put artwork there", and a new face inherits the line — so
+                    the dearest face already on the garment is the wrong quote for an empty
+                    one. */
+                 sideRates: sideRates(fees, (srow && srow.data) || null, it.print_type),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   return { lines, unpriced };

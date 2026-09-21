@@ -105,6 +105,24 @@ await db.connect()
    on a bare garment rather than on one that already contains a print), a flat placement rate,
    and a per-product embroidery override BELOW the platform figure — which is what catches a
    delta that reads the platform rate instead of the product's. */
+/* MANY COLUMNS THIS GATE SEEDS ARE CREATED AT ROUTE LOAD, NOT BY schema.sql (§6: "grep the
+   route, not just schema.sql"). Seeding them therefore races the app's own startup, and which
+   side wins changes with boot timing — a flake that reads as a broken gate. Declared here so
+   the harness depends on nothing but itself. */
+for (const ddl of [
+  `alter table catalog_products add column if not exists data jsonb default '{}'::jsonb`,
+  `alter table orders add column if not exists paid boolean not null default false`,
+  `alter table order_items add column if not exists line_id text`,
+  `alter table order_items add column if not exists unit_cost numeric`,
+  `alter table order_items add column if not exists ship_fee numeric`,
+  `alter table order_items add column if not exists cost_parts jsonb`,
+  `alter table order_designs add column if not exists line_id text`,
+  `alter table order_designs add column if not exists side text`,
+  `alter table order_designs add column if not exists method text`,
+  `alter table order_designs add column if not exists storage_key text`,
+  `alter table order_designs add column if not exists art_hash text`,
+  `alter table wallet_ledger add column if not exists order_id text`,
+]) await db.query(ddl).catch(() => {})
 await db.query(
   `insert into catalog_products (id, name, sku, type, status, base_price, data)
    values ('p-gate','Gate Crewneck','EG-GATE','Sweatshirt','Active', 0, $1::jsonb)`,

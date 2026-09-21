@@ -11,6 +11,26 @@ import { readPricing, writePricing, quoteFor, AI_PRICING_KEY } from '../ai-prici
 // Per-category flat shipping and per-method surcharges. Admin-editable so pricing policy
 // is a settings change, not a deploy. `emb_price` is NOT the embroidery surcharge — it's
 // the price of the embroidery FILE — hence the separate method_emb.
+/**
+ * THE FACES A PLACEMENT CAN BE PRICED FOR, and the techniques it can be priced by.
+ *
+ * DEFINED HERE, WHERE THE WRITER IS, and re-exported by pricing.js so there is exactly one
+ * list. They were two: pricing.js read `side_<face>` and this file's KEYS never contained
+ * them, so the eight-face grid in Settings › Pricing posted its values and the write loop
+ * skipped every one — the grid has never saved a rate in its life, while pricing.js's own
+ * note claimed it did. A key that can be READ must be WRITABLE by construction, not by two
+ * lists agreeing.
+ */
+export const PRICED_SIDES = ['front', 'back', 'left', 'right', 'sleeve', 'hood', 'inside', 'wrap'];
+/** The techniques a surcharge can be set for — the codes methodAddOn normalises labels to. */
+export const METHOD_KEYS = ['dtg', 'dtf', 'emb', 'apl', 'lsr', 'scr', 'sub', 'vnl'];
+/** What a placement costs: per FACE (a sleeve is not a back) and per TECHNIQUE (a printed
+ *  back is not an embroidered back). Both fall through to method_side when unset. */
+export const PLACEMENT_KEYS = [
+  ...PRICED_SIDES.map((s) => `side_${s}`),
+  ...METHOD_KEYS.map((m) => `side_${m}`),
+];
+
 const KEYS = [
   // designer_payout is what a DESIGNER earns per approved design — money going OUT.
   // It was called design_fee, which read like something a seller pays, and a
@@ -59,6 +79,9 @@ const KEYS = [
   // already pays for, so this only ever multiplies sides 2, 3, 4 — see sideAddOn in
   // pricing.js. 0 keeps a second print free, which is what it was before this existed.
   'method_side',
+  // Per face and per technique — see PLACEMENT_KEYS above. Unset falls through to
+  // method_side, so a floor that never opens those boxes prices exactly as it did.
+  ...PLACEMENT_KEYS,
   // Markup added to a supplier's PRODUCT COST to get the base cost we charge sellers.
   // Supplier syncs (S&S, Otto) fill in product cost; this turns it into a sell price
   // without anyone retyping a number per size.
