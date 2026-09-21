@@ -4605,7 +4605,7 @@ export function ordersRoutes(app, requireAuth) {
        * An override splits the same way: staff price the JOB, and a typed figure is still
        * that job's price however many surfaces it lands on.
        */
-      let perSide = null;
+      let perSide = null, perSideCount = null;
       if (amount != null && sides.length) {
         const weight = new Map(sides.map((s) => [s, 0]));
         for (const k of (counted || [])) {
@@ -4613,7 +4613,11 @@ export function ordersRoutes(app, requireAuth) {
           if (f && weight.has(f)) weight.set(f, weight.get(f) + 1);
         }
         let totalW = [...weight.values()].reduce((n, v) => n + v, 0);
-        if (!totalW) { for (const s of sides) weight.set(s, 1); totalW = sides.length; }
+        /* Whether the shares are weighted by real designs or are just an even split. Only a
+           counted group can say how many pictures a face carries. */
+        const weighted = totalW > 0;
+        if (!weighted) { for (const s of sides) weight.set(s, 1); totalW = sides.length; }
+        if (weighted) { perSideCount = {}; for (const s of sides) perSideCount[s] = weight.get(s); }
         perSide = {}; let acc = 0;
         sides.forEach((s, i) => {
           const v = i === sides.length - 1
@@ -4639,6 +4643,11 @@ export function ordersRoutes(app, requireAuth) {
          *  only — the charge moves `amount` once. Null when there is nothing to split (no
          *  face recorded, or a complex fee still To Be Determined). */
         perSide,
+        /** How many designs sit on each face. `label` counts the whole JOB ("Design fee · 3
+         *  designs"), which is the wrong sentence for a row showing one face's share — "3
+         *  designs · $2.00" reads as three jobs for two dollars. A row phrases itself from
+         *  this instead. Null when the shares are an even split rather than a real count. */
+        perSideCount,
         /** Staff typed this figure rather than taking the tier's list price — the row says
          *  so, so an unusual number is not mistaken for a pricing bug. */
         overridden,

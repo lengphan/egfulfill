@@ -3025,6 +3025,10 @@ export type OrderDesignFee = {
    *  Absent from a server too old to send it; `shareOf` in the order page falls back to an
    *  even split, which is what it was for every fee that had only one face anyway. */
   perSide?: Record<string, number> | null
+  /** How many designs sit on each face. `label` counts the whole JOB — "Design fee · 3
+   *  designs" — which is the wrong sentence for a row showing one face's $2.00 share. A
+   *  split row phrases itself from this. Null when the split is even rather than counted. */
+  perSideCount?: Record<string, number> | null
   status: "charged" | "estimated" | "tbd"
   /** Every line this ONE fee covers. Both fees pay for work done once — a file is checked
    *  once however many items carry it, a picture is digitised once — so lines sharing a

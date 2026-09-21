@@ -1466,6 +1466,28 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    *  Left while Back was drawn above it: one control on the second of
                                    *  two identical rows, which reads as arbitrary. Measured on
                                    *  EGF-002155, whose sides are [left, right, back]. */
+                                  /**
+                                   * HOW A SPLIT ROW READS (owner, 2026-09-21: "why is the wording 3
+                                   * designs — that doesn't seem clear").
+                                   *
+                                   * `label` counts the whole JOB, and that is the right sentence for
+                                   * the $6.00 the seller is billed. It is the wrong one on a row
+                                   * showing what ONE face costs: "Design fee · 3 designs  $2.00"
+                                   * reads as three jobs for two dollars. The face heading above
+                                   * already names the surface and the figure already says the price,
+                                   * so a face carrying one design needs no count at all.
+                                   *
+                                   * The job's own phrasing stays in orders.js. These are two
+                                   * sentences about two different things — what was billed, and what
+                                   * this surface came to — not one duplicated.
+                                   */
+                                  const labelFor = (f: typeof mine[number], faces: string[]) => {
+                                    const c = f.perSideCount
+                                    if (!c) return f.label
+                                    const n = faces.reduce((t, sd) => t + (Number(c[sd]) || 0), 0)
+                                    if (!n) return f.label
+                                    return n > 1 ? `${tl("order", "Design fee")} · ${n} ${tl("order", "designs")}` : tl("order", "Design fee")
+                                  }
                                   const topDrawn = (f: typeof mine[number]) =>
                                     faceRows.find((r) => (f.sides ?? []).some((sd) => sd.toLowerCase() === r.face.toLowerCase()))?.face ?? null
                                   /** What is left of a fee once every drawn face has taken its share.
@@ -1504,7 +1526,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    * of a control in its title, never in a line underneath it.
                                    */
                                   const feeRow = (f: typeof mine[number], key: string, face: string | string[] | null | false, indent = "pl-3",
-                                                  part?: { amount: number | null; editable: boolean; whole?: string }) => (
+                                                  part?: { amount: number | null; editable: boolean; whole?: string; label?: string }) => (
                                     <div key={key} className="flex justify-between">
                                       <dt className={`${indent} text-muted-foreground`}>
                                         {/* The face is named here ONLY when this fee is not inside a
@@ -1531,7 +1553,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                             </span>
                                           )
                                         })()}
-                                        {f.label}
+                                        {part?.label ?? f.label}
                                       </dt>
                                       {isStaff && (part ? part.editable : true)
                                         ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll}
@@ -1752,7 +1774,10 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                           return feeRow(fe, `fee-${i}-${j}-${k}`, false, "pl-6", {
                                             amount: shareOf(fe, f),
                                             editable: !first || first.toLowerCase() === f.toLowerCase(),
+                                            /* The JOB's own sentence, on the control that prices it —
+                                               the only place "3 designs · $6.00" is true. */
                                             whole: split && fe.amount != null ? `${fe.label} · ${usd(fe.amount)}` : undefined,
+                                            label: split ? labelFor(fe, [f]) : undefined,
                                           })
                                         }),
                                       ]
@@ -1770,6 +1795,11 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                       amount: drawn(f).length ? remainderOf(f) : f.amount,
                                       editable: !drawn(f).length,
                                       whole: drawn(f).length && f.amount != null ? `${f.label} · ${usd(f.amount)}` : undefined,
+                                      /* Named for the faces THIS row covers, same as a face row. A
+                                         remainder standing for one undrawn face is one design. */
+                                      label: drawn(f).length
+                                        ? labelFor(f, (f.sides ?? []).filter((sd) => !drawn(f).some((d) => d.toLowerCase() === sd.toLowerCase())))
+                                        : undefined,
                                     }))}
                                     {/* SHIPPING, ON THE ITEM THAT CAUSED IT. The parcel is sized
                                         by the biggest thing in it, so one line carries the
