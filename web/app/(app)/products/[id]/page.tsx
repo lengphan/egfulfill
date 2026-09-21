@@ -261,14 +261,29 @@ export default function ProductDetailPage() {
    *  print is inside the base cost, so only faces 2, 3, 4 are charged. */
  const sideFee = Number(fees?.sideFee ?? 0) || 0
   /**
-   * EVERY PLACEMENT IS CHARGED, so every placement counts.
+   * EVERY PLACEMENT IS CHARGED, AT THIS PRODUCT'S OWN RATE.
    *
-   * This was `length - 1` — the first-placement-free formula — and it survived the rule change
-   * that removed inclusion because with single-select placement it always evaluated to zero and
-   * nothing looked wrong. A dead expression cannot be seen to be stale, which is precisely how
-   * it stayed: the page quoted a print for nothing while the order charged for it.
+   * Two faults, one after the other. It was `sideFee * (length - 1)` — the first-placement-free
+   * formula — which survived the rule change that removed inclusion because single-select
+   * placement made it always zero, and a dead expression cannot be seen to be stale.
+   *
+   * And `sideFee` is the PLATFORM's flat rate. A product carrying its own per-face prices —
+   * `sidePrice: {front: 1}` on this cap — was quoted the platform $3.00 here while the order
+   * charged $1.00, so the page and the invoice disagreed by the exact amount somebody had
+   * deliberately typed into the editor.
+   *
+   * Mirrors faceRate in server/src/pricing.js: the product's own figure for THIS face, then its
+   * flat override, then the platform's.
    */
- const sidesAdd = sideFee > 0 ? sideFee * pricedSides.length : 0
+ const sideRateFor = (face: string) => {
+ const own = (product as { sidePrice?: unknown }).sidePrice
+ const map = own && typeof own === "object" ? (own as Record<string, unknown>) : null
+ const perFace = map ? Number(map[face]) || 0 : 0
+ if (perFace > 0) return perFace
+ const ownFlat = typeof own === "number" ? own : Number(own) || 0
+    return ownFlat > 0 ? ownFlat : sideFee
+  }
+ const sidesAdd = pricedSides.reduce((n, f) => n + sideRateFor(f), 0)
   /* A BLANK IS THE GARMENT AND NOTHING ELSE: no method surcharge, and no surface — there is
      no printed face to charge for. Falls back to the base cost only if this size has no blank
      price of its own, which `blankTiers` has already made unreachable from the chip. */
