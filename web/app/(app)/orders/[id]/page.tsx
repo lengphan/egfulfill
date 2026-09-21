@@ -1204,6 +1204,14 @@ export default function OrderDetailPage() {
                            percentage. A rate rounded for display and then re-applied is how a
                            breakdown ends up a cent away from the total it is breaking down. */
                         const goods = (Number(l.unitCost) || 0) * qty
+                        /* DECLARED HERE, NOT BESIDE `who`. `ownFees` below reads `n` inside a
+                           filter callback, so a line with design fees hit the temporal dead zone
+                           and threw "Cannot access 'n' before initialization" — the whole order
+                           page rendered as the error boundary. */
+                        const n = items.findIndex((x) =>
+                          (l.line_id && x.line_id === l.line_id)
+                          || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+                        const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.name || l.sku || "Item")
                         /**
                          * THE ITEM'S OWN DESIGN FEES COUNT TOWARDS ITS HEADING.
                          *
@@ -1231,10 +1239,6 @@ export default function OrderDetailPage() {
                         const method = Number(l.methodFee) || 0
                         const sideTotal = parts.reduce((n, p) => n + p.amount, 0)
                         const blank = (Number(l.unitCost) || 0) - method - sideTotal
-                        const n = items.findIndex((x) =>
-                          (l.line_id && x.line_id === l.line_id)
-                          || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
-                        const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.name || l.sku || "Item")
                         /**
                          * EVERY ITEM BREAKS DOWN THE SAME WAY (owner, 2026-09-17).
                          *
