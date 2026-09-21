@@ -1597,14 +1597,15 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                       return [
                                         <div key={`fh-${i}-${j}`} className="flex justify-between gap-2 pt-0.5">
                                           <dt className="min-w-0 truncate pl-3 font-medium capitalize text-foreground">
+                                            {/* THE SURFACE, AND ONLY THE SURFACE (owner, 2026-09-21).
+                                                I put the technique here for the floor a commit ago
+                                                and it was the repetition this heading exists to
+                                                remove, one level down: the heading only appears when
+                                                the face has children, and the first child is the
+                                                print — "Front · Embroidery" over "Embroidery · 20%
+                                                off" says it twice, every time, on every face.
+                                                The floor still reads it, one line below. */}
                                             {tl("sides", f)}
-                                            {/* STAFF SEE THE TECHNIQUE ON THE HEADING. The floor
-                                                needs to know which press a face goes to; a seller
-                                                is buying a printed front and does not. Same split
-                                                the rest of this card already makes. */}
-                                            {isStaff && r.method && (
-                                              <span className="font-normal text-muted-foreground/70"> · {r.method}</span>
-                                            )}
                                           </dt>
                                           <dd className="shrink-0 font-medium tabular-nums text-foreground">
                                             {tbd && <span className="text-muted-foreground">+ </span>}{usd(sub)}
