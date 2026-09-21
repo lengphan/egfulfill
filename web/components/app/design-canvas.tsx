@@ -2501,9 +2501,23 @@ export function DesignCanvasDialog({
      * Attaching a stitch file to a method-less line is EVIDENCE that the line is embroidery,
      * not a mistake to block. A real DTG or laser line still refuses, and still says which.
      */
-    const methodSet = String(liveItem.print_type || "").trim()
-    if (machine.length && methodSet && !isEmb) {
-      notes.push(`${names(machine)} ${machine.length > 1 ? "are embroidery files" : "is an embroidery file"}, and this line is ${methodSet} — there is no machine to run ${machine.length > 1 ? "them" : "it"}. Use a PNG or JPG instead.`)
+    /**
+     * THE PLACEMENT YOU ARE LOOKING AT DECIDES, NOT THE LINE.
+     *
+     * This tested the LINE's method, which was right when a line had one method and is wrong
+     * now that each placement carries its own: a stitch file dropped on an embroidered BACK was
+     * refused because the line's column said DTG, and one dropped on a DTG back was accepted
+     * because the column said Embroidery. Both the wrong way round, and the server — which
+     * decides per placement — would have disagreed with whichever answer this gave.
+     *
+     * A placement that says nothing inherits the line, which is the only reason the line's
+     * value is read at all. The file is dropped while a surface is on screen, so that surface
+     * is the one being asked about.
+     */
+    const faceMethodHere = String(faceMethod[sideKey] || liveItem.print_type || "").trim()
+    const faceRunsStitches = isEmbroidery(faceMethodHere)
+    if (machine.length && faceMethodHere && !faceRunsStitches) {
+      notes.push(`${names(machine)} ${machine.length > 1 ? "are embroidery files" : "is an embroidery file"}, and ${tl("sides", sideKey)} is ${faceMethodHere} — there is no machine to run ${machine.length > 1 ? "them" : "it"} there. Set that placement to Embroidery, or use a PNG or JPG.`)
     }
     /**
      * MORE THAN ONE IMAGE FILLS MORE THAN ONE FACE (owner's call, 2026-09-09).
@@ -2535,7 +2549,10 @@ export function DesignCanvasDialog({
     /* Mirrors the refusal above: a method-less line accepts the file, exactly as the server
        does. Gating this on `isEmb` was the other half of the same bug — even with the note
        removed, the attach would not have run. */
-    if (machine.length && (!methodSet || isEmb)) {
+    /* Mirrors the refusal above and the server's: a placement with no method of its own and
+       no line method to inherit is undecided, not DTG, and a stitch file is how it gets
+       decided. */
+    if (machine.length && (!faceMethodHere || faceRunsStitches)) {
       for (const f of machine) { if (!(await attachMachineFile(f))) failed = true }
     }
     // A real attach failure outranks the notes: it is the thing that went wrong, and it

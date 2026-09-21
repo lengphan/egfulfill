@@ -1453,11 +1453,24 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                     const opts = optionsFor(col.key, row)
                     const list = col.key === "blank" ? productNames : opts
                     const missing = started && col.required && !(row[c] ?? "").trim()
-                    /* GREYED, NOT DISABLED. A disabled input silently swallows a paste, and
-                       a sheet is filled by pasting; it would also fight anyone who types the
-                       Machine File before the Print Type. So the cell says it is pointless
-                       and still accepts what you put there — validation then warns, and the
-                       server has the final word against the saved line. */
+                    /**
+                     * READ-ONLY, NOT MERELY GREY (owner, 2026-09-21) — and not `disabled`.
+                     *
+                     * It was greyed and still typable on the argument that a disabled input
+                     * swallows a paste and a sheet is filled by pasting. Half of that survives
+                     * and half does not: a MULTI-CELL paste is handled by the grid itself and
+                     * writes to state, so it lands whatever the input says, and Delete on a
+                     * selected cell clears through the same path. What read-only actually stops
+                     * is somebody TYPING a reference into a placement that cannot run it, which
+                     * is the one case the owner asked to close.
+                     *
+                     * `readOnly` rather than `disabled` because the cell must stay focusable:
+                     * this is a spreadsheet, and a cell you cannot arrow into is a hole in the
+                     * keyboard path. Disabled would also take away the clear.
+                     *
+                     * The greying and the hover stay. A cell that refuses input without saying
+                     * why is the failure §4 names, and the reason is already on the title.
+                     */
                     const methodKey = METHOD_FOR[col.key]
                     const inert = !!methodKey && stitchDeadOn(row, methodKey)
                     return (
@@ -1471,6 +1484,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                       >
                         <input
                           data-cell={`${r}-${c}`}
+                          readOnly={inert}
                           value={row[c] ?? ""}
                           /**
                            * ONE CLICK SELECTS THE WHOLE VALUE. Every cell is an <input>, so a
