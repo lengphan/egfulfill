@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
 
-import { CircleNotch, Trash, Package, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle, X } from "@phosphor-icons/react"
+import { CircleNotch, DotsSixVertical, Trash, Package, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle, X } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -641,6 +641,20 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  const whoMade: EtsyWhoMade = "i_did"
  const [tagDraft, setTagDraft] = useState("")
  const [images, setImages] = useState<string[]>([])
+ /* WHICH TILE IS IN THE HAND, AND WHICH ONE IT IS OVER. Two pieces of state, not one:
+    the tile being dragged goes translucent so you can see the set without it, and the
+    tile under the pointer carries the ring that says "this is the slot it lands in".
+    A grid needs the second one in a way a list does not — in a single column the gap
+    the row will fall into is obvious, in a wrapping grid it is not. */
+ const [dragImg, setDragImg] = useState<number | null>(null)
+ const [overImg, setOverImg] = useState<number | null>(null)
+ /* THE INDEX IN THE HAND IS A REF, NOT THE STATE BESIDE IT — and that is not a detail.
+    `dragstart` and the first `dragover` can land in the same tick, and a handler closed
+    over the render BEFORE setDragImg still sees null: the guard then skips preventDefault,
+    the drop is never accepted, and the photo springs back with no error anywhere. Caught by
+    driving the real events rather than by reading this code. A ref is written synchronously,
+    so it is right on the very next event; the state exists only to repaint the tiles. */
+ const dragRef = useRef<number | null>(null)
  const [size, setSize] = useState("")
  const [method, setMethod] = useState("")
   // Which variants actually go on the listing. Both default to everything the blank
@@ -936,6 +950,25 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
     }
   }
  const makePrimary = (i: number) => { imgTouched.current = true; setImages((p) => [p[i], ...p.filter((_, x) => x !== i)]) }
+ /**
+  * MOVE, NOT SWAP. Dropping photo 5 on photo 1 puts it at 1 and pushes the rest along —
+  * which is what the order of a listing's photos means. A swap would send photo 1 to the
+  * end, and a seller dragging their best shot to the front would silently exile whatever
+  * was there.
+  *
+  * Position 0 is the primary, so dragging a tile to the front IS "make primary" — the same
+  * act, reachable the way everyone expects it to be reachable.
+  */
+ const moveImage = (from: number, to: number) => {
+ if (from === to) return
+ imgTouched.current = true
+ setImages((p) => {
+ if (from < 0 || to < 0 || from >= p.length || to >= p.length) return p
+ const next = p.slice()
+ next.splice(to, 0, next.splice(from, 1)[0])
+ return next
+    })
+  }
  const removeImage = (i: number) => { imgTouched.current = true; setImages((p) => p.filter((_, x) => x !== i)) }
 
   /**
@@ -1679,7 +1712,46 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     </button>
                   )}
                   {images.map((src, i) => (
-                    <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
+                    /* DRAG THE PHOTOGRAPH ITSELF, not a handle beside it.
+                       Native HTML5 drag, the same shape the column picker uses. Three details
+                       are load-bearing and each one is a silent failure on its own:
+                       · `draggable={false}` on the <img>, or the browser drags the IMAGE (its
+                         own default) and the tile's drag never starts — you get a ghost of the
+                         picture and a dropped URL instead of a reorder.
+                       · `setData` in dragstart, or Firefox refuses to begin a drag at all.
+                       · the dragImg guard in dragover, so a file dragged in from the desktop
+                         is not mistaken for a tile and does not reorder anything. */
+                    <div
+ key={i}
+ draggable
+ onDragStart={(e) => {
+ dragRef.current = i
+ setDragImg(i)
+ e.dataTransfer.effectAllowed = "move"
+ e.dataTransfer.setData("text/plain", String(i))
+                      }}
+ onDragEnd={() => { dragRef.current = null; setDragImg(null); setOverImg(null) }}
+ onDragOver={(e) => {
+ if (dragRef.current === null) return
+ e.preventDefault()
+ e.dataTransfer.dropEffect = "move"
+ if (overImg !== i) setOverImg(i)
+                      }}
+ onDragLeave={() => setOverImg((p) => (p === i ? null : p))}
+ onDrop={(e) => {
+ if (dragRef.current === null) return
+ e.preventDefault()
+ moveImage(dragRef.current, i)
+ dragRef.current = null
+ setDragImg(null)
+ setOverImg(null)
+                      }}
+ className={
+ "group relative aspect-square cursor-grab overflow-hidden rounded-lg border border-border bg-muted/40 transition-opacity active:cursor-grabbing " +
+                        (dragImg === i ? "opacity-40 " : "") +
+                        (overImg === i && dragImg !== i ? "ring-2 ring-primary ring-offset-1 ring-offset-background " : "")
+                      }
+                    >
                       {/* THE PICTURE IS THE BUTTON.
                           A magnifier in the middle of the photo was a control you had to
                           find and hit before you could look closer — and it sat ON the thing
@@ -1695,11 +1767,13 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  type="button"
  onClick={() => setZoom({ which: "own", index: i })}
  aria-label={`View photo ${i + 1} larger`}
- title={tl("publish", "View full size")}
- className="absolute inset-0 cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+ /* The tile now does two things on the same surface, so the tooltip names both —
+    §4 puts that in a `title`, never in a line of type under the picture. */
+ title={tl("publish", "Drag to reorder · click to view full size")}
+ className="absolute inset-0 cursor-grab outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
+                        <img src={src} alt={`Photo ${i + 1}`} draggable={false} className="size-full object-cover" />
                       </button>
                       {/* pointer-events-none, or the band across the bottom of the primary
                           photo would be a dead strip that swallows the click. */}
@@ -1714,9 +1788,16 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                           place to click a photo to enlarge it was now the delete button.
                           Measured with elementFromPoint at the tile's centre, which is the
                           only way to catch a hit-target the eye reads as empty photo. */}
-                      <div className="pointer-events-none absolute inset-0 flex items-start justify-end gap-1 bg-black/40 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                      <div className="pointer-events-none absolute inset-0 flex items-start justify-between gap-1 bg-black/40 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        {/* THE GRIP IS A MARK, NOT A CONTROL. The whole tile drags, so this
+                            takes no pointer events — it exists because a thing you can drag
+                            has to LOOK like a thing you can drag, and the alternative was a
+                            sentence under the grid telling people so. */}
+                        <DotsSixVertical size={15} weight="bold" aria-hidden className="mt-0.5 shrink-0 text-white/85 drop-shadow" />
+                        <span className="flex items-start gap-1">
                         {i !== 0 && <button onClick={() => makePrimary(i)} className="pointer-events-auto rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">{tl("publish", "Primary")}</button>}
                         <button onClick={() => removeImage(i)} aria-label={tl("publish", "Remove photo")} className="pointer-events-auto rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>
+                        </span>
                       </div>
                     </div>
                   ))}

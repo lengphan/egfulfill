@@ -2180,7 +2180,7 @@ const vi: Dict = {
   "publish.Remove photo": "Xoá ảnh",
   "publish.Reupload": "Tải lên lại",
   "publish.Primary": "Ảnh chính",
-  "publish.View full size": "Xem cỡ đầy đủ",
+  "publish.Drag to reorder · click to view full size": "Kéo để sắp xếp · bấm để xem cỡ đầy đủ",
   "publish.published": "đã đăng",
   "publish.checked · not sent": "đã kiểm tra · chưa gửi",
   "publish.refused": "bị từ chối",
