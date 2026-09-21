@@ -206,6 +206,8 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "subscription.Billing history": "Lịch sử thanh toán",
+  "subscription.Plan renewal": "Gia hạn gói",
   "variantPicker.Decoration": "Trang trí",
   "variantPicker.Printed": "Có in",
   "canvas.Decoration": "Trang trí",

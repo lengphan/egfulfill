@@ -14,7 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ApiError, getBillingPlan, subscribePlan, setAutoRenew, type BillingPlan } from "@/lib/api"
+import { ApiError, getBillingPlan, subscribePlan, setAutoRenew, getPlanHistory, type BillingPlan, type PlanCharge } from "@/lib/api"
+import { usd } from "@/lib/order-format"
 import { updateUser } from "@/lib/auth"
 import {
   PLAN_TIERS,
@@ -57,6 +58,14 @@ function useFmtDate() {
 // the client can't name its own amount.
 export function SubscriptionPanel() {
   const fmtDate = useFmtDate()
+  /** Plan charges, read off the ledger. Empty on a seller who has never paid, which is the
+   *  common case here — the card below is not drawn at all then. */
+ const [charges, setCharges] = useState<PlanCharge[]>([])
+  useEffect(() => {
+ let live = true
+ getPlanHistory().then((r) => { if (live) setCharges(r?.charges ?? []) }).catch(() => {})
+ return () => { live = false }
+  }, [])
   const tl = useLabelT()
   // Session-backed; read after mount to avoid hydration mismatch.
  const [plan, setPlanState] = useState<PlanId>("starter")
@@ -402,6 +411,40 @@ export function SubscriptionPanel() {
           </div>
         </div>
       </SectionCard>
+
+      {/**
+        * WHAT THE PLAN HAS ACTUALLY COST (owner, 2026-09-21).
+        *
+        * The card above says what the plan IS. Nothing said what it has cost, so "how many
+        * times have I been billed for this" had no answer anywhere in the app — on the one
+        * screen where somebody decides whether to keep paying for it.
+        *
+        * Read straight off wallet_ledger, which is append-only and idempotent per
+        * (account, type, ref): a retried renewal is one row, not two, so the count of rows is
+        * the count of charges. Anything rebuilt from the plan and a renewal date would be a
+        * guess about history.
+        *
+        * Hidden entirely when there is nothing — a seller who has never paid is the common
+        * case on this screen, and an empty "Billing history" card on a free plan is a heading
+        * that exists to say nothing.
+        */}
+      {charges.length > 0 && (
+        <SectionCard title={tl("subscription", "Billing history")}>
+          <div className="divide-y divide-border">
+            {charges.map((c, i) => (
+              <div key={c.ref ?? i} className="flex items-center justify-between gap-3 px-5 py-2.5">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{c.note || tl("subscription", "Plan renewal")}</div>
+                  <div className="text-xs text-muted-foreground">{fmtDate(c.at)}</div>
+                </div>
+                {/* An amount PAID, at value size (§4) and right-aligned, which already implies
+                    tabular figures — globals.css does that for every text-right cell. */}
+                <div className="shrink-0 text-right text-sm font-semibold tabular-nums">{usd(c.amount)}</div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
       {/* Confirm + charge. The amount shown is computed from the SERVER's price list, so
  it matches what actually gets debited. */}

@@ -5282,6 +5282,13 @@ export function grantTrial(body: { userId: string; plan?: string; days?: number 
 /** One rung of the volume ladder: ship `minUnits` in a month, earn `pct` the next. */
 /** The subscription price list. Admin-editable; the server keeps the constants as defaults. */
 export type PlanPrices = { plans: Record<string, number>; spydeck_addon: number }
+/** Every plan charge this seller has been billed, newest first — read straight off the
+ *  append-only ledger, so the list and the money cannot disagree. A team member sees the
+ *  OWNER's, the same resolution the rest of billing uses. */
+export type PlanCharge = { at: string; amount: number; note: string | null; ref: string | null }
+export function getPlanHistory() {
+  return api<{ charges: PlanCharge[] }>(`/api/billing/history`)
+}
 export function getPlanPrices() {
   return api<PlanPrices>(`/api/billing/prices`)
 }

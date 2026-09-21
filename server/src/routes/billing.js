@@ -7,7 +7,7 @@
 // fund it, so the client can send the seller to top up (or, later, pay a provider
 // directly — see `method` below).
 import { q } from '../db.js';
-import { resolveEntitlements } from '../auth.js';
+import { resolveEntitlements, resolveSeller } from '../auth.js';
 import { balanceOf, moveFunds } from './wallet.js';
 import { audit } from '../audit.js';
 import { notify } from './notifications.js';
@@ -262,6 +262,45 @@ export function billingRoutes(app, requireAuth, requireAdmin) {
    * Starter is allowed to be 0 and only 0 is special-cased nowhere: a plan priced at 0 simply
    * never renews (runRenewals skips monthly <= 0), which is exactly what a free tier is.
    */
+  /**
+   * WHAT THIS SELLER HAS ACTUALLY BEEN CHARGED FOR THEIR PLAN.
+   *
+   * Every renewal already writes a ledger row — moveFunds splits one transfer into two, and
+   * the seller's is the `subscription-out` side with a negative delta. Nothing read it back,
+   * so the Plan screen could say what the plan IS and never what it has COST, and "how many
+   * times have I been billed" had no answer anywhere in the app.
+   *
+   * THE LEDGER IS THE RECORD, not a second table. It is append-only and idempotent per
+   * (account, type, ref) — the ref is `renew-<user>-<month>`, which is what makes a retried
+   * renewal one charge rather than two — so a list read straight off it cannot disagree with
+   * the money. Anything rebuilt from `users.plan` and a date would be a guess about history.
+   *
+   * SELLER-SCOPED, through resolveSeller: a team member sees the OWNER's plan everywhere else,
+   * and billing is the owner's business — so the same resolution, or a member would read an
+   * empty history and conclude nothing had been paid.
+   */
+  app.get('/api/billing/history', { preHandler: requireAuth }, async (req) => {
+    const sel = await resolveSeller(req.user, q);
+    const r = await q(
+      `select created_at, delta, note, ref
+         from wallet_ledger
+        where account = $1 and type = 'subscription-out'
+        order by created_at desc
+        limit 60`,
+      [String(sel.id)]).catch(() => ({ rows: [] }));
+    return {
+      charges: r.rows.map((x) => ({
+        at: x.created_at,
+        /* POSITIVE, because it is shown as an amount paid. The ledger stores the seller's side
+           as negative — that is what makes SUM(delta) a balance — and a list of minus signs
+           under a heading that says "charged" is the sign being reported twice. */
+        amount: Math.abs(Number(x.delta) || 0),
+        note: x.note || null,
+        ref: x.ref || null,
+      })),
+    };
+  });
+
   app.get('/api/billing/prices', { preHandler: requireAdmin }, async () => readPrices());
 
   /**
