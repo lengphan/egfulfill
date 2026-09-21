@@ -1123,19 +1123,41 @@ export function ProductEditorDialog({
  if (sizes.length === 0) {
  if (!(savedBase > 0)) { fail("pricing", "Set a base cost before saving — it is what the seller is charged. Without one the order prices itself at what we pay the supplier plus the markup setting, which can be no margin at all."); return }
     } else {
- const unpriced = sizes.filter((s) => {
+      /**
+       * A BLANK PRICE IS A PRICE, and this did not know it.
+       *
+       * The check demanded `price` — base cost — per size, and base cost is the column that
+       * now hides once every size carries a Blank. So a fully priced product refused to save,
+       * naming a field that was not on screen: the owner's "the save didn't save at all".
+       *
+       * `charged` is the figure costPartsOf actually reads: the size's blank, else its base
+       * cost, else the product-level base. A size is priced when THAT is set, which is the
+       * same question the pricing engine asks.
+       */
+ const chargedFor = (s: string) => {
+ const bl = num(tiers[s]?.blank)
+ if (bl > 0) return bl
  const p = num(tiers[s]?.price)
- return !(p > 0) && !(savedBase > 0)
-      })
+        return p > 0 ? p : savedBase
+      }
+ const unpriced = sizes.filter((s) => !(chargedFor(s) > 0))
  if (unpriced.length) {
- fail("pricing", `Set a base cost for ${unpriced.length === sizes.length ? "each size" : unpriced.join(", ")} before saving — it is what the seller is charged, and without it the order prices itself at what we pay the supplier plus the markup setting.`)
+ fail("pricing", `Set a Blank price for ${unpriced.length === sizes.length ? "every size" : unpriced.join(", ")}.`)
  return
       }
+      /**
+       * BELOW COST IS CHECKED ON THE NUMBER THAT IS CHARGED.
+       *
+       * This tested base cost, which since the pricing change is read only where a size has no
+       * Blank. So a cap with Blank $5.00 against a $7.72 product cost passed — it sells $2.72
+       * under what we pay — because its base cost of $15.72 still looked healthy, and that
+       * figure is no longer what anybody is billed.
+       */
  const atCost = sizes
-        .map((s) => ({ s, base: num(tiers[s]?.price) > 0 ? num(tiers[s].price) : savedBase, cost: num(tiers[s]?.cost) > 0 ? num(tiers[s].cost) : (num(productCost) || 0) }))
+        .map((s) => ({ s, base: chargedFor(s), cost: num(tiers[s]?.cost) > 0 ? num(tiers[s].cost) : (num(productCost) || 0) }))
         .find((r) => r.cost > 0 && r.base > 0 && r.base <= r.cost)
  if (atCost) {
- fail("pricing", `Base cost for ${atCost.s} is $${atCost.base.toFixed(2)} against the $${atCost.cost.toFixed(2)} the blank costs us — that order makes nothing. Price it above the product cost.`)
+ fail("pricing", `${atCost.s}: $${atCost.base.toFixed(2)} is below the $${atCost.cost.toFixed(2)} it costs us.`)
  return
       }
     }
@@ -1790,6 +1812,14 @@ export function ProductEditorDialog({
  const costN = Number(t?.cost)
                     // What pricing will actually charge if Base cost is left blank.
  const derived = t?.cost?.trim() && isFinite(costN) && costN > 0 ? (costN + markup).toFixed(2) : ""
+                    /* What this size costs us: its own figure, else the product's. The same
+                       fallback the placeholder and the save check use. */
+ const rowCost = isFinite(costN) && costN > 0 ? costN : (Number(productCost) || 0)
+                    /* Is the price we CHARGE under it? Blank is the base of every order now, so
+                       this is the number that matters — and the Margin column, which reports
+                       base cost, will look healthy while it is wrong. */
+ const blankN = Number(t?.blank)
+ const belowCost = rowCost > 0 && isFinite(blankN) && blankN > 0 && blankN <= rowCost
  const patch = (k: keyof Tier, v: string) =>
  setTiers((p) => ({ ...p, [s]: { ...EMPTY_TIER, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
  return (
@@ -1837,8 +1867,24 @@ export function ProductEditorDialog({
  blank cell leaves the printed base cost in charge exactly as
  before. */
  placeholder="—"
- title={tl("product", "What a seller pays for this size with nothing printed on it. Leave empty to charge the base cost.")}
- className="h-8 text-xs" inputMode="decimal" aria-label={`Blank price for size ${s}`}
+                        /**
+                         * BELOW COST, SAID ON THE FIELD ITSELF.
+                         *
+                         * Save refuses it, but only once everything else is filled in and the
+                         * button is pressed — so the one error that cannot be argued with was
+                         * found last. This is the figure every order starts from now, and the
+                         * Margin column reports base cost, which stays healthy while this one
+                         * sells at a loss. Exactly how a cap ended up at $5.00 against a $7.72
+                         * product cost with nothing on screen objecting.
+                         *
+                         * The border, not a sentence under the control (§4). The number and
+                         * the cost are on the hover; the row already shows both.
+                         */
+ title={belowCost
+                          ? `$${Number(t?.blank).toFixed(2)} is below the $${rowCost.toFixed(2)} it costs us`
+ : tl("product", "What a seller pays for this size with nothing printed on it. Leave empty to charge the base cost.")}
+ className={"h-8 text-xs" + (belowCost ? " border-destructive text-destructive" : "")}
+                        inputMode="decimal" aria-label={`Blank price for size ${s}`}
                       />
                       <Input
  value={t?.shipping ?? ""}
