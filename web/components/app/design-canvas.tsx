@@ -835,11 +835,6 @@ function CustomerFileThumb({ src }: { src: string }) {
  return <img src={canvasReadableSrc(art.src)} alt={tl("canvas", "Customer file")} className={box + " object-cover"} />
 }
 
-/** The word a line stores to say it carries no decoration. Kept identical to the label in
- *  lib/print-method.ts — that table is what normalises it back, and two spellings of one
- *  token is how a value stops being recognised. */
-const BLANK_ONLY = "Blank Only"
-
 export function DesignCanvasDialog({
  open, onOpenChange, orderId, orderLabel, item, initialDesign, initialPos, onSaved, catalog,
  siblings, designs, onSendToDesigner, filesLocked, sideFee, sideFees,
@@ -1318,44 +1313,11 @@ export function DesignCanvasDialog({
   // threads, so the factory knows which cones to load. Re-runs when the design changes.
   // One shared rule (lib/variant-resolve) — the thread module and the machine-file step
   // below both read it, so they cannot drift apart again.
-  /**
-   * "NO PRINT" ON A MULTI-PLACEMENT PRODUCT.
-   *
-   * The line-level Method field is hidden here once a product has more than one placement —
-   * the per-placement rows below replace it. But "no print" is a statement about the LINE, not
-   * about a placement, so hiding that field took the only way of saying it away on exactly the
-   * products where somebody might: open a four-placement apron and there was no route to a
-   * bare garment at all.
-   *
-   * A checkbox, not a seventh entry in a method list: it is one binary fact about the whole
-   * garment, and listing it beside DTG and Embroidery would put it back in the per-placement
-   * vocabulary it is not part of.
-   *
-   * Offered only where the product prices a blank. A "Blank Only" that quotes the PRINTED base
-   * cost is the more expensive kind of wrong.
-   */
- const blankPriced = useMemo(() => {
- const tiers = product?.sizePrices ?? []
- if (!tiers.length) return false
- const own = liveItem.size ? tiers.find((t) => t.size === liveItem.size) : null
-    return (Number((own ?? tiers[0])?.blank) || 0) > 0
-  }, [product, liveItem.size])
- const isNoPrint = /^\s*(blank|no[\s-]*print)\s*$/i.test(String(liveItem.print_type || ""))
- const [noPrintBusy, setNoPrintBusy] = useState(false)
- const setNoPrint = async (on: boolean) => {
- setNoPrintBusy(true)
-    try {
-      /* THE SAME WRITER THE ORDER ROW USES, so the two cannot disagree about what the line
-         says — the argument that put the variant pickers on this screen in the first place. */
- await postItemSetup(orderId, {
-        ...(item.line_id ? { line_id: item.line_id } : { sku: item.sku }),
- printType: on ? "Blank Only" : "",
-      })
- setVariantPatch((prev) => ({ ...(prev ?? {}), printType: on ? "Blank Only" : "" }))
- onSaved?.()
-    } catch { /* the checkbox springs back on the next render from liveItem */ }
-    finally { setNoPrintBusy(false) }
-  }
+  /** A line that says it carries no decoration hides its placement rows — there is nothing to
+   *  print on. Set in the picker's Decoration field; read here. The pattern matches every
+   *  spelling lib/print-method.ts recognises, so a line written under an earlier wording still
+   *  reads as one. */
+ const isNoPrint = /^\s*(blank(\s*only)?|no[\s-]*print)\s*$/i.test(String(liveItem.print_type || ""))
 
  const isEmb = isEmbroidery(liveItem.print_type)
   /**
@@ -3590,35 +3552,14 @@ export function DesignCanvasDialog({
             * FEE is gated instead, on the server, so declaring a surface never costs
             * anything until something is actually placed on it.
             */}
-          {/**
-            * A VARIANT FIELD, NOT A CHECKBOX (owner, 2026-09-21).
-            *
-            * It was a checkbox on the reasoning that §4 says a toggle looks like a toggle. True
-            * in general, and the wrong call here: this sits in a column of pill-shaped variant
-            * fields — blank, colour, size, then one per placement — and a lone square among
-            * them read as something bolted on rather than as one of the garment's facts, which
-            * is what it is.
-            *
-            * TWO STATES IN ONE FIELD. "Blank Only" is the value; the clear row is "Printed",
-            * which is the honest name for the other state — the placements below decide HOW it
-            * is printed, and this only says WHETHER. One option plus a clear row rather than
-            * two options, because empty is the real storage state (print_type = "") and a
-            * second option would have to write a word meaning "not blank", which nothing reads.
-            *
-            * ABOVE the per-placement rows, because it is about the line and they are each about
-            * one placement. Choosing Blank Only hides them: there is nothing to print on.
-            */}
-          {!filesLocked && faces.length > 1 && blankPriced && (
-            <VariantField
-              label={tl("canvas", "Decoration")}
-              value={isNoPrint ? BLANK_ONLY : ""}
-              options={[BLANK_ONLY]}
-              placeholder={tl("canvas", "Printed")}
-              clearLabel={tl("canvas", "Printed")}
-              disabled={noPrintBusy}
-              onChange={(v) => void setNoPrint(v === BLANK_ONLY)}
-            />
-          )}
+          {/* THE "BLANK ONLY" FIELD IS VARIANTPICKER'S, NOT THIS SCREEN'S.
+
+              It was here because the picker hid its Method field on a multi-placement product
+              and took the only way of saying "bare garment" with it. The picker now carries a
+              Decoration field of its own — separate from Method, because IS it printed and HOW
+              it is printed are two different questions — so it shows on every product, and a
+              copy here would be the second control for one fact. Which is exactly what it was
+              added to fix. */}
           {!filesLocked && !isNoPrint && faces.length > 1 && methodFaces.map((sd) => (
             <VariantField
               key={sd}

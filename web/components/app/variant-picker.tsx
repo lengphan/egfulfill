@@ -170,6 +170,7 @@ export function VariantPicker({
    * for the line's size: a Blank option on a product with no blank price quotes the PRINTED
    * base cost, which is the more expensive kind of wrong.
    */
+  const isBlankOnly = /^\s*(blank(\s*only)?|no[\s-]*print)\s*$/i.test(String(item.print_type || ""))
   const blankPriced = (() => {
     /* THE FACE GATE IS GONE WITH THE RULE IT GUARDED. It existed because costPartsOf's
        isBlankLine required that no placement declare a method — and that branch no longer
@@ -288,15 +289,40 @@ export function VariantPicker({
           label={tl("variantPicker", "Method")}
           /* EMPTY IS "NOT DECIDED", and shows the placeholder like every other field here. A
              blank is a CHOICE and reads as its own word. */
-          value={canon(item.print_type || "", blankPriced ? [BLANK_LABEL, ...methodList] : methodList)}
-          /* BLANK FIRST. It is the one option that is not a technique, and a reader scanning a
-             list of techniques for "none of these" finds it faster at the top than buried
-             after Sublimation. */
-          options={blankPriced ? [BLANK_LABEL, ...methodList] : methodList}
+          value={isBlankOnly ? "" : canon(item.print_type || "", methodList)}
+          /* TECHNIQUES ONLY. "Blank Only" used to sit at the top of this list, which put a
+             non-technique among the techniques and made one dropdown answer two questions —
+             IS it printed, and HOW. It has its own field now, below. */
+          options={methodList}
           emptyLabel="none"
           disabled={busy === "printType"}
-          onChange={(v) => save({ printType: v === BLANK_LABEL ? BLANK_LABEL : v }, "printType")}
+          onChange={(v) => save({ printType: v }, "printType")}
         />
+        )}
+        {/**
+          * IS IT PRINTED AT ALL — a different question from HOW, and it needs its own control.
+          *
+          * It lived inside the Method list, which meant one dropdown answered both and a
+          * non-technique sat among the techniques. On a multi-placement product Method is
+          * hidden entirely (the per-placement rows replace it), so the only way to say "bare
+          * garment" disappeared with it — and the canvas grew a second control with a different
+          * label to compensate. Two controls for one fact, which is what this removes.
+          *
+          * One option plus a clear row reading "Printed": empty is the real stored state
+          * (print_type = ""), and a second option would have to write a word meaning "not
+          * blank" that nothing reads back.
+          */}
+        {blankPriced && (
+          <VariantField
+            label={tl("variantPicker", "Decoration")}
+            value={isBlankOnly ? BLANK_LABEL : ""}
+            options={[BLANK_LABEL]}
+            placeholder={tl("variantPicker", "Printed")}
+            clearLabel={tl("variantPicker", "Printed")}
+            className={hideMethod ? undefined : "col-span-2 sm:col-span-1"}
+            disabled={busy === "printType"}
+            onChange={(v) => save({ printType: v === BLANK_LABEL ? BLANK_LABEL : "" }, "printType")}
+          />
         )}
       </div>
 
