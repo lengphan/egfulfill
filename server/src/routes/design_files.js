@@ -160,78 +160,88 @@ export function designFilesRoutes(app, requireAuth) {
    *             automatic attach: a false positive here puts the wrong artwork on
    *             someone's order, which is far worse than digitising twice.
    */
-  app.get('/api/design_files/reuse', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
-    const orderId = String(req.query.orderId || '');
-    const sku = String(req.query.sku || '');
-    // The LINE, when the caller knows it. Optional so older callers keep working, and
-    // load-bearing when they pass it — see the key shapes below.
-    const lineId = req.query.lineId ? String(req.query.lineId) : null;
-    if (!orderId || !sku) { reply.code(400); return { error: 'orderId + sku required' }; }
+  /**
+   * WHAT THIS ORDER'S ARTWORK HAS ALREADY BEEN DIGITISED AS — every line, in three queries.
+   *
+   * ONE IMPLEMENTATION, because the single-line lookup below is now a wrapper around it. The
+   * matching rules here are delicate — line-first keys, files with no sku attributed only
+   * when their order carries exactly one artwork, a fuzzy pass that runs only when nothing
+   * matched exactly — and a second copy of them is how the two surfaces come to disagree
+   * about whether we already own a file (§5).
+   *
+   * THREE QUERIES WHATEVER THE ORDER'S SIZE. The per-line route loaded up to 500 candidate
+   * rows for its fuzzy pass; doing that once per line would be that again for every item on
+   * the order. Sources come back together, exact hits are matched on `= any(hashes)`, and the
+   * candidates are compared in JS — so a ten-line order costs what a one-line order costs.
+   *
+   * STAFF ONLY, at every caller. §6: a seller must never learn their design was used by
+   * another seller, and this answer names the other order and its shop.
+   */
+  async function reuseForOrder(orderId) {
+    /* THE SOURCE ARTWORK PER LINE, matched on all three key shapes rather than sku alone.
+       A design row written by the older client stores the LINE ID in its sku column, so a
+       lookup by sku alone misses it and reports nothing — indistinguishable from "no
+       matches", which is why that never looked broken. Front first: a line holds a row per
+       side, and "is this already digitised" is asked about the design the item is identified
+       by, not whichever face was saved last. */
+    const sources = await q(
+      `select coalesce('L:' || i.line_id, 'S:' || i.sku) as key, d.art_hash, d.art_phash
+         from order_items i
+         join lateral (
+           select art_hash, art_phash from order_designs d
+            where d.order_id = i.order_id and d.art_hash is not null
+              and ( (i.line_id is not null and d.line_id = i.line_id)
+                 or (d.line_id is null and (d.sku = i.sku or d.sku = i.line_id)) )
+            order by (coalesce(d.side,'front') = 'front') desc, d.updated_at desc nulls last
+            limit 1
+         ) d on true
+        where i.order_id = $1`, [orderId]).then((r) => r.rows).catch(() => []);
+    const out = {};
+    if (!sources.length) return out;
 
-    /**
-     * THE SOURCE ARTWORK, matched on all three key shapes rather than sku alone.
-     *
-     * `where sku=$2` missed any design row written by the older client, which stores the
-     * LINE ID in the sku column (verified: order 12345's row carries line_id NULL and its
-     * line id in `sku`). A missed source returns hashed:false and shows nothing — and a
-     * failed lookup is indistinguishable from "no matches", which is why this never
-     * looked broken. Same three cases the order list join uses, most specific first.
-     */
-    const src = await q(
-      `select art_hash, art_phash from order_designs
-        where order_id = $1
-          and art_hash is not null
-          and ( ($3::text is not null and line_id = $3)
-             or (line_id is null and (sku = $2 or ($3::text is not null and sku = $3))) )
-        -- The FRONT first, for the same reason the order list prefers it: a line holds a
-        -- row per side, and "is this artwork already digitised" should be asked about the
-        -- design the item is identified by, not about whichever face was saved last.
-        order by (line_id is not null) desc, (sku = $3) desc,
-                 (coalesce(side,'front') = 'front') desc, updated_at desc nulls last
-        limit 1`,
-      [orderId, sku, lineId]).then((r) => r.rows[0]).catch(() => null);
-    if (!src || !src.art_hash) return { exact: [], similar: [], hashed: false };
-
-    // Files whose ORDER LINE carried the same artwork. Excludes this order's own files —
-    // "you already have one here" is not reuse, it's the normal case.
-    const exact = await q(
-      `select f.design_id, f.file_name, f.kind, f.order_id, f.created_at,
+    const hashes = [...new Set(sources.map((r) => r.art_hash).filter(Boolean))];
+    /* Files whose ORDER LINE carried the same artwork. Excludes this order's own files —
+       "you already have one here" is not reuse, it is the normal case. */
+    const exactRows = await q(
+      `select d.art_hash, f.design_id, f.file_name, f.kind, f.order_id, f.created_at,
               coalesce(u.store_name, u.name, u.email, '—') as seller
          from design_file_data f
          join order_designs d on d.order_id = f.order_id
            and (
              f.sku = d.sku
-             -- A FILE WITH NO SKU still belongs to its order's artwork. 6 of 19 machine
-             -- files carry none, so d.sku = f.sku dropped them and they could never be
-             -- offered for reuse. Attributed only when that order has exactly ONE distinct
-             -- artwork — with two, we would be guessing which design the file is for, and
-             -- a false positive here puts the wrong artwork on someone's order.
+             /* A FILE WITH NO SKU still belongs to its order's artwork. 6 of 19 machine files
+                carry none, so d.sku = f.sku dropped them and they could never be offered.
+                Attributed only when that order has exactly ONE distinct artwork — with two we
+                would be guessing which design the file is for, and a false positive here puts
+                the wrong artwork on somebody's order. */
              or (f.sku is null and (
                    select count(distinct x.art_hash) from order_designs x
                     where x.order_id = f.order_id and x.art_hash is not null) = 1)
            )
          left join users u on u.id = f.seller_id
-        where d.art_hash = $1 and f.order_id <> $2 and f.kind in ('pes','emb')
-        order by f.created_at desc limit 20`,
-      [src.art_hash, orderId]).then((r) => r.rows).catch(() => []);
+        where d.art_hash = any($1::text[]) and f.order_id <> $2 and f.kind in ('pes','emb')
+        order by f.created_at desc limit 200`,
+      [hashes, orderId]).then((r) => r.rows).catch(() => []);
+    const byHash = new Map();
+    for (const r of exactRows) {
+      const list = byHash.get(r.art_hash) || [];
+      if (list.length < 20) list.push({ design_id: r.design_id, file_name: r.file_name, kind: r.kind,
+                                        order_id: r.order_id, created_at: r.created_at, seller: r.seller });
+      byHash.set(r.art_hash, list);
+    }
 
-    // Fuzzy pass runs only when there's no exact hit — if we already have the real thing,
-    // offering lookalikes is noise.
-    let similar = [];
-    if (!exact.length && src.art_phash) {
-      const cand = await q(
+    /* The fuzzy pass runs only for lines with no exact hit — if we already have the real
+       thing, offering lookalikes is noise. Loaded once and compared per line. */
+    const needFuzzy = sources.some((r) => !(byHash.get(r.art_hash) || []).length && r.art_phash);
+    let cand = [];
+    if (needFuzzy) {
+      cand = await q(
         `select f.design_id, f.file_name, f.kind, f.order_id, f.created_at, d.art_phash,
                 coalesce(u.store_name, u.name, u.email, '—') as seller
            from design_file_data f
            join order_designs d on d.order_id = f.order_id
            and (
              f.sku = d.sku
-             -- A FILE WITH NO SKU still belongs to its order's artwork. 6 of 19 machine
-             -- files carry none, so d.sku = f.sku dropped them and they could never be
-             -- offered for reuse. Attributed only when that order has exactly ONE distinct
-             -- artwork — with two, we would be guessing which design the file is for, and
-             -- a false positive here puts the wrong artwork on someone's order.
              or (f.sku is null and (
                    select count(distinct x.art_hash) from order_designs x
                     where x.order_id = f.order_id and x.art_hash is not null) = 1)
@@ -240,14 +250,57 @@ export function designFilesRoutes(app, requireAuth) {
           where d.art_phash is not null and f.order_id <> $1 and f.kind in ('pes','emb')
           order by f.created_at desc limit 500`,
         [orderId]).then((r) => r.rows).catch(() => []);
-      similar = cand
-        .map((row) => ({ row, dist: phashDistance(src.art_phash, row.art_phash) }))
-        .filter((x) => x.dist != null && x.dist <= PHASH_NEAR)
-        .sort((a, b) => a.dist - b.dist)
-        .slice(0, 10)
-        .map((x) => ({ ...x.row, distance: x.dist, art_phash: undefined }));
     }
-    return { exact, similar, hashed: true };
+
+    for (const src of sources) {
+      const exact = byHash.get(src.art_hash) || [];
+      let similar = [];
+      if (!exact.length && src.art_phash) {
+        similar = cand
+          .map((row) => ({ row, dist: phashDistance(src.art_phash, row.art_phash) }))
+          .filter((x) => x.dist != null && x.dist <= PHASH_NEAR)
+          .sort((a, b) => a.dist - b.dist)
+          .slice(0, 10)
+          .map((x) => ({ ...x.row, distance: x.dist, art_phash: undefined }));
+      }
+      out[src.key] = { exact, similar, hashed: true };
+    }
+    return out;
+  }
+
+  /**
+   * EVERY LINE AT ONCE — so the answer can be SHOWN rather than waited for.
+   *
+   * The per-line lookup below is asked at one moment only: when staff press Send to board.
+   * That is the last useful moment and not the first — by then someone has already decided
+   * to spend a designer, and a file we already own should have stopped them before they got
+   * there (owner, 2026-09-21: "surfaces when file is submitted, not after press send to
+   * board"). This is read whenever staff open the order, so artwork a seller dropped
+   * overnight is answered the moment anybody looks.
+   */
+  app.get('/api/orders/:id/design_reuse', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    return { lines: await reuseForOrder(String(req.params.id)) };
+  });
+
+  app.get('/api/design_files/reuse', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const orderId = String(req.query.orderId || '');
+    const sku = String(req.query.sku || '');
+    const lineId = req.query.lineId ? String(req.query.lineId) : null;
+    /**
+     * A LINE ID IS ENOUGH, and requiring a sku is what switched this off for manual orders.
+     *
+     * Every line on a manual order carries an empty sku — measured on EGF-002155, where both
+     * lines do — so this returned 400 and the caller skipped the lookup entirely. Cross-seller
+     * duplicate detection, which is the whole point, never ran on any of them. The matching
+     * below has always keyed line-first; only the guard insisted on the weaker identifier.
+     */
+    if (!orderId || (!sku && !lineId)) { reply.code(400); return { error: 'orderId + sku or lineId required' }; }
+    const all = await reuseForOrder(orderId);
+    /* Line-first, then the sku shapes — the same precedence the sources query uses. */
+    const hit = (lineId && all[`L:${lineId}`]) || (sku && all[`S:${sku}`]) || null;
+    return hit || { exact: [], similar: [], hashed: false };
   });
 
   /**
@@ -268,7 +321,13 @@ export function designFilesRoutes(app, requireAuth) {
     const b = req.body || {};
     const orderId = String(b.orderId || '');
     const sku = String(b.sku || '');
-    if (!orderId || !sku) { reply.code(400); return { error: 'orderId + sku required' }; }
+    /* THE LINE, when the caller has one — and on a manual order it is all they have. Same
+       reason the lookup stopped insisting on a sku: every line of a manual order carries an
+       empty one, so offering a reuse the factory could then not APPLY would be worse than
+       not offering it. The copy lands on the line rather than on a sku that identifies
+       nothing (§5: line_id is line identity). */
+    const lineId = b.line_id ? String(b.line_id) : (b.lineId ? String(b.lineId) : null);
+    if (!orderId || (!sku && !lineId)) { reply.code(400); return { error: 'orderId + sku or line_id required' }; }
 
     const src = await q('select * from design_file_data where design_id=$1', [String(req.params.designId)])
       .then((r) => r.rows[0]);
@@ -280,15 +339,15 @@ export function designFilesRoutes(app, requireAuth) {
       // storage_key travels with the copy. Without it the new row points at the same object
       // through a URL the download route can no longer read, so a reused file downloads as
       // nothing while the original works.
-      `insert into design_file_data (design_id, order_id, sku, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, created_at, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$12,$9,$10,$11, now(), now())`,
-      [newId, orderId, sku, seller || null, src.file_name, src.mime, src.data, src.url, src.content_hash,
-       Number(src.price) || 0, src.kind, src.storage_key || null]
+      `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, created_at, updated_at)
+       values ($1,$2,$3,$13,$4,$5,$6,$7,$8,$12,$9,$10,$11, now(), now())`,
+      [newId, orderId, sku || null, seller || null, src.file_name, src.mime, src.data, src.url, src.content_hash,
+       Number(src.price) || 0, src.kind, src.storage_key || null, lineId]
     );
     // Audited so the reuse is traceable on OUR side even though it's invisible on theirs.
     audit(req, 'design_file.reused', {
       entityType: 'order', entityId: orderId,
-      after: { from: String(req.params.designId), to: newId, sku },
+      after: { from: String(req.params.designId), to: newId, sku: sku || null, line_id: lineId },
     });
     return { ok: true, designId: newId };
   });

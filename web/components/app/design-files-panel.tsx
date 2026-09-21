@@ -5,7 +5,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react"
 import { FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, designsBySide, sidesForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
+import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, designsBySide, sidesForLine, getOrderDesignReuse, reuseDesignFile, type DesignFileRow, type OrderDesign, type OrderItem, type ReuseMatch } from "@/lib/api"
 import { designSrc } from "@/lib/order-image"
 import { lineFactsOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
@@ -575,6 +575,31 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   // the cautious side — it never tells a seller that somebody else sent their own file.
  const isSeller = !role || role === "seller"
 
+  /**
+   * ALREADY DIGITISED? ASKED WHEN THE FILE ARRIVES, NOT WHEN SOMEBODY BRIEFS A DESIGNER.
+   *
+   * The reuse lookup existed at ONE moment: the Send to board press. That is the last useful
+   * moment rather than the first — by then a person has decided to pay for the work, and a
+   * stitch file we already own should have stopped them before they got there (owner,
+   * 2026-09-21: "surfaces when file is submitted, not after press send to board").
+   *
+   * READ, NOT PUSHED. Surfacing it in the upload's own response would only reach whoever
+   * happened to be holding the mouse — a seller dropping artwork overnight would tell nobody,
+   * and §6 forbids telling THEM, since the answer names another seller's order. Reading it
+   * here means the first member of staff to open the order sees it, whenever that is.
+   *
+   * STAFF ONLY, and the server agrees (403). This panel renders for the seller too.
+   */
+ const [reuse, setReuse] = useState<Record<string, { exact: ReuseMatch[]; similar: ReuseMatch[]; hashed: boolean }>>({})
+ useEffect(() => {
+ if (isSeller) return
+ let live = true
+ const t = setTimeout(() => {
+ getOrderDesignReuse(orderId).then((r) => { if (live) setReuse(r?.lines ?? {}) }).catch(() => {})
+    }, 0)
+ return () => { live = false; clearTimeout(t) }
+  }, [orderId, isSeller, files])
+
  const load = useCallback(() => {
  getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
   }, [orderId])
@@ -1094,11 +1119,21 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
        the files happen to mention, so the groups read 1, 2, 3 even when item 2 has nothing. */
  const keys: (number | null)[] = [...items.map((_, i) => i + 1), null]
  return keys
-      .map((no) => ({
- no,
+      .map((no) => {
+ const it = no == null ? null : items[no - 1]
+ const rows = ordered.filter((f) => noOfFile(f) === no)
+        /* ONLY WHEN THE LINE HAS NO FILE OF ITS OWN. Offering to reuse somebody else's copy
+           of the artwork beside the stitch file we already cut for this line is noise, and
+           worse, it invites a second file onto a line that needs one. */
+ const own = rows.some((f) => f.kind === "emb" || f.kind === "pes")
+ const key = it ? (it.line_id ? `L:${it.line_id}` : it.sku ? `S:${it.sku}` : "") : ""
+ return {
+ no, it,
  placed: placed.filter((r) => r.no === no),
- rows: ordered.filter((f) => noOfFile(f) === no),
-      }))
+ rows,
+ hits: !isSeller && !own && key ? reuse[key] ?? null : null,
+        }
+      })
       .filter((g) => g.placed.length || g.rows.length)
   })()
 
@@ -1276,6 +1311,67 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
           )}
         </div>
       ))}
+      {/**
+        * WE ALREADY HAVE THIS ONE — staff only, and it suggests rather than acts.
+        *
+        * §6: a perceptual match SUGGESTS and a human confirms; nothing is ever attached
+        * automatically. An exact hit is the same artwork and safe to take; a similar one is
+        * a lookalike and says so, because the cost of being wrong is somebody else's design
+        * on this order.
+        *
+        * The other seller is NEVER named. The factory may know two sellers uploaded the same
+        * picture; the order page must not be where that leaks, and the row says what we can
+        * do rather than whose work it was.
+        */}
+      {(() => {
+ const h = g.hits
+ if (!h || (!h.exact.length && !h.similar.length)) return null
+ const m = h.exact[0] ?? h.similar[0]
+ const isExact = !!h.exact.length
+ const target = g.it
+ return (
+          <div className="flex items-center gap-2.5 border-t border-border py-2">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <Sparkle size={14} weight="bold" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">
+                {isExact
+                  ? tl("designFiles", "This artwork is already digitised")
+                  : tl("designFiles", "A similar design is already digitised")}
+              </div>
+              <div className="truncate text-xs text-muted-foreground">{m.file_name || m.design_id}</div>
+            </div>
+            <Button
+              size="sm"
+              variant={isExact ? "default" : "outline"}
+              disabled={busy === `reuse-${m.design_id}` || !target}
+              onClick={async () => {
+ if (!target) return
+ setBusy(`reuse-${m.design_id}`); setErr(null)
+                try {
+ const res = await reuseDesignFile(m.design_id, {
+ orderId,
+ sku: target.sku || undefined,
+ line_id: target.line_id ?? undefined,
+                  })
+ if (res?.error) throw new Error(res.error)
+ load()
+                } catch (e) {
+ setErr(e instanceof Error ? e.message : "Couldn't reuse that file.")
+                } finally { setBusy(null) }
+              }}
+              title={isExact
+                ? tl("designFiles", "Put this file on the order instead of digitising it again")
+                : tl("designFiles", "Check it matches, then put it on the order")}
+            >
+              {busy === `reuse-${m.design_id}`
+                ? <CircleNotch size={14} className="animate-spin" />
+                : isExact ? tl("designFiles", "Use it") : tl("designFiles", "Check it")}
+            </Button>
+          </div>
+        )
+      })()}
         </Fragment>
       ))}
       {/* Offered alongside existing files too, not only when the list is empty — a seller

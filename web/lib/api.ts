@@ -1987,7 +1987,7 @@ export type ReuseMatch = { design_id: string; file_name?: string | null; kind?: 
 /** exact = identical artwork, safe to reuse. similar = looks alike, needs a human to confirm. */
 /** Copy an existing machine file onto another order. Staff only — the receiving seller
  *  sees a normal deliverable on their own order and learns nothing about its origin. */
-export function reuseDesignFile(designId: string, body: { orderId: string; sku: string }) {
+export function reuseDesignFile(designId: string, body: { orderId: string; sku?: string; line_id?: string | null }) {
   return api<{ ok?: boolean; designId?: string; error?: string }>(
     `/api/design_files/${encodeURIComponent(designId)}/reuse`,
     { method: "POST", body: JSON.stringify(body) })
@@ -1995,6 +1995,16 @@ export function reuseDesignFile(designId: string, body: { orderId: string; sku: 
 /** `lineId` matters: a design row written by the older client stores the LINE ID in its
  *  sku column, so a lookup by sku alone misses it and reports "no matches" — which is
  *  indistinguishable from a failed lookup. Optional, so older callers still work. */
+/** Every line of an order at once, keyed `L:<line_id>` / `S:<sku>` — staff only.
+ *
+ *  The per-line lookup is asked at ONE moment, when staff press Send to board, which is the
+ *  last useful moment rather than the first: by then somebody has decided to pay a designer.
+ *  This is read whenever staff open the order, so a file we already own is offered before
+ *  anyone briefs the work (owner, 2026-09-21). */
+export function getOrderDesignReuse(orderId: string) {
+  return api<{ lines: Record<string, { exact: ReuseMatch[]; similar: ReuseMatch[]; hashed: boolean }> }>(
+    `/api/orders/${encodeURIComponent(orderId)}/design_reuse`)
+}
 export function getDesignReuse(orderId: string, sku: string, lineId?: string | null) {
   return api<{ exact: ReuseMatch[]; similar: ReuseMatch[]; hashed: boolean }>(
     `/api/design_files/reuse?orderId=${encodeURIComponent(orderId)}&sku=${encodeURIComponent(sku)}${lineId ? `&lineId=${encodeURIComponent(lineId)}` : ""}`)

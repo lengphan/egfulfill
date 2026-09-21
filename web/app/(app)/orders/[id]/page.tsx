@@ -2925,7 +2925,12 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
               {items.length === 0
                 ? <EmptyState icon={Package} title={tl("order", "No lines on this order")} />
                 : (
-                <div className="divide-y divide-border">
+                /* SectionCard's body carries NO padding of its own — every other card on this
+                   page puts it on its own child (`space-y-3 p-5`, `flex … p-5`), and this list
+                   was the one that forgot, so its rows ran to the card's edge and the Send to
+                   board buttons sat on the border. Tight vertically because each row already
+                   carries py-3; the 20px sides are the house figure. */
+                <div className="divide-y divide-border px-5 py-2">
                   {items.flatMap((it, ix) => {
                     /**
                      * ONE ROW PER FACE, because a card is per face — a front and a back are two
