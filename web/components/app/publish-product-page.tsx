@@ -2247,7 +2247,22 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                           return (
                             <details
  open={ttOpen[d.connection_id] ?? missing.length > 0}
- onToggle={(e) => setTtOpen((m) => ({ ...m, [d.connection_id]: (e.currentTarget as HTMLDetailsElement).open }))}
+ /* READ `open` NOW, NOT INSIDE THE UPDATER.
+                                 A state updater is a function React calls during the NEXT
+                                 render, long after the handler returned — and React nulls
+                                 `currentTarget` the moment it does. So the updater threw
+                                 `Cannot read properties of null` from inside useState, which
+                                 is a throw DURING RENDER: the whole page became "This page
+                                 couldn't load", and publishing was dead from the day this
+                                 was written (2026-09-09) for anyone who ticked a TikTok shop
+                                 — the panel opens itself whenever a field is missing, so the
+                                 toggle fired on mount with no click at all.
+                                 The event is only safe to read synchronously; the boolean is
+                                 what goes into the updater. */
+ onToggle={(e) => {
+ const isOpen = (e.currentTarget as HTMLDetailsElement).open
+ setTtOpen((m) => ({ ...m, [d.connection_id]: isOpen }))
+                              }}
  className="px-2 pb-2"
                             >
                               {/* A CARET, BECAUSE THIS OPENS. `list-none marker:content-none`
