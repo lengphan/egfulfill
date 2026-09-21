@@ -4509,6 +4509,10 @@ export function ordersRoutes(app, requireAuth) {
        * money in their statement that the order could not explain.
        */
       let label, amount;
+      /* WHICH DESIGNS THIS FEE IS ACTUALLY COUNTED IN, for the per-face split below. Only the
+         standard tier counts pictures; the other two are one job whatever they cover, and
+         null there means "weight every face the same". */
+      let counted = null;
       /* WHICH SURFACE THE WORK IS ON. Empty when the designs carry no side, which is every
          row written before faces existed — the UI prints a bare "Design fee" then, exactly as
          it did, rather than naming a face nobody recorded. */
@@ -4563,6 +4567,7 @@ export function ordersRoutes(app, requireAuth) {
         sides = [...new Set(billable.map((k) => g.faces.get(k)).filter(Boolean))];
         label = n > 1 ? `Design fee · ${n} designs` : 'Design fee';
         amount = STD * n;
+        counted = billable;
       }
       /*
        * AN OVERRIDE WINS THE NUMBER — because the charge obeys it, and an estimate that
@@ -4577,6 +4582,46 @@ export function ordersRoutes(app, requireAuth) {
       const ov = g.lines.map((l) => l.design_fee_override).find((v) => v != null && v !== '');
       const overridden = ov != null && isFinite(Number(ov));
       if (overridden) amount = Number(ov);
+      /**
+       * WHICH FACE OWES WHAT — one fee, split for DISPLAY only.
+       *
+       * A fee is one job with one price: three pictures on three faces is a single $6 row
+       * naming all three. The summary printed that whole figure under EVERY face it named,
+       * so an item with a back and a left showed $6 twice and its rows stood $6 above the
+       * heading they sat under — the defect this file calls worse than no breakdown at all.
+       * Measured on EGF-002155: heading $40.95, rows $46.95.
+       *
+       * A SPLIT, NOT SEVERAL FEES, and that distinction is the money. Emitting three $2 items
+       * would look identical on screen and bill $2: submit loops the list into chargeDesign,
+       * the first call stamps design_charged_at on every line the design covers, and the
+       * other two stop at the already-charged guard. One job, one price, one charge — the
+       * row is what splits.
+       *
+       * BY DESIGNS ON THE FACE, because designs are what the fee counts. Faces weigh equally
+       * when there is nothing to count (a supplied or complex group covering several). The
+       * LAST face absorbs the rounding, the same rule the item and the order discounts use,
+       * so the shares always reach the fee exactly.
+       *
+       * An override splits the same way: staff price the JOB, and a typed figure is still
+       * that job's price however many surfaces it lands on.
+       */
+      let perSide = null;
+      if (amount != null && sides.length) {
+        const weight = new Map(sides.map((s) => [s, 0]));
+        for (const k of (counted || [])) {
+          const f = g.faces.get(k);
+          if (f && weight.has(f)) weight.set(f, weight.get(f) + 1);
+        }
+        let totalW = [...weight.values()].reduce((n, v) => n + v, 0);
+        if (!totalW) { for (const s of sides) weight.set(s, 1); totalW = sides.length; }
+        perSide = {}; let acc = 0;
+        sides.forEach((s, i) => {
+          const v = i === sides.length - 1
+            ? Math.round((amount - acc) * 100) / 100
+            : Math.round((amount * weight.get(s) * 100) / totalW) / 100;
+          perSide[s] = v; acc += v;
+        });
+      }
       const status = g.charged ? 'charged' : (amount == null ? 'tbd' : 'estimated');
       if (amount != null) total += amount;
       // The rest of the group is NAMED rather than silently folded in: "ab11 +2 items"
@@ -4590,6 +4635,10 @@ export function ordersRoutes(app, requireAuth) {
          *  instead of leaving a bare figure with nothing to connect it to. Empty for designs
          *  written before a side was recorded. */
         sides,
+        /** This ONE fee's share of each face it names, summing to `amount` exactly. Display
+         *  only — the charge moves `amount` once. Null when there is nothing to split (no
+         *  face recorded, or a complex fee still To Be Determined). */
+        perSide,
         /** Staff typed this figure rather than taking the tier's list price — the row says
          *  so, so an unusual number is not mistaken for a pricing bug. */
         overridden,

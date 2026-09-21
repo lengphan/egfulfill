@@ -3015,6 +3015,16 @@ export type OrderDesignFee = {
    *  has to be told. Empty for designs written before a side was recorded, and the summary
    *  then prints the bare label exactly as it used to. */
   sides?: string[] | null
+  /** This ONE fee's share of each face in `sides`, summing to `amount` exactly.
+   *
+   *  DISPLAY ONLY. The charge still moves `amount` once — a fee is one job at one price, and
+   *  several fees would bill wrong (chargeDesign stamps the line on the first one). It exists
+   *  because the summary lists a fee under every face it names, and printing the whole figure
+   *  on each of them put an item's rows above its own heading.
+   *
+   *  Absent from a server too old to send it; `shareOf` in the order page falls back to an
+   *  even split, which is what it was for every fee that had only one face anyway. */
+  perSide?: Record<string, number> | null
   status: "charged" | "estimated" | "tbd"
   /** Every line this ONE fee covers. Both fees pay for work done once — a file is checked
    *  once however many items carry it, a picture is digitised once — so lines sharing a

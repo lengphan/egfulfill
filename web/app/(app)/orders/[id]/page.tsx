@@ -1421,19 +1421,82 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                     .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
                                   const feesFor = (face: string) =>
                                     mine.filter((f) => (f.sides ?? []).some((sd) => sd.toLowerCase() === face.toLowerCase()))
-                                  /* A fee whose surface we never recorded, or one naming a face this
-                                     line no longer prints. It still has to be shown — it is money —
-                                     so it falls to the end of the item rather than being dropped. */
+                                  /**
+                                   * ONE FEE, SPLIT ACROSS THE FACES IT NAMES (owner, 2026-09-21).
+                                   *
+                                   * A design fee is per DESIGN, so three pictures on three faces is a
+                                   * SINGLE row covering all three — and this listed it under every
+                                   * face it named at its WHOLE figure. Measured on EGF-002155: one
+                                   * $6.00 fee printed $6.00 under Back and $6.00 under Left, both
+                                   * subtotals absorbed it, and the item's rows came to $46.95 under a
+                                   * heading of $40.95. A breakdown that does not reach its own total
+                                   * is the one defect this card exists to avoid.
+                                   *
+                                   * The SPLIT is display; the JOB is still one price charged once.
+                                   * Several fees would read the same on screen and bill $2 instead of
+                                   * $6 — submit loops them into chargeDesign and the first stamps
+                                   * every line the design covers.
+                                   */
+                                  const shareOf = (f: typeof mine[number], face: string): number | null => {
+                                    if (f.amount == null) return null
+                                    const sds = (f.sides ?? [])
+                                    const key = sds.find((sd) => sd.toLowerCase() === face.toLowerCase())
+                                    if (!key) return null
+                                    const own = f.perSide ? f.perSide[key] : null
+                                    if (own != null && isFinite(Number(own))) return Number(own)
+                                    /* A server too old to send the split: even shares with the LAST
+                                       face absorbing the rounding — the server's own rule, and the
+                                       one the item and order discounts already follow. Identical to
+                                       the old behaviour for the single-face fees that were most of
+                                       them, so nothing that read correctly starts moving. */
+                                    const i = sds.indexOf(key)
+                                    const each = Math.round((f.amount / sds.length) * 100) / 100
+                                    return i === sds.length - 1
+                                      ? Math.round((f.amount - each * (sds.length - 1)) * 100) / 100
+                                      : each
+                                  }
+                                  /** The faces of this fee that this card actually draws. A face added
+                                   *  after the charge is not in the frozen stamp, so it has no row —
+                                   *  see the remainder below, which is what keeps its share visible. */
+                                  const drawn = (f: typeof mine[number]) =>
+                                    (f.sides ?? []).filter((sd) => faceRows.some((r) => r.face.toLowerCase() === sd.toLowerCase()))
+                                  /** What is left of a fee once every drawn face has taken its share.
+                                   *  Zero on an ordinary fee; on one covering a face this line does not
+                                   *  print it is real money, and dropping it would leave the item short
+                                   *  — the same defect in the other direction. */
+                                  const remainderOf = (f: typeof mine[number]) => {
+                                    if (f.amount == null) return null
+                                    const taken = drawn(f).reduce((n, sd) => n + (shareOf(f, sd) ?? 0), 0)
+                                    return Math.round((f.amount - taken) * 100) / 100
+                                  }
+                                  /* A fee whose surface we never recorded, one naming a face this line
+                                     no longer prints, or the unclaimed PART of one that names a face
+                                     alongside others. It still has to be shown — it is money — so it
+                                     falls to the end of the item rather than being dropped. */
                                   const orphanFees = mine.filter((f) => {
                                     const sds = (f.sides ?? [])
-                                    return !sds.length || !sds.some((sd) => faceRows.some((r) => r.face.toLowerCase() === sd.toLowerCase()))
+                                    if (!sds.length) return true
+                                    if (f.amount == null) return drawn(f).length === 0
+                                    return (remainderOf(f) ?? 0) > 0.005
                                   })
                                   /* `face`: a string names it, null falls back to the fee's OWN sides,
                                      and FALSE hides it — which is the case inside a face group, where
                                      the heading above has already said it. Null could not mean "hide":
                                      it fell through to `f.sides`, so a fee under a Back heading still
                                      printed "Back · Design Fee". */
-                                  const feeRow = (f: typeof mine[number], key: string, face: string | null | false, indent = "pl-3") => (
+                                  /**
+                                   * `part` is this ROW's figure when the fee is split across faces —
+                                   * see shareOf. Absent means the row IS the whole fee, which is every
+                                   * single-face fee and was the only case before today.
+                                   *
+                                   * ONE PENCIL PER JOB. The editor prices the job, not the surface, so
+                                   * three share rows carrying three pencils would claim three prices
+                                   * where the server holds one. It rides on the fee's first drawn face
+                                   * and names the whole figure in its title — §4 puts the explanation
+                                   * of a control in its title, never in a line underneath it.
+                                   */
+                                  const feeRow = (f: typeof mine[number], key: string, face: string | string[] | null | false, indent = "pl-3",
+                                                  part?: { amount: number | null; editable: boolean; whole?: string }) => (
                                     <div key={key} className="flex justify-between">
                                       <dt className={`${indent} text-muted-foreground`}>
                                         {/* The face is named here ONLY when this fee is not inside a
@@ -1444,17 +1507,33 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                             the owner called out (2026-09-21). A fee with no face, or
                                             one naming a face this line no longer prints, still says so
                                             because nothing above it will. */}
-                                        {(face === false ? [] : face ? [face] : (f.sides ?? [])).length > 0 && (
-                                          <span className="capitalize">
-                                            {(face === false ? [] : face ? [face] : (f.sides ?? [])).map((sd) => tl("sides", sd)).join(", ")}
-                                            <span className="text-muted-foreground/60"> · </span>
-                                          </span>
-                                        )}
+                                        {/* An ARRAY names several: the unclaimed part of a split fee
+                                            belongs to the faces this card did not draw, and naming
+                                            all of the fee's faces there would claim the row covers
+                                            surfaces already listed above it. */}
+                                        {(() => {
+                                          const names = face === false ? []
+                                            : Array.isArray(face) ? face
+                                            : face ? [face] : (f.sides ?? [])
+                                          if (!names.length) return null
+                                          return (
+                                            <span className="capitalize">
+                                              {names.map((sd) => tl("sides", sd)).join(", ")}
+                                              <span className="text-muted-foreground/60"> · </span>
+                                            </span>
+                                          )
+                                        })()}
                                         {f.label}
                                       </dt>
-                                      {isStaff
-                                        ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
-                                        : <dd className="tabular-nums text-muted-foreground">{f.amount == null ? <span className="italic">To Be Determined</span> : usd(f.amount)}</dd>}
+                                      {isStaff && (part ? part.editable : true)
+                                        ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll}
+                                                           show={part ? part.amount : undefined}
+                                                           whole={part ? part.whole : undefined} />
+                                        : <dd className="tabular-nums text-muted-foreground">
+                                            {(part ? part.amount : f.amount) == null
+                                              ? <span className="italic">To Be Determined</span>
+                                              : usd((part ? part.amount : f.amount) as number)}
+                                          </dd>}
                                     </div>
                                   )
 
@@ -1634,7 +1713,10 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                        * bill the seller has not been given yet.
                                        */
                                       const tbd = fees.some((fe) => fe.amount == null)
-                                      const sub = (r.amount - cut[j]) + fees.reduce((n, fe) => n + (Number(fe.amount) || 0), 0)
+                                      /* THIS FACE'S SHARE of each fee, not the fee. A fee covering
+                                         three designs on three faces used to add its whole figure to
+                                         all three subtotals — see shareOf. */
+                                      const sub = (r.amount - cut[j]) + fees.reduce((n, fe) => n + (shareOf(fe, f) ?? 0), 0)
                                       return [
                                         <div key={`fh-${i}-${j}`} className="flex justify-between gap-2 pt-0.5">
                                           <dt className="min-w-0 truncate pl-3 font-medium capitalize text-foreground">
@@ -1653,10 +1735,34 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                           </dd>
                                         </div>,
                                         row,
-                                        ...fees.map((fe, k) => feeRow(fe, `fee-${i}-${j}-${k}`, false, "pl-6")),
+                                        ...fees.map((fe, k) => {
+                                          const sds = fe.sides ?? []
+                                          const split = sds.length > 1
+                                          /* The pencil goes on the fee's FIRST drawn face and nowhere
+                                             else, so one job shows one price to set. */
+                                          const first = drawn(fe)[0]
+                                          return feeRow(fe, `fee-${i}-${j}-${k}`, false, "pl-6", {
+                                            amount: shareOf(fe, f),
+                                            editable: !first || first.toLowerCase() === f.toLowerCase(),
+                                            whole: split && fe.amount != null ? `${fe.label} · ${usd(fe.amount)}` : undefined,
+                                          })
+                                        }),
                                       ]
                                     })}
-                                    {orphanFees.map((f, k) => feeRow(f, `fee-${i}-orphan-${k}`, null))}
+                                    {orphanFees.map((f, k) => feeRow(f, `fee-${i}-orphan-${k}`,
+                                      /* The faces still unaccounted for. Null — every face the fee
+                                         names — only when this card drew none of them. */
+                                      drawn(f).length
+                                        ? (f.sides ?? []).filter((sd) => !drawn(f).some((d) => d.toLowerCase() === sd.toLowerCase()))
+                                        : null,
+                                      "pl-3", {
+                                      /* The UNCLAIMED part when some of this fee's faces are drawn
+                                         above — otherwise the whole fee, which is what a fee with no
+                                         face recorded has always shown here. */
+                                      amount: drawn(f).length ? remainderOf(f) : f.amount,
+                                      editable: !drawn(f).length,
+                                      whole: drawn(f).length && f.amount != null ? `${f.label} · ${usd(f.amount)}` : undefined,
+                                    }))}
                                     {/* SHIPPING, ON THE ITEM THAT CAUSED IT. The parcel is sized
                                         by the biggest thing in it, so one line carries the
                                         postage and the rest carry only what they add to the box.

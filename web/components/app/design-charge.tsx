@@ -35,10 +35,23 @@ const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
  *
  * STAFF ONLY, and the server agrees: the person being charged must not set the charge.
  */
-export function DesignFeeAmount({ orderId, fee, onChanged }: {
+/**
+ * `show` PRINTS A DIFFERENT FIGURE FROM THE ONE IT EDITS, and that is deliberate.
+ *
+ * A fee covering three designs on three faces is ONE job at one price, and the summary lists
+ * it under each face at that face's share. The share is what the reader needs; the JOB's price
+ * is what staff set, because the server prices a job and charges it once. So the row can print
+ * $2.00 while the editor opens on $6.00 — the button's own title says which, per §4's rule that
+ * a control explains itself in its label or its title rather than in a sentence underneath.
+ */
+export function DesignFeeAmount({ orderId, fee, onChanged, show, whole }: {
   orderId: string
   fee: OrderDesignFee
   onChanged?: () => void
+  /** The figure to PRINT. Defaults to the fee's own amount. */
+  show?: number | null
+  /** What the pencil is pricing, said in full, when `show` is only a part of it. */
+  whole?: string
 }) {
   const tl = useLabelT()
   const [busy, setBusy] = useState(false)
@@ -134,14 +147,16 @@ export function DesignFeeAmount({ orderId, fee, onChanged }: {
           no figure exists until somebody names one — which typing here does. */}
       {fee.amount == null
         ? <span className="italic text-muted-foreground">{tl("designCharge", "To Be Determined")}</span>
-        : usd(fee.amount)}
+        : usd(show ?? fee.amount)}
       {/* Said only when true. An unusual figure beside a familiar label otherwise reads as a
           pricing bug rather than as a decision somebody made. */}
       {fee.overridden && <span className="text-2xs font-normal text-muted-foreground">edited</span>}
       <button
         type="button"
         disabled={locked}
-        title={locked ? tl("designCharge", "Already charged — this is settled") : tl("designCharge", "Change what this costs")}
+        title={locked
+          ? tl("designCharge", "Already charged — this is settled")
+          : whole || tl("designCharge", "Change what this costs")}
         aria-label={`Edit ${fee.label}`}
         onClick={() => { setEditing(true); setDraft(fee.amount == null ? "" : String(fee.amount)) }}
         className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
