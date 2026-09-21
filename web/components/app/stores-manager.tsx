@@ -655,10 +655,38 @@ export function StoresManager() {
                 {tl("stores", "Etsy does not release the street and postcode to our app, so orders import without them and cannot be shipped until they are filled in. Our browser extension reads them from your own Etsy orders page. Everything else — items, sizes, artwork, tracking back to Etsy — works from this connection.")}
               </div>
             ) : (
-              <div className="mt-3 rounded-lg border border-hold/40 bg-hold/5 px-3 py-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{tl("stores", "You don't have to connect.")}</span>{" "}
-                {tl("stores", "The egful browser extension brings your Etsy orders in from your own Shop Manager page — items, quantities and buyer addresses. Connecting adds automatic syncing and sends tracking back to Etsy, but Etsy still withholds buyer addresses from our app.")}
-              </div>
+              /**
+               * THREE STEPS, NOT A PARAGRAPH (owner, 2026-09-21).
+               *
+               * A seller does not connect a shop; the extension brings their orders in. The
+               * prose that said so was four lines of explanation above a list of import
+               * windows that do not apply to them — so the screen described the path they are
+               * NOT taking and then offered choices belonging to it.
+               *
+               * NO PERIOD CHOOSER ON THIS PATH, and that is a fact about the extension rather
+               * than a simplification: it makes ZERO requests to Etsy and reads the page the
+               * seller already has open, so "past 90 days" is not something it can be asked
+               * for. Offering one would promise a crawl the extension deliberately does not
+               * do — see extension/src/parse.js and tools/check-extension-parse.mjs.
+               */
+              <ol className="mt-3 space-y-2 text-xs text-muted-foreground">
+                {[
+                  tl("stores", "Install the egful extension in Chrome."),
+                  tl("stores", "Open your Etsy Shop Manager orders page."),
+                  tl("stores", "Press the egful icon, then Sync."),
+                ].map((step, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-2xs font-semibold tabular-nums text-foreground">{i + 1}</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+                {/* WHAT IT CANNOT DO, once, where the decision is made. Not a caveat under a
+                    control — it is the answer to "why would I connect at all", and a seller
+                    who reads it after shipping their first order has been told too late. */}
+                <li className="pt-1">
+                  {tl("stores", "The extension reads the page you have open, so older orders mean paging back. Connecting instead syncs automatically and sends tracking to Etsy — but Etsy withholds buyer addresses from our app.")}
+                </li>
+              </ol>
             ))}
             {/* Already-synced shops: say the rule ONCE, up here, rather than repeating it on
  every greyed row. */}

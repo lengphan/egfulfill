@@ -206,6 +206,10 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "stores.Install the egful extension in Chrome.": "Cài tiện ích egful vào Chrome.",
+  "stores.Open your Etsy Shop Manager orders page.": "Mở trang đơn hàng Shop Manager trên Etsy.",
+  "stores.Press the egful icon, then Sync.": "Bấm biểu tượng egful, rồi bấm Sync.",
+  "stores.The extension reads the page you have open, so older orders mean paging back. Connecting instead syncs automatically and sends tracking to Etsy — but Etsy withholds buyer addresses from our app.": "Tiện ích chỉ đọc trang bạn đang mở, nên đơn cũ hơn thì phải lật trang. Kết nối thì đồng bộ tự động và gửi mã vận đơn về Etsy — nhưng Etsy không cung cấp địa chỉ người mua cho ứng dụng của chúng tôi.",
   "subscription.Billing history": "Lịch sử thanh toán",
   "subscription.Plan renewal": "Gia hạn gói",
   "variantPicker.Decoration": "Trang trí",
