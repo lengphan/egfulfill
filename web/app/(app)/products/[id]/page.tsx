@@ -202,11 +202,20 @@ export default function ProductDetailPage() {
   /** The size being asked about. Sizes were inert chips on a product whose price moves by
    * size, so the one figure on the page was true for some of them and not the rest. */
  const tierOf = (sz: string) => product.sizePrices?.find((t) => t.size === sz)
- const priceOfSize = (sz: string) => Number(tierOf(sz)?.price ?? 0) || priceOf(product)
-  /** The bare garment's own price for a size — the `blank` column, which the server prefers
-   *  over the base cost on a line that names no method (costPartsOf). Mirrored here so the
-   *  figure on this page is the figure that gets charged. */
- const blankOfSize = (sz: string) => Number(tierOf(sz)?.blank ?? 0) || 0
+  /**
+   * THE GARMENT'S PRICE, THE SAME LADDER costPartsOf CLIMBS.
+   *
+   * `blank` FIRST, because that is what the server reads for every line now — the blank price
+   * is the base and the placement and method are added on top. This page was still starting
+   * from `price` (the legacy base cost), so a cap quoted $17.46 + $5.00 here and $15.00 +
+   * placement + $5.00 on the order. Two prices for one pick, and the one people see first was
+   * the wrong one.
+   *
+   * `price` stays as the fallback for a size with no blank, which is exactly the rung
+   * costPartsOf falls to.
+   */
+ const priceOfSize = (sz: string) =>
+    Number(tierOf(sz)?.blank ?? 0) || Number(tierOf(sz)?.price ?? 0) || priceOf(product)
  const status = product.status ?? "Active"
  const techs = techsOf(product)
  const shipFee = Number(product.shippingFee ?? product.shipping_fee ?? 0) || 0
@@ -251,17 +260,26 @@ export default function ProductDetailPage() {
   /** What each ADDITIONAL face adds. Mirrors sideAddOn in server/src/pricing.js — the first
    *  print is inside the base cost, so only faces 2, 3, 4 are charged. */
  const sideFee = Number(fees?.sideFee ?? 0) || 0
-  /* ALWAYS ZERO NOW, and deliberately kept rather than deleted: placement is single-select on
-     this page, so there is never a second face to charge for. The formula stays correct for
-     any number of faces — it is what the ORDER's Summary charges, where the faces are actually
-     known — and removing it would leave the two prices computed by different rules. */
- const sidesAdd = sideFee > 0 ? sideFee * Math.max(0, pricedSides.length - 1) : 0
+  /**
+   * EVERY PLACEMENT IS CHARGED, so every placement counts.
+   *
+   * This was `length - 1` — the first-placement-free formula — and it survived the rule change
+   * that removed inclusion because with single-select placement it always evaluated to zero and
+   * nothing looked wrong. A dead expression cannot be seen to be stale, which is precisely how
+   * it stayed: the page quoted a print for nothing while the order charged for it.
+   */
+ const sidesAdd = sideFee > 0 ? sideFee * pricedSides.length : 0
   /* A BLANK IS THE GARMENT AND NOTHING ELSE: no method surcharge, and no surface — there is
      no printed face to charge for. Falls back to the base cost only if this size has no blank
      price of its own, which `blankTiers` has already made unreachable from the chip. */
+  /** The garment on its own — one ladder, the server's. Both branches below start here, so a
+   *  Blank Only price and a printed price cannot be computed from different numbers. */
+ const garmentPrice = selSize ? priceOfSize(selSize) : priceOf(product)
+  /* A BLANK IS THE GARMENT AND NOTHING ELSE: no placement, because nothing is printed on one,
+     and no method surcharge. Everything else adds both. */
  const unitList = isBlank
-    ? ((selSize ? blankOfSize(selSize) : 0) || (selSize ? priceOfSize(selSize) : priceOf(product)))
-    : (selSize ? priceOfSize(selSize) : priceOf(product)) + methodFee(selMethod?.key, selMethod?.label) + sidesAdd
+    ? garmentPrice
+    : garmentPrice + methodFee(selMethod?.key, selMethod?.label) + sidesAdd
 
  return (
     <div className="space-y-5">
@@ -409,15 +427,16 @@ export default function ProductDetailPage() {
             */}
           {(() => {
             const parts: string[] = []
-            const garment = isBlank
-              ? ((selSize ? blankOfSize(selSize) : 0) || (selSize ? priceOfSize(selSize) : priceOf(product)))
-              : (selSize ? priceOfSize(selSize) : priceOf(product))
+            const garment = garmentPrice
             const mf = isBlank ? 0 : methodFee(selMethod?.key, selMethod?.label)
-            if (mf > 0) {
+            const pl = isBlank ? 0 : sidesAdd
+            if (mf > 0 || pl > 0) {
               parts.push(usd(garment))
               /* NAMED, because "+ $5.00" leaves the reader to work out which pick moved the
-                 figure — and on this page four of them can. */
-              parts.push(`${usd(mf)} ${selMethod?.label ?? ""}`.trim())
+                 figure — and on this page four of them can. The placement is named by the face
+                 it is for, the way the order's Summary names it. */
+              if (pl > 0) parts.push(`${usd(pl)} ${tl("sides", pricedSides[0] ?? "front")}`)
+              if (mf > 0) parts.push(`${usd(mf)} ${selMethod?.label ?? ""}`.trim())
             }
             if (isBlank || !parts.length) return null
             return (
