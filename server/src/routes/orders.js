@@ -4427,13 +4427,31 @@ export function ordersRoutes(app, requireAuth) {
        * who paid it is entitled to see what the payment was for; dropping the row would leave
        * money in their statement that the order could not explain.
        */
-      if (g.tier === 'supplied' && !g.charged) continue;
       let label, amount;
       /* WHICH SURFACE THE WORK IS ON. Empty when the designs carry no side, which is every
          row written before faces existed — the UI prints a bare "Design fee" then, exactly as
          it did, rather than naming a face nobody recorded. */
       let sides = [...new Set([...g.faces.values()])];
-      if (g.tier === 'supplied') { label = 'Check fee'; amount = CHECK; }
+      /**
+       * A ZERO IS AN ANSWER; AN ABSENT ROW IS NOT (owner, 2026-09-21).
+       *
+       * A placement whose stitch file the SELLER supplied costs nothing — the check fee that
+       * covered opening it is retired — and it printed no row at all. So "no design fee
+       * because you sent the file" and "no design fee because something is broken" looked
+       * identical on the screen where a seller reconciles a charge, which is the §4 rule
+       * against drawing "can't" and "doesn't exist" the same way.
+       *
+       * RETIRED, BUT NOT ERASED: a check fee already TAKEN keeps its real amount.
+       * wallet_ledger is append-only and a seller who paid one is entitled to see what the
+       * payment was for; dropping that row would leave money in their statement the order
+       * could not explain.
+       *
+       * Nothing about the money moves — amount 0 leaves the total exactly where it was.
+       */
+      if (g.tier === 'supplied') {
+        label = g.charged ? 'Check fee' : 'Design fee · file provided';
+        amount = g.charged ? CHECK : 0;
+      }
       else if (g.tier === 'complex') {
         label = 'Complex design fee';
         // Fixed only once accepted or charged; otherwise under review → To Be Determined.
@@ -4445,7 +4463,19 @@ export function ordersRoutes(app, requireAuth) {
         const billable = g.keys.filter((k) => !seen.has(k));
         billable.forEach((k) => seen.add(k));
         const n = g.keys.length ? billable.length : 1;
-        if (!n) continue;
+        /* SAME REASON. Every picture on this line was already charged on an earlier one — the
+           same artwork is digitised once however many lines carry it — so there is no work
+           left to bill. That is a fact worth printing rather than a row to omit: a seller
+           counting design fees against their items otherwise finds one simply missing. */
+        if (!n) {
+          items.push({
+            line_id: first.line_id ?? null, sku: first.sku ?? null, name: first.name ?? null,
+            tier: g.tier, label: 'Design fee · counted on another item', amount: 0,
+            status: 'estimated', sides,
+            lines: g.lines.map((l) => ({ line_id: l.line_id ?? null, sku: l.sku ?? null })),
+          });
+          continue;
+        }
         /* ONLY THE FACES THIS FEE IS FOR. `billable` is what this group adds that no earlier
            group has been charged for, so naming every face on the group would attribute work
            to a surface somebody else's row already paid for. */
