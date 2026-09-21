@@ -1551,7 +1551,14 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                                gesture that just happened; `selWide` catches a range that was
                                already open. Typing still opens it (onChange, below), because
                                that IS a single-cell edit. */
-                            if (list?.length && !withShift && !selWide) openMenu(e.currentTarget, `${r}-${c}`, false)
+                            /* NOT ON AN INERT CELL (owner, 2026-09-21: "dont enable drop down for
+                                   greyed out grid ... since its disabled rigt"). The cell is
+                                   read-only because this placement cannot run a stitch file, and
+                                   a menu of machine files over a cell that refuses every one of
+                                   them offers a choice that cannot be made — worse than no menu,
+                                   because pressing one looks like it worked. `readOnly` closed
+                                   TYPING; the suggestion list was the other way in. */
+                                if (!inert && list?.length && !withShift && !selWide) openMenu(e.currentTarget, `${r}-${c}`, false)
                           }}
                           onClick={(e) => {
                             const el = e.currentTarget
@@ -1567,7 +1574,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                           onChange={(e) => {
                             setEditing(`${r}-${c}`)
                             setCell(r, c, e.target.value)
-                            if (list?.length) openMenu(e.currentTarget, `${r}-${c}`, true)
+                            if (!inert && list?.length) openMenu(e.currentTarget, `${r}-${c}`, true)
                           }}
                           /**
                            * COPY AND CUT A BLOCK, from the cell that has focus.
