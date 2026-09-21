@@ -24,6 +24,20 @@ export type OrderColDef = {
    */
   px?: number
   align?: "left" | "right"
+  /**
+   * WHEN THIS COLUMN FALLS AWAY as the window narrows — the Tailwind breakpoint BELOW which
+   * it is hidden. Omit and the column is always shown.
+   *
+   * A PRIORITY, NOT A LAYOUT. The table stays a table at every width: what changes is how many
+   * columns it has, so there is one thing to learn rather than a card view that appears at some
+   * threshold and reads differently. What survives is what somebody scans a queue FOR — which
+   * order, what stage, how old, how many.
+   *
+   * `order` and `status` carry no drop and must not: an order you cannot identify or a stage
+   * you cannot read is a row with nothing on it. The rest go in the order they are least
+   * looked at — tracking and date first, then store and customer.
+   */
+  drop?: "lg" | "xl"
   /** Columns the seller may not hide — without these a row is unidentifiable. */
   locked?: boolean
 }
@@ -55,11 +69,25 @@ export const ORDER_COLS: Record<OrderColId, OrderColDef> = {
   // pixel here costs, and the trade is a listing title losing two characters it was
   // truncating anyway against an order number becoming readable at all.
   order: { px: 104, id: "order", label: "Order", width: "w-[104px]", locked: true },
-  store: { px: 88, id: "store", label: "Store", width: "w-[88px]" },
-  customer: { px: 136, id: "customer", label: "Customer", width: "w-[136px]" },
-  items: { id: "items", label: "Items" },
+  store: { px: 88, id: "store", label: "Store", width: "w-[88px]", drop: "xl" },
+  customer: { px: 136, id: "customer", label: "Customer", width: "w-[136px]", drop: "xl" },
+  /**
+   * A COUNT, SO IT HAS A TRACK AND IT IS RIGHT-ALIGNED.
+   *
+   * The only column in this table with neither. Without a width it resized per row, so every
+   * column after it started at a different x — the misalignment reads as the STAGE badge's
+   * fault (it is the variable-width thing you notice) but the badge has had a fixed 136px all
+   * along and this did not.
+   *
+   * Right because it is a number somebody compares down the column, and §4: right-alignment
+   * implies tabular figures, which globals.css already gives every text-right cell — so no
+   * `tabular-nums` here, it would be the second declaration of one rule.
+   *
+   * 64px fits "999" and the header word, which is the widest either gets.
+   */
+  items: { px: 64, id: "items", label: "Items", width: "w-[64px]", align: "right" },
   status: { px: 136, id: "status", label: "Status", width: "w-[136px]" }, // fits "Order Received"
-  tracking: { px: 128, id: "tracking", label: "Tracking", width: "w-[128px]" },
+  tracking: { px: 128, id: "tracking", label: "Tracking", width: "w-[128px]", drop: "lg" },
   /**
    * WHAT THE ORDER COSTS THE SELLER — the number this board was missing entirely.
    *
@@ -93,7 +121,7 @@ export const ORDER_COLS: Record<OrderColId, OrderColDef> = {
    * It read as the item title crowding the date out — the title IS the flexible column, so
    * it looks like the culprit. It is not: this is `table-fixed`, and 72 was never 72.
    */
-  date: { px: 80, id: "date", label: "Date", width: "w-[80px]", align: "right" },
+  date: { px: 80, id: "date", label: "Date", width: "w-[80px]", align: "right", drop: "lg" },
 }
 
 export const DEFAULT_ORDER_COLS: OrderColId[] = ["order", "store", "customer", "items", "status", "tracking", "cost", "total", "date"]

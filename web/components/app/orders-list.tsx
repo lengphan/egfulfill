@@ -57,10 +57,17 @@ const DEMO: OrderRow[] = [
 // ONE renderer per column id, so the header, the cells and the Columns menu all
 // stay in step off the same array — the old app's bug was adding a column in the
 // markup but forgetting COL_ORDER, which silently jumped it to the front.
+/** The breakpoint classes for a column that falls away on a narrow window. Written out in
+ *  full because Tailwind scans source for literal class names — a template string would
+ *  compile to nothing and the column would simply never hide. */
+const DROP_CLASS: Record<string, string> = {
+  lg: "hidden lg:table-cell",
+  xl: "hidden xl:table-cell",
+}
 const cellClass = (id: OrderColId) => {
  const c = ORDER_COLS[id]
  const base = id === "items" ? "" : "truncate"
- return [base, c.align === "right" ? "text-right" : ""].filter(Boolean).join(" ")
+ return [base, c.align === "right" ? "text-right" : "", c.drop ? DROP_CLASS[c.drop] : ""].filter(Boolean).join(" ")
 }
 function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
  switch (id) {
@@ -506,7 +513,10 @@ export function OrdersList() {
                 <TableHead className="w-[36px]" />
                 {visibleCols.map((id) => {
  const c = ORDER_COLS[id]
- return <TableHead key={id} className={[c.width, c.align === "right" ? "text-right" : ""].filter(Boolean).join(" ")}>{c.label}</TableHead>
+      /* The header takes the same drop class as its cells, or the two lists come apart at a
+         breakpoint and every value lands a column left — which is exactly the shift the size
+         table had this week from hiding a header without its cell. */
+ return <TableHead key={id} className={[c.width, c.align === "right" ? "text-right" : "", c.drop ? DROP_CLASS[c.drop] : ""].filter(Boolean).join(" ")}>{c.label}</TableHead>
                 })}
               </TableRow>
             </TableHeader>
