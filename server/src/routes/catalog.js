@@ -2383,7 +2383,28 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     // Same reasoning as the empty-body guard: a payload whose every entry lacked an id
     // leaves `keep` empty, and pruning against an empty keep-list is a full wipe. Prune
     // only when we actually know what to keep.
-    if (keep.length) {
+    /**
+     * THE PRUNE IS THE DANGEROUS HALF, AND IT IS NOW WAREHOUSE + ADMIN (2026-09-21).
+     *
+     * Everything above upserts. This line DELETES every product missing from the posted list,
+     * and catalogue rows carry `base_price`, which bills orders. It sat behind `requireStaff`
+     * like the rest of the route — every non-seller, so an operator or a DESIGNER could drop
+     * products by posting a list that happened to be short. The guards above cannot catch
+     * that: the list is not empty and every entry has an id, so a partial save looks exactly
+     * like a deliberate one.
+     *
+     * The ROUTE stays open to staff on purpose — "Operators building products is intended"
+     * (see the price-change notification below), and gating the whole thing would take that
+     * away. What an operator loses is only the ability to make a product disappear, which is
+     * the same line every other spend boundary draws: the floor executes the spec, it does
+     * not set it.
+     *
+     * A refused prune is SILENT rather than an error: the save itself succeeded, every edit
+     * landed, and nothing was lost — there is simply nothing to report to someone who was not
+     * trying to delete anything. Products removed by a non-owner stay until an owner saves.
+     */
+    const mayPrune = PRICE_OWNERS.has(req.user && req.user.role);
+    if (keep.length && mayPrune) {
       await q(`delete from catalog_products where id <> all($1::text[])`, [keep]);
     }
     // Operators building products is intended; changing what sellers are charged is
