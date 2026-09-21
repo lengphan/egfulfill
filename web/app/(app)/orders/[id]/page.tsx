@@ -1239,15 +1239,36 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                         const ownFees = (designFees?.items ?? [])
                           .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
                           .reduce((t, f) => t + (Number(f.amount) || 0), 0)
-                        const dRatio = (Number(quote?.subtotal) || 0) > 0
-                          ? (Number(quote?.volumeDiscount) || 0) / (Number(quote?.subtotal) || 0) : 0
+                                               /**
+                         * AGAINST THE BLANKS, NOT THE GOODS (owner, 2026-09-21: "the discount would
+                         * apply to the blank only not the methods or surfaces as well").
+                         *
+                         * The ratio has to be taken against the same number the CHARGE used, which
+                         * is now `discountBase` — Σ(blank × qty) — and not `subtotal`, which still
+                         * includes the method and every face. Splitting against the wrong base would
+                         * hand each row a share that does not add up to the deduction at the bottom,
+                         * which is the one defect this breakdown exists to avoid.
+                         *
+                         * Falls back to `subtotal` only for a quote from a server too old to send
+                         * `discountBase`, where the old rule is still the honest answer.
+                         */
+ const dBase = Number(quote?.discountBase ?? quote?.subtotal) || 0
+ const dRatio = dBase > 0 ? (Number(quote?.volumeDiscount) || 0) / dBase : 0
                         const isLast = i === lines.length - 1
                         /* The last line absorbs the rounding, so the shares always reach the
                            whole. Everything before it takes its own exact share. */
-                        const shareBefore = lines.slice(0, i).reduce((n, x) => n + Math.round((Number(x.unitCost) || 0) * (Number(x.qty) || 1) * dRatio * 100) / 100, 0)
+                                               /* EACH LINE'S OWN BLANK, by the same rule the server totals — so the shares
+                           reconcile to the deduction however many lines they are spread over. */
+ const blankOfLine = (x: NonNullable<OrderQuote["lines"]>[number]) => {
+                          const b = Number(x.baseCost)
+                          if (isFinite(b) && b > 0) return b
+                          const d = (Number(x.unitCost) || 0) - (Number(x.methodFee) || 0) - (Number(x.sideFee) || 0)
+                          return d > 0 ? d : 0
+                        }
+ const shareBefore = lines.slice(0, i).reduce((n, x) => n + Math.round(blankOfLine(x) * (Number(x.qty) || 1) * dRatio * 100) / 100, 0)
                         const discOwn = isLast
                           ? Math.max(0, Math.round(((Number(quote?.volumeDiscount) || 0) - shareBefore) * 100) / 100)
-                          : Math.round(goods * dRatio * 100) / 100
+                          : Math.round(blankOfLine(l) * qty * dRatio * 100) / 100
                         const method = Number(l.methodFee) || 0
                         const sideTotal = parts.reduce((n, p) => n + p.amount, 0)
                         const blank = (Number(l.unitCost) || 0) - method - sideTotal
@@ -1276,6 +1297,14 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                 {who}
                                 {blankSkuOf(l) && <span className="font-normal text-muted-foreground"> · {blankSkuOf(l)}</span>}
                                 {qty > 1 && <span className="font-normal text-muted-foreground/70"> × {qty}</span>}
+                                {/* ONCE, WHERE IT IS DECIDED. The rate applies to this item's goods, so
+                                    the item is the right place to say it — and saying it here is what lets
+                                    every row below drop the words and keep only its own figures.
+                                    `discOwn`, not `dpct` alone: a rate shown on an item that earned no
+                                    deduction would be a promise the rows underneath do not keep. */}
+                                {discOwn > 0.005 && dpct > 0 && (
+                                  <span className="font-semibold text-success"> · {dpct}% {tl("order", "off")}</span>
+                                )}
                               </dt>
                               {/* ALL-IN, because everything under it now is. The heading was the
                                   GOODS while shipping and the discount sat at order level; with
@@ -1468,15 +1497,20 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                       }
                                     }),
                                   ]
-                                  const goodsSum = goodsRows.reduce((n, r) => n + r.amount, 0)
-                                  let taken = 0
-                                  const cut = goodsRows.map((r, j) => {
-                                    if (discOwn <= 0.005 || goodsSum <= 0) return 0
-                                    if (j === goodsRows.length - 1) return Math.max(0, Math.round((discOwn - taken) * 100) / 100)
-                                    const c = Math.round((r.amount / goodsSum) * discOwn * 100) / 100
-                                    taken += c
-                                    return c
-                                  })
+                                  /**
+                                   * ALL OF IT ON THE BLANK ROW (owner, 2026-09-21).
+                                   *
+                                   * This used to spread the item's deduction across every goods row in
+                                   * proportion to its amount, which is what the old rule required —
+                                   * the discount came off the whole of `unitCost`. It comes off the
+                                   * BLANK now, so a face striking through would show a saving on a
+                                   * charge that never received one, and the faces would not add up to
+                                   * what they are billed.
+                                   *
+                                   * No rounding to spread and so no remainder to absorb: one row takes
+                                   * the whole figure, and the figure is already the item's exact share.
+                                   */
+                                  const cut = goodsRows.map((r) => (r.face === null && discOwn > 0.005 ? discOwn : 0))
 
                                   /**
                                    * A FACE IS SAID ONCE (owner, 2026-09-21: "i want Front once,
@@ -1546,9 +1580,14 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                                 * editor keeps its legacy column for.
                                                 */
                                               : tl("order", "Blank")}
-                                            {off > 0.005 && (
-                                              <span className="text-success tabular-nums"> · {dpct}% {tl("order", "off")}</span>
-                                            )}
+                                            {/* THE RATE IS NOT REPEATED HERE (owner, 2026-09-21: "this is
+                                                quite cluttered? 20% off each row"). It was printed on every
+                                                discounted row of every item — six times on a three-face
+                                                line — and it is the same rate on all of them, because it
+                                                is the ITEM's. It is named once, on the heading.
+                                                The row keeps the struck-through list price and the net, so
+                                                it still shows its own before and after: what goes is the
+                                                repeated words, not the provenance. */}
                                           </dt>
                                           {/**
                                             * INCLUDED IS A WORD, NOT A ZERO. "$0.00" beside the

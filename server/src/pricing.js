@@ -1332,8 +1332,33 @@ export function computeTotals(lines, fees, volumePct = 0) {
   // Through the combiner even with one input, so the single-rate path and the eventual
   // multi-rate path are the same code and the clamp lives in one place.
   const pct = effectiveDiscountPct([volumePct]);
-  const volumeDiscount = money(subtotal * (pct / 100));
-  if (!units) return { subtotal, shipping: 0, units: 0, volumePct: pct, volumeDiscount: 0, total: subtotal };
+  /**
+   * THE DISCOUNT COMES OFF THE BLANK, AND ONLY THE BLANK (owner, 2026-09-21).
+   *
+   * It was `subtotal × pct`, and `subtotal` is Σ(unitCost × qty) — the garment PLUS the print
+   * method's surcharge PLUS every printed face. So a volume rate earned on garments was also
+   * taking a cut off embroidery and off each placement, which are work we do rather than
+   * stock we buy cheaper by the dozen. Shipping was already excluded for exactly that reason
+   * ("a courier's price and not ours to discount"); the method and the faces are the same
+   * argument and were simply never separated out.
+   *
+   * `baseCost` is the blank's own price — `parts.base`, held apart from `methodFee` and
+   * `sideFee` — so the base is a field, not a subtraction. The fallback derives it the way
+   * the summary's own Blank row does, so a line the catalogue could not price contributes
+   * what the screen says it does rather than silently nothing.
+   *
+   * CHARGED LINES ARE UNAFFECTED: a frozen line's `unitCost` and `baseCost` come from its
+   * stamp, so what was billed still recomputes to what was billed.
+   */
+  const blankOf = (l) => {
+    const base = num(l.baseCost);
+    if (base != null && base > 0) return base;
+    const derived = num(l.unitCost) - (num(l.methodFee) || 0) - (num(l.sideFee) || 0);
+    return derived > 0 ? derived : 0;
+  };
+  const discountBase = money(lines.reduce((s, l) => s + blankOf(l) * l.qty, 0));
+  const volumeDiscount = money(discountBase * (pct / 100));
+  if (!units) return { subtotal, discountBase: 0, shipping: 0, units: 0, volumePct: pct, volumeDiscount: 0, total: subtotal };
   /**
    * THE DEAREST LINE SETS THE RATE, not the first one typed.
    *
@@ -1357,7 +1382,10 @@ export function computeTotals(lines, fees, volumePct = 0) {
   // Floored at zero. A 100% ladder rung is a real thing an admin can save, and a negative
   // total would be a CREDIT — moveFunds would pay the seller to place an order.
   const total = Math.max(0, money(subtotal + shipping - volumeDiscount));
-  return { subtotal, shipping, units, volumePct: pct, volumeDiscount, total };
+  /* `discountBase` rides along so the summary splits the deduction across rows against the
+     SAME number the charge used. Deriving it again on the client is how a breakdown and a
+     charge come to disagree about one line. */
+  return { subtotal, discountBase, shipping, units, volumePct: pct, volumeDiscount, total };
 }
 
 // Freeze the quoted prices onto the items, so the charge is reproducible and a later

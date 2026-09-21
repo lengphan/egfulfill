@@ -3112,6 +3112,11 @@ export type OrderQuote = {
   planPct?: number
   discountFrom?: "plan" | "volume" | null
   volumeDiscount: number
+  /** What the discount is taken against: Σ(blank × qty), never the method or the faces —
+   *  those are work we do, not stock bought cheaper by the dozen. Shipping was already out
+   *  for the same reason. The summary splits the deduction across rows against THIS number,
+   *  so its parts reconcile to the figure the charge used. */
+  discountBase?: number
   /** What earned the rate: units shipped last period, and the 1-based rung. Null once the
    *  order is charged — `volumeFrozen` — because the stamped rate is then all we know, and
    *  showing this month's units beside last month's charged rate invites them to be read
