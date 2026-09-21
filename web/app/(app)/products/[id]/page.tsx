@@ -480,10 +480,32 @@ export default function ProductDetailPage() {
                       // grey that was simply the wrong colour. Hex stays as the fallback.
  const img = product.colorImages?.[c]
  const hex = knownHex(c)
-                      // Neither a photo nor a colour we can name in hex: say the word. It
-                      // is wider than a dot, and it is the only honest thing to draw.
+                      /* Neither a photo nor a colour we can name in hex: say the word. It is
+                         wider than a dot, and it is the only honest thing to draw — a
+                         pattern like "CP001 - Camo 001" has no flat hex and a wrong dot is
+                         worse than a name.
+                         BUT IT IS STILL A COLOUR YOU CAN BUY. This was a <span>: no
+                         onClick, no aria-pressed, no selected ring — so any colourway the
+                         map did not know became a colourway nobody could PICK, silently,
+                         and the row it sat in was 32px against the swatches' 28px, which is
+                         what made the line look ragged. Same control, same height, same
+                         selected treatment; only the fill differs. */
  if (!img && !hex) return (
-                        <span key={c} className="inline-flex h-8 items-center rounded-lg border border-input px-3 text-sm">{c}</span>
+                        <button
+ type="button"
+ key={c}
+ title={c}
+ aria-label={c}
+ aria-pressed={c === selColor}
+ onClick={() => setPickColor(c)}
+ onMouseEnter={() => setHoverColor(c)}
+ onMouseLeave={() => setHoverColor(null)}
+ onFocus={() => setHoverColor(c)}
+ onBlur={() => setHoverColor(null)}
+ className={"inline-flex h-7 shrink-0 items-center rounded-lg border border-input px-2.5 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " + (c === selColor ? "ring-2 ring-foreground ring-offset-2 ring-offset-card" : "")}
+                        >
+                          {c}
+                        </button>
                       )
  return (
                         <button

@@ -59,6 +59,21 @@ const MAP: Record<string, string> = {
   oat: "#ded3bf", wheat: "#d9c69a", mauve: "#9a7b8c", blush: "#e8b4bc", plum: "#6b3f5b",
   "bright salmon": "#f4837c", "bright orange": "#f2650d",
   taupe: "#a99a8b", greige: "#b6ada1", pebble: "#c9c3ba", flint: "#6f7378",
+  // ── The last six ─────────────────────────────────────────────────────────────────────
+  // Found by running THIS resolver over every colour name the live catalogue uses: 230 of
+  // them, of which seven placed nowhere. Six are real colours and are here; the seventh is
+  // "CP001 - Camo 001", which is a PATTERN and has no honest flat hex — it keeps the name
+  // chip, which is the right answer for it rather than a wrong dot.
+  //
+  // Oxford is the one that prompted this: Jerzees' light grey heather, on every 995M and
+  // 996M we carry. All six are muted or heathered by nature, so none is set at full
+  // saturation — see "blue jean" above for why a bright dot beside a washed name is
+  // treated as worse than no dot.
+  // "Military Green" is olive drab, not the generic green the substring pass finds once
+  // "heather" stops shadowing it — caught by diffing all 230 names before and after.
+  "military green": "#4b5320",
+  oxford: "#b5b5b0", hibiscus: "#e2497e", seaglass: "#b8d8cf", tweed: "#8b8377",
+  wasabe: "#a8b545", wasabi: "#a8b545", "wonder alumina": "#b9bfc0",
 }
 
 const ABBR: Record<string, string> = {
@@ -77,11 +92,24 @@ function oneHex(raw: string): string | null {
   if (!s) return null
   if (MAP[s]) return MAP[s]
   if (ABBR[s] && MAP[ABBR[s]]) return MAP[ABBR[s]]
-  // Whole-word contains a known color (longest first so "light blue" beats "blue").
-  for (const k of Object.keys(MAP).sort((a, b) => b.length - a.length)) {
-    if (new RegExp(`(^|[^a-z])${k.replace(/[.]/g, "\\.")}([^a-z]|$)`).test(s)) return MAP[k]
+  /* A TEXTURE IS NOT A COLOUR, AND IT MUST NOT WIN THE SUBSTRING PASS.
+     The pass runs longest-key-first, and "heather" (7) is longer than "black" (5) — so
+     "Black Heather" resolved to the light grey heather chip and "Vintage Heather Navy" to
+     the same one, two near-white dots in a row where one is nearly black and the other is
+     navy. Measured on the Jerzees 995M, where they sit side by side.
+     So: try the name with the texture words REMOVED first. The exact-match pass above has
+     already run, so "Heather Grey" and "Heather Gray" keep their own entries, and a bare
+     "Heather" — a real Gildan colourway — still lands on grey via the unstripped pass
+     below, because stripping leaves nothing to match. */
+  const hit = (t: string): string | null => {
+    for (const k of Object.keys(MAP).sort((a, b) => b.length - a.length)) {
+      if (new RegExp(`(^|[^a-z])${k.replace(/[.]/g, "\\.")}([^a-z]|$)`).test(t)) return MAP[k]
+    }
+    return null
   }
-  return null
+  const bare = s.replace(/\b(heather|hthr|htr|heathered|vintage|vtg|antique|washed|garment[- ]dyed|pigment[- ]dyed)\b/g, " ").replace(/\s+/g, " ").trim()
+  if (bare && bare !== s) { const m = hit(bare); if (m) return m }
+  return hit(s)
 }
 
 // A single reference hex for a colour name (the first token of a two-tone name), or null
