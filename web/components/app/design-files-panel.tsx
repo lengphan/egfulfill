@@ -1136,6 +1136,11 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
       })
       .filter((g) => g.placed.length || g.rows.length)
   })()
+  /** The lookup RAN (the server hashed at least one line's artwork), and whether it found
+   *  anything worth drawing. Two facts, because "nothing found" and "never asked" are
+   *  different answers and only one of them is worth printing. */
+ const reuseChecked = Object.values(reuse).some((v) => v?.hashed)
+ const reuseHit = fileGroups.some((g) => g.hits && (g.hits.exact.length || g.hits.similar.length))
 
   // NOTHING TO BUY is a real state and it now says so. Returning null here left the card
   // above it showing a title and blank space — a promise of files with no files and no
@@ -1374,6 +1379,27 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
       })()}
         </Fragment>
       ))}
+      {/**
+        * CHECKED AND FOUND NOTHING IS AN ANSWER — say it, quietly (owner, 2026-09-21, asking
+        * "where do i see?" for the third time).
+        *
+        * The match only draws a row when there IS one, so an order with no match renders
+        * exactly like an order where the lookup never ran, or where the feature is broken.
+        * §4 forbids drawing "can't" and "doesn't exist" the same way, and this is the case
+        * that proves it: the only way to tell them apart was to call the endpoint by hand.
+        *
+        * `hashed` is the server's own word for "the lookup ran" — the artwork was found and
+        * hashed — so this line is only shown when it is true. When it is false we say
+        * nothing, because then we genuinely do not know.
+        *
+        * ONE LINE, STAFF ONLY, and only when there is no match to show instead. A populated
+        * screen may not carry prose (§4); a RESULT is not prose, it is the answer.
+        */}
+      {!isSeller && reuseChecked && !reuseHit && (
+        <div className="border-t border-border pt-2 text-xs text-muted-foreground">
+          {tl("designFiles", "No match on another order — this artwork has not been digitised before.")}
+        </div>
+      )}
       {/* Offered alongside existing files too, not only when the list is empty — a seller
  may send a corrected file after we've already delivered one. */}
       {dropZone(true)}

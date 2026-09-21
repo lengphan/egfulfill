@@ -284,11 +284,32 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
        band it actually fell in. */
  const wRaw = Number(t.weightOz)
  const hasWeight = t.weightOz.trim() !== "" && isFinite(wRaw) && wRaw > 0
- if (!hasPrice && !hasCost && !hasWeight) continue
- const ship = t.shipping.trim() === "" ? null : Number(t.shipping)
     // Blank price is optional and NULL when unset — never 0. Zero would mean "we give the
     // garment away", and the server only uses this field when it is a real number.
  const blk = t.blank.trim() === "" ? null : Number(t.blank)
+    /**
+     * A BLANK PRICE IS A REASON FOR A TIER TO EXIST — and leaving it out of this test was
+     * silently deleting prices (owner, 2026-09-21: "i changed and saved the prices, still
+     * shows Active · no price").
+     *
+     * The test read price, cost or weight, and its comment said "any of the three" — written
+     * when Base cost was the price of a garment. It is not any more: since 2026-09-18 the
+     * BLANK is the base of every order and the placement and method are added on top, so it
+     * is the field somebody pricing a product actually fills in. A row carrying only a Blank
+     * failed all three tests and was dropped on the way out.
+     *
+     * TWO FAILURES, and the second is the bad one. A new price never saved — measured on
+     * EG-300 and EG-600, whose sizePrices came back EMPTY from a save whose updated_at
+     * proved it had run. And because tiersToStr loads the stored tiers back into the same
+     * state, merely OPENING a product priced this way and pressing Save erased the prices
+     * that were already there.
+     *
+     * `shipping` alone is still not enough, deliberately — postage on a size nobody has
+     * priced describes nothing. Blank is a price; shipping is an attribute of one.
+     */
+ const hasBlank = blk != null && isFinite(blk) && blk > 0
+ if (!hasPrice && !hasCost && !hasWeight && !hasBlank) continue
+ const ship = t.shipping.trim() === "" ? null : Number(t.shipping)
  out.push({
  size,
  price: hasPrice ? price : 0,
