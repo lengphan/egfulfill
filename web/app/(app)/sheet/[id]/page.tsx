@@ -132,6 +132,9 @@ export default function SheetPage() {
    * warns about.
    */
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Did the import actually run? A ref, not state: nothing renders from it, and the dialog's
+   *  close handler reads it in the same tick it is set — a state update would not have landed. */
+  const importedRef = useRef(false)
   /** The edit waiting to go out. Held so Save can send THIS body immediately rather than
    *  re-deriving what changed, and so a retry after a failure re-sends the same thing. */
   const pending = useRef<{ name?: string; rows?: string[][] } | null>(null)
@@ -325,10 +328,26 @@ export default function SheetPage() {
           initialRows={handoff}
           /* Closing the preview is "Edit sheet" — you land back on the grid with the rows
              still there, which is the whole point of the errors being named by row. */
-          onOpenChange={(v) => { if (!v) setHandoff(null) }}
+          /**
+           * THE NAVIGATION WAITS FOR "DONE" (owner, 2026-09-21).
+           *
+           * onImported pushed straight to /orders, so the dialog's result screen rendered for
+           * one frame and the page left. That screen is the ONLY place the import says which
+           * machine files failed and why — a list the server builds per file — so the one
+           * report nobody could read was the one nobody can reconstruct afterwards. The owner
+           * saw it as a window that flashed.
+           *
+           * The sheet is still completed at import, because that is when it happened. Only the
+           * leaving is deferred, to the button whose whole job is "I have read this".
+           */
+          onOpenChange={(v) => {
+            if (v) return
+            setHandoff(null)
+            if (importedRef.current) { importedRef.current = false; router.push("/orders") }
+          }}
           onImported={() => {
             completeOrderSheet(id, []).catch(() => {})
-            router.push("/orders")
+            importedRef.current = true
           }}
         />
       )}
