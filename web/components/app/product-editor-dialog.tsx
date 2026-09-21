@@ -1832,6 +1832,14 @@ export function ProductEditorDialog({
  title={productCost.trim() !== "" ? `Using the product-level supplier cost ${Number(productCost).toFixed(2)}` : tl("product", "Enter the supplier cost for this size")}
  className="h-8 text-xs" inputMode="decimal" aria-label={`Product cost for size ${s}`}
                       />
+                      {/* CONDITIONAL LIKE ITS HEADER. Hiding the header alone left this input
+                          in the row, so the row had one more cell than the header and every
+                          value after it rendered a column to the left: the base cost appeared
+                          under "Blank", the blank under "Shipping", and editing what looked
+                          like a blank price wrote to base cost — which is exactly the "it
+                          doesn't save" the owner saw. The grid template is shared by both rows
+                          for this reason; the cells have to be too. */}
+                      {showBaseCost && (
                       <Input
  value={t?.price ?? ""}
  onChange={(e) => patch("price", e.target.value)}
@@ -1846,6 +1854,7 @@ export function ProductEditorDialog({
  : basePrice.trim() !== "" ? tl("product", "Using the product-level base cost above") : tl("product", "Enter a product cost to price this size")}
  className="h-8 text-xs" inputMode="decimal" aria-label={`Base cost for size ${s}`}
                       />
+                      )}
                       <Input
  value={t?.blank ?? ""}
  onChange={(e) => patch("blank", e.target.value)}
