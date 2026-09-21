@@ -170,7 +170,6 @@ export function VariantPicker({
    * for the line's size: a Blank option on a product with no blank price quotes the PRINTED
    * base cost, which is the more expensive kind of wrong.
    */
-  const isBlankOnly = /^\s*(blank(\s*only)?|no[\s-]*print)\s*$/i.test(String(item.print_type || ""))
   const blankPriced = (() => {
     /* THE FACE GATE IS GONE WITH THE RULE IT GUARDED. It existed because costPartsOf's
        isBlankLine required that no placement declare a method — and that branch no longer
@@ -289,40 +288,29 @@ export function VariantPicker({
           label={tl("variantPicker", "Method")}
           /* EMPTY IS "NOT DECIDED", and shows the placeholder like every other field here. A
              blank is a CHOICE and reads as its own word. */
-          value={isBlankOnly ? "" : canon(item.print_type || "", methodList)}
-          /* TECHNIQUES ONLY. "Blank Only" used to sit at the top of this list, which put a
-             non-technique among the techniques and made one dropdown answer two questions —
-             IS it printed, and HOW. It has its own field now, below. */
-          options={methodList}
+          value={canon(item.print_type || "", blankPriced ? [BLANK_LABEL, ...methodList] : methodList)}
+          /**
+           * BLANK ONLY LIVES HERE (owner, 2026-09-21, reversing my own split).
+           *
+           * I moved it out to a Decoration field of its own, on the argument that "is it
+           * printed" and "how" are two questions and a non-technique should not sit among the
+           * techniques. The argument is fine and the result was not: the order row went to
+           * FIVE fields and wrapped onto a second line, with a Method dropdown holding one
+           * option standing next to a whole field holding two.
+           *
+           * And "not at all" is a real answer to "how is this decorated". The taxonomy was
+           * never worth a wrapped row and a second control to learn.
+           *
+           * FIRST IN THE LIST: somebody scanning techniques for "none of these" finds it at
+           * the top, not after Sublimation.
+           */
+          options={blankPriced ? [BLANK_LABEL, ...methodList] : methodList}
           emptyLabel="none"
           disabled={busy === "printType"}
+          /* The clear row writes "", which is "not decided". Picking Blank Only writes the
+             word, which is what costPartsOf tests for a bare garment. */
           onChange={(v) => save({ printType: v }, "printType")}
         />
-        )}
-        {/**
-          * IS IT PRINTED AT ALL — a different question from HOW, and it needs its own control.
-          *
-          * It lived inside the Method list, which meant one dropdown answered both and a
-          * non-technique sat among the techniques. On a multi-placement product Method is
-          * hidden entirely (the per-placement rows replace it), so the only way to say "bare
-          * garment" disappeared with it — and the canvas grew a second control with a different
-          * label to compensate. Two controls for one fact, which is what this removes.
-          *
-          * One option plus a clear row reading "Printed": empty is the real stored state
-          * (print_type = ""), and a second option would have to write a word meaning "not
-          * blank" that nothing reads back.
-          */}
-        {blankPriced && (
-          <VariantField
-            label={tl("variantPicker", "Decoration")}
-            value={isBlankOnly ? BLANK_LABEL : ""}
-            options={[BLANK_LABEL]}
-            placeholder={tl("variantPicker", "Printed")}
-            clearLabel={tl("variantPicker", "Printed")}
-            className={hideMethod ? undefined : "col-span-2 sm:col-span-1"}
-            disabled={busy === "printType"}
-            onChange={(v) => save({ printType: v === BLANK_LABEL ? BLANK_LABEL : "" }, "printType")}
-          />
         )}
       </div>
 
