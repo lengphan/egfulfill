@@ -101,6 +101,23 @@ for (let i = 0; i < 40; i++) {
 }
 await db.connect()
 
+/**
+ * WAIT FOR THE APP'S OWN MIGRATIONS, don't race them.
+ *
+ * /health answers as soon as Fastify listens, but several tables this gate seeds are created
+ * at ROUTE LOAD rather than in schema.sql (§6: "grep the route, not just schema.sql") —
+ * wallet_ledger among them. Seeding the instant the server binds therefore passed or failed
+ * on boot timing, which reads as a broken gate rather than a fast one.
+ */
+for (let i = 0; i < 60; i++) {
+  const ok = await db.query(
+    `select to_regclass('wallet_ledger') is not null as a, to_regclass('order_designs') is not null as b`)
+    .then((r) => r.rows[0].a && r.rows[0].b).catch(() => false)
+  if (ok) break
+  await new Promise((r) => setTimeout(r, 250))
+  if (i === 59) { console.error('FAIL  the app never created its own tables — nothing below could be trusted.'); process.exit(1) }
+}
+
 /* THE REAL PRODUCT'S SHAPE, from EG-18000 on production: a true blank price (so faces stack
    on a bare garment rather than on one that already contains a print), a flat placement rate,
    and a per-product embroidery override BELOW the platform figure — which is what catches a
@@ -116,12 +133,16 @@ for (const ddl of [
   `alter table order_items add column if not exists unit_cost numeric`,
   `alter table order_items add column if not exists ship_fee numeric`,
   `alter table order_items add column if not exists cost_parts jsonb`,
+  /* schema.sql still declares the ORIGINAL primary key (order_id, sku), which predates
+     per-line and per-side artwork; the app replaces it at route load with the line+side
+     unique index. Seeding four faces of two lines under one sku collides with the old one,
+     so the gate drops it exactly as the running database has. */
+  `alter table order_designs drop constraint if exists order_designs_pkey`,
   `alter table order_designs add column if not exists line_id text`,
   `alter table order_designs add column if not exists side text`,
   `alter table order_designs add column if not exists method text`,
   `alter table order_designs add column if not exists storage_key text`,
   `alter table order_designs add column if not exists art_hash text`,
-  `alter table wallet_ledger add column if not exists order_id text`,
 ]) await db.query(ddl).catch(() => {})
 await db.query(
   `insert into catalog_products (id, name, sku, type, status, base_price, data)
@@ -161,7 +182,10 @@ for (const [line, side, m] of [['L-emb', 'front', 'Embroidery'], ['L-emb', 'back
 /* THE LEDGER IS WHAT SAYS SOMEBODY PAID — `chargedAmount` reads it rather than a flag, and
    the route gates on the same thing. Balance funded well above the placements under test. */
 await db.query(`insert into wallet_ledger (account, delta, type, ref) values ($1, 500, 'topup-in','gate-topup')`, [SELLER])
-await db.query(`insert into wallet_ledger (account, delta, type, ref, order_id) values ($1,-70,'order-charge-out',$2,$2),('factory',70,'order-charge-in',$2,$2)`, [SELLER, ORDER])
+/* MATCHED ON `ref`, which is how order_refunds' CHARGE_KINDS finds a production charge —
+   `order_id` is a later convenience column created at route load, and depending on it here
+   made the seed race the app's own startup. */
+await db.query(`insert into wallet_ledger (account, delta, type, ref) values ($1,-70,'order-charge-out',$2),('factory',70,'order-charge-in',$2)`, [SELLER, ORDER])
 
 const feeRows = () => db.query(
   `select note, delta from wallet_ledger where type='order-fee-out' and ref like $1 order by id`, [`fee-${ORDER}-%`]
@@ -181,62 +205,60 @@ console.log('\nA METHOD IS STATED, NOT INHERITED — the face is about to be bil
   check('no money moved', (await feeRows()).length, 0)
 }
 
-console.log('\nA NEW FACE ON AN EMBROIDERED LINE — placement only, the method has not moved')
+console.log('\nA NEW FACE COSTS NOTHING — THE PLACEMENT IS ALREADY PAID (2026-09-21)')
 {
+  /* One placement per LINE now, not one per face. This line's front already carries it, so a
+     fourth surface adds no money — what a second picture costs is a design fee, billed per
+     picture elsewhere. The artwork must still LAND: free is not a refusal. */
   const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-emb', side: 'right', data: 'https://x/new.png', name: 'new', method: 'Embroidery' })
   check('saved', r.status, 200)
-  check('charged the placement', r.body.surcharge && r.body.surcharge.amount, 3)
+  check('no surcharge', r.body.surcharge, undefined)
+  check('the artwork landed', await faceCount('L-emb'), 4)
   const it = await itemOf('L-emb')
-  check('unit_cost restamped 28 -> 31', Number(it.unit_cost), 31)
-  check('the stamp grew to four faces', it.cost_parts.sides.length, 4)
-  check('and the billed faces keep their amounts', it.cost_parts.sides.map((p) => p.amount), [3, 3, 3, 3])
-  check('method unchanged — it was already the dearest', it.cost_parts.method, 4)
-  const fees = await feeRows()
-  check('one fee row', fees.length, 1)
-  check('for the placement', Number(fees[0].delta), -3)
-  /* THE POSITION THE SCREEN SHOWS, not the order these were inserted. `order_items.id` is a
-     random uuid, so "Item N" is the row's place under the aggregate's own `created_at, id`
-     ordering — asserting a hard-coded 1 tested my guess about uuids, not the label. What
-     matters is that the note and the summary cannot disagree, so it is computed the same way. */
-  const pos = (await db.query(
-    `select n from (select line_id as k, row_number() over (order by created_at, id) as n
-                      from order_items where order_id=$1) t where k='L-emb'`, [ORDER])).rows[0].n
-  check('named for the face and the item', fees[0].note, `Right placement · Item ${pos}`)
+  check('unit_cost untouched', Number(it.unit_cost), 28)
+  check('the stamp is unchanged', it.cost_parts.sides.length, 3)
+  check('no fee row', (await feeRows()).length, 0)
 }
 
-console.log('\nRE-UPLOADING THE SAME FACE IS FREE — the placement is charged, not the picture')
+console.log('\nRE-UPLOADING THE SAME FACE IS FREE TOO')
 {
   const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-emb', side: 'right', data: 'https://x/fixed.png', name: 'fixed', method: 'Embroidery' })
   check('saved', r.status, 200)
   check('no surcharge', r.body.surcharge, undefined)
-  check('still one fee row', (await feeRows()).length, 1)
-  check('unit_cost unchanged', Number((await itemOf('L-emb')).unit_cost), 31)
+  check('still no fee row', (await feeRows()).length, 0)
 }
 
-console.log('\nTHE METHOD MOVES THE LINE — an embroidered face on a DTF line, across both units')
+console.log('\nAN EMPTY WALLET REFUSES A CHARGEABLE FACE AND WRITES NOTHING')
 {
+  /* The method jump below IS chargeable, so it is the honest thing to refuse. Drained first,
+     then restored — which also proves the retry bills once rather than twice. */
+  await db.query(`insert into wallet_ledger (account, delta, type, ref) values ($1, -498, 'adjust-out','gate-drain')`, [SELLER])
+  const before = await faceCount('L-dtf')
   const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-dtf', side: 'right', data: 'https://x/emb.png', name: 'emb', method: 'Embroidery' })
-  check('saved', r.status, 200)
-  /* 15 blank + 4 embroidery (the product's own rate, not the platform's 5) + 3 faces x 3 = 28
-     against a stamp of 21, x2 units. A per-face charge would have billed 6 and missed 8. */
-  check('placement AND the method jump, x2 units', r.body.surcharge && r.body.surcharge.amount, 14)
-  const it = await itemOf('L-dtf')
-  check('unit_cost restamped 21 -> 28', Number(it.unit_cost), 28)
-  check('method rose 0 -> 4', it.cost_parts.method, 4)
-  check('billed method follows the dearest face', it.cost_parts.billedMethod, 'Embroidery')
-}
-
-console.log('\nAN EMPTY WALLET REFUSES THE PLACEMENT AND WRITES NOTHING')
-{
-  await db.query(`insert into wallet_ledger (account, delta, type, ref) values ($1, -483, 'adjust-out','gate-drain')`, [SELLER])
-  const before = await faceCount('L-emb')
-  const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-emb', side: 'sleeve', data: 'https://x/s.png', name: 's', method: 'Embroidery' })
   check('402 Payment Required', r.status, 402)
   check('and names the shortfall', typeof r.body.shortfall === 'number', true)
-  check('the artwork did NOT land', await faceCount('L-emb'), before)
-  check('unit_cost untouched', Number((await itemOf('L-emb')).unit_cost), 31)
+  check('the artwork did NOT land', await faceCount('L-dtf'), before)
+  check('unit_cost untouched', Number((await itemOf('L-dtf')).unit_cost), 21)
 }
 
-console.log(bad ? `\nFAIL  ${bad} check${bad === 1 ? '' : 's'} failed.` : '\nPASS  the surface delta bills once, at the right figure, and refuses rather than overdraws.')
+console.log('\nTHE METHOD STILL MOVES THE LINE, ACROSS BOTH UNITS')
+{
+  await db.query(`insert into wallet_ledger (account, delta, type, ref) values ($1, 200, 'topup-in','gate-refill')`, [SELLER])
+  const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-dtf', side: 'right', data: 'https://x/emb.png', name: 'emb', method: 'Embroidery' })
+  check('saved', r.status, 200)
+  /* 15 blank + 4 embroidery (the product's own rate, not the platform's 5) + the two faces
+     already stamped at 3 each + the new face at 0 = 25, against a stamp of 21, x2 units.
+     The PLACEMENT adds nothing now; the technique still does — which is the half no per-face
+     rule could ever have reached. */
+  check('the method jump alone, x2 units', r.body.surcharge && r.body.surcharge.amount, 8)
+  const it = await itemOf('L-dtf')
+  check('unit_cost restamped 21 -> 25', Number(it.unit_cost), 25)
+  check('method rose 0 -> 4', it.cost_parts.method, 4)
+  check('billed method follows the dearest face', it.cost_parts.billedMethod, 'Embroidery')
+  check('the new face is stamped at zero', it.cost_parts.sides.map((p) => p.amount), [3, 3, 0])
+  check('exactly one fee row', (await feeRows()).length, 1)
+}
+
+console.log(bad ? `\nFAIL  ${bad} check${bad === 1 ? '' : 's'} failed.` : '\nPASS  a face adds no placement, the technique still bills, and an empty wallet refuses.')
 await db.end()
 process.exit(bad ? 1 : 0)

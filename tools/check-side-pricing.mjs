@@ -30,12 +30,14 @@ const check = (l, got, want) => {
 }
 const fees = { method_side: 3 }
 
-console.log('\nEVERY FACE IS CHARGED')
+console.log('\nONE PLACEMENT PER LINE — THE FIRST FACE CARRIES IT')
 {
   const r = sideBreakdown([{ side: 'front', method: 'Embroidery' }, { side: 'back', method: 'DTG' }], fees, null)
-  check('both faces appear', r.parts.map((p) => [p.face, p.amount]), [['front', 3], ['back', 3]])
+  /* Both faces are still LISTED — dropping the free one would hide that the garment prints
+     on two surfaces — but only the first carries money (owner, 2026-09-21). */
+  check('both faces appear, only the first charged', r.parts.map((p) => [p.face, p.amount]), [['front', 3], ['back', 0]])
   check('no face is named as included', r.included, null)
-  check('total is both', sideAddOn(['front', 'back'], fees, null), 6)
+  check('total is one placement, not two', sideAddOn(['front', 'back'], fees, null), 3)
 }
 
 console.log('\nA ONE-FACE LINE NOW PAYS FOR ITS FACE')
@@ -59,8 +61,13 @@ console.log('\nORDER IS STILL PRICED_SIDES, NOT INSERTION ORDER')
 
 console.log('\nPER-FACE RATES STILL RESOLVE')
 {
+  /* The rate that applies is the FIRST face's, so a hood override shows only when the hood
+     is the face being charged. Both cases, because the precedence and the one-placement rule
+     are separate rules and a test that only proves one of them hides the other. */
   const r = sideBreakdown(['front', 'hood'], fees, { sidePrice: { hood: 7 } })
-  check('the product’s own hood rate wins', r.parts.map((p) => [p.face, p.amount]), [['front', 3], ['hood', 7]])
+  check('front leads, so the hood override is not the one billed', r.parts.map((p) => [p.face, p.amount]), [['front', 3], ['hood', 0]])
+  const h = sideBreakdown(['hood'], fees, { sidePrice: { hood: 7 } })
+  check('hood alone bills the product’s own rate', h.parts.map((p) => [p.face, p.amount]), [['hood', 7]])
 }
 
 console.log('\nTHE FACE METHOD STILL RIDES ALONG')
@@ -96,10 +103,31 @@ console.log('\nMORE DESIGNS ON ONE FACE IS STILL ONE PLACEMENT')
      different `kind`, so the unique index permits both — and one thing to decorate. */
   const pair = [{ side: 'front', method: 'DTG' }, { side: 'front', method: 'Embroidery' }]
   check('artwork + its machine file is one placement', sideAddOn(pair, fees, null, 'DTG'), 3)
-  /* The control: a SECOND surface does add one. If this ever matches the rows above, the
-     dedupe has stopped distinguishing faces from designs and everything is free. */
-  check('a second FACE does add one', sideAddOn([{ side: 'front', method: 'DTG' }, { side: 'back', method: 'DTG' }], fees, null, 'DTG'), 6)
+  /* THE CONTROL, restated for the one-placement rule. Money can no longer tell a second face
+     from a second design — both leave the total alone — so the fact that still separates them
+     is the ROW: a second FACE is another surface and gets listed (at zero); a second design on
+     the SAME face is the same surface and must not. If these ever agree, the dedupe has
+     stopped distinguishing them and the summary would name a face the garment does not have. */
+  const twoFaces = sideBreakdown([{ side: 'front', method: 'DTG' }, { side: 'back', method: 'DTG' }], fees, null, 'DTG')
+  check('a second FACE is listed', twoFaces.parts.map((p) => [p.face, p.amount]), [['front', 3], ['back', 0]])
+  check('a second DESIGN on one face is not', sideBreakdown(two, fees, null, 'DTG').parts.length, 1)
 }
 
-console.log(bad ? `\n${bad} failure(s).` : '\nEvery surface is charged, and nothing else moved.')
+/**
+ * THE SECOND FACE COSTS A DESIGN FEE, NOT A PLACEMENT.
+ *
+ * This is the whole of the 2026-09-21 reversal, stated as arithmetic: adding artwork to
+ * another surface must not raise the garment's price. What it DOES raise is the design fee,
+ * which is billed per picture by computeDesignFees and is not this function's business.
+ */
+console.log('\nADDING A FACE DOES NOT RAISE THE GARMENT')
+{
+  const one = sideAddOn([{ side: 'front', method: 'Embroidery' }], fees, null, 'Embroidery')
+  const four = sideAddOn(
+    ['front', 'back', 'left', 'right'].map((side) => ({ side, method: 'Embroidery' })), fees, null, 'Embroidery')
+  check('one face', one, 3)
+  check('four faces, same placement money', four, one)
+}
+
+console.log(bad ? `\n${bad} failure(s).` : '\nOne placement per line, the rest free, and nothing else moved.')
 process.exit(bad ? 1 : 0)

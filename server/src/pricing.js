@@ -585,8 +585,37 @@ function sideDetail(faces, fees, d, lineMethod = null) {
   const ownFlat = num(own);
   const ownMap = own && typeof own === 'object' ? own : null;
   const flat = (ownFlat != null && ownFlat > 0 ? ownFlat : num(fees && fees.method_side)) || 0;
+  /**
+   * ONE PLACEMENT PER LINE, NOT ONE PER FACE (owner, 2026-09-21, reversing the 2026-09-18
+   * rule that every face is charged).
+   *
+   *   first face      blank + placement + its design fee
+   *   every face after                    its design fee only
+   *
+   * The owner's words: "only one face should be charged with face fees on top of blank and
+   * design fees. then second face onwards should only be design fee for that face, not more
+   * face fees."
+   *
+   * WHY THE REVERSAL IS COHERENT. What a second face really costs is the WORK of digitising
+   * or preparing another picture, and the design fee already bills exactly that — per design,
+   * once, whatever the quantity. Charging a placement on top billed the same additional
+   * artwork twice under two names, and on a one-unit order the two were the same size, which
+   * is what made it read as a double charge.
+   *
+   * THE FIRST FACE IN PRICED_SIDES ORDER carries it, not the dearest and not the first
+   * uploaded: `ordered` is already sorted, so the same garment is charged the same way
+   * whatever sequence somebody happened to place the artwork in. A line printed only on the
+   * sleeve pays the sleeve's rate, because it is that line's first face.
+   *
+   * THE FREE FACES ARE STILL LISTED, at zero. Dropping them would hide from the summary that
+   * the garment prints on three surfaces, and §4's "a zero is an answer" is the whole point
+   * here — the row says the face exists AND that it added nothing.
+   *
+   * CHARGED ORDERS DO NOT MOVE. unit_cost and cost_parts are stamped at submit and this never
+   * re-reads them, so an order billed under the old rule keeps the price it was billed at.
+   */
   const parts = [];
-  // EVERY face is charged — see the note at the top of this function.
+  let charged = false;
   for (const face of ordered) {
     /* THE FACE'S OWN TECHNIQUE, else the LINE's. A face that says nothing is decorated the
        way the line is, which is the same inheritance every other reader of this column uses —
@@ -595,7 +624,9 @@ function sideDetail(faces, fees, d, lineMethod = null) {
     /* The face's own technique when it has one, else null — NOT the line's. A face that says
        nothing inherits, and the caller already knows the line's method; filling it in here
        would make an inherited face indistinguishable from one somebody chose. */
-    if (rate > 0) parts.push({ face, amount: money(rate), method: methodOf.get(face) || null });
+    const amount = charged ? 0 : money(rate);
+    if (rate > 0) charged = true;
+    parts.push({ face, amount, method: methodOf.get(face) || null });
   }
   /* NO INCLUDED FACE ANY MORE, so none is named. `included` stays absent rather than null-ed
      out of habit: a CHARGED order's stamp still carries the face it had, and the summary reads
