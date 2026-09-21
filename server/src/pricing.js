@@ -969,7 +969,22 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
        a test). `faces` stays NAMES for the side maths — sideAddOn and sideBreakdown are
        about which surface, not what is on it — and `withMethods` carries the pair for the
        one question that needs both. */
-    const rawList = Array.isArray(raw) ? raw
+    /**
+     * A BLANK ONLY LINE PRINTS NOTHING, whatever artwork is sitting on it.
+     *
+     * `raw` comes from order_designs — the pictures placed on the garment — so a line switched
+     * to Blank Only went on being charged a placement for every face that still held one. The
+     * method said undecorated and the money said printed, and the two were read off different
+     * columns.
+     *
+     * The ARTWORK IS NOT TOUCHED. Emptying the list here prices the line as the bare garment
+     * and leaves every picture exactly where it is, so switching back to DTG restores the
+     * placements and their charges with nothing to redo — which is the behaviour asked for,
+     * reached by not charging rather than by moving somebody's work around.
+     */
+    const blankOnly = /^\s*(blank(\s*only)?|no[\s-]*print)\s*$/i.test(String(it.print_type || ''));
+    const rawList = blankOnly ? []
+      : Array.isArray(raw) ? raw
       : Array.from({ length: Math.max(1, Number(raw) || 1) }, (_, i) => (i === 0 ? 'front' : `face-${i}`));
     const withMethods = rawList.map((f) => (f && typeof f === 'object'
       ? { side: String(f.side || 'front'), method: String(f.method || '').trim() || String(it.print_type || '').trim() }

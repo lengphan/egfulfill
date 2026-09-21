@@ -304,7 +304,14 @@ export function VariantPicker({
            * FIRST IN THE LIST: somebody scanning techniques for "none of these" finds it at
            * the top, not after Sublimation.
            */
-          options={blankPriced ? [BLANK_LABEL, ...methodList] : methodList}
+          /* `keep` HAS ALREADY PUT IT THERE. It prepends the line's current value when the
+             product's own list does not contain it — and "Blank Only" never is in that list,
+             because it is not a technique a product is printed with. Prepending again printed
+             it TWICE, both ticked, which is the shape of a menu nobody trusts. Added only when
+             it is not already present. */
+          options={blankPriced && !methodList.some((m) => same(m, BLANK_LABEL))
+            ? [BLANK_LABEL, ...methodList]
+            : methodList}
           emptyLabel="none"
           disabled={busy === "printType"}
           /* The clear row writes "", which is "not decided". Picking Blank Only writes the
