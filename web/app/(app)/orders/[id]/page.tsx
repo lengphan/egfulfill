@@ -1460,6 +1460,14 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    *  see the remainder below, which is what keeps its share visible. */
                                   const drawn = (f: typeof mine[number]) =>
                                     (f.sides ?? []).filter((sd) => faceRows.some((r) => r.face.toLowerCase() === sd.toLowerCase()))
+                                  /** The fee's TOPMOST row on this card — faceRows order, not the
+                                   *  fee's own. `sides` arrives in the order the server happened to
+                                   *  walk the designs, so anchoring the pencil to sides[0] put it on
+                                   *  Left while Back was drawn above it: one control on the second of
+                                   *  two identical rows, which reads as arbitrary. Measured on
+                                   *  EGF-002155, whose sides are [left, right, back]. */
+                                  const topDrawn = (f: typeof mine[number]) =>
+                                    faceRows.find((r) => (f.sides ?? []).some((sd) => sd.toLowerCase() === r.face.toLowerCase()))?.face ?? null
                                   /** What is left of a fee once every drawn face has taken its share.
                                    *  Zero on an ordinary fee; on one covering a face this line does not
                                    *  print it is real money, and dropping it would leave the item short
@@ -1738,9 +1746,9 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                         ...fees.map((fe, k) => {
                                           const sds = fe.sides ?? []
                                           const split = sds.length > 1
-                                          /* The pencil goes on the fee's FIRST drawn face and nowhere
+                                          /* The pencil goes on the fee's TOPMOST drawn face and nowhere
                                              else, so one job shows one price to set. */
-                                          const first = drawn(fe)[0]
+                                          const first = topDrawn(fe)
                                           return feeRow(fe, `fee-${i}-${j}-${k}`, false, "pl-6", {
                                             amount: shareOf(fe, f),
                                             editable: !first || first.toLowerCase() === f.toLowerCase(),
