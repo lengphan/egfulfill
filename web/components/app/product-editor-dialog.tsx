@@ -568,6 +568,19 @@ export function ProductEditorDialog({
  const [bulkBase, setBulkBase] = useState("")
  const [bulkPct, setBulkPct] = useState(false)
   /**
+   * WHICH COLUMN, AND WHICH WAY (owner, 2026-09-21).
+   *
+   * The bar only ever wrote Blank, and only ever upward — so a price list that needed
+   * trimming, or a shipping fee that moved, was 12 cells of typing. It also carried its rule
+   * in two prefixes ("Blank price", "product cost +") stacked on a control barely wider than
+   * the words, which is the §4 case exactly: a label that has to explain the control is the
+   * wrong label.
+   *
+   * Three levers instead of two prefixes: WHAT to change, WHICH WAY, and BY HOW MUCH.
+   */
+ const [bulkField, setBulkField] = useState<"blank" | "shipping" | "cost">("blank")
+ const [bulkDown, setBulkDown] = useState(false)
+  /**
    * THE SHELF, PER VARIANT — variantSku -> units, as TEXT.
    *
    * Text rather than numbers because "" is a value here and 0 is a different one: blank
@@ -941,14 +954,31 @@ export function ProductEditorDialog({
  const b = bulkBase.trim()
  if (b === "") return
  const amt = Number(b) || 0
+ const sign = bulkDown ? -1 : 1
  setTiers((prev) => {
  const nextT: Record<string, Tier> = { ...prev }
  for (const s of sizes) {
  const cur = nextT[s] ?? EMPTY_TIER
+        /**
+         * EACH FIELD MOVES AGAINST ITS OWN VALUE. "+10%" on Shipping means a tenth of the
+         * shipping already there — not a tenth of something else. A single shared base was
+         * what made this bar only able to write one column.
+         *
+         * BLANK KEEPS ITS FALLBACK, and it is the reason the old bar existed: on a row with
+         * no blank yet there is nothing to raise, so it starts from that row's own supplier
+         * cost, else the product's — which is what "product cost + 12" did, and the only way
+         * to fill an empty table in one press. The other two columns have no such second
+         * meaning, so an empty cell there starts at zero.
+         */
  const rowCost = num(cur.cost)
- const cost = !isNaN(rowCost) ? rowCost : (num(productCost) || 0)
- const next = bulkPct ? cost * (1 + amt / 100) : cost + amt
- nextT[s] = { ...cur, blank: String(Math.round(next * 100) / 100) }
+ const ownCost = !isNaN(rowCost) ? rowCost : (num(productCost) || 0)
+ const current = num(cur[bulkField])
+ const start = !isNaN(current) ? current : (bulkField === "blank" ? ownCost : 0)
+ const raw = bulkPct ? start * (1 + (sign * amt) / 100) : start + sign * amt
+        /* NEVER BELOW ZERO. A minus that overshoots is a typo, and a negative price would be
+           saved and then billed — clamping is the only outcome that cannot cost money. */
+ const next = Math.max(0, Math.round(raw * 100) / 100)
+ nextT[s] = { ...cur, [bulkField]: String(next) }
       }
  return nextT
     })
@@ -1742,23 +1772,43 @@ export function ProductEditorDialog({
                     group where it only qualifies the one field it applies to, and the arrow
                     showing what the rule resolves to before anything is pressed. */}
                 {sizes.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2.5">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">{tl("product", "Blank price")}</span>
-                      <span className="flex items-center gap-1.5">
-                        <span className="text-xs text-muted-foreground">{tl("product", "product cost +")}</span>
-                        <span className="inline-flex rounded-md border border-border p-0.5 text-xs">
-                          {([[false, "$"], [true, "%"]] as const).map(([v, lbl]) => (
-                            <button key={lbl} type="button" onClick={() => setBulkPct(v)}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2.5">
+                    {/* NO PREFIXES. The rule used to be spelled out in two labels stacked on
+                        the control — "Blank price" over "product cost +" — which is §4's case:
+                        a control that needs a sentence has the wrong label. The controls now
+                        SAY it: [Blank] [+] [%] [12] reads as one line left to right. */}
+                    <span className="text-xs font-medium text-foreground">{tl("product", "Bulk price")}</span>
+                    <select value={bulkField} onChange={(e) => setBulkField(e.target.value as typeof bulkField)}
+                      className="eg-select eg-control h-8 pr-7 text-sm"
+                      aria-label={tl("product", "Which price to change")}>
+                      <option value="blank">{tl("product", "Blank")}</option>
+                      <option value="shipping">{tl("product", "Shipping")}</option>
+                      <option value="cost">{tl("product", "Product cost")}</option>
+                    </select>
+                    {/* WHICH WAY. Two buttons rather than a typed minus: the amount box strips
+                        everything but digits (it has to — a stray character silently became
+                        NaN and wrote 0 across every size), so a minus could never be typed
+                        into it, and a down-adjustment was simply not expressible. */}
+                    <span className="inline-flex rounded-md border border-border p-0.5 text-xs">
+                      {([[false, "+"], [true, "−"]] as const).map(([v, lbl]) => (
+                        <button key={lbl} type="button" onClick={() => setBulkDown(v)}
+                          aria-pressed={bulkDown === v}
+                          className={"eg-tap rounded px-2 py-0.5 font-medium transition-colors " + (bulkDown === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                          {lbl}
+                        </button>
+                      ))}
+                    </span>
+                    <span className="inline-flex rounded-md border border-border p-0.5 text-xs">
+                      {([[false, "$"], [true, "%"]] as const).map(([v, lbl]) => (
+                        <button key={lbl} type="button" onClick={() => setBulkPct(v)}
+                          aria-pressed={bulkPct === v}
  className={"eg-tap rounded px-2 py-0.5 font-medium transition-colors " + (bulkPct === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                              {lbl}
-                            </button>
-                          ))}
-                        </span>
-                        <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
- className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Blank price over product cost, for every size")} />
-                      </span>
-                    </label>
+                          {lbl}
+                        </button>
+                      ))}
+                    </span>
+                    <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
+ className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Amount to add or take off every size")} />
                     <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk}
  disabled={!bulkBase.trim()}>{tl("product", "Apply to all sizes")}</Button>
                   </div>
