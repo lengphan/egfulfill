@@ -57,12 +57,11 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
   const tl = useLabelT()
   const running = data.running
   const earned = data.earned
-  const tiers = data.tiers
   const units = running?.units ?? 0
-  const top = tiers[tiers.length - 1].minUnits
-  // The rail runs to the top rung. Past it there is nothing left to earn, so the fill simply
-  // completes rather than the scale stretching and making every marker drift.
-  const pos = Math.min(100, (units / top) * 100)
+  /* `tiers`, `top` and `pos` went with the rail. The ladder's last rung only ever existed to
+     scale a bar across every tier, and scaling to a rung nobody reaches this month is the
+     fault that made two thirds of it dead space. The live distance is to the NEXT rung, which
+     the server already computes. */
 
   return (
     <>
@@ -72,93 +71,75 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
         </div>
       )}
 
-      {/* THE RAIL — the ladder and your place on it.
-          The current position is marked explicitly rather than left to be inferred from
-          where the fill stops. At zero units the fill has no width at all, so there was
-          nothing on screen saying "you are here" — the one thing the rail exists to show. */}
-      <div className="relative pt-7">
-        <div
-          className="absolute top-0 whitespace-nowrap text-xs font-semibold text-primary"
-          style={{ left: `${pos}%`, transform: pos < 8 ? "translateX(0)" : pos > 92 ? "translateX(-100%)" : "translateX(-50%)" }}
-        >
-          {/* SHIPPED, and the word is load-bearing. unitsByPeriod counts rows with a
-              shipped_at in this month — an order placed today contributes nothing until it
-              goes out. Without the word, "0 units" beside a 100-unit order that was just
-              placed reads as a bar that is broken rather than one that is waiting, which is
-              exactly the question it produced. */}
-          {units.toLocaleString()} {units === 1 ? "unit" : "units"} {tl("volumeBoard", "shipped")}
-        </div>
-
-        <div className="relative h-2 rounded-full bg-muted">
-          <div className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pos}%` }} />
-          {tiers.map((t) => {
-            const reached = units >= t.minUnits
-            return (
-              <span
-                key={t.minUnits}
-                className={"absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card " + (reached ? "bg-primary" : "bg-border")}
-                style={{ left: `${Math.min(100, (t.minUnits / top) * 100)}%` }}
-              />
-            )
-          })}
-          {/* The marker for NOW — a bar rather than another dot, so it cannot be mistaken for
-              a rung. Hidden at 0 where it would collide with the rail's own end cap. */}
-          {pos > 0 && (
-            <span
-              className="absolute top-1/2 h-5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground ring-2 ring-card"
-              style={{ left: `${pos}%` }}
-            />
-          )}
-        </div>
-
-        {/* Percentage first and larger — it is the thing being earned; the threshold is the
-            condition. The arrow between them was doing no work and read as clutter. */}
-        <div className="relative mt-2.5 h-9">
-          {tiers.map((t, i) => {
-            const left = Math.min(100, (t.minUnits / top) * 100)
-            const shift = i === 0 && left < 12 ? "0" : i === tiers.length - 1 ? "-100%" : "-50%"
-            const reached = units >= t.minUnits
-            return (
-              <span
-                key={t.minUnits}
-                className="absolute whitespace-nowrap leading-tight"
-                style={{ left: `${left}%`, transform: `translateX(${shift})` }}
-              >
-                <span className={"block text-sm font-semibold tabular-nums " + (reached ? "text-primary" : "text-muted-foreground")}>
-                  {t.pct}%
-                </span>
-                <span className="block text-xs tabular-nums text-muted-foreground">
-                  {t.minUnits.toLocaleString()} units
-                </span>
-              </span>
-            )
-          })}
-        </div>
-      </div>
-
       {/**
-       * ONE SENTENCE, AND ONLY WHAT THE PICTURE ABOVE CANNOT SAY.
-       *
-       * It read: "You've shipped 0 units in September. 100 more earns 3% off in October." —
-       * and the rail directly above already carries the marker "0 units", while the rungs
-       * already read "3% · 100 units". So two thirds of the sentence was captioning a
-       * diagram, in a card whose whole job is one fact.
-       *
-       * What is left is the part nothing else can show: HOW MANY MORE, and WHEN it lands.
-       * The month matters because the discount is earned in one month and applied in the
-       * next, which is the single thing about this scheme people get wrong.
-       */}
-      <p className="mt-5 text-sm leading-relaxed">
+        * ONE NUMBER, ONE TARGET, ONE HAIRLINE (owner's pick, 2026-09-21).
+        *
+        * The rail it replaces drew a CONTINUOUS bar for a STEPPED reward — the rate jumps at
+        * 100 and again at 300, so a sliding fill claimed a rate that grows with every unit
+        * when 99 units earns exactly what 0 does. Three more faults followed from that one:
+        * the scale ran to the TOP rung, so the distance actually being travelled was squeezed
+        * into the first third and the rest was territory nobody crosses; at zero the fill had
+        * no width and the position marker was hidden to avoid the end cap, so the state a new
+        * seller is in LONGEST was the one it could not draw; and a fill, a dot per rung, a
+        * position bar and two rows of labels made four devices out of an 8px line.
+        *
+        * This measures the only distance that is live: to the NEXT rung. The figure is the
+        * count, the target is beside it, and the meter is the same quantity in a shape you can
+        * see at arm's length — no ladder to mis-scale, and zero is a real reading rather than
+        * an empty bar.
+        *
+        * WHAT IT GIVES UP, deliberately: the rungs beyond the next one are no longer on
+        * screen, so 6% is not visible from a standing start. The trade was made with that
+        * named — see the options sheet — and the sentence still says what is being earned and
+        * when it lands, which is the part nothing else on the page can say.
+        */}
+      <div>
         {running?.next && running.unitsToNext != null ? (
           <>
-            {tl("volumeBoard", "Ship")} <span className="font-semibold tabular-nums">{running.unitsToNext.toLocaleString()}</span>
-            {" "}{tl("volumeBoard", "more this month for")} <span className="font-semibold">{running.next.pct}% off</span> in{" "}
-            {monthShort(running.appliesTo)}.
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              {/* The count, at the size of a figure somebody reads across a desk. §4: a VALUE,
+                  not a caption. */}
+              <span className="text-3xl font-bold leading-none tracking-tight tabular-nums">
+                {units.toLocaleString()}
+              </span>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {tl("volumeBoard", "of")} {running.next.minUnits.toLocaleString()}{" "}
+                {tl("volumeBoard", "units shipped")} · {tl("volumeBoard", "next rate")}{" "}
+                <span className="font-semibold text-foreground">{running.next.pct}%</span>
+              </span>
+            </div>
+            {/* A HAIRLINE, not a rail. It carries one quantity — how far to the next rung —
+                so it needs no rungs, no marker and no scale to misread. */}
+            <div className="mt-3.5 h-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-500"
+                style={{ width: `${Math.min(100, (units / running.next.minUnits) * 100)}%` }}
+              />
+            </div>
           </>
-        ) : running && running.pct > 0 ? (
-          <>{tl("volumeBoard", "Top tier —")} <span className="font-semibold">{running.pct}% off</span> in {monthShort(running.appliesTo)}.</>
-        ) : null}
-      </p>
+        ) : (
+          /* TOP RUNG. There is no next target, so there is no distance to draw — the meter
+             would be a full bar measuring nothing. The figure and the rate are the whole fact. */
+          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+            <span className="text-3xl font-bold leading-none tracking-tight tabular-nums">
+              {units.toLocaleString()}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {tl("volumeBoard", "units shipped")} ·{" "}
+              <span className="font-semibold text-foreground">{running?.pct ?? 0}% {tl("volumeBoard", "off")}</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* WHEN IT LANDS — the one thing the figures above cannot say, and the single fact about
+          this scheme people get wrong: it is earned in one month and applied in the next. */}
+      {running?.appliesTo && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {tl("volumeBoard", "Earned this month, applied")}{" "}
+          <span className="font-semibold text-foreground">{monthShort(running.appliesTo)}</span>.
+        </p>
+      )}
 
       {/* LAST MONTH ONLY WHEN IT EARNED SOMETHING. "August: 0 units — no tier reached" is a
           receipt for nothing happening, under a card that has already said where you are: a
