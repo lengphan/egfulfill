@@ -4237,6 +4237,28 @@ export function ordersRoutes(app, requireAuth) {
     return q(
       `select i.line_id, i.sku, i.name, i.print_type, i.design_tier, i.design_quote_status, i.design_charged_at,
               i.design_fee_override,
+              -- WHICH SIDES ARE ACTUALLY EMBROIDERED (2026-09-21). Digitising is an embroidery
+              -- job: a DTG back is never digitised and must never be billed as though it were.
+              -- A face with its own method is taken at its word; one that says nothing inherits
+              -- the line, which is the same rule sideBreakdown and the summary already use.
+              coalesce((select array_agg(distinct lower(d.side)) from order_designs d
+                 where d.order_id = i.order_id
+                   and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
+                   and coalesce(d.side, '') <> ''
+                   and (d.data is not null or d.storage_key is not null)
+                   and (d.method ~* 'emb' or (coalesce(d.method, '') = '' and coalesce(i.print_type, '') ~* 'emb'))
+               ), '{}') as emb_sides,
+              -- WHICH SIDES CARRY A STITCH FILE (2026-09-21). machine_key answers "does this
+              -- line have one at all", which is what made one file mark all three faces
+              -- 'supplied'. This answers "which faces", so the tier can follow the design.
+              -- A file attached with no side is kept as '' and read as covering the whole
+              -- line, which is what every row written before sides existed relies on.
+              coalesce((select array_agg(distinct lower(coalesce(f.side,''))) from design_file_data f
+                 where f.order_id = i.order_id
+                   and f.kind in ('emb','pes')
+                   and (f.line_id = i.line_id
+                        or (f.line_id is null and coalesce(f.sku,'') = coalesce(i.sku,'')))
+               ), '{}') as machine_sides,
               -- A STITCH FILE, NOT ANY FILE (2026-09-21). This had no kind filter, so it took the
               -- newest file of ANY kind on the line and tierOf reads "machine_key => supplied" —
               -- a seller who uploaded a JPEG and no stitch file was billed the cheap CHECK fee on
@@ -4396,20 +4418,72 @@ export function ordersRoutes(app, requireAuth) {
      * and two pictures is three check fees and two standard fees, which is the number of
      * times somebody actually sits down to work.
      */
-    const groups = new Map();
-    for (const r of rows) {
-      const tier = tierOf(r);
-      if (!tier) continue;
-      const key = `${tier}|${designKeyOf(r, tier)}`;
+    /**
+     * THE TIER FOLLOWS THE DESIGN, NOT THE LINE (owner, 2026-09-21).
+     *
+     * `tierOf` asks whether the LINE has a stitch file, so a line embroidering front, back and
+     * left with one EMB for the front was billed a single check fee — the back and the left
+     * were digitised for nothing. The fee has always been per design (the standard path bills
+     * one per distinct picture and dedupes across lines); only the tier was per line.
+     *
+     * So a row is now split: the pictures sitting on a face that HAS a stitch file are
+     * supplied, and the rest are work. Both halves keep their own group, their own identity
+     * and their own dedup.
+     *
+     * A SIDELESS FILE STILL COVERS THE LINE. Every machine file attached before sides existed
+     * has side '', and reading that as "this line" is what keeps those orders priced exactly
+     * as they were. Only a file attached WITH a side narrows to it.
+     *
+     * Staff's own `design_tier` still wins outright and still applies to the whole line —
+     * somebody looked at it and said what it was, and this is not the place to overrule them.
+     */
+    const machineSidesOf = (r) => new Set(
+      (Array.isArray(r.machine_sides) ? r.machine_sides : []).map((x) => String(x || '').toLowerCase())
+    );
+    const addTo = (groups, tier, r, keys, faces) => {
+      if (!keys.length && !faces.size && !r.machine_key) return;
+      const key = `${tier}|${designKeyOf({ ...r, image_keys: keys }, tier)}`;
       const g = groups.get(key);
       if (g) {
         g.lines.push(r);
         if (r.design_charged_at) g.charged = true;
-        for (const [k, v] of facePairsOf(r)) if (!g.faces.has(k)) g.faces.set(k, v);
-        continue;
+        for (const [k, v] of faces) if (!g.faces.has(k)) g.faces.set(k, v);
+        for (const k of keys) if (!g.keys.includes(k)) g.keys.push(k);
+        return;
       }
       groups.set(key, { tier, lines: [r], charged: !!r.design_charged_at, quote: r.design_quote_status,
-                        keys: imageKeysOf(r), faces: facePairsOf(r) });
+                        keys: [...keys], faces: new Map(faces) });
+    };
+
+    const groups = new Map();
+    for (const r of rows) {
+      const tier = tierOf(r);
+      if (!tier) continue;
+      const pairs = facePairsOf(r);
+      const keys = imageKeysOf(r);
+      /* Staff said so, or there is nothing to split — one group, exactly as before. */
+      if (r.design_tier || !keys.length) { addTo(groups, tier, r, keys, pairs); continue; }
+      const sides = machineSidesOf(r);
+      const wholeLine = sides.has('');
+      const hasFile = (k) => wholeLine || sides.has(String(pairs.get(k) || '').toLowerCase());
+      /**
+       * ONLY AN EMBROIDERED FACE CAN BE DIGITISED, and this is the half that would have
+       * over-charged without it. Line FFL-muarioso0-0 is Embroidery on the front and DTG on
+       * the back: splitting on the file alone would have billed the DTG back a digitising
+       * fee for work no machine does. A face that is not embroidery stays in the line's own
+       * group and is priced exactly as it was.
+       */
+      const embSides = new Set(
+        (Array.isArray(r.emb_sides) ? r.emb_sides : []).map((x) => String(x || '').toLowerCase())
+      );
+      const isEmb = (k) => embSides.has(String(pairs.get(k) || '').toLowerCase());
+      const supplied = keys.filter((k) => hasFile(k) || !isEmb(k));
+      const work = keys.filter((k) => !hasFile(k) && isEmb(k));
+      const facesFor = (ks) => new Map(ks.filter((k) => pairs.has(k)).map((k) => [k, pairs.get(k)]));
+      if (supplied.length) addTo(groups, 'supplied', r, supplied, facesFor(supplied));
+      /* The work half is never 'supplied': there is no file on those faces. It keeps the
+         line's own tier when staff called it complex, else it is standard digitising. */
+      if (work.length) addTo(groups, tier === 'complex' ? 'complex' : 'standard', r, work, facesFor(work));
     }
     const items = []; let total = 0;
     /**
