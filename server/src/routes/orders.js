@@ -16,7 +16,7 @@ import { supportReplyEmail } from '../emails.js';
 import { audit } from '../audit.js';
 import { isGrantEnabled } from './role_grants.js';
 import { designNoFor, designLabel, ensureDesignIds } from '../design-id.js';
-import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName, priceLines, computeTotals, feeSettings, methodAddOnsFor, matchProduct } from '../pricing.js';
+import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName, priceLines, computeTotals, feeSettings, methodAddOnsFor, matchProduct, repriceDelta } from '../pricing.js';
 import { reclassifyFactoryOrders } from '../factory-orders.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll } from './factory_settings.js';
@@ -3466,9 +3466,13 @@ export function ordersRoutes(app, requireAuth) {
              * "Embroidery" are how the floor says them, and the word adds width, not meaning.
              */
             const shortMethod = (t) => String(t || '').replace(/\s*printing\s*$/i, '').trim();
+            /* created_at THEN id — the ordering the items aggregate uses. order_items.id is a
+               random uuid, so sorting by it alone agrees with the screen only while every row
+               was written in the same breath; a line added later sorts somewhere arbitrary and
+               this row would then name a different item than the reader is looking at. */
             const pos = (await q(
               `select n from (
-                 select ${lineId ? 'line_id' : 'sku'} as k, row_number() over (order by id) as n
+                 select ${lineId ? 'line_id' : 'sku'} as k, row_number() over (order by created_at, id) as n
                    from order_items where order_id=$1
                ) t where k=$2 limit 1`, [req.params.id, lineId || sku]
             ).catch(() => ({ rows: [] }))).rows[0];
@@ -3952,6 +3956,104 @@ export function ordersRoutes(app, requireAuth) {
     const rawTpl = (req.body || {}).template_id ?? (req.body || {}).templateId;
     const tplSpoken = rawTpl !== undefined && rawTpl !== null;
     const templateId = String(rawTpl || '').trim().slice(0, 64) || null;
+
+    /**
+     * A FACE ADDED AFTER THE CHARGE IS PAID FOR BEFORE IT LANDS (owner, 2026-09-21).
+     *
+     * A paid order does not re-price — that rule stands, and `unit_cost`/`cost_parts` are
+     * stamped to enforce it. What never existed was a way to bill the DIFFERENCE, so artwork
+     * attached after the charge was simply produced for free. Measured on EGF-002155: billed
+     * for three faces at $9, a fourth placement attached fifteen minutes later, and $3 that
+     * nothing on the platform could collect.
+     *
+     * BEFORE THE WRITE, AND IT REFUSES (owner's call). The method change a few hundred lines
+     * up charges best-effort AFTER saving, and deliberately so: that is the floor correcting a
+     * line, and an unreachable wallet must not undo a correction somebody made. This is the
+     * opposite act — the SELLER adding work to their own order — so it is charged first and
+     * the placement fails with the shortfall if the wallet cannot cover it. Nothing is written
+     * that has not been paid for, which is also what keeps the stamp honest.
+     *
+     * THROUGH chargeOrderFee, exactly as the method change does: the same lock, the same
+     * `order-fee` ledger shape, a named row in the Summary, a line in History, and reversible
+     * by the same ↩. A second money mechanism is a second set of edge cases.
+     *
+     * ONLY A NEW FACE. Replacing the picture on a surface already billed changes nothing about
+     * the price — the placement is what is charged, not the artwork — so a re-upload is free,
+     * which is what lets somebody fix a file without being billed for the privilege.
+     */
+    let surcharge = null;
+    if (lineId && !methodOnly && (storedData || storedKey)) {
+      /* Does this surface already carry artwork? Only its ABSENCE is a new placement. */
+      const already = await q(
+        `select 1 from order_designs
+          where order_id=$1 and line_id=$2 and lower(coalesce(side,'front'))=$3
+            and (data is not null or storage_key is not null) limit 1`,
+        [req.params.id, lineId, side]).then((r) => r.rowCount).catch(() => 1);
+      /* THE LEDGER, NOT A FLAG — the same test the method change uses. `unit_cost` is stamped
+         at submit and money moves at the charge, so a stamp alone does not mean anyone paid. */
+      const paid = already ? 0 : await chargedAmount(req.params.id).catch(() => 0);
+      if (!already && paid > 0) {
+        /**
+         * THE METHOD IS STATED, NOT INHERITED — and this is where guessing costs real money.
+         *
+         * A face that says nothing inherits `order_items.print_type`, which is the line's own
+         * column and is allowed to drift from its faces. On the very order this was written
+         * for, print_type reads DTG while every face is Embroidery and the line BILLS as
+         * embroidery — so the added face would have inherited a technique the garment does not
+         * use. The price depends on it: on that order's other line the same placement is $6 as
+         * DTG and $14 as embroidery, because the method fee is per line at the dearest.
+         *
+         * A wrong guess here is not a wrong label, it is a wrong charge, and §6's rule about
+         * the reader applies exactly — a blank a human fills is cheaper than a confident
+         * invention. Only for a face about to be BILLED: an unpaid order still inherits, since
+         * its price is re-read from the artwork on every quote and nothing is settled yet.
+         */
+        if (!method) {
+          reply.code(400);
+          return { error: `Say how the ${side} is decorated before placing artwork on it. This order is already charged, so the placement is billed now and its price depends on the technique.`,
+                   needsMethod: true, side };
+        }
+        const d = await repriceDelta(req.params.id, lineId, { side, method })
+          .catch((e) => ({ delta: 0, reason: 'failed', error: e.message }));
+        if (d.delta > 0.005) {
+          /* "Item N", the position — the same word the Summary's other rows use, and for the
+             same reason the method change gives: a trade name wraps this row to three lines. */
+          const pos = (await q(
+            `select n from (
+               select line_id as k, row_number() over (order by created_at, id) as n
+                 from order_items where order_id=$1
+             ) t where k=$2 limit 1`, [req.params.id, lineId]).catch(() => ({ rows: [] }))).rows[0];
+          const what = `${side.charAt(0).toUpperCase()}${side.slice(1)} placement · ${pos ? `Item ${pos.n}` : (sku || 'item')}`;
+          /* IDEMPOTENT ON THE STAMP IT IS MOVING FROM, not on the face. A retry of this exact
+             save recomputes the same figure from the same stamp and so reuses the ref; the
+             next face added recomputes from a stamp one side longer and gets its own. */
+          const out = await chargeOrderFee({
+            orderId: req.params.id, amount: d.delta, note: what,
+            by: req.user && req.user.sub,
+            clientId: `surface-${lineId}-${((d.parts && d.parts.sides) || []).length}`,
+          });
+          if (out && out.error) {
+            /* 402 Payment Required, and NOTHING IS WRITTEN. chargeOrderFee has already put the
+               shortfall in the seller's support thread and rung the bell, so the refusal here
+               only has to carry the figure back to whoever pressed save. */
+            reply.code(402);
+            return { error: out.error, needsFunds: true, amount: d.delta,
+                     shortfall: out.shortfall ?? null, balance: out.balance ?? null, side };
+          }
+          /* THE STAMP MOVES TO WHAT WAS JUST PAID, so the next change is measured from here
+             and this face can never be billed twice. */
+          await q('update order_items set unit_cost=$3, cost_parts=$4 where order_id=$1 and line_id=$2',
+                  [req.params.id, lineId, d.newUnit, JSON.stringify(d.parts)]).catch(() => {});
+          audit(req, 'order.fee', {
+            entityType: 'order', entityId: req.params.id,
+            after: { note: what, amount: d.delta, line_id: lineId, side, method,
+                     auto: 'surface-added', unit_cost: d.newUnit },
+          });
+          surcharge = { amount: d.delta, note: what, unitCost: d.newUnit, side };
+        }
+      }
+    }
+
     await q(
       `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, template_id, method, updated_at)
        values ($1,$2,$10,$3,$11,$4,$9,$5,$6,$7,$8,$12,$14, now())
@@ -3988,7 +4090,12 @@ export function ordersRoutes(app, requireAuth) {
        same id on every other face declared that day. */
     const designNo = artHash ? await designNoFor(artHash, req.params.id) : null;
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null, design_no: designNo } });
-    return { ok: true, design_no: designNo, design_id: designLabel(designNo) };
+    /* WHAT THIS PLACEMENT COST, when it cost anything. The caller has just moved the seller's
+       money and has to be able to say so on the spot — a debit discovered later on a statement
+       is the one that becomes a support thread. Absent on every free save, which is all of
+       them before a charge and all re-uploads after one. */
+    return { ok: true, design_no: designNo, design_id: designLabel(designNo),
+             ...(surcharge ? { surcharge } : null) };
   });
 
   /**

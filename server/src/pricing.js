@@ -1150,6 +1150,122 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
 }
 
 /**
+ * WHAT A CHARGED LINE WOULD COST WITH THE ARTWORK THAT IS ON IT NOW, AND WHAT THAT LEAVES
+ * OWING (owner, 2026-09-21).
+ *
+ * A face added after submit deliberately does not re-price a paid order — that rule stands and
+ * is what `unit_cost`/`cost_parts` are stamped for. What did not exist was any way to bill the
+ * difference, so artwork attached after the charge was simply produced for nothing. Measured on
+ * FF-ombao6-muayb8d6-1in74r: billed for three faces at $9, a fourth placement attached fifteen
+ * minutes later, artwork worth $12, and $3 that nothing could ever collect.
+ *
+ * IT RE-RUNS THE LADDER; IT IS NOT A SECOND PRICE LIST. A "surface fee" charger would be a
+ * second opinion about what a line costs, and §5 has the receipts on what private copies of a
+ * pricing rule do. `priceLines` is called with the real catalogue, the real fees and the faces
+ * that are on the garment now — so a face whose technique is DEARER than anything the line
+ * carried moves the line's method fee too, which is per line at the dearest and which no
+ * per-face rule could ever have reached. On that order's other line — DTF and DTG, method $0 —
+ * an embroidered face is $3 of placement and $4 of method, ×2 units: $14, not $6.
+ *
+ * THE STAMP IS A FLOOR AND ONLY EVER GROWS.
+ *
+ *   base          frozen. The garment's price does not move because a face was added.
+ *   stamped faces frozen at what they were billed, so a rate changed in Settings since the
+ *                 charge cannot reach backwards. A face whose artwork has since been REMOVED
+ *                 keeps its amount too: the seller paid for it, and recorded history does not
+ *                 change silently.
+ *   new faces     priced today — there is no stamped rate to honour, and today's is the only
+ *                 honest answer.
+ *   method        max(stamped, today). Never down: removing the dearest face does not refund
+ *                 the setup it already paid for.
+ *
+ * ONE-WAY BY CONSTRUCTION. Every term is a max or a frozen value, so the figure it returns is
+ * never negative and this can only ever charge. Refunds stay a human act on a named row —
+ * which is the shape the owner chose.
+ *
+ * IT MOVES NO MONEY AND WRITES NOTHING. It answers a question; the caller decides whether to
+ * bill it, and restamps with `parts` so the NEXT change is measured from what was just paid.
+ *
+ * @param pending  a face about to be written — {side, method} — so the price can be known, and
+ *                 refused, BEFORE the artwork lands. Null asks about the garment as it stands.
+ */
+export async function repriceDelta(orderId, lineId, pending = null) {
+  if (!orderId || !lineId) return { delta: 0, reason: 'no-line' };
+  const item = await q(
+    `select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee, line_id, cost_parts
+       from order_items where order_id=$1 and line_id=$2 limit 1`, [orderId, lineId])
+    .then((r) => r.rows[0]).catch(() => null);
+  if (!item) return { delta: 0, reason: 'no-line' };
+  /* NOT CHARGED YET. The quote re-prices from the artwork on every read, so there is nothing
+     frozen to differ from — the seller sees the new face in their total before they submit,
+     which is the whole of the pre-charge behaviour and must not be billed twice. */
+  if (item.unit_cost == null) return { delta: 0, reason: 'not-charged' };
+  const stamp = item.cost_parts && typeof item.cost_parts === 'object' ? item.cost_parts : null;
+  /* A line frozen before cost_parts existed cannot say WHICH faces its money paid for, so
+     nothing here can tell an already-billed face from a new one. Charging on a guess is the
+     one outcome worse than not charging: it bills a seller twice for the same surface. */
+  if (!stamp || stamp.base == null) return { delta: 0, reason: 'no-stamp' };
+
+  const [fees, idx, rows] = await Promise.all([
+    feeSettings(), catalogIndex(),
+    q(`select lower(coalesce(side,'front')) as side, method from order_designs
+        where order_id=$1 and line_id=$2 and (data is not null or storage_key is not null)`,
+      [orderId, lineId]).then((r) => r.rows).catch(() => []),
+  ]);
+
+  /* ONE ENTRY PER FACE, first method wins — the same fold quoteOrder does, because two rows
+     can share a side (a raster and its stitch file) and only one may carry a method. */
+  const faces = [];
+  for (const r of [...rows, ...(pending ? [pending] : [])]) {
+    const side = String((r && r.side) || 'front').trim().toLowerCase();
+    if (!side) continue;
+    const method = String((r && r.method) || '').trim();
+    const hit = faces.find((f) => f.side === side);
+    if (hit) { if (!hit.method && method) hit.method = method; continue; }
+    faces.push({ side, method });
+  }
+  if (!faces.length) return { delta: 0, reason: 'no-faces' };
+
+  /* THE LADDER, LIVE. unit_cost and cost_parts nulled so nothing frozen short-circuits it —
+     this is deliberately the same function that priced the order in the first place. */
+  const fresh = priceLines([{ ...item, unit_cost: null, ship_fee: null, cost_parts: null }],
+                           idx, fees, () => faces);
+  const line = fresh.lines && fresh.lines[0];
+  if (!line || line.baseCost == null) return { delta: 0, reason: 'unpriceable' };
+
+  const stampSides = Array.isArray(stamp.sides) ? stamp.sides : [];
+  const billed = new Set(stampSides.map((p) => String(p.face || '').toLowerCase()));
+  const liveParts = (line.sideParts && line.sideParts.parts) || [];
+  /* Every face that was billed, at the amount it was billed — then every face that was not,
+     at today's rate. The order follows the live breakdown for the new ones, which is
+     PRICED_SIDES order, so a restamped line lists its faces the same way every time. */
+  const added = liveParts.filter((p) => !billed.has(String(p.face || '').toLowerCase()));
+  const sides = [...stampSides, ...added];
+  const method = Math.max(Number(stamp.method) || 0, Number(line.methodFee) || 0);
+  const base = Number(stamp.base) || 0;
+  const newUnit = money(base + method + sides.reduce((n, p) => n + (Number(p.amount) || 0), 0));
+  const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+  const delta = money((newUnit - (Number(item.unit_cost) || 0)) * qty);
+  if (!(delta > 0.005)) return { delta: 0, reason: 'no-change', newUnit, qty };
+
+  /* The method may have moved, so what the line is BILLED at moves with it — and `methods` is
+     the set actually on the garment, which is what the summary's strip reads. A method that
+     did not rise keeps the stamp's word for it: that is what the money paid for. */
+  const rose = (Number(line.methodFee) || 0) > (Number(stamp.method) || 0);
+  return {
+    delta, newUnit, qty, added,
+    parts: {
+      ...stamp,
+      method,
+      sides,
+      billedMethod: rose ? (line.billedMethod || stamp.billedMethod || null) : (stamp.billedMethod || null),
+      methods: [...new Set([...(Array.isArray(stamp.methods) ? stamp.methods : []),
+                            ...(Array.isArray(line.methods) ? line.methods : [])].filter(Boolean))],
+    },
+  };
+}
+
+/**
  * THE RATE THIS SELLER WOULD GET ON A NEW ORDER — for a quote, before one exists.
  *
  * quoteOrder reads the discount off an ORDER (frozen if charged, else the ladder). A quote
