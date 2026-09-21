@@ -23,8 +23,26 @@ import { getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 
 // ── helpers ───────────────────────────────────────────────────
-const priceOf = (p: CatalogProduct) =>
-  Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
+/**
+ * THE CARD QUOTES WHAT AN ORDER WOULD START FROM.
+ *
+ * It read the product-level `price` — the legacy base cost — and never looked at the size
+ * tiers, so a product priced the current way (a Blank per size) showed a figure nobody is
+ * charged. A cap whose Blank is $5.00 sat on the card at $15.72.
+ *
+ * THE LOWEST BLANK, because the card carries one number for a product whose sizes may differ
+ * and "from" is the only honest reading of that. Then the same ladder costPartsOf climbs: a
+ * size's own base cost, then the product's. A product nobody has priced still returns 0 and is
+ * still dropped by the caller that cares.
+ */
+const priceOf = (p: CatalogProduct) => {
+  const tiers = p.sizePrices ?? []
+  const lowest = (key: "blank" | "price") =>
+    tiers.map((t) => Number((t as Record<string, unknown>)[key] ?? 0) || 0)
+      .filter((n) => n > 0)
+      .sort((a, b) => a - b)[0] ?? 0
+  return lowest("blank") || lowest("price") || Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
+}
 
 /**
  * THE PUBLIC PRICE — mirrors publicShape in server/src/routes/catalog.js, in the same order:
@@ -39,7 +57,11 @@ const priceOf = (p: CatalogProduct) =>
  * exists to let the page SAY so rather than leave it invisible and unexplained.
  */
 const publicPriceOf = (p: CatalogProduct) => {
- const v = Number(p.price ?? p.basePrice ?? p.base_price ?? NaN)
+  /* THE SAME LADDER as priceOf, or this says "no price" about a product priced the current
+     way — by a Blank per size — and the card then reports it unpriced while the order page
+     quotes it happily. It is only ever asked whether a price EXISTS, which makes a wrong
+     answer here invisible until somebody wonders why a real product is flagged. */
+ const v = priceOf(p)
  return Number.isFinite(v) && v > 0 ? v : null
 }
 
