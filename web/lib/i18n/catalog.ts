@@ -1455,6 +1455,8 @@ const vi: Dict = {
   "order.Blank": "Phôi",
   "order.included": "đã bao gồm",
   "order.extra placement": "mặt in thêm",
+  "order.Supplier cost": "Chi phí nhà cung cấp",
+  "order.Order costs": "Chi phí đơn hàng",
   "stores.You don't have to connect.": "Bạn không bắt buộc phải kết nối.",
   "stores.The egful browser extension brings your Etsy orders in from your own Shop Manager page — items, quantities and buyer addresses. Connecting adds automatic syncing and sends tracking back to Etsy, but Etsy still withholds buyer addresses from our app.": "Tiện ích trình duyệt egful đưa đơn hàng Etsy của bạn về từ chính trang Shop Manager của bạn — sản phẩm, số lượng và địa chỉ người mua. Kết nối sẽ thêm đồng bộ tự động và gửi mã vận đơn về Etsy, nhưng Etsy vẫn không cung cấp địa chỉ người mua cho ứng dụng của chúng tôi.",
   "stores.Coming soon": "Sắp có",

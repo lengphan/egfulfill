@@ -958,17 +958,54 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
  const spendRows = (
     <>
       {/**
-       * THE PER-ITEM COSTS MOVED UP (owner, 2026-09-21).
+       * SUPPLIER COST LIVES DOWN HERE, WITH THE REST OF WHAT THE FACTORY SPENDS
+       * (owner, 2026-09-21, reversing the same day's move up onto the item heading).
        *
-       * They were listed again here, under their own "Item 1 · EG-18010 × 100" heading — the
-       * same item named twice on one card, once for what the seller paid and once for what it
-       * cost us, with the reader expected to hold the first figure in their head while they
-       * scrolled to the second. The cost now sits in a column BESIDE the charge, on the item's
-       * own heading, which is the only place both numbers are true of the same thing.
+       * Riding it on the item's own row put one number the SELLER is charged and one number
+       * only the FACTORY may see on the same line, a word apart — "$40.00 cost $11.50". That
+       * is two different audiences' money in one row, and the reason it is wrong is not
+       * layout: every other thing we spend — postage, a partner's fee, the lines we cannot
+       * cost — is gathered in one block, and a factory reading "what did this order cost us"
+       * should find all of it in one place rather than one figure up in the seller's column
+       * and the rest below.
        *
-       * What stays here is what genuinely belongs to the ORDER and not to any item: postage,
-       * a partner's fee, and the lines we could not cost at all.
+       * So the per-item rows come back, under their own heading. The duplication the move was
+       * meant to solve is real and is handled by the HEADING instead: the group says what
+       * these figures are once, so the rows need no word of their own.
        */}
+      {(() => {
+        const rows = byItemNo(quote?.lines ?? []).map((l, i) => {
+          const c = Number(l.supplierCost)
+          if (!Number.isFinite(c) || c <= 0) return null
+          const qty = Number(l.qty) || 1
+          const n = items.findIndex((x) =>
+            (l.line_id && x.line_id === l.line_id)
+            || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+          const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.sku || "Item")
+          return (
+            <div key={`cost-${i}`} className="flex justify-between text-sm">
+              <dt className="min-w-0 truncate text-muted-foreground">
+                {who}
+                {blankSkuOf(l) && <span className="text-muted-foreground/70"> · {blankSkuOf(l)}</span>}
+                {qty > 1 && <span className="text-muted-foreground/70"> × {qty}</span>}
+              </dt>
+              <dd className="shrink-0 tabular-nums">−{usd(c * qty)}</dd>
+            </div>
+          )
+        }).filter(Boolean)
+        if (!rows.length) return null
+        return (
+          <>
+            {/* SUPPLIER COST, not "Blanks" — the row above in the seller's half is already
+                called Blank, and the same word on both sides of the card for two different
+                numbers is what sent this figure up to the heading in the first place. */}
+            <div className="pt-0.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+              {tl("order", "Supplier cost")}
+            </div>
+            {rows}
+          </>
+        )
+      })()}
       {/* WHAT IS NOT COVERED, named. The per-item rows above only exist for lines we know a
           supplier cost for; this says which ones we do not, so a short total explains itself. */}
       {(() => {
@@ -1289,11 +1326,10 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                         const split = method > 0.005 || parts.length > 0 || blank > 0.005
                         return (
                           <Fragment key={`line-${i}`}>
-                            {/* NOT justify-between: with a third cell the middle figure would
-                                float into the gap. The label takes the slack; both figures stay
-                                right, and the cost column lands at the same x on every item. */}
-                            <div className="flex items-baseline gap-2">
-                              <dt className="min-w-0 flex-1 truncate font-medium">
+                            {/* Two cells again — the cost moved down to the factory block, so
+                                there is no third figure to reserve a gutter for. */}
+                            <div className="flex items-baseline justify-between gap-2">
+                              <dt className="min-w-0 truncate font-medium">
                                 {who}
                                 {blankSkuOf(l) && <span className="font-normal text-muted-foreground"> · {blankSkuOf(l)}</span>}
                                 {qty > 1 && <span className="font-normal text-muted-foreground/70"> × {qty}</span>}
@@ -1313,46 +1349,6 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                   breakdown whose parts do not reach its total is worse than one
                                   that never broke the figure down. Σ(headings) is quote.total. */}
                               <dd className="shrink-0 tabular-nums">{usd(goods + shipOwn - discOwn + ownFees)}</dd>
-                              {/**
-                                * WHAT IT COST US, BESIDE WHAT THEY PAID — staff only.
-                                *
-                                * The two figures lived in blocks stacked one above the other, so
-                                * answering "did this item make money" meant finding the same item
-                                * twice and subtracting by eye. They belong on one row.
-                                *
-                                * ON THE HEADING AND NOWHERE ELSE, and that is not laziness: a
-                                * supplier cost is held PER LINE, not per face. A second column
-                                * down the whole card would be an em dash on every face and every
-                                * fee — chrome in the densest part of the summary, standing in for
-                                * data we do not have.
-                                *
-                                * Blank when the catalogue gives no cost. Not zero: a blank says we
-                                * cannot tell, and zero would claim the garment was free and quietly
-                                * inflate the margin below.
-                                */}
-                              {/**
-                                * A COLUMN WAS TRIED AND MEASURED OUT (2026-09-21).
-                                *
-                                * CHARGED and COST as two right-hand columns is the right shape
-                                * and the wrong width: reserving the second gutter on every row —
-                                * which it has to be, or a child's figure lands under COST and
-                                * "Blank $25.65" reads as a cost — left this ~330px rail too
-                                * little for the labels. Measured: "Front · DTG" lost its label
-                                * entirely and two more rows wrapped.
-                                *
-                                * So the second figure rides on the item's own row, carrying its
-                                * own word. It costs no child any width, claims no column, and
-                                * puts what we paid beside what they paid, which was the point.
-                                */}
-                              {isStaff && (
-                                <dd className="shrink-0 text-2xs text-muted-foreground"
-                                    title={tl("order", "What this item costs us")}>
-                                  {tl("order", "cost")}{" "}
-                                  <span className="text-sm tabular-nums">
-                                    {Number(l.supplierCost) > 0 ? usd(Number(l.supplierCost) * qty) : "—"}
-                                  </span>
-                                </dd>
-                              )}
                             </div>
                             {split && (
                               <>
