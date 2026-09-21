@@ -3576,11 +3576,16 @@ export function DesignCanvasDialog({
               value={faceMethod[sd] ?? ""}
               options={faceMethodOptions}
               placeholder={lineMethod || tl("canvas", "Same as the line")}
-              /* NAMED FOR WHAT IT DOES, or it reads as a repeat of the option below it. The
-                 placeholder here is the LINE's method, so the clear row printed the same
-                 words the option list already contained — "DTG printing" twice in one menu,
-                 which looks like a bug whatever it means. */
-              clearLabel={tl("canvas", "Same as the line")}
+              /* NO CLEAR ROW (owner, 2026-09-21). "Same as the line" was there so a placement
+                 could go back to inheriting — a real state (order_designs.method null) and one
+                 nobody was looking for in a list of techniques. Picking a technique is the only
+                 thing this control is opened to do, and the row sat above the two options as a
+                 third thing to read past every time.
+
+                 A placement already showing the line's method as its placeholder still reads
+                 correctly; it simply cannot be returned to that state from here, which is what
+                 was asked for. */
+              clearable={false}
               emptyLabel={lineMethod ? `${lineMethod} (${tl("canvas", "from the line")})` : undefined}
               disabled={methodBusy}
               /* NOT compact. That is `text-2xs` — 11px, which §4 reserves for a MARK you
