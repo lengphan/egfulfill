@@ -145,9 +145,21 @@ function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
         : <span className="font-medium">{usd(r)}</span>
     }
  return (
-      <span className="font-medium" title={o.cost_estimated ? "Estimated from today's prices — charged when you submit" : "Charged to your wallet"}>
+      /* ESTIMATED IS SAID IN WEIGHT, NOT IN A WORD — the way `cost` two cases above already
+         says it, and for a measured reason.
+         The word rode after the figure, so an estimated row's digits sat a marker's width to
+         the left of a charged row's and the column never lined up; and inside this `truncate`
+         cell the ellipsis ate the VALUE ("$44.99…"), which §4 forbids — a total is read, not
+         recognised. Leading the marker fixed the alignment and moved the clipping onto the
+         word itself, which then rendered as a bare "e…": a mark that is neither read nor
+         recognised is just noise.
+         There is no width for both. 100px holds "$1,204.50" and nothing else, and the pixels
+         to hold a word as well come off `items`, which is already truncating listing titles.
+         So the distinction keeps its meaning and costs nothing: muted = a price nobody has
+         paid, inked = money that moved. The sentence is still on the `title`. */
+      <span className={o.cost_estimated ? "text-muted-foreground" : "font-medium"}
+            title={o.cost_estimated ? "Estimated from today's prices — charged when you submit" : "Charged to your wallet"}>
         {usd(c)}
-        {o.cost_estimated ? <span className="ml-1 text-2xs font-normal text-muted-foreground">est.</span> : null}
       </span>
     )
   }

@@ -2173,8 +2173,12 @@ export function OrdersHub() {
                        digit the heaviest mark in the row — heavier than the customer's name and
                        level with the order number and a LIVE status, so semibold meant three
                        unrelated things at once. Weight belongs to identity and to status
-                       (lib/status-tone.ts); size says this is a value. */
- className="text-sm tabular-nums text-foreground"
+                       (lib/status-tone.ts); size says this is a value.
+                       MEDIUM, NOT SEMIBOLD (owner, 2026-09-21: "bold the number of items a bit
+                       more"). One step, not two: it lifts the count clear of the muted metadata
+                       either side of it without putting it level with the order number and a
+                       live status again, which is the collision this paragraph records. */
+ className="text-sm font-medium tabular-nums text-foreground"
  title={`${items.length} line${items.length === 1 ? "" : "s"} · ${units} unit${units === 1 ? "" : "s"}`}
                   >
                     {units || "—"}

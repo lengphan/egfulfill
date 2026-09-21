@@ -74,7 +74,13 @@ export const ORDER_COLS: Record<OrderColId, OrderColDef> = {
    * exact string it was sized for.
    */
   cost: { px: 100, id: "cost", label: "Cost", width: "w-[100px]", align: "right" },
-  total: { px: 88, id: "total", label: "Total", width: "w-[88px]", align: "right" },
+  /* 100px, MEASURED THE SAME WAY `cost` ABOVE WAS — and it is the same string, because this
+     column reads the same `o.cost`. At 88 the 24px of `px-3` left 64 for a figure that runs
+     to "$1,204.50" at 73px, so a four-figure total clipped on the one column a seller opens
+     this board to read. The 12px comes off `items`, which is what the budget note at the top
+     of this file says every fixed pixel costs — and a listing title losing two characters it
+     was already truncating is the cheaper half of that trade. */
+  total: { px: 100, id: "total", label: "Total", width: "w-[100px]", align: "right" },
   /**
    * 80px, AND THE REASON IS PADDING — the thing every width here was measured without.
    *
