@@ -753,7 +753,14 @@ export default function OrderDetailPage() {
    *  75-character garment name in a money column pushes the figure onto a second row.
    *  resolveProduct is the canonical matcher (CLAUDE.md §5); the raw value is the fallback
    *  for a blank that resolves to nothing. */
- const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
+ /* A field INSIDE the grouped address box. The group owns the edge and the corners, so each
+   field gives up its own: no border, no radius, and an INSET focus ring — an outset one on a
+   child of an `overflow-hidden` parent gets its top and bottom shaved off. Height comes up
+   from the primitive's h-8 because these are read back at a glance while someone copies an
+   address off a screen. */
+const ADDR_FIELD = "h-9 rounded-none border-0 bg-transparent focus-visible:ring-inset"
+
+const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
     (l.blank ? resolveProduct({ blank: l.blank } as never, catalog)?.sku : null) || l.blank || null
 
  const feeCovers = (f: OrderDesignFee): number[] =>
@@ -2920,22 +2927,50 @@ export default function OrderDetailPage() {
                    the order they are written on a parcel. Street is first because it is the
                    one that is usually missing. */
                 <div className="space-y-2 border-t border-border pt-3">
-                  <Input autoFocus placeholder="Name" value={addrDraft.name ?? ""}
-                    onChange={(e) => setAddrDraft({ ...addrDraft, name: e.target.value })} />
-                  <Input placeholder="Street address" value={addrDraft.line1 ?? ""}
-                    onChange={(e) => setAddrDraft({ ...addrDraft, line1: e.target.value })} />
-                  <Input placeholder="Apartment, suite (optional)" value={addrDraft.line2 ?? ""}
-                    onChange={(e) => setAddrDraft({ ...addrDraft, line2: e.target.value })} />
-                  <div className="grid grid-cols-[minmax(0,1fr)_5rem_6rem] gap-2">
-                    <Input placeholder="City" value={addrDraft.city ?? ""}
-                      onChange={(e) => setAddrDraft({ ...addrDraft, city: e.target.value })} />
-                    <Input placeholder="State" value={addrDraft.state ?? ""}
-                      onChange={(e) => setAddrDraft({ ...addrDraft, state: e.target.value })} />
-                    <Input placeholder="ZIP" value={addrDraft.zip ?? ""}
-                      onChange={(e) => setAddrDraft({ ...addrDraft, zip: e.target.value })} />
+                  {/*
+                   * ONE EDGE, NOT SEVEN (owner, 2026-09-21: "remove borderline they look too much").
+                   *
+                   * Seven separately-outlined lozenges stacked in a 300px rail is the §4 count
+                   * of 490 outlined boxes, in miniature: when every line is a box, the boxes
+                   * stop meaning anything and the panel reads as chrome rather than an address.
+                   *
+                   * NOT borderless, and that is deliberate — components/ui/input.tsx already
+                   * tried it and reverted: `border-transparent` over a fill "does not read as
+                   * somewhere you TYPE; it reads as a disabled chip". So the edge stays and the
+                   * REPETITION goes. The group keeps one hairline and the fields are divided by
+                   * the same hairline, which is how a real address is written down — lines on a
+                   * form, not seven separate forms.
+                   *
+                   * `rounded-none` + `border-0` on the children and `overflow-hidden` on the
+                   * group, so the outer corners are the only ones and no child pokes through.
+                   * The focus ring is inset for the same reason: an outset ring on a child
+                   * inside a clipped parent gets its top and bottom shaved off.
+                   */}
+                  <div className="divide-y divide-border overflow-hidden rounded-lg border border-input">
+                    <Input autoFocus placeholder="Name" value={addrDraft.name ?? ""} className={ADDR_FIELD}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, name: e.target.value })} />
+                    <Input placeholder="Street address" value={addrDraft.line1 ?? ""} className={ADDR_FIELD}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, line1: e.target.value })} />
+                    <Input placeholder="Apartment, suite (optional)" value={addrDraft.line2 ?? ""} className={ADDR_FIELD}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, line2: e.target.value })} />
+                    {/* City · State · ZIP share a line on a parcel, so they share one here.
+                        NO vertical rule between them, and not by omission: `divide-x` sets a
+                        border-left on the children, which the fields' own `border-0` cancels —
+                        it rendered as nothing and the comment claiming otherwise would have
+                        outlived the reason. Three placeholders on one line already read as
+                        three columns, and a rule between them would put the chrome back that
+                        this whole change removes. */}
+                    <div className="grid grid-cols-[minmax(0,1fr)_5rem_6rem]">
+                      <Input placeholder="City" value={addrDraft.city ?? ""} className={ADDR_FIELD}
+                        onChange={(e) => setAddrDraft({ ...addrDraft, city: e.target.value })} />
+                      <Input placeholder="State" value={addrDraft.state ?? ""} className={ADDR_FIELD}
+                        onChange={(e) => setAddrDraft({ ...addrDraft, state: e.target.value })} />
+                      <Input placeholder="ZIP" value={addrDraft.zip ?? ""} className={ADDR_FIELD}
+                        onChange={(e) => setAddrDraft({ ...addrDraft, zip: e.target.value })} />
+                    </div>
+                    <Input placeholder="Country" value={addrDraft.country ?? ""} className={ADDR_FIELD}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, country: e.target.value })} />
                   </div>
-                  <Input placeholder="Country" value={addrDraft.country ?? ""}
-                    onChange={(e) => setAddrDraft({ ...addrDraft, country: e.target.value })} />
                   {/* A refusal carries its reason — that is the answer, not a subtitle. */}
                   {addrErr && <div className="text-xs text-destructive">{addrErr}</div>}
                   <div className="flex items-center gap-2 pt-1">
