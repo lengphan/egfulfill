@@ -162,7 +162,30 @@ export function OrderNumber({
          explicitly" — it did not, and this is what makes that sentence true. Only that one
          call site passes a className at all, so nothing else moves. */
       <span className="inline-flex flex-col gap-0.5 leading-tight">
-        <span className={cn(BASE, className)}>{label}</span>
+        {/**
+         * THE OTHER SIDE'S NUMBER GOES ON TOP (owner, 2026-09-21: "push the order ID /
+         * marketplace or self entered order ID on top - instead of our web ID on top").
+         *
+         * It is the number the work is FOUND by: a buyer quotes it, a marketplace shows it,
+         * a seller typed it into their own sheet. `EGF-002056` is ours, and ours is the one
+         * that can be looked up from either end — so the reference nobody else holds was
+         * sitting above the one everybody does.
+         *
+         * STILL BESIDE, NEVER INSTEAD, which is what the note above actually protects: `#seq`
+         * remains on the row, quotable, sortable and the thing the boards key on. Only the
+         * emphasis moved. Swapping it OUT is what would break the design-fee notes and every
+         * message that cites it.
+         *
+         * An order that never carried one still shows ours alone — the branch above returns
+         * before this, so there is no stack to invert and no empty line where the marketplace
+         * number would have been.
+         */}
+        <span className={cn(BASE, className)}
+              title={sheetRef
+                ? tl("orderNumber", "The number from the import sheet")
+                : tl("orderNumber", "The order's number on the platform it came from")}>
+          {otherRef}
+        </span>
         {/* A VALUE, so text-xs and not smaller — it is a reference somebody reads off a sheet
             and matches against ours, which §4 puts at 12px minimum and never at 11. */}
         {/* text-sm, NOT text-xs. §4 puts an order number in the VALUE band — "an account
@@ -175,13 +198,14 @@ export function OrderNumber({
             below its floor is not a way to make it secondary, it is a way to make it
             unreadable, and at 12px against a semibold 14px the size jump was the thing that
             read as untidy. */}
+        {/* OURS, UNDER IT. Still text-sm: §4 puts an order number in the VALUE band with a
+            14px floor because it is read, copied and matched against somebody's records —
+            it gives way by WEIGHT and COLOUR, never by being shrunk below legibility. */}
         <span
           className="text-sm font-normal tabular-nums text-muted-foreground"
-          title={sheetRef
-            ? tl("orderNumber", "The number from the import sheet")
-            : tl("orderNumber", "The order's number on the platform it came from")}
+          title={tl("orderNumber", "Our reference for this order")}
         >
-          {otherRef}
+          {label}
         </span>
       </span>
     )
