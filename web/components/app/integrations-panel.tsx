@@ -94,7 +94,18 @@ function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void })
   )
 }
 
-function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
+/**
+ * ONE ROW, NO PARAGRAPH.
+ *
+ * `pending` used to be state HERE, and the row printed the whole sentence — so saving
+ * Otto's four keys stacked the same three lines four times and the panel became the
+ * notice. §4: a populated screen does not explain a control that is already on it.
+ *
+ * The row now reports upward and wears a MARK; the group says the sentence once, with the
+ * thing you actually have to do. Which rows are waiting is still visible — that is what
+ * the mark is for — it just is not restated per row.
+ */
+function SecretRow({ s, onSaved, onPending }: { s: SecretMeta; onSaved: () => void; onPending: (name: string) => void }) {
   const tl = useLabelT()
  const [editing, setEditing] = useState(false)
  const [val, setVal] = useState("")
@@ -109,6 +120,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
  const r = await setAdminSecret(s.name, clear ? "" : val.trim())
  setEditing(false); setVal("")
  setPending(!!r.restartRequired)
+ if (r.restartRequired) onPending(s.name)
  onSaved()
     } catch {} finally { setBusy(false) }
   }
@@ -129,6 +141,8 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
         <span className="text-muted-foreground">{tl("integrations", s.label)}</span>
         <span className="flex items-center gap-1.5 font-mono">
           {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">{tl("integrations", "not set")}</span>}
+          {/* THE MARK. Recognised, not read (§4) — the sentence is under the group. */}
+          {pending && <Warning size={11} weight="fill" className="shrink-0 text-hold" aria-label={tl("integrations", "waiting for a restart")} />}
           {s.editable && (
             <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? tl("integrations", "Replace") : tl("integrations", "Set")} aria-label={tl("integrations", "Edit credential")}>
               <PencilSimple size={12} />
@@ -136,12 +150,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
           )}
         </span>
       </div>
-      {pending && (
-        <div className="flex items-start gap-1.5 rounded-md bg-hold/10 px-2 py-1 text-2xs text-hold">
-          <Warning size={11} weight="fill" className="mt-0.5 shrink-0" />
-          <span>{tl("integrations", "Saved, but not in use yet — this one is read when the API starts. Restart it, then this row is what’s live.")}</span>
-        </div>
-      )}
+
     </div>
   )
 }
@@ -393,6 +402,16 @@ export function IntegrationsPanel() {
  const [checking, setChecking] = useState(false)
   // Per-row on-demand test (only rows with a `test` config use it).
  const [tests, setTests] = useState<Record<string, { running?: boolean; result?: { ok: boolean; msg: string } }>>({})
+  /**
+   * WHICH SAVED KEYS ARE WAITING ON A RESTART — held here, not per row.
+   *
+   * Every one of these is read when the API starts, so "saved" and "in use" are different
+   * states and the panel has to say which. It used to say it on each row, which turned four
+   * Otto keys into four copies of the same paragraph. Names, so the count is right when the
+   * same row is saved twice, and the service key rides along so the notice belongs to the
+   * panel you are looking at.
+   */
+ const [pendingRestart, setPendingRestart] = useState<{ key: string; names: string[] }>({ key: "", names: [] })
  const runTest = useCallback(async (i: Integration) => {
  if (!i.test) return
  setTests((p) => ({ ...p, [i.key]: { running: true } }))
@@ -618,8 +637,30 @@ export function IntegrationsPanel() {
                   {(secrets[active.key] ?? []).map((s) => (
  s.kind && s.kind !== "secret"
                       ? <PlainSettingRow key={s.name} s={s} onSaved={reloadSecrets} />
- : <SecretRow key={s.name} s={s} onSaved={reloadSecrets} />
+ : <SecretRow key={s.name} s={s} onSaved={reloadSecrets}
+                                    onPending={(n) => setPendingRestart((p) => p.key !== active.key
+                                      ? { key: active.key, names: [n] }
+                                      : p.names.includes(n) ? p : { key: active.key, names: [...p.names, n] })} />
                   ))}
+                  {/* SAID ONCE, FOR THE WHOLE SERVICE. These keys are read when the API
+                      starts, so a save is not yet live — true of every row, which is exactly
+                      why it does not belong on every row. It carries the command because
+                      "restart it" with no way to is a problem statement, not an answer. */}
+                  {/* Carries its service key rather than being reset by an effect — switching panels
+                      then simply stops matching, and `react-hooks/set-state-in-effect` has
+                      nothing to complain about because there is no effect. */}
+                  {pendingRestart.key === active.key && pendingRestart.names.length > 0 && (
+                    <div className="flex items-start gap-1.5 rounded-md bg-hold/10 px-2 py-1.5 text-xs text-hold">
+                      <Warning size={12} weight="fill" className="mt-0.5 shrink-0" />
+                      <span>
+                        {pendingRestart.names.length === 1
+                          ? tl("integrations", "Saved — live after the API restarts.")
+                          : `${pendingRestart.names.length} ${tl("integrations", "saved — live after the API restarts.")}`}
+                        {" "}
+                        <code className="rounded bg-hold/15 px-1 font-mono">docker compose restart api</code>
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 // Says WHICH of the two it is, rather than showing the same blank space for
