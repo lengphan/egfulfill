@@ -3,7 +3,9 @@
 import { useLabelT } from "@/lib/i18n"
 import { useMemo, useState } from "react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
-import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel } from "@/lib/variant-resolve"
+import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel, bestMockup } from "@/lib/variant-resolve"
+import { thumbSrc } from "@/lib/order-image"
+import { ourSku } from "@/lib/our-sku"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { getUser } from "@/lib/auth"
 import { VariantField } from "@/components/app/variant-field"
@@ -192,6 +194,42 @@ export function VariantPicker({
     return blankLabel && !names.includes(blankLabel) ? [blankLabel, ...names] : names
   }, [catalog, blankLabel])
 
+  /**
+   * THE PICTURE, AND THE CODE ON ITS OWN (owner, 2026-09-21: "remove the product name here
+   * in the drop down + provide a small image on the start of each row").
+   *
+   * Every row was `EG-18009 - Unisex Colorblast™ Heavyweight T-Shirt`, and the names run
+   * long enough that the list truncated to a column of "EG-180…" — the half that tells two
+   * products apart was the half being cut. The thumbnail answers "which garment is this"
+   * before any of it is read.
+   *
+   * DISPLAY ONLY. The option VALUE stays the full `code - name` string, because that is the
+   * contract: both resolvers split it, the sheet offers it back, and the NAME half is what
+   * lets a line keep resolving after a product is renamed. Shortening what is stored would
+   * quietly trade a rename-proof line for a tidier menu.
+   */
+  const blankThumbs = useMemo(() => {
+    const out: Record<string, string> = {}
+    for (const p of catalog) {
+      const label = productLabel(p)
+      if (!label) continue
+      const img = bestMockup(p, item.color, "")
+      if (img) out[label] = thumbSrc(img, 48)
+    }
+    return out
+  }, [catalog, item.color])
+  /* Everything before the first " - " is the code. A product with no code at all is its own
+     name and has no separator, so it survives this untouched rather than becoming "".
+     PAINTED ON THE WAY OUT: productLabel builds the contract from the RAW sku, so a bare
+     number arrives here as "5000" — ourSku() is what turns it into EG-5000, and it has to be
+     applied at the point of display or this one menu disagrees with every other surface. The
+     stored option is untouched either way; that is the whole point of painting. */
+  const codeOnly = (o: string) => {
+    const at = o.indexOf(" - ")
+    const code = at > 0 ? o.slice(0, at) : o
+    return ourSku(code) || code
+  }
+
   const key = item.line_id ? { line_id: item.line_id } : { sku: item.sku }
 
   const save = async (patch: Parameters<typeof postItemSetup>[1], field: string) => {
@@ -268,6 +306,7 @@ export function VariantPicker({
         <VariantField
           label={tl("variantPicker", "Blank")} value={blankLabel} required
           options={blankOptions}
+          thumbs={blankThumbs} display={codeOnly}
           className={hideMethod ? "col-span-2" : undefined}
           disabled={busy === "blank"} onChange={pickBlank}
         />

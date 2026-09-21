@@ -39,6 +39,23 @@ const swatchHex = (name: string) => swatchBg(name) ?? NEUTRAL_CHIP
  * intrinsic width made a row of them ragged. This is the app's DropdownMenu with a
  * trigger styled like our inputs, so it matches every other control on the page.
  */
+/**
+ * THE OPTION'S PICTURE. Module scope, not inside render — `react-hooks/static-components`
+ * (CLAUDE.md §5), and a component re-declared every render remounts its <img> on each
+ * keystroke, which is a flicker in a menu you are scrolling.
+ *
+ * SQUARE, and the same square on the trigger as in the list: a picture that changes size
+ * when the menu opens reads as two different things. `rounded-md`, never `rounded-full` —
+ * §4 keeps the circle for what is genuinely round, and a garment photo is not. Falls back
+ * to a tinted square rather than a broken-image glyph, so a product with no mockup still
+ * lines its code up with every other row.
+ */
+function OptionThumb({ src }: { src?: string | null }) {
+  return src
+    ? <img src={src} alt="" aria-hidden className="size-5 shrink-0 rounded-md object-cover" />
+    : <span aria-hidden className="size-5 shrink-0 rounded-md bg-muted" />
+}
+
 export function VariantField({
  label,
  value,
@@ -49,6 +66,8 @@ export function VariantField({
  disabled,
  required,
  swatches,
+ thumbs,
+ display,
  compact,
  className,
  prefix,
@@ -65,6 +84,23 @@ export function VariantField({
  required?: boolean
   /** Render a colour dot beside each option (Colour field). */
  swatches?: boolean
+  /**
+   * A PICTURE INSTEAD OF THE REST OF THE SENTENCE (owner, 2026-09-21).
+   *
+   * The Blank dropdown offered `EG-18009 - Unisex Colorblast™ Heavyweight T-Shirt`, and the
+   * names are long enough that every row truncated — so the list read as a wall of
+   * "EG-180…" with the distinguishing half cut off. A thumbnail does the recognising the
+   * name was there to do, and does it faster: you know a cap from a hoodie before you have
+   * read anything.
+   *
+   * Keyed by the OPTION STRING, which stays the full `code - name` contract. Only the
+   * DISPLAY shortens (see `display`) — what is written to the line is unchanged, because
+   * that string is what both resolvers split and what lets a line survive a rename.
+   */
+ thumbs?: Record<string, string | null | undefined>
+  /** How an option READS. Defaults to pretty(). The value written on pick is always the
+   *  option itself, so this never touches what is stored. */
+ display?: (o: string) => string
   /** Row variant: no label above, smaller — used inline on order item rows. */
  compact?: boolean
   /** Extra classes merged into the trigger (e.g. a height override for a form row). */
@@ -118,6 +154,7 @@ export function VariantField({
   // show the name — nobody should have to decode a warehouse SKU to pick a colour.
  const tl = useLabelT()
  const pretty = (v: string) => (swatches ? prettyColorName(v) : v)
+
   /**
    * THE LABEL LIVES IN THE FIELD, not on a row above it.
    *
@@ -146,7 +183,7 @@ export function VariantField({
    */
  const note = emptyLabel ? tl("field", emptyLabel) : ""
  const shown = value
-    ? pretty(value)
+    ? (display ? display(value) : pretty(value))
  : hasOptions || !note ? ph : `${ph} · ${note}`
  const unset = !value
 
@@ -174,6 +211,7 @@ export function VariantField({
       {swatches && value && (
         <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchHex(value) }} />
       )}
+      {thumbs && value && <OptionThumb src={thumbs[value]} />}
       {/* NOT shrink-0: on a narrow column the face name would hold its width and truncate the
           method instead, which loses the half that changes. The value still gets flex-1, so
           the face gives way first. */}
@@ -211,7 +249,8 @@ export function VariantField({
         {options.map((o) => (
           <DropdownMenuItem key={o} onClick={() => onChange(o)} className="gap-2">
             {swatches && <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchHex(o) }} />}
-            <span className="min-w-0 flex-1 truncate">{pretty(o)}</span>
+            {thumbs && <OptionThumb src={thumbs[o]} />}
+            <span className="min-w-0 flex-1 truncate">{display ? display(o) : pretty(o)}</span>
             {o === value && <Check size={12} weight="bold" className="shrink-0 text-primary" />}
           </DropdownMenuItem>
         ))}
