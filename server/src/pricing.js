@@ -152,6 +152,13 @@ function blankCandidates(cell) {
   const out = [cell];
   const at = cell.indexOf(' - ');
   if (at > 0) { out.push(cell.slice(0, at).trim(), cell.slice(at + 3).trim()); }
+  /* THE `EG-` MAY BE PAINT — see the same block in web/lib/variant-resolve.ts. ourSku()
+     prints a bare-numeric sku as `EG-5000`, and the sheet's dropdown text is the cell that
+     comes back, so the number on its own has to be a candidate too. */
+  for (const c of [...out]) {
+    const m = /^EG-(\d+)$/i.exec(c);
+    if (m) out.push(m[1]);
+  }
   return out.filter(Boolean);
 }
 
@@ -169,9 +176,17 @@ function blankCandidates(cell) {
  * matches on it, and a line already carrying "10892 - Adams Headwear LP104" still resolves,
  * because both resolvers try the whole string and then each half.
  */
+/* A BARE NUMBER IS OURS, PRINTED `EG-5000` (owner, 2026-09-21). MIRRORS ourSku() in
+   web/lib/our-sku.ts, where the reasoning is written out. Prefixed for DISPLAY only —
+   nothing on this side moves: stock stays keyed on `5000` and the catalog row is untouched.
+   A part number has shape (100-632-120342, 10-271-016-SM); a bare integer has none, so the
+   two are told apart by that and §2.9 still withholds the former. */
+const BARE_NUMBER = /^\d+$/;
+
 export function ourSku(sku) {
   const s = String(sku == null ? '' : sku).trim();
-  return /^EG-/i.test(s) ? s : '';
+  if (/^EG-/i.test(s)) return s;
+  return BARE_NUMBER.test(s) ? `EG-${s}` : '';
 }
 
 export function matchProduct(idx, item) {

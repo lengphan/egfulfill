@@ -141,6 +141,18 @@ const CASES = [
   { what: 'composite blank, no sku (the grid and the sheet both write this)', item: { blank: '5000 - Gildan Unisex Heavy Cotton™ T-Shirt', sku: '' }, want: 'p1' },
   { what: 'composite blank, production row', item: { blank: 'EG-VC600 - hat', sku: '' }, want: 'p3' },
   { what: 'composite blank, production row', item: { blank: '10892 - Adams Headwear LP104', sku: '' }, want: 'p4' },
+  /* THE PAINTED PREFIX COMING BACK (2026-09-21). ourSku() prints sku `5000` as `EG-5000`,
+     and the import sheet's dropdown text IS the cell the seller returns — so this is the
+     string a real import now carries for a product whose stored sku has no prefix at all.
+     If blankCandidates ever stops stripping it, every line picked from a regenerated sheet
+     resolves to nothing and prices at zero, on BOTH sides at once, which is the one failure
+     this file's own banner says it exists to catch. */
+  { what: 'painted EG- prefix, whole cell', item: { blank: 'EG-5000 - Gildan Unisex Heavy Cotton™ T-Shirt', sku: '' }, want: 'p1' },
+  { what: 'painted EG- prefix, code alone', item: { blank: 'EG-5000', sku: '' }, want: 'p1' },
+  /* And the prefix that is REAL must not be mangled into a lookup for a product that does
+     not exist — p2 is genuinely EG-1002, and stripping to "1002" must find nothing rather
+     than something else. */
+  { what: 'real EG- code still resolves as itself', item: { blank: 'EG-18000', sku: '' }, want: 'p2' },
   { what: 'bare name and a sku (how older rows were written)', item: { blank: 'Gildan Unisex Heavy Blend™ Crewneck Sweatshirt', sku: 'EG-18000' }, want: 'p2' },
   { what: 'a NAME containing " - " is matched whole, not split', item: { blank: 'Adidas - Performance Polo', sku: '' }, want: 'p5' },
   { what: 'variant sku, no blank', item: { blank: '', sku: '5000-L-SKY' }, want: 'p1' },
@@ -160,20 +172,27 @@ const CASES = [
  * the sheet and the app would offer different strings for one product and each other's rows
  * would stop resolving.
  */
+/* A BARE NUMBER IS OURS AND PRINTS `EG-<n>` (owner, 2026-09-21: "so its like 5000 - make it
+   EG-5000"). These two rows expected "" until today, which was the previous decision and not
+   a bug being papered over: the rule changed, so the fixture does. `want` is therefore a
+   value rather than a flag, because "ours" is no longer the same string as the sku.
+   A PART NUMBER HAS SHAPE and still returns "" — that half of §2.9 did not move. */
 const SKUS = [
-  { sku: 'EG-1002', ours: true },
-  { sku: 'eg-la13', ours: true },       // case is not the point
-  { sku: '10-271-016-SM', ours: false },  // OTTO's part number, live in the sku column
-  { sku: '100-632-120342', ours: false },
-  { sku: '10892', ours: false },
-  { sku: '5000', ours: false },
-  { sku: '', ours: false },
+  { sku: 'EG-1002', want: 'EG-1002' },
+  { sku: 'eg-la13', want: 'eg-la13' },        // case is not the point
+  { sku: '10-271-016-SM', want: '' },         // OTTO's part number, live in the sku column
+  { sku: '100-632-120342', want: '' },
+  { sku: '10892', want: 'EG-10892' },         // bare digits → painted, never rewritten
+  { sku: '5000', want: 'EG-5000' },
+  { sku: '13124', want: 'EG-13124' },
+  { sku: '5000A', want: '' },                 // a letter is shape; not ours to claim
+  { sku: '', want: '' },
 ]
 const fail = []
 for (const c of SKUS) {
   const w = ours.ourSku(c.sku)
   const v = srv.ourSku(c.sku)
-  const want = c.ours ? c.sku : ''
+  const want = c.want
   if (w !== want) fail.push(`web ourSku("${c.sku}") → "${w}", expected "${want}"`)
   if (v !== want) fail.push(`server ourSku("${c.sku}") → "${v}", expected "${want}"`)
   if (w !== v) fail.push(`DRIFT on ourSku("${c.sku}") — web "${w}", server "${v}"`)
@@ -182,7 +201,7 @@ for (const c of SKUS) {
    theirs does, never a blank where a code should be. */
 const DISPLAY = [
   { p: { sku: 'EG-1005', supplierSku: '102-664-001' }, want: 'EG-1005' },
-  { p: { sku: '10892', supplierSku: '' }, want: '10892' },
+  { p: { sku: '10892', supplierSku: '' }, want: 'EG-10892' },
   { p: { sku: '', supplierSku: '103-713-031753A' }, want: '103-713-031753A' },
   { p: { sku: '', supplierSku: '' }, want: '' },
 ]

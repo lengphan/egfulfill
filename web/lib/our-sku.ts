@@ -22,9 +22,34 @@
  * server-side, and the two must agree about what "ours" means or one product would be offered
  * under two different strings. tools/check-blank-resolve.mjs runs both.
  */
+/**
+ * A BARE NUMBER IS OURS, AND IT IS PRINTED `EG-5000` (owner, 2026-09-21).
+ *
+ * `5000`, `10895`, `13124`, `108084` — four live products whose sku is nothing but digits.
+ * They are not vendor part numbers in the sense the note above means: a part number has
+ * shape (`100-632-120342`, `10-271-016-SM`), and a bare integer carries none. Withholding
+ * them printed a NAME where every other row printed a code, which is the "organized" the
+ * owner is after — a column that is a code on some rows and a sentence on others.
+ *
+ * PREFIXED, NOT REWRITTEN, and that distinction is the whole safety of this change. Nothing
+ * on the backend moves: stock stays keyed on `5000`, publish still writes `p.sku`, and the
+ * row in catalog_products is untouched. This is the display rule the file's own title claims
+ * to be — the owner's words, "purely front end to make it more organized".
+ *
+ * WHAT IT COSTS, paid in blankCandidates: the import sheet's dropdown text IS the imported
+ * cell, so a seller now picks `EG-5000` for a product whose sku is `5000`. Both resolvers
+ * therefore strip a leading `EG-` as one of the candidates they try. tools/check-blank-resolve.mjs
+ * runs both over that exact case.
+ *
+ * Anything with a hyphen or a letter still returns "" — those ARE the supplier's, and §2.9
+ * has not moved.
+ */
+const BARE_NUMBER = /^\d+$/
+
 export function ourSku(sku: string | null | undefined): string {
   const s = String(sku ?? "").trim()
-  return /^EG-/i.test(s) ? s : ""
+  if (/^EG-/i.test(s)) return s
+  return BARE_NUMBER.test(s) ? `EG-${s}` : ""
 }
 
 /**

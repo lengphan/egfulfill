@@ -44,6 +44,15 @@ export function blankCandidates(cell: string): string[] {
   const out = [cell]
   const at = cell.indexOf(" - ")
   if (at > 0) { out.push(cell.slice(0, at).trim(), cell.slice(at + 3).trim()) }
+  /* THE `EG-` MAY BE PAINT. ourSku() prints a bare-numeric sku as `EG-5000` so the code
+     column reads the same on every row, and the import sheet's dropdown text IS the cell
+     that comes back — so the seller picks `EG-5000` for a product whose stored sku is
+     `5000`. Try the number on its own. Costs nothing when the prefix is real: a product
+     actually called EG-1001 simply has no row keyed `1001`. */
+  for (const c of [...out]) {
+    const m = /^EG-(\d+)$/i.exec(c)
+    if (m) out.push(m[1])
+  }
   return out.filter(Boolean)
 }
 
