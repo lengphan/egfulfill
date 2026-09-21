@@ -173,6 +173,22 @@ export function StoresManager() {
  const [shopDomain, setShopDomain] = useState("")
   // Which channel is awaiting a "how far back to import" choice (pre-connect modal), if any.
  const [pending, setPending] = useState<"etsy" | "shopify" | "tiktok" | null>(null)
+  /**
+   * A SELLER ON ETSY IS ON THE EXTENSION'S PATH, and it cannot be asked for a date range.
+   *
+   * The extension makes ZERO requests to Etsy — it reads the page the seller already has open
+   * (extension/src/parse.js, asserted by tools/check-extension-parse.mjs). So "past 90 days"
+   * is not something it can do, and offering the window here promised a crawl that
+   * deliberately does not exist. The comment beside the steps has said so since 2026-09-21;
+   * the chooser rendered anyway, because it sits OUTSIDE the branch that draws them.
+   *
+   * `showScope` is an escape hatch, not the default. Connect stays REACHABLE — §6 is explicit
+   * that taking it away would strand everyone already connected, and it is still the only
+   * path that pushes tracking back to Etsy — but it is one line at the foot rather than four
+   * buttons above the instructions.
+   */
+ const [showScope, setShowScope] = useState(false)
+ const extensionOnly = pending === "etsy" && !isStaffUser && !showScope
   // Which TikTok region the server's authorize URL targets ("us" | "global"). Shown in the
   // connect modal so a US seller can catch a wrong-region login BEFORE hitting "account not
   // found" — that error means the popup opened the other region's separate account system.
@@ -618,16 +634,23 @@ export function StoresManager() {
  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
  role="dialog"
  aria-modal="true"
- onClick={() => setPending(null)}
+ onClick={() => { setPending(null); setShowScope(false) }}
         >
           <div
  className="w-full max-w-md rounded-2xl border border-border bg-card p-5 "
  onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-base font-semibold">Import orders from {channelName(pending)}</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {tl("stores", "How far back should we pull existing orders? This only affects the first import — new orders always sync automatically afterward.")}
-            </p>
+            <div className="text-base font-semibold">
+              {extensionOnly
+                ? tl("stores", "Get your Etsy orders")
+                : `Import orders from ${channelName(pending)}`}
+            </div>
+            {/* The window question belongs to the path that can answer it. */}
+            {!extensionOnly && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {tl("stores", "How far back should we pull existing orders? This only affects the first import — new orders always sync automatically afterward.")}
+              </p>
+            )}
             {pending === "tiktok" && tiktokRegion && (
               <div className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                 Opens the <span className="font-medium text-foreground">{tiktokRegion === "us" ? "US" : "global"}</span> TikTok Shop
@@ -669,28 +692,68 @@ export function StoresManager() {
                * for. Offering one would promise a crawl the extension deliberately does not
                * do — see extension/src/parse.js and tools/check-extension-parse.mjs.
                */
-              <ol className="mt-3 space-y-2 text-xs text-muted-foreground">
-                {[
-                  tl("stores", "Install the egful extension in Chrome."),
-                  tl("stores", "Open your Etsy Shop Manager orders page."),
-                  tl("stores", "Press the egful icon, then Sync."),
-                ].map((step, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-2xs font-semibold tabular-nums text-foreground">{i + 1}</span>
-                    <span>{step}</span>
+              <>
+                {/**
+                  * A PICTURE OF THE BUTTON, because that is the step people get stuck on.
+                  *
+                  * "Press the egful icon" is a description of something the seller has never
+                  * seen, in a toolbar holding a dozen other icons. The real artwork, at the
+                  * size Chrome draws it, ringed where it sits — the sentence becomes a
+                  * pointer instead of a riddle (owner, 2026-09-21, choosing this over the
+                  * steps alone).
+                  *
+                  * The ring is --primary, not the icon's own periwinkle: §4 keeps hue out of
+                  * the chrome, and the icon supplies all the colour this needs.
+                  */}
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-2.5 py-2">
+                  <span className="flex shrink-0 gap-1" aria-hidden="true">
+                    <span className="size-1.5 rounded-full bg-border" />
+                    <span className="size-1.5 rounded-full bg-border" />
+                    <span className="size-1.5 rounded-full bg-border" />
+                  </span>
+                  {/* The seller's OWN orders page, named — so the picture matches the tab they
+                      are told to open in step 2 rather than showing a generic browser. */}
+                  <span className="flex h-5 min-w-0 flex-1 items-center overflow-hidden rounded-full border border-border bg-background px-2 text-[9.5px] text-muted-foreground">
+                    <span className="truncate">etsy.com/your/orders</span>
+                  </span>
+                  <span className="shrink-0 rounded-lg bg-background p-0.5 ring-2 ring-primary">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/egful-extension.png" alt="" className="size-5 rounded-[5px]" />
+                  </span>
+                </div>
+                <div className="mt-1.5 text-xs font-medium text-foreground">
+                  {tl("stores", "↑ this is the button you press")}
+                </div>
+                <ol className="mt-3 space-y-2.5 text-xs text-muted-foreground">
+                  <li className="flex gap-2">
+                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-2xs font-semibold tabular-nums text-foreground">1</span>
+                    <span>{tl("stores", "Add the egful extension to Chrome.")}</span>
                   </li>
-                ))}
-                {/* WHAT IT CANNOT DO, once, where the decision is made. Not a caveat under a
-                    control — it is the answer to "why would I connect at all", and a seller
-                    who reads it after shipping their first order has been told too late. */}
-                <li className="pt-1">
-                  {tl("stores", "The extension reads the page you have open, so older orders mean paging back. Connecting instead syncs automatically and sends tracking to Etsy — but Etsy withholds buyer addresses from our app.")}
-                </li>
-              </ol>
+                  <li className="flex gap-2">
+                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-2xs font-semibold tabular-nums text-foreground">2</span>
+                    <span>{tl("stores", "Open your Etsy Orders page.")}</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-2xs font-semibold tabular-nums text-foreground">3</span>
+                    <span className="flex items-center gap-1.5">
+                      {tl("stores", "Click")}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/egful-extension.png" alt="" className="inline size-4 rounded" />
+                      {tl("stores", "then Sync.")}
+                    </span>
+                  </li>
+                </ol>
+                {/* WHAT IT CANNOT DO, once, where the decision is made — and in one line now.
+                    The old sentence carried the whole Connect trade-off as well, four lines
+                    above a chooser the seller could not use. */}
+                <p className="mt-3 text-2xs text-muted-foreground">
+                  {tl("stores", "It reads the page you have open. For older orders, go back a page and Sync again.")}
+                </p>
+              </>
             ))}
             {/* Already-synced shops: say the rule ONCE, up here, rather than repeating it on
  every greyed row. */}
-            {syncedWindowFor(pending) !== null && (
+            {!extensionOnly && syncedWindowFor(pending) !== null && (
               <div className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                 This shop already imported{" "}
                 <span className="font-medium text-foreground">
@@ -699,6 +762,7 @@ export function StoresManager() {
                 . You can widen that, but not narrow it — nothing already imported is ever removed.
               </div>
             )}
+            {!extensionOnly && (
             <div className="mt-4 space-y-2">
               {SCOPE_OPTIONS.map((o) => {
                 // Greyed, not hidden: a missing option reads as a bug, while a disabled one
@@ -745,12 +809,29 @@ export function StoresManager() {
                 )
               })}
             </div>
+            )}
+            {/**
+              * CONNECT IS STILL HERE, as a line rather than as the screen.
+              *
+              * §6 keeps it offered to sellers — taking it away would strand everyone already
+              * connected, and it is the only path that pushes tracking back to Etsy. But it
+              * is the exception now, not the question the dialog opens with.
+              */}
+            {extensionOnly && (
+              <button
+ type="button"
+ onClick={() => setShowScope(true)}
+ className="mt-3 text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                {tl("stores", "Connect the shop instead")}
+              </button>
+            )}
             <button
  type="button"
- onClick={() => setPending(null)}
+ onClick={() => { setPending(null); setShowScope(false) }}
  className="mt-4 w-full rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
-              {tl("stores", "Cancel")}
+              {extensionOnly ? tl("stores", "Close") : tl("stores", "Cancel")}
             </button>
           </div>
         </div>
