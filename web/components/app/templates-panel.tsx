@@ -1,7 +1,7 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
-import { useEffect, useState } from "react"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
+import { useCallback, useEffect, useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Stack, X, PencilSimple, CircleNotch, Plus } from "@phosphor-icons/react"
@@ -21,6 +21,19 @@ import { EmptyState } from "@/components/app/empty-state"
  */
 export function TemplatesPanel() {
   const tl = useLabelT()
+  /**
+   * NO SIXTH `useFmtDate`. Five files already define their own copy of that hook
+   * (settings-view, stores-manager, consignment-panel, subscription-panel, design/page) and
+   * adding another is how a helper becomes five helpers that quietly disagree about a format.
+   * `useDateFormat` is the shared one they all wrap; this card wraps it inline and in one
+   * place. Extracting the five is worth doing — it is just not worth doing from here.
+   */
+  const fmtDate = useDateFormat()
+  const shortDate = useCallback((s?: string | null) => {
+    if (!s) return ""
+    const d = new Date(s)
+    return isNaN(d.getTime()) ? "" : fmtDate(d, { month: "short", day: "numeric" })
+  }, [fmtDate])
   const router = useRouter()
   const [items, setItems] = useState<ProductTemplate[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -165,7 +178,9 @@ export function TemplatesPanel() {
               </div>
               <div className="flex flex-col gap-1 p-2">
                 <div className="flex items-center gap-1">
-                  <div className="min-w-0 flex-1 truncate text-sm font-medium">{t.name || tl("templates", "Untitled")}</div>
+                  {/* SEMIBOLD, like a library image's title. These two grids are read the
+                      same way and sat at different weights for no reason anyone chose. */}
+                  <div className="min-w-0 flex-1 truncate text-sm font-semibold">{t.name || tl("templates", "Untitled")}</div>
                   <Button
                     size="icon-sm"
                     variant="ghost"
@@ -175,9 +190,13 @@ export function TemplatesPanel() {
                     <PencilSimple size={14} weight="bold" />
                   </Button>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {/* Which blank this was built on — the other half of "blank + artwork",
-                      and previously nowhere on the card. */}
+                <div className="mt-auto flex items-center gap-1.5 pt-1.5">
+                  {/* WHEN, THEN WHAT IT IS BUILT ON — the same left-hand meta the artwork
+                      library card carries, so a person moving between the two grids reads
+                      them the same way instead of learning each one. */}
+                  {shortDate(t.updated_at) && (
+                    <span className="shrink-0 text-xs text-muted-foreground">{shortDate(t.updated_at)}</span>
+                  )}
                   <span className="min-w-0 truncate text-xs text-muted-foreground">{blankName || tl("templates", "No blank saved")}</span>
                   {/* The template's ID, copyable — and not decoration: this is exactly what
                       goes in the import sheet's Template ID column, which fills the blank,
@@ -189,7 +208,12 @@ export function TemplatesPanel() {
                   <button
                     onClick={() => { navigator.clipboard?.writeText(ref).catch(() => {}); setCopied(t.id); setTimeout(() => setCopied(null), 1400) }}
                     title={tl("templates", "Copy this template's reference")}
-                    className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 tabular-nums text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    /* AN IDENTIFIER, SO text-sm. §4: a VALUE is at least 14px — something
+                       read, copied or transcribed — and 12px was the size of the caption
+                       beside it. This is the string that goes in the import sheet's Template
+                       ID column; the artwork library's IMG badge has been at this weight all
+                       along and the two are the same job. */
+                    className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   >
                     {copied === t.id ? tl("templates", "Copied") : ref}
                   </button>

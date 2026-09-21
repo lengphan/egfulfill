@@ -225,7 +225,9 @@ export function templatesRoutes(app, requireAuth) {
      */
     const staff = isStaff(req.user);
     const r = await q(
-      `select t.id, t.seq, t.name, t.data, t.composite, t.layers, t.owner_id
+      /* updated_at comes back now — the card shows a date beside the reference, the way the
+         artwork library's cards do, and the column has always existed and never been read. */
+      `select t.id, t.seq, t.name, t.data, t.composite, t.layers, t.owner_id, t.updated_at
          from templates t
          left join users u on u.id = t.owner_id
         where t.owner_id = $1

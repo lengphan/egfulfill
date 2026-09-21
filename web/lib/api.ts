@@ -5454,6 +5454,9 @@ export type ProductTemplate = {
   data: Record<string, unknown> | null
   composite: string | null
   layers: unknown[] | null
+  /** When it was last saved. Shown on the card beside the reference, same as a library
+   *  image's date — the two lists are read the same way and should say the same things. */
+  updated_at?: string | null
 }
 export function getTemplates() {
   return api<ProductTemplate[]>(`/api/templates`)
