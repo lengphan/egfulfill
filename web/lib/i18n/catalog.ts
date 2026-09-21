@@ -206,6 +206,8 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "product.Blank price": "Giá phôi",
+  "product.Blank price over product cost, for every size": "Giá phôi cộng trên giá nhập, cho mọi cỡ",
   "import.— not embroidered.": "— mặt này không thêu.",
   "import.No template": "Không có mẫu",
   "import.is ambiguous — use TPL-.": "bị trùng tên — hãy dùng số TPL-.",

@@ -566,7 +566,6 @@ export function ProductEditorDialog({
   // size's own product cost (so a pricier 3XL still lands a proportional base); shipping is
   // always a flat $. Writes into the editable rows — nothing is charged until you Save.
  const [bulkBase, setBulkBase] = useState("")
- const [bulkShip, setBulkShip] = useState("")
  const [bulkPct, setBulkPct] = useState(false)
   /**
    * THE SHELF, PER VARIANT — variantSku -> units, as TEXT.
@@ -582,7 +581,6 @@ export function ProductEditorDialog({
  const [stock, setStock] = useState<Record<string, string>>({})
  const [loadedStock, setLoadedStock] = useState<Record<string, string>>({})
  const [bulkStock, setBulkStock] = useState("")
- const [bulkBlank, setBulkBlank] = useState("")
   /** Which size has its colourways open. One at a time — this is a drawer under a row, not
    * the grid of 496 fields the table replaced. */
  const [stockOpen, setStockOpen] = useState<string | null>(null)
@@ -927,26 +925,30 @@ export function ProductEditorDialog({
   // STOCK IS NOT IN HERE ANY MORE — see applyBulkStock below. It writes per VARIANT
   // (size × colour) while these three write per SIZE, so a single "apply to all" meant two
   // different granularities depending on which box you had typed in.
+  /**
+   * ONE BOX, AND IT SETS THE PRICE THAT IS ACTUALLY READ (owner, 2026-09-21).
+   *
+   * There were three — a base-cost markup, a blank, and a shipping fee — plus a live "→ $9.72"
+   * readout of what the markup resolved to. Three ways to half-fill a row, and the one that
+   * looked primary set BASE COST, which pricing.js only reads where a size has no blank price.
+   *
+   * Now it fills BLANK, per size, from that size's own supplier cost — and each size keeps its
+   * own, which is the whole reason this is applied per row rather than as one product-level
+   * figure. A size with no cost of its own falls back to the product's, exactly as the row
+   * editor's placeholder already does.
+   */
  const applyBulk = () => {
- const b = bulkBase.trim(), sh = bulkShip.trim(), bl = bulkBlank.trim()
- if (b === "" && sh === "" && bl === "") return
+ const b = bulkBase.trim()
+ if (b === "") return
  const amt = Number(b) || 0
  setTiers((prev) => {
  const nextT: Record<string, Tier> = { ...prev }
  for (const s of sizes) {
  const cur = nextT[s] ?? EMPTY_TIER
- let price = cur.price
- if (b !== "") {
  const rowCost = num(cur.cost)
  const cost = !isNaN(rowCost) ? rowCost : (num(productCost) || 0)
- const nextBase = bulkPct ? cost * (1 + amt / 100) : cost + amt
- price = String(Math.round(nextBase * 100) / 100)
-        }
- nextT[s] = {
-          ...cur, price,
- shipping: sh !== "" ? String(Number(sh) || 0) : cur.shipping,
- blank: bl !== "" ? String(Number(bl) || 0) : cur.blank,
-        }
+ const next = bulkPct ? cost * (1 + amt / 100) : cost + amt
+ nextT[s] = { ...cur, blank: String(Math.round(next * 100) / 100) }
       }
  return nextT
     })
@@ -1009,16 +1011,6 @@ export function ProductEditorDialog({
     { id: "shipping", label: tl("product", "Shipping") },
   ], [tl, unpricedCount])
 
- const bulkPreview = useMemo(() => {
- if (bulkBase.trim() === "") return null
- const amt = Number(bulkBase)
- if (!isFinite(amt)) return null
- const first = sizes.find((s) => num(tiers[s]?.cost) > 0)
- const cost = first ? num(tiers[first].cost) : (num(productCost) || 0)
- if (!(cost > 0)) return null
- const next = bulkPct ? cost * (1 + amt / 100) : cost + amt
- return { cost: cost.toFixed(2), base: (Math.round(next * 100) / 100).toFixed(2) }
-  }, [bulkBase, bulkPct, sizes, tiers, productCost])
 
   /** OUR sku, as it will be saved — the stock grid keys off it, so it has to be the same
    * string `save` writes and not the raw field. */
@@ -1730,7 +1722,7 @@ export function ProductEditorDialog({
                 {sizes.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2.5">
                     <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">{tl("product", "Base cost")}</span>
+                      <span className="text-xs text-muted-foreground">{tl("product", "Blank price")}</span>
                       <span className="flex items-center gap-1.5">
                         <span className="text-xs text-muted-foreground">{tl("product", "product cost +")}</span>
                         <span className="inline-flex rounded-md border border-border p-0.5 text-xs">
@@ -1742,29 +1734,11 @@ export function ProductEditorDialog({
                           ))}
                         </span>
                         <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
- className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Base upcharge over product cost")} />
-                        {/* The result, not the rule. Muted because it is a readout and not
-                            somewhere to type — but text-sm, because it is a VALUE. */}
-                        {bulkPreview && (
-                          <span className="whitespace-nowrap text-sm tabular-nums text-muted-foreground"
- title={`Product cost ${bulkPreview.cost} ${bulkPct ? `+ ${bulkBase}%` : `+ ${bulkBase}`} = base cost ${bulkPreview.base}`}>
-                            → ${bulkPreview.base}
-                          </span>
-                        )}
+ className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Blank price over product cost, for every size")} />
                       </span>
                     </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">{tl("product", "Blank ($)")}</span>
-                      <Input value={bulkBlank} onChange={(e) => setBulkBlank(e.target.value.replace(/[^0-9.]/g, ""))}
- className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Blank price for every size")} />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">{tl("product", "Shipping ($)")}</span>
-                      <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
- className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Shipping fee for every size")} />
-                    </label>
                     <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk}
- disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkBlank.trim()}>{tl("product", "Apply to all sizes")}</Button>
+ disabled={!bulkBase.trim()}>{tl("product", "Apply to all sizes")}</Button>
                   </div>
                 )}
                 {/* STOCK IS A COLUMN HERE. It was a size × colour grid of its own below —
