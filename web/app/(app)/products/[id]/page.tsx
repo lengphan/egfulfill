@@ -394,13 +394,36 @@ export default function ProductDetailPage() {
               !isBlank && pricedSides.length > 1 ? pricedSides.map((sd) => tl("sides", sd)).join(" + ") : null,
             ].filter(Boolean).join(" · ")}
           </div>
-          {/* NO BREAKDOWN HERE (owner, 2026-09-18). A Base cost / Front · Embroidery split was
-              added to answer "what does the blank alone cost", and on this page it answers a
-              question nobody is asking: the pills above already say which combination the
-              figure is for, and the variant line under the price names it in words. Two more
-              rows restating the same selection is the repetition §4 warns about.
-              The order's Summary keeps its breakdown — there the figure is a CHARGE somebody
-              has to check, not a price they are choosing. */}
+          {/**
+            * THE SUM, ON ONE LINE (owner, 2026-09-21): $10.00 + $5.00 DTG.
+            *
+            * A two-ROW table was here and came off — the pills already say which combination
+            * the figure is for, so rows restating that were the repetition §4 warns about. The
+            * question those rows failed to answer is a different one: what is this number MADE
+            * of. A sum answers it in the width already taken by the price.
+            *
+            * ONLY WHEN THERE IS SOMETHING TO ADD. On Blank Only there is one part and the sum
+            * would be the headline again with a plus sign — so it says nothing and is not
+            * drawn. That is also the clearest statement the page can make about what Blank
+            * Only means: nothing is added to the garment.
+            */}
+          {(() => {
+            const parts: string[] = []
+            const garment = isBlank
+              ? ((selSize ? blankOfSize(selSize) : 0) || (selSize ? priceOfSize(selSize) : priceOf(product)))
+              : (selSize ? priceOfSize(selSize) : priceOf(product))
+            const mf = isBlank ? 0 : methodFee(selMethod?.key, selMethod?.label)
+            if (mf > 0) {
+              parts.push(usd(garment))
+              /* NAMED, because "+ $5.00" leaves the reader to work out which pick moved the
+                 figure — and on this page four of them can. */
+              parts.push(`${usd(mf)} ${selMethod?.label ?? ""}`.trim())
+            }
+            if (isBlank || !parts.length) return null
+            return (
+              <div className="text-sm tabular-nums text-muted-foreground">{parts.join("  +  ")}</div>
+            )
+          })()}
           <ShippingFees
  first={shipFee || shipFirstFee(product, fees?.shipBands)}
  extra={fees?.shipExtra ?? 0}
