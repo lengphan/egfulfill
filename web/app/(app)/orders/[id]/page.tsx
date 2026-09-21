@@ -1994,7 +1994,13 @@ export default function OrderDetailPage() {
         </Button>
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
+            {/* BASELINE, NOT CENTRE. The number is a two-line stack and the badge is one
+                line, so `items-center` floated "Pending" in the gap between the number and
+                its reference — level with neither. Baseline puts it on the number's own
+                line, which is the thing it describes. Same rule the mixed-type rows follow:
+                centring boxes of different heights makes the row slide the moment either
+                one wraps. */}
+            <div className="flex items-baseline gap-2.5">
               {/* The number is a LABEL (orders.seq), and staff can correct it in place —
                   a mistyped one otherwise had to be lived with. Not the id: that is the key
                   ten tables join on. See components/app/order-number.tsx. */}

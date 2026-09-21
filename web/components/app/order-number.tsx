@@ -151,8 +151,18 @@ export function OrderNumber({
   if (!mayEdit) {
     if (!otherRef) return <span className={cn(BASE, className)}>{label}</span>
     return (
-      <span className={cn("inline-flex flex-col leading-tight", className)}>
-        <span className={BASE}>{label}</span>
+      /* TWO CHANGES, BOTH MEASURED (2026-09-21, "this look jammed").
+         GAP: the two lines abutted at exactly 0px — measured 188-210 and 210-231 — so a
+         number and its reference read as one mushy block rather than a title with a note
+         under it.
+         AND `className` NOW REACHES THE NUMBER. It was on the CONTAINER, where a font size
+         cannot survive a child that sets its own: BASE is text-sm, so the order page's
+         `text-2xl` never applied and both lines rendered at the same 15px. The note at that
+         call site says it passes the size "so it overrides the primitive's row size
+         explicitly" — it did not, and this is what makes that sentence true. Only that one
+         call site passes a className at all, so nothing else moves. */
+      <span className="inline-flex flex-col gap-0.5 leading-tight">
+        <span className={cn(BASE, className)}>{label}</span>
         {/* A VALUE, so text-xs and not smaller — it is a reference somebody reads off a sheet
             and matches against ours, which §4 puts at 12px minimum and never at 11. */}
         {/* text-sm, NOT text-xs. §4 puts an order number in the VALUE band — "an account
