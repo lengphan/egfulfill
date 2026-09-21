@@ -412,37 +412,17 @@ export default function ProductDetailPage() {
               !isBlank && pricedSides.length > 1 ? pricedSides.map((sd) => tl("sides", sd)).join(" + ") : null,
             ].filter(Boolean).join(" · ")}
           </div>
-          {/**
-            * THE SUM, ON ONE LINE (owner, 2026-09-21): $10.00 + $5.00 DTG.
-            *
-            * A two-ROW table was here and came off — the pills already say which combination
-            * the figure is for, so rows restating that were the repetition §4 warns about. The
-            * question those rows failed to answer is a different one: what is this number MADE
-            * of. A sum answers it in the width already taken by the price.
-            *
-            * ONLY WHEN THERE IS SOMETHING TO ADD. On Blank Only there is one part and the sum
-            * would be the headline again with a plus sign — so it says nothing and is not
-            * drawn. That is also the clearest statement the page can make about what Blank
-            * Only means: nothing is added to the garment.
-            */}
-          {(() => {
-            const parts: string[] = []
-            const garment = garmentPrice
-            const mf = isBlank ? 0 : methodFee(selMethod?.key, selMethod?.label)
-            const pl = isBlank ? 0 : sidesAdd
-            if (mf > 0 || pl > 0) {
-              parts.push(usd(garment))
-              /* NAMED, because "+ $5.00" leaves the reader to work out which pick moved the
-                 figure — and on this page four of them can. The placement is named by the face
-                 it is for, the way the order's Summary names it. */
-              if (pl > 0) parts.push(`${usd(pl)} ${tl("sides", pricedSides[0] ?? "front")}`)
-              if (mf > 0) parts.push(`${usd(mf)} ${selMethod?.label ?? ""}`.trim())
-            }
-            if (isBlank || !parts.length) return null
-            return (
-              <div className="text-sm tabular-nums text-muted-foreground">{parts.join("  +  ")}</div>
-            )
-          })()}
+          {/* NO SUM LINE (owner, 2026-09-21, reversing the request that added it). It read
+              "$15.00 + $3.00 front + $5.00 Embroidery" under a headline of $23.00 and a variant
+              line that already names the picks — three restatements of one choice, which is the
+              repetition §4 is about and the same reason the two-row table came off this page
+              before it.
+
+              What the sum was actually for was checking the arithmetic, and the arithmetic was
+              wrong: this page was quoting the legacy base cost and charging nothing for the
+              placement. That is fixed in the ladder above, where it belonged — the display was
+              never the fix. The order's Summary still breaks the figure down, because there it
+              is a CHARGE somebody reconciles rather than a price they are choosing. */}
           <ShippingFees
  first={shipFee || shipFirstFee(product, fees?.shipBands)}
  extra={fees?.shipExtra ?? 0}
