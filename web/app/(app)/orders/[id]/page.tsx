@@ -1355,16 +1355,25 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                     const sds = (f.sides ?? [])
                                     return !sds.length || !sds.some((sd) => faceRows.some((r) => r.face.toLowerCase() === sd.toLowerCase()))
                                   })
-                                  const feeRow = (f: typeof mine[number], key: string, face: string | null) => (
+                                  /* `face`: a string names it, null falls back to the fee's OWN sides,
+                                     and FALSE hides it — which is the case inside a face group, where
+                                     the heading above has already said it. Null could not mean "hide":
+                                     it fell through to `f.sides`, so a fee under a Back heading still
+                                     printed "Back · Design Fee". */
+                                  const feeRow = (f: typeof mine[number], key: string, face: string | null | false, indent = "pl-3") => (
                                     <div key={key} className="flex justify-between">
-                                      <dt className="pl-3 text-muted-foreground">
-                                        {/* The face is repeated on the fee row rather than implied by
-                                            indentation: these rows are read one at a time, and a row
-                                            that only makes sense in the company of the one above it
-                                            stops making sense the moment anything is inserted. */}
-                                        {(face ? [face] : (f.sides ?? [])).length > 0 && (
+                                      <dt className={`${indent} text-muted-foreground`}>
+                                        {/* The face is named here ONLY when this fee is not inside a
+                                            face group. Repeating it used to be the rule — a row read
+                                            one at a time has to stand alone — and under a HEADING that
+                                            names the face and totals it, it no longer does: the parent
+                                            is the context, and repeating it three rows running is what
+                                            the owner called out (2026-09-21). A fee with no face, or
+                                            one naming a face this line no longer prints, still says so
+                                            because nothing above it will. */}
+                                        {(face === false ? [] : face ? [face] : (f.sides ?? [])).length > 0 && (
                                           <span className="capitalize">
-                                            {(face ? [face] : (f.sides ?? [])).map((sd) => tl("sides", sd)).join(", ")}
+                                            {(face === false ? [] : face ? [face] : (f.sides ?? [])).map((sd) => tl("sides", sd)).join(", ")}
                                             <span className="text-muted-foreground/60"> · </span>
                                           </span>
                                         )}
@@ -1421,6 +1430,24 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                     return c
                                   })
 
+                                  /**
+                                   * A FACE IS SAID ONCE (owner, 2026-09-21: "i want Front once,
+                                   * then below").
+                                   *
+                                   * It used to be printed on its own charge AND on every design
+                                   * fee that named it, so one embroidered front read
+                                   *   Front · Embroidery
+                                   *   Front · Design fee · file provided
+                                   * and a two-face line said "Front" twice and "Back" twice.
+                                   *
+                                   * A face becomes a HEADING carrying its own subtotal, with its
+                                   * charges under it — but ONLY when it has more than one, because
+                                   * a heading above a single child is a row split into two rows.
+                                   * One charge stays the single line it always was.
+                                   */
+                                  const groupedFaces = new Set(
+                                    goodsRows.filter((r) => r.face && feesFor(r.face).length > 0).map((r) => r.face as string)
+                                  )
                                   return (<>
                                     {goodsRows.map((r, j) => {
                                       const off = cut[j]
@@ -1433,15 +1460,20 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                               can infer from a list of the others, and it was
                                               asked about twice. */}
                                           <dt
-                                            className="min-w-0 truncate pl-3 text-muted-foreground"
+                                            className={`min-w-0 truncate text-muted-foreground ${r.face && groupedFaces.has(r.face) ? "pl-6" : "pl-3"}`}
                                             title={r.hover
                                               || (r.surfaceFree && r.face
                                                 ? tl("order", "This order was charged when one placement came inside the blank's price. Every placement is charged now.")
                                                 : undefined)}
                                           >
                                             {r.face
-                                              ? (<><span className="capitalize">{tl("sides", r.face)}</span>
-                                                   {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}</>)
+                                              ? (groupedFaces.has(r.face)
+                                                  /* The heading above already said which face. This row
+                                                     is what was DONE to it — the technique, or the bare
+                                                     word when the line never recorded one. */
+                                                  ? <span>{r.method || tl("order", "Print")}</span>
+                                                  : (<><span className="capitalize">{tl("sides", r.face)}</span>
+                                                   {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}</>))
                                               /**
                                                 * "BLANK" — and the collision that took this name
                                                 * away resolved itself.
@@ -1499,8 +1531,46 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                         </div>
                                       )
                                     }).flatMap((row, j) => {
-                                      const f = goodsRows[j].face
-                                      return f ? [row, ...feesFor(f).map((fe, k) => feeRow(fe, `fee-${i}-${j}-${k}`, f))] : [row]
+                                      const r = goodsRows[j]
+                                      const f = r.face
+                                      if (!f) return [row]
+                                      const fees = feesFor(f)
+                                      /* One charge on this face: it stays the single line it was.
+                                         A heading above one child is a row split into two rows. */
+                                      if (!fees.length) return [row]
+                                      /**
+                                       * THE HEADING'S FIGURE IS WHAT THIS FACE COST — the charge
+                                       * after its share of the discount, plus every fee under it.
+                                       * A heading that does not add up to its children is worse
+                                       * than no heading: the reader checks it once, finds it
+                                       * short, and stops trusting the rest of the card.
+                                       *
+                                       * A fee still under review has no amount (it prints "To Be
+                                       * Determined"), so the subtotal says "+" — it is a floor,
+                                       * not a total, and claiming otherwise would understate a
+                                       * bill the seller has not been given yet.
+                                       */
+                                      const tbd = fees.some((fe) => fe.amount == null)
+                                      const sub = (r.amount - cut[j]) + fees.reduce((n, fe) => n + (Number(fe.amount) || 0), 0)
+                                      return [
+                                        <div key={`fh-${i}-${j}`} className="flex justify-between gap-2 pt-0.5">
+                                          <dt className="min-w-0 truncate pl-3 font-medium capitalize text-foreground">
+                                            {tl("sides", f)}
+                                            {/* STAFF SEE THE TECHNIQUE ON THE HEADING. The floor
+                                                needs to know which press a face goes to; a seller
+                                                is buying a printed front and does not. Same split
+                                                the rest of this card already makes. */}
+                                            {isStaff && r.method && (
+                                              <span className="font-normal text-muted-foreground/70"> · {r.method}</span>
+                                            )}
+                                          </dt>
+                                          <dd className="shrink-0 font-medium tabular-nums text-foreground">
+                                            {tbd && <span className="text-muted-foreground">+ </span>}{usd(sub)}
+                                          </dd>
+                                        </div>,
+                                        row,
+                                        ...fees.map((fe, k) => feeRow(fe, `fee-${i}-${j}-${k}`, false, "pl-6")),
+                                      ]
                                     })}
                                     {orphanFees.map((f, k) => feeRow(f, `fee-${i}-orphan-${k}`, null))}
                                     {/* SHIPPING, ON THE ITEM THAT CAUSED IT. The parcel is sized
