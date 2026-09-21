@@ -167,12 +167,19 @@ const T_COLUMNS = [
 // Dropdown value lists. Mirrors COLUMN_OPTIONS in web/lib/order-import.ts; `methods` mirrors
 // PRODUCT_METHODS in web/lib/print-method.ts.
 const T_OPTS = {
-  // THE WORDS, NOT OUR SHORTHAND. This was the eight codes, because the importer normalises
-  // against codes — but "APL" in a seller's dropdown is a guess rather than a choice.
+  // THE NAME A PERSON WOULD WRITE. This was the eight codes, because the importer normalises
+  // against codes — but "APL" in a seller's dropdown is a guess rather than a choice, so the
+  // stitched and glued techniques spell themselves out.
+  // DTG and DTF DO NOT, and that is not an exception: the acronym is what everyone writes,
+  // and the trailing "printing" was a word the other six did not carry (METHOD_TABLE,
+  // 2026-09-18 — "nobody writes 'Embroidery stitching'"). This list kept it for three days
+  // longer than the app did, which is how a seller's dropdown ended up disagreeing with
+  // every screen they'd just come from.
   // methodCode() matches these back by regex (/APPLIQ/, /EMB/, /DIRECT/ …), so a sheet
-  // already in someone's Drive that still says "APL" imports exactly as it did.
-  // Mirrors METHOD_LABELS in server/src/print-route.js — change both.
-  methods: ['DTG printing', 'DTF printing', 'Embroidery', 'Appliqué', 'Laser', 'Screen print', 'Sublimation', 'Vinyl'],
+  // already in someone's Drive that says "APL" — or "DTG printing" — imports exactly as it did.
+  // Mirrors METHOD_LABELS in server/src/print-route.js and METHOD_TABLE in
+  // web/lib/print-method.ts — three copies, change them together.
+  methods: ['DTG', 'DTF', 'Embroidery', 'Appliqué', 'Laser', 'Screen', 'Sublimation', 'Vinyl'],
   sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'One Size'],
   // THE WORD, NOT THE FACE KEY. order_designs stores 'left'; a spreadsheet cell saying
   // "Left" on its own is a question, so the dropdown spells the sleeve out and

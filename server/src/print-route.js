@@ -41,13 +41,26 @@ export function methodCode(printType) {
  * Mirrors METHOD_TABLE's labels in web/lib/print-method.ts. That is the third hand-kept
  * copy the note at the top of this file already warns about — change them together.
  */
+/*
+ * CAUGHT UP WITH THE WEB (2026-09-21). METHOD_TABLE dropped the trailing word on 2026-09-18
+ * — "nobody writes 'Embroidery stitching'", and the acronym already ends in it: Direct To
+ * Garment. These two copies did not move with it, so the order import sheet's method column
+ * still offered "DTG printing" while every screen in the app said "DTG". The note directly
+ * above has said "change them together" the whole time.
+ *
+ * SCR is "Screen", not "Screen print", for the same reason and from the same table.
+ *
+ * Safe by construction: nothing COMPARES these. methodCode() matches by regex (/DTG/,
+ * /EMB/, /DIRECT/ …), so a sheet already sitting in a seller's Drive that says "DTG
+ * printing" imports exactly as it did.
+ */
 export const METHOD_LABELS = {
-  DTF: 'DTF printing',
-  DTG: 'DTG printing',
+  DTF: 'DTF',
+  DTG: 'DTG',
   EMB: 'Embroidery',
   APL: 'Appliqué',
   LSR: 'Laser',
-  SCR: 'Screen print',
+  SCR: 'Screen',
   SUB: 'Sublimation',
   VNL: 'Vinyl',
 };
