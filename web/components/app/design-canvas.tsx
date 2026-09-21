@@ -835,6 +835,11 @@ function CustomerFileThumb({ src }: { src: string }) {
  return <img src={canvasReadableSrc(art.src)} alt={tl("canvas", "Customer file")} className={box + " object-cover"} />
 }
 
+/** The word a line stores to say it carries no decoration. Kept identical to the label in
+ *  lib/print-method.ts — that table is what normalises it back, and two spellings of one
+ *  token is how a value stops being recognised. */
+const BLANK_ONLY = "Blank Only"
+
 export function DesignCanvasDialog({
  open, onOpenChange, orderId, orderLabel, item, initialDesign, initialPos, onSaved, catalog,
  siblings, designs, onSendToDesigner, filesLocked, sideFee, sideFees,
@@ -3585,19 +3590,34 @@ export function DesignCanvasDialog({
             * FEE is gated instead, on the server, so declaring a surface never costs
             * anything until something is actually placed on it.
             */}
-          {/* ABOVE the per-placement rows, because it is about the line and they are about one
-              placement each. Ticking it hides them: there is nothing to print on. */}
+          {/**
+            * A VARIANT FIELD, NOT A CHECKBOX (owner, 2026-09-21).
+            *
+            * It was a checkbox on the reasoning that §4 says a toggle looks like a toggle. True
+            * in general, and the wrong call here: this sits in a column of pill-shaped variant
+            * fields — blank, colour, size, then one per placement — and a lone square among
+            * them read as something bolted on rather than as one of the garment's facts, which
+            * is what it is.
+            *
+            * TWO STATES IN ONE FIELD. "Blank Only" is the value; the clear row is "Printed",
+            * which is the honest name for the other state — the placements below decide HOW it
+            * is printed, and this only says WHETHER. One option plus a clear row rather than
+            * two options, because empty is the real storage state (print_type = "") and a
+            * second option would have to write a word meaning "not blank", which nothing reads.
+            *
+            * ABOVE the per-placement rows, because it is about the line and they are each about
+            * one placement. Choosing Blank Only hides them: there is nothing to print on.
+            */}
           {!filesLocked && faces.length > 1 && blankPriced && (
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={isNoPrint}
-                disabled={noPrintBusy}
-                onChange={(e) => void setNoPrint(e.target.checked)}
-                className="size-4 accent-primary"
-              />
-              <span className="font-medium text-foreground">{tl("canvas", "Blank Only")}</span>
-            </label>
+            <VariantField
+              label={tl("canvas", "Decoration")}
+              value={isNoPrint ? BLANK_ONLY : ""}
+              options={[BLANK_ONLY]}
+              placeholder={tl("canvas", "Printed")}
+              clearLabel={tl("canvas", "Printed")}
+              disabled={noPrintBusy}
+              onChange={(v) => void setNoPrint(v === BLANK_ONLY)}
+            />
           )}
           {!filesLocked && !isNoPrint && faces.length > 1 && methodFaces.map((sd) => (
             <VariantField

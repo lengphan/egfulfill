@@ -206,6 +206,8 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "canvas.Decoration": "Trang trí",
+  "canvas.Printed": "Có in",
   "settings.Screen": "Màn lụa",
   "canvas.Blank Only": "Không in",
   "setup.Seller": "Người bán",
