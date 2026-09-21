@@ -1347,8 +1347,31 @@ export function SpyDeckView() {
         })
         .catch(() => {})
     }, 0)
- return () => clearTimeout(id)
-  }, [entitled])
+    /**
+     * AND AGAIN WHEN THE TAB COMES BACK (owner, 2026-09-21: "product was succesfully uploaded
+     * from our spydeck but it ddidnt update as uploaded").
+     *
+     * This ran once, on entitlement, and nothing re-read it for the life of the view — so a
+     * publish that happened afterwards could not reach the grid, and the card went on
+     * offering "Create product" for something already in the shop. The record itself was
+     * written correctly; only the grid's copy of it was old.
+     *
+     * `focus`, not a callback from the publish flow: publishing leaves this page entirely,
+     * and a listing can also be published in another tab or by someone else on the account.
+     * Coming back is the moment the answer can be stale, whatever made it stale.
+     */
+ const onFocus = () => {
+ getSpydeckUploads(isStaff)
+        .then((rows) => {
+ const list = rows ?? []
+ setUploaded(list)
+ setUploadedIds(new Set(list.map((l) => String(l.listing_id))))
+        })
+        .catch(() => {})
+    }
+ window.addEventListener("focus", onFocus)
+ return () => { clearTimeout(id); window.removeEventListener("focus", onFocus) }
+  }, [entitled, isStaff])
 
   // Stable identity (no deps) so memoised cards don't re-render on every parent change.
   // The card passes its own `wasSaved`, so this never needs to read `savedIds`.
