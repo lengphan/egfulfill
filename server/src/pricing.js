@@ -1097,6 +1097,25 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                  sideFee: stamp ? money((stamp.sides || []).reduce((n, p) => n + (Number(p.amount) || 0), 0))
                                 : money(sideAddOn(faces, fees, (srow && srow.data) || null)),
                  /**
+                  * WHAT THE ARTWORK ON THE GARMENT WOULD COST TODAY — always live, never the stamp.
+                  *
+                  * The note above says a charged line's `sideFee` and what is on the garment now
+                  * "are allowed to differ", and the summary has a row built to say so when they
+                  * do. It could never fire. `sideFee` READS the stamp once one exists, and
+                  * `sideFeeCharged` is derived from the same frozen cost — so the client was
+                  * comparing a number against itself and finding it equal, every time, forever.
+                  *
+                  * Measured on FF-ombao6-muayb8d6-1in74r: billed for three faces at 9, a fourth
+                  * placement attached afterwards, artwork now worth 12 — and the order page said
+                  * nothing at all, which is what the owner reported.
+                  *
+                  * ADDITIVE AND CHARGES NOTHING. The money still comes from the stamp: a face
+                  * added after submit must not re-price a paid order, and that has not changed.
+                  * This is the other half of the sentence — what it WOULD cost — so the two can
+                  * finally be compared and the difference named.
+                  */
+                 sideFeeNow: money(sideAddOn(faces, fees, (srow && srow.data) || null)),
+                 /**
                   * WHAT THE EXTRA FACES ACTUALLY CONTRIBUTED TO THE PRICE THIS LINE CARRIES,
                   * as against what they would cost if it were quoted today.
                   *

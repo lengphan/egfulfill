@@ -3056,6 +3056,11 @@ export type OrderQuote = {
      *  submit deliberately does not re-price it. Null when the catalogue cannot give a base
      *  cost to subtract, which is "we cannot tell", never "nothing". */
     sideFeeCharged?: number | null
+    /** What the artwork ON THE GARMENT NOW would cost, always live — never the stamp. The
+     *  charged figure and this one are the two halves of "did the artwork change after this
+     *  was billed", and until this existed the summary compared `sideFeeCharged` against
+     *  `sideFee`, which on a charged line is the same stamp twice. */
+    sideFeeNow?: number | null
     /** WHICH face cost what, so a breakdown can name them instead of reporting "2 sides" and
      *  leaving the reader to work out which one carried the money. `included` is the face in
      *  the base cost — named, because "why is the front not listed" is otherwise unanswerable

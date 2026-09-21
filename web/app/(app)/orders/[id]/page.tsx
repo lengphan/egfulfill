@@ -1099,7 +1099,13 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
       // The catalogue could not give a base cost, so there is nothing to subtract and
       // nothing we can honestly say about this line's faces.
  if (paid == null) return []
- if (Math.abs(paid - (Number(l.sideFee) || 0)) > 0.005) {
+ /* AGAINST THE LIVE FIGURE, not `sideFee`. On a charged line `sideFee` IS the stamp and
+         `paid` is derived from the same frozen cost, so this test compared a number with itself
+         and never once fired — a face attached after billing was silent on every order. Falls
+         back to `sideFee` only for a line quoted by a server too old to send `sideFeeNow`,
+         where the old (never-true) comparison is still the honest answer. */
+ const now = l.sideFeeNow ?? l.sideFee
+ if (Math.abs(paid - (Number(now) || 0)) > 0.005) {
         /* THE REASON IS A `title`, NOT A SUBTITLE (§4, and the owner: "too long of
            description"). It shipped as a two-line sentence under the label, which in a
            380px column wrapped to three and put more prose on this card than the whole
