@@ -82,6 +82,7 @@ import {
  type DbBackup,
  type BackupsState,
 } from "@/lib/api"
+import { PRODUCT_METHODS } from "@/lib/print-method"
 import { TabLabel } from "@/components/app/tab-label"
 import { getShippoBilling, SHIPPO_BILLING_URL, type ShippoBilling } from "@/lib/api"
 import { getAnnouncement, putAnnouncement, type AnnouncementSpeed } from "@/lib/api"
@@ -2145,6 +2146,7 @@ function PlatformPanel() {
           <p className="mb-2 mt-4 text-xs text-muted-foreground">
             {tl("settings", "Every placement is charged. Set a placement to charge it its own rate instead of the figure above; leave it blank to use that figure.")}
           </p>
+          <div className="mb-2 eg-label text-muted-foreground">{tl("settings", "By face")}</div>
           <div className="grid gap-4 sm:grid-cols-4 lg:grid-cols-8">
             {ALL_SIDES.map((face) => (
               <MoneyField
@@ -2153,6 +2155,30 @@ function PlatformPanel() {
  value={bands[`side_${face}`] ?? ""}
  placeholder={Number(bands.method_side) > 0 ? `$${Number(bands.method_side).toFixed(2)}` : undefined}
  onChange={(v) => setBand(`side_${face}`, v)}
+              />
+            ))}
+          </div>
+          {/**
+            * BY TECHNIQUE, because a printed back is not an embroidered back.
+            *
+            * One flat figure billed a second DTG pass on a garment already loaded the same as
+            * a fresh hooping with somebody standing there, so "front and back" on a printed
+            * tee was charged at embroidery money (owner, 2026-09-21).
+            *
+            * BELOW THE FACES, mirroring the ladder that reads them: a face's own rate wins over
+            * its technique's, because it is the more specific statement about this garment — a
+            * sleeve is awkward whatever is put on it. Both fall through to the flat figure
+            * above, which is what the greyed placeholders say.
+            */}
+          <div className="mb-2 mt-4 eg-label text-muted-foreground">{tl("settings", "By technique")}</div>
+          <div className="grid gap-4 sm:grid-cols-4 lg:grid-cols-8">
+            {PRODUCT_METHODS.map((m) => (
+              <MoneyField
+ key={m.key}
+ label={tl("settings", m.label)}
+ value={bands[`side_${m.key}`] ?? ""}
+ placeholder={Number(bands.method_side) > 0 ? `$${Number(bands.method_side).toFixed(2)}` : undefined}
+ onChange={(v) => setBand(`side_${m.key}`, v)}
               />
             ))}
           </div>

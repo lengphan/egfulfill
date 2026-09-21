@@ -70,5 +70,36 @@ console.log('\nTHE FACE METHOD STILL RIDES ALONG')
   check('an inherited face stays null', r.parts[1].method, null)
 }
 
+/**
+ * A PLACEMENT IS PER FACE, NOT PER DESIGN (owner, 2026-09-21: "how to make sure there's no
+ * face fees when more designs are added per face").
+ *
+ * The placement pays for decorating a SURFACE — one hooping, one pass — so a second picture
+ * on the same front is the same surface and must cost nothing extra. The design fee is the
+ * one that counts pictures, and it is a separate charge that does not scale with quantity.
+ *
+ * `sideDetail` dedupes on the face name, and order_designs' unique index already holds one
+ * row per (line, kind, side) — but the index would not stop a raster and its stitch file, or
+ * a caller handing the same face twice, and this is the half that bills. Written down as a
+ * test because the answer "it dedupes" is only true while nobody removes the Set.
+ */
+console.log('\nMORE DESIGNS ON ONE FACE IS STILL ONE PLACEMENT')
+{
+  const one = [{ side: 'front', method: 'DTG' }]
+  const two = [{ side: 'front', method: 'DTG' }, { side: 'front', method: 'DTG' }]
+  const three = [...two, { side: 'front', method: 'DTG' }]
+  check('one design on the front', sideAddOn(one, fees, null, 'DTG'), 3)
+  check('two designs, same front, same charge', sideAddOn(two, fees, null, 'DTG'), 3)
+  check('three, still one placement', sideAddOn(three, fees, null, 'DTG'), 3)
+  check('and one row, not three', sideBreakdown(three, fees, null, 'DTG').parts.map((p) => p.face), ['front'])
+  /* A raster and the stitch file cut FROM it share a surface. Two rows in order_designs —
+     different `kind`, so the unique index permits both — and one thing to decorate. */
+  const pair = [{ side: 'front', method: 'DTG' }, { side: 'front', method: 'Embroidery' }]
+  check('artwork + its machine file is one placement', sideAddOn(pair, fees, null, 'DTG'), 3)
+  /* The control: a SECOND surface does add one. If this ever matches the rows above, the
+     dedupe has stopped distinguishing faces from designs and everything is free. */
+  check('a second FACE does add one', sideAddOn([{ side: 'front', method: 'DTG' }, { side: 'back', method: 'DTG' }], fees, null, 'DTG'), 6)
+}
+
 console.log(bad ? `\n${bad} failure(s).` : '\nEvery surface is charged, and nothing else moved.')
 process.exit(bad ? 1 : 0)
