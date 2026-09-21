@@ -329,12 +329,49 @@ export function machineFilesRoutes(app, requireAuth) {
       `select line_id, sku, print_type from order_items where order_id=$1 and line_id=$2 limit 1`,
       [orderId, lineId]).then((r) => r.rows[0]).catch(() => null);
     if (!line) { reply.code(404); return { error: `No line ${lineId} on order ${orderId}.` }; }
-    const method = String(line.print_type || '').toLowerCase();
+    /* The sku's -EMB suffix still counts: lines that predate the print_type column carry the
+       method there and nowhere else. */
     const suffix = /-emb$/i.test(String(line.sku || ''));
-    const embroidered = suffix || /emb|stitch|embroid/.test(method);
-    if (!embroidered && method) {
+    /**
+     * THE PLACEMENT'S TECHNIQUE DECIDES, NOT THE LINE'S (owner, 2026-09-21).
+     *
+     * This read `line.print_type` alone and 409'd a stitch file onto any line whose column was
+     * not embroidery. Methods are per PLACEMENT now — one garment is embroidered at the front
+     * and printed at the back — so a .EMB for an embroidered BACK was refused because the
+     * line's own column happened to say DTG, and the file was simply lost.
+     *
+     * THE SAME ROOT CAUSE, FOR THE FOURTH TIME: a rule written when the method belonged to the
+     * line, still reading the line after the method moved to the placement. The canvas refused
+     * a stitch file on a method-less line, the summary named the surcharge after the wrong
+     * technique, tierOf charged no design fee for an embroidered face — and this.
+     *
+     * A PLACEMENT THAT SAYS NOTHING INHERITS, which is what makes the line's column still
+     * matter and the only reason it is read at all. The refusal stands where the resolved
+     * technique IS something and is not embroidery: a stitch file has no machine to run there,
+     * and that is a real answer rather than a formatting preference.
+     */
+    const faceMethod = side
+      ? await q(
+          `select method from order_designs
+            where order_id = $1
+              and (line_id = $2 or (line_id is null and coalesce(sku,'') = coalesce($3,'')))
+              and lower(coalesce(side,'')) = $4
+              and coalesce(method,'') <> ''
+            limit 1`,
+          [orderId, lineId, line.sku, side]
+        ).then((r) => String(r.rows[0]?.method || '')).catch(() => '')
+      : '';
+    /* The placement's word, else the line's. Lower-cased once, here, so the test below reads
+       one value however it was resolved. */
+    const effective = String(faceMethod || line.print_type || '').toLowerCase();
+    const runsStitches = suffix || /emb|stitch|embroid/.test(effective);
+    if (!runsStitches && effective) {
       reply.code(409);
-      return { error: `That line is ${line.print_type} — a stitch file has no machine to run on it, so it was not attached.` };
+      return {
+        error: side
+          ? `The ${side} of that line is ${faceMethod || line.print_type} — a stitch file has no machine to run there, so it was not attached.`
+          : `That line is ${line.print_type} — a stitch file has no machine to run on it, so it was not attached.`,
+      };
     }
 
     /**
