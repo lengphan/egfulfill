@@ -244,7 +244,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    */
  const [msg, setMsg] = useState<{
  ok: boolean; text: string; tone?: "warn"
- lines?: { supplier: string; ok: boolean; short: string; detail?: string }[]
+ lines?: { supplier: string; ok: boolean; short: string; detail?: string; dry?: boolean; manual?: boolean }[]
  cardRetry?: boolean
   } | null>(null)
   // Set when S&S declines the saved card, so we can offer a "Change payment" shortcut
@@ -1118,7 +1118,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  const ottoMissingParty = !(opts.defaults.otto_customer && opts.defaults.otto_contact)
 
  setBusy("place-all"); setMsg(null)
- const outcomes: { supplier: string; ok: boolean; short: string; detail?: string }[] = []
+ /* `dry` and `manual` exist so the SUMMARY can tell three different successes apart:
+    sent to a supplier, built but not sent (live ordering off), and recorded for someone
+    to order by hand. All three are `ok`, and only the first one actually ordered anything. */
+ const outcomes: { supplier: string; ok: boolean; short: string; detail?: string; dry?: boolean; manual?: boolean }[] = []
  const results: string[] = []
  const placedKeys = new Set<string>()
     // The Otto lines held back for a card — the SKUs themselves, not a flag. A flag can
@@ -1228,6 +1231,14 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  outcomes.push({
  supplier: g.supplier ?? "Unassigned",
  ok,
+          /* CARRIED UP TO THE SUMMARY. The per-supplier line below has always said
+             "dry run — not sent"; the headline above it read "Order placed." because a
+             dry run does not FAIL. Two true sentences contradicting each other, and the
+             headline is the one people act on — this was reported as "the order wasn't
+             placed at all", which is exactly right and exactly what the green banner
+             denied. §4: an outcome that did not happen is never announced as success. */
+ dry,
+ manual: !g.api,
  short: ok
             ? (g.api
                 ? (dry ? "dry run — not sent" : sandbox ? `placed in SANDBOX${ottoNo ? ` · ${ottoNo}` : ""}` : `placed${ssNo || ottoNo ? ` · #${ssNo ?? ottoNo}` : ""}`)
@@ -1251,12 +1262,29 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  const anyFailed = outcomes.some((o) => !o.ok)
  if (outcomes.length) {
  const done = outcomes.filter((o) => o.ok).length
+ const dryCount = outcomes.filter((o) => o.ok && o.dry).length
+      /* SENT = actually reached a supplier. A hand-ordered group has no API and was only
+         recorded, and a dry run was built and thrown away — neither left the building, and
+         neither may prop up a headline that says an order was placed. */
+ const sent = outcomes.filter((o) => o.ok && !o.dry && !o.manual).length
+ const recorded = outcomes.filter((o) => o.ok && o.manual).length
  setMsg({
  ok: !anyFailed,
- tone: anyFailed && placedKeys.size ? "warn" : undefined,
+          /* WARN, NOT GREEN, when nothing actually went. Green is the colour this screen
+             uses for money that moved and stock that is on its way; neither happened. */
+ tone: (anyFailed && placedKeys.size) || (!anyFailed && sent === 0) ? "warn" : undefined,
           // A one-line summary; the per-supplier detail is the list below it.
  text: anyFailed
             ? (done ? `${done} of ${outcomes.length} placed.` : "Nothing was placed.")
+            /* A DRY RUN IS NOT A PLACEMENT. Live ordering is off by default for every
+               supplier (SS_ORDER_LIVE / OTTOCAP_ORDER_LIVE / SANMAR_ORDER_LIVE, none set),
+               and the payloads have never been validated against a live account — that is
+               why the gate exists. So "nothing was sent" is the NORMAL outcome today, and
+               announcing it as "Order placed." sends someone to a supplier portal to look
+               for an order that was never made. Named, with the reason and the way out. */
+ : sent === 0 && dryCount > 0 ? "Nothing was sent — live ordering is off for these suppliers."
+ : sent === 0 && recorded > 0 ? `Recorded — order ${recorded === 1 ? "this" : "these"} by hand.`
+ : dryCount > 0 ? `${sent} sent · ${dryCount} dry run — not sent.`
  : outcomes.length > 1 ? `All ${outcomes.length} orders placed.` : "Order placed.",
  lines: outcomes,
  cardRetry: outcomes.some((o) => !o.ok && o.short === "payment refused"),
