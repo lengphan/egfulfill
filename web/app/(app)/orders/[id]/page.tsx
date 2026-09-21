@@ -1435,18 +1435,30 @@ export default function OrderDetailPage() {
                                             {r.face
                                               ? (<><span className="capitalize">{tl("sides", r.face)}</span>
                                                    {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}</>)
-                                              /* "BASE COST", NOT "BLANK" — the name was taken.
-                                                 The product editor prices four columns per size:
-                                                 Product cost, BASE COST, BLANK and Shipping, and
-                                                 its `Blank` is the bare garment with no print —
-                                                 a different number (6.00 against this row's 17.46
-                                                 on the same size). This row is unitCost − method
-                                                 − sides, which is the Base cost column exactly,
-                                                 so it takes that column's name. Two unrelated
-                                                 figures under one word, on two screens a seller
-                                                 reads together, is how a price stops being
-                                                 checkable. */
-                                              : tl("order", "Base cost")}
+                                              /**
+                                                * "BLANK" — and the collision that took this name
+                                                * away resolved itself.
+                                                *
+                                                * It was renamed to "Base cost" because the
+                                                * editor's Blank column was a DIFFERENT number
+                                                * from this row: the bare garment against the
+                                                * legacy base cost, 6.00 against 17.46 on one
+                                                * size. Two unrelated figures under one word.
+                                                *
+                                                * costPartsOf reads `blank` as the base of every
+                                                * line now, so this row IS that column — same
+                                                * number, same meaning, and the model the whole
+                                                * summary states is blank + placement + method.
+                                                * Calling it Base cost now points at the legacy
+                                                * rung, which is the one thing it is not.
+                                                *
+                                                * A product with NO blank price still falls to
+                                                * that rung and this row is then the base cost
+                                                * wearing the other name — the one case where
+                                                * the label is loose, and the same case the
+                                                * editor keeps its legacy column for.
+                                                */
+                                              : tl("order", "Blank")}
                                             {off > 0.005 && (
                                               <span className="text-success tabular-nums"> · {dpct}% {tl("order", "off")}</span>
                                             )}
