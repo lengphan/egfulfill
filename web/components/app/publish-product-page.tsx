@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation"
 import { CircleNotch, DotsSixVertical, Trash, Package, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle, X } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
+import { getListingTemplates, saveListingTemplate, deleteListingTemplate,
+         type ListingTemplate, type ListingTemplateData } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -639,6 +641,39 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * partner registered, that is the value to send.
    */
  const whoMade: EtsyWhoMade = "i_did"
+ /**
+  * SAVED LISTING TEMPLATES — the form without the pictures.
+  *
+  * Most listings built from SpyDeck differ only in the title and the artwork: the same
+  * description boilerplate, the same blank, the same colourways, the same per-size prices,
+  * retyped every time. A template is that form, stored server-side under the seller (a team
+  * shares its owner's), picked from the rail at the top of this page.
+  */
+ const [templates, setTemplates] = useState<ListingTemplate[]>([])
+ /** Which one is showing in the picker. Cleared the moment the form is edited would be a
+  *  lie the other way — it stays as "what you last applied", which is what it is. */
+ const [tmplPick, setTmplPick] = useState("")
+ const [tmplName, setTmplName] = useState("")
+ const [tmplOpen, setTmplOpen] = useState(false)
+ const [tmplBusy, setTmplBusy] = useState(false)
+ const [tmplErr, setTmplErr] = useState("")
+ /** Delete is a TWO-PRESS action. The bin sits beside Save, it removes something the seller
+  *  built, and nothing on this page would tell them it had gone — so the first press arms it
+  *  and says so, and it disarms itself if they do anything else. */
+ const [tmplArmed, setTmplArmed] = useState(false)
+ /**
+  * THE VARIANTS A TEMPLATE ASKED FOR, HELD UNTIL THE BLANK'S OPTIONS ARRIVE.
+  *
+  * Applying a template sets the blank, and an effect below resets the picked colours and
+  * sizes to EVERYTHING that blank offers whenever its option lists change — which is right
+  * for a blank somebody just chose and wrong for one a template chose, because the template
+  * carries the picks too. Setting them in `applyTemplate` loses: the reset is deferred by a
+  * timeout and lands after.
+  *
+  * A ref rather than state, for the same reason the drag index is one: it is written and
+  * read inside one deferred pass, and a setState would not have landed in time.
+  */
+ const tmplVariantsRef = useRef<{ colors: string[]; sizes: string[] } | null>(null)
  const [tagDraft, setTagDraft] = useState("")
  const [images, setImages] = useState<string[]>([])
  /* WHICH TILE IS IN THE HAND, AND WHICH ONE IT IS OVER. Two pieces of state, not one:
@@ -867,7 +902,33 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   // Selecting a blank offers all of its variants. Keyed off the option lists rather than
   // the blank so a product whose colours load late still ends up fully selected.
  useEffect(() => {
- const id = setTimeout(() => { setPickedColors(colorOpts); setPickedSizes(sizeOpts) }, 0)
+ const id = setTimeout(() => {
+      /**
+       * A TEMPLATE'S PICKS WIN OVER "ALL OF THEM" — once, for the blank it just set.
+       *
+       * Without this the feature looks broken in the most confusing way: the seller saves a
+       * template with two colourways, applies it, and watches every colour tick itself on a
+       * frame later. The blank arrives first and its options arrive with it, so this reset
+       * always runs after `applyTemplate` has finished.
+       *
+       * INTERSECTED, never taken whole. A template can outlive the product it names — a
+       * colourway gets dropped from the catalogue and the template still lists it — and
+       * publishing a variant the factory no longer stocks is an order nobody can make.
+       */
+ const want = tmplVariantsRef.current
+ if (want) {
+ tmplVariantsRef.current = null
+ const c = colorOpts.filter((x) => want.colors.includes(x))
+ const z = sizeOpts.filter((x) => want.sizes.includes(x))
+        /* NOTHING IN COMMON means the template predates this blank entirely. Publishing no
+           variants at all would be a silent, wrong answer, so fall back to the product's own
+           defaults — the same state as having picked the blank by hand. */
+ setPickedColors(c.length ? c : colorOpts)
+ setPickedSizes(z.length ? z : sizeOpts)
+ return
+      }
+ setPickedColors(colorOpts); setPickedSizes(sizeOpts)
+    }, 0)
  return () => clearTimeout(id)
   }, [colorOpts, sizeOpts])
 
@@ -949,6 +1010,108 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  readImageFile(f, (url) => setImages((p) => (p.length >= MAX_IMAGES ? p : [...p, url])), (m) => setResult({ ok: false, text: m }))
     }
   }
+  // ── Listing templates: load, apply, save ──────────────────────────────────────────────
+ useEffect(() => {
+ getListingTemplates()
+      .then((r) => setTemplates(Array.isArray(r) ? r : []))
+      .catch(() => {})   // a template list that will not load is not a reason to block a publish
+  }, [])
+
+  /**
+   * FILL THE FORM FROM A TEMPLATE — everything but the photos.
+   *
+   * OVERWRITES, on purpose (owner, 2026-09-21). Picking a template is a deliberate act with
+   * a visible result, and "fill only what is empty" makes the outcome depend on what you had
+   * already touched — two applies of the same template giving two different forms. Photos are
+   * never in a template: a listing built from a competitor's card carries their shots as
+   * reference only, and this is exactly the path that would launder them into a publishable
+   * set.
+   */
+ const applyTemplate = (t: ListingTemplate) => {
+ const d: ListingTemplateData = t.data ?? {}
+ setTitle(d.title ?? "")
+ setDesc(d.description ?? "")
+ setTags([...(d.tags ?? [])])
+ setRetail(d.price != null ? String(d.price) : "")
+ setQty(d.quantity != null ? String(d.quantity) : "999")
+    /* Per-size prices are stored as numbers and edited as text. */
+ setSizeRetail(Object.fromEntries(Object.entries(d.size_prices ?? {}).map(([k, v]) => [k, String(v)])))
+ if (d.method) setMethod(d.method)
+    /* The picks are handed to the reset effect rather than set here — see the ref's note. */
+ tmplVariantsRef.current = { colors: [...(d.colors ?? [])], sizes: [...(d.sizes ?? [])] }
+    /* THE BLANK BY SKU, THEN BY NAME — the same two-step the product picker uses, because a
+       catalogue row re-saved under a new id keeps its sku, and a sku-shape mismatch must not
+       silently drop the product and publish a listing with no cost behind it. */
+ const want = (rows: CatalogProduct[]) =>
+ rows.find((x) => d.blank_sku && String(x.sku ?? "") === d.blank_sku)
+      ?? rows.find((x) => d.blank_name && String(x.name ?? "") === d.blank_name)
+      ?? null
+ const seat = (rows: CatalogProduct[]) => {
+ const p = want(rows)
+ if (!p) {
+        /* Say it rather than leaving an empty Base product the seller has to notice. */
+ setTmplErr(`${t.name} was saved on a product that is no longer in the catalogue — pick a base product.`)
+ return
+      }
+ setBlank(p); setBlankText(p.name ?? "")
+    }
+ if (catalogRef.current.length) seat(catalogRef.current)
+ else getCatalogProducts().then((rows) => { catalogRef.current = rows ?? []; seat(catalogRef.current) }).catch(() => {})
+  }
+
+  /** What the form is RIGHT NOW, as a template. Photos are absent by construction. */
+ const asTemplateData = (): ListingTemplateData => ({
+ title: title.trim(),
+ description: desc,
+ tags: [...tags],
+ blank_sku: blank?.sku ?? undefined,
+ blank_id: blank?.id != null ? String(blank.id) : undefined,
+ blank_name: blank?.name ?? undefined,
+ method: method || undefined,
+ colors: [...pickedColors],
+ sizes: [...pickedSizes],
+ price: Number(retail) > 0 ? Number(retail) : undefined,
+ quantity: Number(qty) > 0 ? Number(qty) : undefined,
+ size_prices: Object.fromEntries(
+ Object.entries(sizeRetail)
+        .map(([k, v]) => [k, Number(v)])
+        .filter(([, v]) => Number.isFinite(v as number) && (v as number) > 0),
+    ),
+  })
+
+  /** Save the form as a NEW template, or replace the one currently picked. */
+ const storeTemplate = async (replace: boolean) => {
+ const name = tmplName.trim()
+ if (!name) { setTmplErr("Give the template a name."); return }
+ setTmplBusy(true); setTmplErr("")
+ try {
+ const r = await saveListingTemplate({
+ id: replace && tmplPick ? tmplPick : undefined,
+ name, data: asTemplateData(),
+      })
+ if (r.error) throw new Error(r.error)
+      /* Replace in place when it was an update, else put the new one at the front — the list
+         is ordered by last touched, which is what the server will hand back next time too. */
+ setTemplates((p) => [r, ...p.filter((x) => x.id !== r.id)])
+ setTmplPick(r.id)
+ setTmplOpen(false); setTmplName("")
+    } catch (e) {
+ setTmplErr(e instanceof Error ? e.message : "Couldn't save that template.")
+    } finally { setTmplBusy(false) }
+  }
+
+ const removeTemplate = async (id: string) => {
+ setTmplBusy(true); setTmplErr("")
+ try {
+ const r = await deleteListingTemplate(id)
+ if (r.error) throw new Error(r.error)
+ setTemplates((p) => p.filter((x) => x.id !== id))
+ if (tmplPick === id) setTmplPick("")
+    } catch (e) {
+ setTmplErr(e instanceof Error ? e.message : "Couldn't delete that template.")
+    } finally { setTmplBusy(false) }
+  }
+
  const makePrimary = (i: number) => { imgTouched.current = true; setImages((p) => [p[i], ...p.filter((_, x) => x !== i)]) }
  /**
   * MOVE, NOT SWAP. Dropping photo 5 on photo 1 puts it at 1 and pushes the rest along —
@@ -1555,7 +1718,104 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
           <CaretLeft size={13} weight="bold" /> {returnLabel}
         </button>
         <h1 className="text-xl font-semibold">{pageTitle}</h1>
+
+        {/* ── TEMPLATES ────────────────────────────────────────────────────────────────
+            UP HERE, NOT IN THE RAIL. The rail answers "where does this go"; a template
+            fills the FORM, so it belongs where the form starts — and on the header row it
+            is above the fold at every width, which is the only place a thing that saves
+            you typing is any use.
+
+            A SELECT AND A BUTTON, which is §4's rule about shape: picking a template is
+            setting a field (`.eg-control`), saving one is an action (`Button`). Neither
+            carries a sentence underneath — the select's own empty option says what it is.
+            Hidden until there is a form to save: on a page with no draft there is nothing
+            to template and nothing to apply it to. */}
+        {draft != null && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {templates.length > 0 && (
+              <select
+                className="eg-select eg-control pr-8"
+                value={tmplPick}
+                aria-label={tl("publish", "Apply a saved template")}
+                title={tl("publish", "Fill the form from a saved template — photos are never included")}
+                onChange={(e) => {
+                  const id = e.target.value
+                  setTmplPick(id)
+                  setTmplErr("")
+                  setTmplArmed(false)
+                  const t = templates.find((x) => x.id === id)
+                  if (t) applyTemplate(t)
+                }}
+              >
+                <option value="">{tl("publish", "Template…")}</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            )}
+            <Button
+              size="sm" variant="outline"
+              onClick={() => {
+                /* Seeded with the picked template's name, so the common act — apply, tweak,
+                   save back — is one press and a confirm rather than retyping the name. */
+                setTmplName(templates.find((x) => x.id === tmplPick)?.name ?? title.trim().slice(0, 60))
+                setTmplErr("")
+                setTmplArmed(false)
+                setTmplOpen((v) => !v)
+              }}
+            >
+              {tl("publish", "Save as template")}
+            </Button>
+            {tmplPick && (
+              <Button
+                size="sm" variant={tmplArmed ? "destructive" : "ghost"}
+                disabled={tmplBusy}
+                title={tl("publish", "Delete this template")}
+                aria-label={tl("publish", "Delete this template")}
+                onClick={() => {
+                  if (!tmplArmed) { setTmplArmed(true); return }
+                  setTmplArmed(false)
+                  void removeTemplate(tmplPick)
+                }}
+              >
+                <Trash size={13} weight="bold" />
+                {/* THE WORD ONLY WHEN ARMED. A bin that always says "Delete?" is asking a
+                    question nobody put to it; armed, the word IS the state. */}
+                {tmplArmed && <span className="ml-1.5">{tl("publish", "Delete?")}</span>}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* THE NAME, ASKED FOR IN PLACE. A dialog for one text field is a lot of chrome, and
+          a browser prompt() cannot be styled or translated. This is a row that appears under
+          the header and takes the focus. */}
+      {tmplOpen && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
+          <Input
+            autoFocus
+            value={tmplName}
+            onChange={(e) => setTmplName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void storeTemplate(false); if (e.key === "Escape") setTmplOpen(false) }}
+            placeholder={tl("publish", "Name this template")}
+            className="w-56"
+          />
+          <Button size="sm" disabled={tmplBusy} onClick={() => void storeTemplate(false)}>
+            {tl("publish", "Save new")}
+          </Button>
+          {/* REPLACE is offered only when one is picked, because "update" with nothing
+              selected has no referent and would have to guess which one. */}
+          {tmplPick && (
+            <Button size="sm" variant="outline" disabled={tmplBusy} onClick={() => void storeTemplate(true)}>
+              {tl("publish", "Replace picked")}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => setTmplOpen(false)}>{tl("publish", "Cancel")}</Button>
+        </div>
+      )}
+      {/* A REFUSAL CARRIES ITS REASON — that is the answer, not a subtitle (§4). */}
+      {tmplErr && <p className="text-sm text-destructive">{tmplErr}</p>}
 
       {/* NO DRAFT. Say which of the two it is — still reading, or genuinely gone — because
  a blank form and a lost one look identical otherwise. sessionStorage dies with the

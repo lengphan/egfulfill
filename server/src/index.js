@@ -25,6 +25,7 @@ import { sanmarRoutes } from './routes/sanmar.js';
 import { usersRoutes } from './routes/users.js';
 import { uspsRoutes } from './routes/usps.js';
 import { templatesRoutes } from './routes/templates.js';
+import { listingTemplatesRoutes } from './routes/listing_templates.js';
 import { billingRoutes } from './routes/billing.js';
 import { planRoutes } from './routes/plan.js';
 import { consignmentRoutes } from './routes/consignment.js';
@@ -774,6 +775,7 @@ sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);  /
 usersRoutes(app, requireAdmin, requireAuth);   // admin user management + staff-readable GET /api/sellers (seller-adjust panel)
 uspsRoutes(app, requireAuth, requireStaff);
 templatesRoutes(app, requireAuth);
+listingTemplatesRoutes(app, requireAuth);            // saved publish forms (title/description/variants/pricing), per seller
 vietqrRoutes(app, requireAuth);   // /vqr/* are PUBLIC (VietQR server-to-server); /api/vietqr/* need auth
 topupsRoutes(app, requireAuth);   // manual top-up reconciliation (pending → admin "Received")
 payoutsRoutes(app, requireAuth);  // manual seller payouts (saved payout details → request → admin/warehouse pay = wallet debit)

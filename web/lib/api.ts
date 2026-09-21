@@ -5033,6 +5033,61 @@ export function keepListingPhoto(data: string, name?: string) {
     `/api/spydeck/photo`, { method: "POST", body: JSON.stringify({ data, name }) })
 }
 
+/**
+ * LISTING TEMPLATES — a saved publish form, minus the pictures.
+ *
+ * The publish page fills itself from one of these instead of the seller retyping the same
+ * description, blank, colourways and per-size prices on every listing built from SpyDeck.
+ *
+ * NOT the Design Lab's `templates` (getTemplates below) — those are artwork composites and
+ * layers, a factory-wide library. These are one seller's words and numbers, and a team
+ * shares its owner's. The two share a noun and nothing else.
+ *
+ * THE PHOTOS ARE NOT IN HERE and must not be added. A listing built from a competitor's card
+ * carries their shots as reference only; a template is precisely the mechanism that would
+ * carry them into the next listing as publishable. The server drops any field it is not
+ * expecting, so this type is the contract rather than a suggestion.
+ */
+export type ListingTemplateData = {
+  title?: string
+  description?: string
+  tags?: string[]
+  /** The blank this listing is produced on. Stored by SKU because that is what survives a
+   *  catalogue row being re-saved; the id and name are kept only to match and to label. */
+  blank_sku?: string
+  blank_id?: string
+  blank_name?: string
+  method?: string
+  colors?: string[]
+  sizes?: string[]
+  price?: number
+  quantity?: number
+  /** Per-size retail. Absent sizes fall back to `price`, exactly as the form treats them. */
+  size_prices?: Record<string, number>
+}
+export type ListingTemplate = {
+  id: string
+  name: string
+  data: ListingTemplateData
+  updated_at?: string | null
+}
+
+export function getListingTemplates() {
+  return api<ListingTemplate[]>(`/api/listing_templates`)
+}
+/** Create, or replace the one whose `id` is sent. An id that is not yours 404s — it never
+ *  quietly creates a second template wearing the id you asked to update. */
+export function saveListingTemplate(body: { id?: string; name: string; data: ListingTemplateData }) {
+  return api<ListingTemplate & { error?: string }>(`/api/listing_templates`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+export function deleteListingTemplate(id: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/listing_templates/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  })
+}
+
 export function deleteSpydeckUpload(listingId: number | string) {
   return api<{ ok?: boolean }>(`/api/spydeck/uploads/${encodeURIComponent(String(listingId))}`, { method: "DELETE" })
 }
