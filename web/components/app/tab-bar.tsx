@@ -141,7 +141,23 @@ export function TabBar<T extends string>({
    * longer fit scroll rather than fold or clip.
    */
   const text = "text-sm"
-  const pad = size === "sm" ? "pb-1.5" : "pb-2"
+  /**
+   * THE RAIL HAD NO TOP PADDING AT ALL, so it was not a rail — it was a line of text with a
+   * rule under it. Measured on /orders before this: the nav was 30px tall, the tab 29px,
+   * `padding-top: 0px`, `padding-bottom: 8px`, against 21px of line box. Every pixel of the
+   * bar's height was the text itself plus 8px below.
+   *
+   * That reads as "too narrow" wherever something sits directly above it — a DialogHeader,
+   * most of all, which has no bottom padding of its own (`flex flex-col gap-1.5`), so the
+   * product editor's four tabs sat against the title with nothing between them.
+   *
+   * Symmetric now, and the ACTIVE RULE DOES NOT MOVE: it is drawn by `after:-bottom-px`,
+   * which is anchored to the button's bottom edge, so top padding raises the bar's ceiling
+   * without changing the distance from the word to its underline. Bottom goes 8→10 for the
+   * same reason the top is 10 — an underline that close to the letters reads as an
+   * underscore on the word rather than a mark under the tab.
+   */
+  const pad = size === "sm" ? "pt-1.5 pb-1.5" : "pt-2.5 pb-2.5"
   const gap = size === "sm" ? "gap-4" : "gap-5"
   return (
     // `none` keeps -mb-px, so the bar's own rule sits ON the container's rather than one
