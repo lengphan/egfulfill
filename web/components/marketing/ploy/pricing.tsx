@@ -130,7 +130,7 @@ export function PloyPricing({
       {/* ── ROW BY ROW ─────────────────────────────────────────────────────── */}
       <section className={`relative ${GUTTER} ${SECTION}`}>
         <h2 className="ploy-display text-[clamp(2.2rem,5.4vw,4.4rem)]">
-          <motion.span {...reveal(0)} className="block">Line by line.</motion.span>
+          <motion.span {...reveal(0)} className="block">Compare.</motion.span>
         </h2>
 
         {/* The table scrolls in ITS OWN container — §4: wide content scrolls inside itself and
@@ -142,9 +142,11 @@ export function PloyPricing({
                 the fixed site header rather than hiding under it. */}
             <thead className="sticky top-16 z-10 bg-ploy-paper">
               <tr className="border-b border-ploy-ink/12">
-                <th className="px-6 py-5 text-left text-[13px] font-semibold uppercase tracking-[0.14em] text-ploy-ink/45">
-                  Compare
-                </th>
+                {/* NO LABEL — the display heading directly above this table is the word
+                    "Compare", and repeating it in the first column header put the same word
+                    twice within 30px of itself. The column holds the feature names, which
+                    say what they are; what it needed was the heading, and it has one. */}
+                <th className="px-6 py-5 text-left" />
                 {PLAN_TIERS.map((p) => (
                   <th key={p.id} className="px-6 py-5 text-left">
                     <span className="text-[17px] font-semibold">{p.name}</span>

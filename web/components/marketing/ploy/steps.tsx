@@ -147,7 +147,12 @@ function StepRow({ i, total, step, progress }: { i: number; total: number; step:
   return (
     <motion.li
       style={{ opacity }}
-      className="grid grid-cols-[44px_minmax(0,1fr)] items-baseline gap-x-6 gap-y-2 border-b border-ploy-ink/12 py-6 last:border-b-0 md:gap-x-8 md:py-7"
+      /* NO RULE BETWEEN STEPS — the spine through the nodes is the only line here (owner,
+         2026-09-21). A rule under every row drew a second horizontal structure across a
+         block whose whole organising line is VERTICAL, so the eye got a ladder of boxes
+         instead of one sequence running down the numbers. The padding still separates the
+         rows; a border was never what was doing that work. */
+      className="grid grid-cols-[44px_minmax(0,1fr)] items-baseline gap-x-6 gap-y-2 py-6 md:gap-x-8 md:py-7"
     >
       {/* The numeral is what puts this circle on the row's baseline — `items-baseline` reads
           the text inside it, not the box, which is why the ring needs no offset of its own at

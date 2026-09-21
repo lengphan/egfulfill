@@ -11,6 +11,7 @@ import { getPublicProduct, type PublicProduct } from "@/lib/api"
    value ("DTG printing / Embroidery") and de-dupes by normalised key. */
 import { normalizeMethods, normTech } from "@/lib/print-method"
 import { bySize, sizeRangeLabel } from "@/lib/size-order"
+import { descriptionLines } from "@/lib/description"
 /* The canonical swatch resolver — the same one the app's product page reads, so one colour
    name cannot render three ways across the product (§5). */
 import { swatchChipStyle } from "@/lib/color-swatch"
@@ -592,10 +593,26 @@ function Panel({
               </dl>
             </>
           )}
-          {p.description && (
-            <p className="mt-6 max-w-prose border-t border-ploy-ink/12 pt-5 text-[13px] leading-relaxed text-ploy-ink/55">
-              {p.description}
-            </p>
+          {/* ONE DOT PER FEATURE, not one paragraph of them (owner, 2026-09-21).
+              A supplier description is a feature LIST that arrives as a single string with
+              the separators inline — "5.3 oz./yd² • Blackberry, Dark Heather … • Tear away
+              label" — and printed as one <p> it is a wall nobody reads, which hides the one
+              line somebody actually came for ("Side vents", "100% U.S. cotton").
+              `descriptionLines` is the existing answer to this and already backs the product
+              page and the supplier dialog; this surface simply never called it. It handles
+              the tagged feeds (S&S, Otto) and SanMar's one-paragraph form alike, so the fix
+              is the import, not a second parser living here. */}
+          {descriptionLines(p.description).length > 0 && (
+            <ul className="mt-6 max-w-prose space-y-1.5 border-t border-ploy-ink/12 pt-5 text-[13px] leading-relaxed text-ploy-ink/55">
+              {descriptionLines(p.description).map((line, i) => (
+                <li key={i} className="flex items-start gap-2.5">
+                  {/* The dot is a MARK, so it takes no space in the text flow and sits on the
+                      first line's optical centre rather than its box's. */}
+                  <span aria-hidden className="mt-[0.5em] size-[3px] shrink-0 rounded-full bg-ploy-ink/35" />
+                  <span className="min-w-0">{line}</span>
+                </li>
+              ))}
+            </ul>
           )}
 
           {/* THE SIZE CHART, where the sizes are — not a full section under a fold that most

@@ -20,6 +20,20 @@ const LABEL = /[A-Z][a-z]+(?:\s[A-Z][a-z]+)*:/
  */
 const GLUED = new RegExp(`(?<=[a-z])(?=${LABEL.source})`)
 const SPACED = new RegExp(`(?<=\\b[a-z]{3,})\\s(?=${LABEL.source})`)
+/**
+ * ENDED: the clause before the label finished with a full stop —
+ *   "…OEKO-TEX and FLA certified. Responsible Materials: contains US grown BCI cotton"
+ *
+ * SPACED cannot see this one: its lookbehind wants a lowercase letter immediately before the
+ * space and finds the period instead, so the two labelled clauses stayed glued into a single
+ * bullet — which on a Gildan tee is the longest line on the page and the only one carrying
+ * two separate facts. Found by running the real module over the real SanMar string.
+ *
+ * Safe against ordinary sentences because LABEL is anchored on a trailing COLON: "…you can
+ * see and feel. Classic fit" has none and is left alone. Abbreviations are safe too — the
+ * three characters before the period must be lowercase, so "U.S." never qualifies.
+ */
+const ENDED = new RegExp(`(?<=[a-z]{3,}\\.)\\s(?=${LABEL.source})`)
 /** Bullet glyphs used INLINE, mid-sentence, rather than at the start of a line. */
 const INLINE_BULLETS = /[•·●▪|]+/
 
@@ -56,6 +70,7 @@ export function descriptionLines(raw?: string | null): string[] {
     .flatMap((l) => l.split(INLINE_BULLETS))
     .flatMap((l) => l.split(GLUED))
     .flatMap((l) => l.split(SPACED))
+    .flatMap((l) => l.split(ENDED))
     .map((l) => l.replace(/^\s*[•\-*·–—]\s*/, "").trim())   // strip pre-existing bullets
     .filter(Boolean)
 }
