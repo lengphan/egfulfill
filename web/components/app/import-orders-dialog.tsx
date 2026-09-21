@@ -1110,12 +1110,15 @@ export function ImportOrdersDialog({
                       : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
                     <span>
                       {templatesFailed
-                        ? tl("import", "Your saved templates couldn't be loaded, so the Template ID column won't apply anything — the blank and artwork will be empty on those lines.")
+                        ? tl("import", "Templates couldn't be loaded — the Template ID column will apply nothing.")
                         : <>
-                            {templateOutcome.applied} of {templateOutcome.typed} {templateOutcome.typed === 1 ? "line" : "lines"} will take
-                            their blank and artwork from a saved template.
-                            {templateOutcome.unmatched.length > 0 && <> {tl("import", "No template matches")} <span className="tabular-nums">{templateOutcome.unmatched.join(", ")}</span> {tl("import", "— check the number on the template card.")}</>}
-                            {templateOutcome.ambiguous.length > 0 && <> {tl("import", "More than one template is called")} <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span>{tl("import", ", so those lines were left alone — use the TPL- number instead.")}</>}
+                            {/* THE COUNT ONLY WHEN SOMETHING APPLIED. "0 of 1 line will take their
+                                blank and artwork from a saved template" is a sentence about
+                                what did NOT happen, printed above the reason it did not —
+                                the failure said twice, the long way round first. */}
+                            {templateOutcome.applied > 0 && <>{templateOutcome.applied} of {templateOutcome.typed} {templateOutcome.typed === 1 ? "line" : "lines"} from a template.</>}
+                            {templateOutcome.unmatched.length > 0 && <> {tl("import", "No template")} <span className="tabular-nums">{templateOutcome.unmatched.join(", ")}</span>.</>}
+                            {templateOutcome.ambiguous.length > 0 && <> <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span> {tl("import", "is ambiguous — use the TPL- number.")}</>}
                           </>}
                     </span>
                   </div>
@@ -1132,9 +1135,8 @@ export function ImportOrdersDialog({
                       ? <WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
                       : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
                     <span>
-                      {artworkOutcome.ok} of {artworkOutcome.typed} {artworkOutcome.typed === 1 ? "line" : "lines"} will get
-                      their artwork from your library.
-                      {artworkOutcome.unknown.length > 0 && <> {tl("import", "Nothing in your library matches")} <span className="tabular-nums">{artworkOutcome.unknown.join(", ")}</span> {tl("import", "— check the reference on the design’s card in Design Lab.")}</>}
+                      {artworkOutcome.ok > 0 && <>{artworkOutcome.ok} of {artworkOutcome.typed} {artworkOutcome.typed === 1 ? "line" : "lines"} from your library.</>}
+                      {artworkOutcome.unknown.length > 0 && <> {tl("import", "Not in your library:")} <span className="tabular-nums">{artworkOutcome.unknown.join(", ")}</span>.</>}
                     </span>
                   </div>
                 )}
@@ -1155,7 +1157,7 @@ export function ImportOrdersDialog({
                       : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
                     <span>
                       {machineOutcome.failed
-                        ? tl("import", "Your machine files couldn't be looked up, so the Machine File ID column won't attach anything — those lines will arrive without a stitch file.")
+                        ? tl("import", "Machine files couldn't be looked up — the Machine File ID column will attach nothing.")
                         : <>
                             {machineOutcome.ok} of {machineOutcome.typed} {machineOutcome.typed === 1 ? "line" : "lines"} will get
                             their stitch file, attached to that line only.

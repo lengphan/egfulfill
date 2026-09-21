@@ -206,6 +206,11 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "import.No template": "Không có mẫu",
+  "import.is ambiguous — use the TPL- number.": "bị trùng tên — hãy dùng số TPL-.",
+  "import.Not in your library:": "Không có trong thư viện:",
+  "import.Templates couldn't be loaded — the Template ID column will apply nothing.": "Không tải được mẫu — cột Template ID sẽ không áp dụng gì.",
+  "import.Machine files couldn't be looked up — the Machine File ID column will attach nothing.": "Không tra được tệp máy — cột Machine File ID sẽ không đính kèm gì.",
   "stores.Install the egful extension in Chrome.": "Cài tiện ích egful vào Chrome.",
   "stores.Open your Etsy Shop Manager orders page.": "Mở trang đơn hàng Shop Manager trên Etsy.",
   "stores.Press the egful icon, then Sync.": "Bấm biểu tượng egful, rồi bấm Sync.",
