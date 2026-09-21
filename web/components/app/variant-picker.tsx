@@ -3,9 +3,8 @@
 import { useLabelT } from "@/lib/i18n"
 import { useMemo, useState } from "react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
-import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel, bestMockup } from "@/lib/variant-resolve"
+import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel, bestMockup, blankCode } from "@/lib/variant-resolve"
 import { thumbSrc } from "@/lib/order-image"
-import { ourSku } from "@/lib/our-sku"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { getUser } from "@/lib/auth"
 import { VariantField } from "@/components/app/variant-field"
@@ -218,17 +217,10 @@ export function VariantPicker({
     }
     return out
   }, [catalog, item.color])
-  /* Everything before the first " - " is the code. A product with no code at all is its own
-     name and has no separator, so it survives this untouched rather than becoming "".
-     PAINTED ON THE WAY OUT: productLabel builds the contract from the RAW sku, so a bare
-     number arrives here as "5000" — ourSku() is what turns it into EG-5000, and it has to be
-     applied at the point of display or this one menu disagrees with every other surface. The
-     stored option is untouched either way; that is the whole point of painting. */
-  const codeOnly = (o: string) => {
-    const at = o.indexOf(" - ")
-    const code = at > 0 ? o.slice(0, at) : o
-    return ourSku(code) || code
-  }
+  /* The code-only rule moved to lib/variant-resolve as `blankCode` — the import sheet's
+     Blank Product menu now asks the same question, and two copies of it is how the two
+     spellings of productLabel drifted before (§5). */
+  const codeOnly = blankCode
 
   const key = item.line_id ? { line_id: item.line_id } : { sku: item.sku }
 

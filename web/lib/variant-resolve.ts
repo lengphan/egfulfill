@@ -2,6 +2,7 @@ import type { CatalogProduct, OrderItem } from "@/lib/api"
 import { normalizeMethods } from "@/lib/print-method"
 import { bySize } from "@/lib/size-order"
 import { prettyColorName } from "@/lib/color-name"
+import { ourSku } from "@/lib/our-sku"
 
 // Client mirror of pricing.js matchProduct / eg-design-tools.js chosenProduct: resolve an
 // order line to its catalog product. Picked blank (it.blank) wins; then the SKU matched
@@ -40,6 +41,34 @@ export function variantSkusOf(p: CatalogProduct): string[] {
  * product whose NAME contains " - " resolving as it always did — splitting first would turn
  * "Adidas - Performance Polo" into a search for a product called "Adidas".
  */
+/**
+ * THE CODE HALF OF THE CONTRACT, FOR DISPLAY ONLY.
+ *
+ * `productLabel` builds `EG-1001 - Classic Tee` because that string is what a sheet cell
+ * holds and what both resolvers split. But a MENU of those truncates to a column of
+ * "EG-180…" — the half that tells two garments apart is the half that gets cut — so the
+ * lists show the code and let a thumbnail do the recognising (owner, 2026-09-21).
+ *
+ * Everything before the first " - " is the code. A product with no code at all is its own
+ * name and carries no separator, so it survives untouched rather than becoming "".
+ *
+ * PAINTED ON THE WAY OUT: productLabel builds the contract from the RAW sku, so a bare
+ * number arrives as "5000" — ourSku() is what turns it into EG-5000, and it has to be
+ * applied at the point of display or one menu disagrees with every other surface.
+ *
+ * NEVER WRITE THIS BACK. The stored value stays the full `code - name`: the NAME half is
+ * what keeps a line resolving after a product is renamed, so shortening what is stored
+ * would trade a rename-proof line for a tidier menu. It lives here rather than in a
+ * component because two menus now ask this question — the order line's variant strip and
+ * the import sheet's Blank Product column — and a private copy in each is how the two
+ * spellings of `productLabel` drifted in the first place (§5).
+ */
+export function blankCode(label: string): string {
+  const at = label.indexOf(" - ")
+  const code = at > 0 ? label.slice(0, at) : label
+  return ourSku(code) || code
+}
+
 export function blankCandidates(cell: string): string[] {
   const out = [cell]
   const at = cell.indexOf(" - ")

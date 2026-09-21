@@ -39,7 +39,8 @@ import {
   type ImportRecord,
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
-import { resolveProduct, productLabel, setTypeMockups, offeredSides } from "@/lib/variant-resolve"
+import { resolveProduct, productLabel, setTypeMockups, offeredSides, bestMockup, blankCode } from "@/lib/variant-resolve"
+import { thumbSrc } from "@/lib/order-image"
 import { normalizeMethods } from "@/lib/print-method"
 import { platformName } from "@/shared/order-rules"
 import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles, getProductTypes,
@@ -87,9 +88,11 @@ const blankRow = () => CSV_COLUMNS.map(() => "")
  * list is twelve of these telling you nothing about which stitch file each one is. So an
  * option may carry a label; the cell still gets the value.
  */
-type Opt = string | { value: string; label: string }
+type Opt = string | { value: string; label: string; img?: string | null }
 const optValue = (o: Opt) => (typeof o === "string" ? o : o.value)
 const optLabel = (o: Opt) => (typeof o === "string" ? o : o.label)
+/** The option's picture, when it has one — only the Blank column does. */
+const optImg = (o: Opt) => (typeof o === "string" ? null : o.img ?? null)
 
 /**
  * 1–20, AS A PICKER, on a column that is typed far more often than any other.
@@ -776,13 +779,35 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * so anything this grid wrote in a different shape would import differently from the
    * sheet the same rows can be pasted into. resolveProduct matches either half.
    */
-  const productNames = useMemo(
+  /**
+   * THE CODE, AND A PICTURE OF THE GARMENT (owner, 2026-09-21: "remove the product name on
+   * the drop down… keep the SKU for short + introduce images small on the front of each
+   * product").
+   *
+   * Every row of this menu was `108084 - Transfer Duffel. 108084` or `EG-1002 - OTTO CAP®
+   * Digital Camoufla…`, and at the width of a sheet column the names run past the edge —
+   * so the list truncated exactly where two products stop looking alike. The thumbnail
+   * answers "which garment is this" before any of it is read, and the code is the half a
+   * person types anyway.
+   *
+   * THE VALUE IS UNTOUCHED. `optValue` still yields the full `code - name` contract that
+   * productLabel builds, which is what lands in the cell, what the .xlsx template offers
+   * back, and what both resolvers split — see blankCode's note on why shortening what is
+   * STORED would trade a rename-proof line for a tidier menu. And the type-ahead below
+   * matches label OR value, so typing "duffel" still finds a row that now shows "108084".
+   */
+  const productNames = useMemo<Opt[]>(
     () => catalog
       // productLabel is the one spelling of this string — the line strip and the .xlsx
       // template read the same helper, so the three can no longer drift apart.
-      .map((c) => productLabel(c))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b)),
+      .map((c) => {
+        const value = productLabel(c)
+        if (!value) return null
+        const img = bestMockup(c, "", "")
+        return { value, label: blankCode(value), img: img ? thumbSrc(img, 48) : null }
+      })
+      .filter((o): o is { value: string; label: string; img: string | null } => !!o)
+      .sort((a, b) => a.value.localeCompare(b.value)),
     [catalog],
   )
 
@@ -1799,13 +1824,35 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
               <button
                 key={optValue(o)}
                 type="button"
+                /* The NAME did not disappear, it moved to the tooltip — a row showing
+                   "EG-1002" beside a cap still has to be able to say which cap. */
                 title={optValue(o)}
                 /* mousedown, not click: the input blurs first and would close this menu
                    before a click ever landed. preventDefault keeps the caret where it is. */
                 onMouseDown={(e) => { e.preventDefault(); setCell(mr, mc, optValue(o)); setMenu(null) }}
-                className="block w-full truncate px-2.5 py-1.5 text-left hover:bg-accent"
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-accent"
               >
-                {optLabel(o)}
+                {optImg(o) !== null && (
+                  /* SQUARE, and the same square on every row whether or not a picture
+                     arrived — a menu whose rows change height as you scroll past products
+                     without mockups is a menu that jumps under the cursor. rounded-md, not
+                     rounded-full: §4 keeps the circle for what is genuinely round, and a
+                     garment photo is not. */
+                  optImg(o)
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img
+                        src={optImg(o) as string}
+                        alt=""
+                        aria-hidden
+                        /* A MOCKUP URL THAT 404s MUST NOT DRAW A BROKEN GLYPH. Hidden, not
+                           removed: the 20px slot stays, so one dead image cannot make its
+                           row shorter than the rows above and below it. */
+                        onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
+                        className="size-5 shrink-0 rounded-md object-cover"
+                      />
+                    : <span aria-hidden className="size-5 shrink-0 rounded-md bg-muted" />
+                )}
+                <span className="min-w-0 truncate">{optLabel(o)}</span>
               </button>
             ))}
             {/* THE CAP, SAID OUT LOUD. 50 of several hundred blanks were rendered and the

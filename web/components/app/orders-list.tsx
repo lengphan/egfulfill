@@ -34,7 +34,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, sideRatesFor, methodsLabelOf } from "@/lib/order-format"
+import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, sideRatesFor, methodsLabelOf } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
@@ -80,29 +80,42 @@ function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
       /* NOT font-medium. The buyer's name is the one column nobody scans a queue by, and
          weighting it put it above the order number and the status — the two that are. */
  case "customer": return <span>{customerOf(o)}</span>
- case "items": return (
-      <div className="flex min-w-0 items-center gap-2.5">
-        {/* NO PICTURE IN THE PARENT ROW — owner's call, 2026-08-26.
-            It carried one thumbnail, on the argument that photos are what a row is SCANNED
-            by. The counter-argument won: at row height the artwork is too small to actually
-            judge, so it bought recognition rather than information — while the full-bleed
-            artwork one click down in the expanded row is big enough to decide from. The row
-            is identity, stage and the two controls; the picture lives where it can be read.
-            The factory boards keep their stack: they are reading what is in the parcel. */}
-        <div className="min-w-0">
-          {/* The "+2" SITS OUTSIDE THE TRUNCATION. It is the only place the other lines are
-              counted now that the photo strip is one picture, and a long first name would
-              otherwise cut off the one word that says there are more. */}
-          <div className="flex min-w-0 items-baseline gap-1 text-sm">
-            <span className="truncate">{itemsParts(o).first}</span>
-            {itemsParts(o).extra > 0 && (
-              <span className="shrink-0 text-muted-foreground tabular-nums">+{itemsParts(o).extra}</span>
-            )}
-          </div>
-          <div className="truncate text-xs text-muted-foreground">{unitsOf(o)} unit{unitsOf(o) === 1 ? "" : "s"}</div>
-        </div>
-      </div>
-    )
+      /**
+       * THE COUNT, AND ONLY THE COUNT (owner, 2026-09-21: "remove the item name here no
+       * need — just show the item number… since the name is clipped and there's no way to
+       * see / no need to see").
+       *
+       * The cell used to lead with the product name over a units line, and at this
+       * column's 64px neither survived: a marketplace title came out as "Ga…" and even
+       * "100 units" clipped to "100 u…". Two truncated strings where one number fits — and
+       * an ellipsis is not a shorter name, it is no name, so the space was being spent on
+       * nothing. The full list, named, is one click down in the expanded row.
+       *
+       * Weighted like the factory board's own units column, which asks and answers exactly
+       * this question: text-sm font-medium, one step up from the muted metadata either
+       * side so a quantity someone is judging capacity from is not read past — and one
+       * step only, because semibold here would put it level with the order number and a
+       * live status (see that column's note; it made semibold mean three things at once).
+       *
+       * No tabular-nums: §4 — the column is right-aligned and globals.css already gives
+       * every text-right cell tabular figures, which is what makes 1 over 12 over 100 line
+       * up without a second opinion per cell.
+       */
+ case "items": {
+ const units = unitsOf(o)
+ const lines = (o.items ?? []).length
+ return (
+        <span
+ className="text-sm font-medium text-foreground"
+          /* The line/unit distinction leaves the cell but not the row: two lines of one
+             each and one line of two are both "2", and the tooltip is where that lives now
+             — the same split the factory column already draws. */
+ title={`${lines} line${lines === 1 ? "" : "s"} · ${units} unit${units === 1 ? "" : "s"}`}
+        >
+          {units || "—"}
+        </span>
+      )
+    }
  case "status": return <SellerStatusBadge order={o} />
  case "tracking": return o.tracking
       ? <span className="truncate text-sm tabular-nums text-muted-foreground">{o.tracking}</span>
