@@ -4237,8 +4237,24 @@ export function ordersRoutes(app, requireAuth) {
     return q(
       `select i.line_id, i.sku, i.name, i.print_type, i.design_tier, i.design_quote_status, i.design_charged_at,
               i.design_fee_override,
+              /**
+               * A STITCH FILE, NOT ANY FILE (2026-09-21).
+               *
+               * This had no `kind` filter at all, so it picked the newest file of ANY kind on the
+               * line — and `tierOf` reads "machine_key ⇒ supplied". A seller who uploaded a JPEG
+               * and no stitch file was therefore billed the cheap CHECK fee instead of digitising,
+               * on work nobody had digitised.
+               *
+               * It is reachable and it is reached: design_file_data holds 78 emb, 2 pes and 8
+               * `image` rows, and four live line-groups carry only images.
+               *
+               * The kinds are the two this table stores for machine files — design_files.js writes
+               * 'emb' and 'pes', and orders.js already tests exactly that pair when it asks whether
+               * an order has one at all (`kind in ('pes','emb')`). Same question, same answer.
+               */
               (select coalesce(f.content_hash, f.design_id) from design_file_data f
                  where f.order_id = i.order_id
+                   and f.kind in ('emb','pes')
                    and (f.line_id = i.line_id
                         or (f.line_id is null and coalesce(f.sku,'') = coalesce(i.sku,'')))
                  order by (f.line_id is not null) desc, f.created_at desc limit 1) as machine_key,
