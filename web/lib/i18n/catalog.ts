@@ -206,11 +206,12 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "import.— not embroidered.": "— mặt này không thêu.",
   "import.No template": "Không có mẫu",
-  "import.is ambiguous — use the TPL- number.": "bị trùng tên — hãy dùng số TPL-.",
+  "import.is ambiguous — use TPL-.": "bị trùng tên — hãy dùng số TPL-.",
   "import.Not in your library:": "Không có trong thư viện:",
-  "import.Templates couldn't be loaded — the Template ID column will apply nothing.": "Không tải được mẫu — cột Template ID sẽ không áp dụng gì.",
-  "import.Machine files couldn't be looked up — the Machine File ID column will attach nothing.": "Không tra được tệp máy — cột Machine File ID sẽ không đính kèm gì.",
+  "import.Templates didn’t load.": "Không tải được mẫu — cột Template ID sẽ không áp dụng gì.",
+  "import.Machine files didn’t load.": "Không tra được tệp máy — cột Machine File ID sẽ không đính kèm gì.",
   "stores.Install the egful extension in Chrome.": "Cài tiện ích egful vào Chrome.",
   "stores.Open your Etsy Shop Manager orders page.": "Mở trang đơn hàng Shop Manager trên Etsy.",
   "stores.Press the egful icon, then Sync.": "Bấm biểu tượng egful, rồi bấm Sync.",
@@ -1375,12 +1376,12 @@ const vi: Dict = {
   "import.Blue *": "Dấu * xanh",
   "import.Dashed": "Nét đứt",
   "import.Drop a .csv, .xlsx or .xls — or": "Thả tệp .csv, .xlsx hoặc .xls — hoặc",
-  "import.All three work here · uses the egful template format": "Cả ba định dạng đều dùng được · theo mẫu của egful",
-  "import.Upload a CSV/XLSX, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.":
+  "import.Uses the egful template format": "Cả ba định dạng đều dùng được · theo mẫu của egful",
+  "import.CSV, XLSX, paste, or a Google Sheet.":
     "Tải lên CSV/XLSX, dán các dòng, hoặc lấy từ Google Sheet. Các tên cột quen thuộc của Shopify/Etsy được nhận diện tự động.",
   "import.Column names": "Tên cột",
   "import.They’re in your orders queue now.": "Chúng đã nằm trong hàng đợi đơn hàng của bạn.",
-  "import.The orders imported. Attach these from the line’s designer.": "Đã nhập đơn hàng. Hãy đính kèm các tệp này từ trình thiết kế của từng dòng.",
+  "import.Attach from the designer.": "Đã nhập đơn hàng. Hãy đính kèm các tệp này từ trình thiết kế của từng dòng.",
   "import.No template matches": "Không có mẫu nào khớp",
   "import.More than one template is called": "Có nhiều hơn một mẫu tên là",
   "import.Nothing in your library matches": "Không có gì trong thư viện của bạn khớp với",
@@ -4763,7 +4764,7 @@ const vi: Dict = {
   "dispatch.Mark the selected orders Shipped & Fulfilled": "Đánh dấu các đơn đã chọn là Đã gửi & Hoàn tất",
   "dispatch.Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label": "Tải các nhãn này lên hàng đợi tiền quét của byeastside — tính phí xử lý nhanh cho mỗi nhãn",
   "imageLightbox.Image": "Ảnh",
-  "import.Paste rows copied from a spreadsheet (tab or comma separated), including the header row.": "Dán các dòng sao chép từ bảng tính (ngăn cách bằng tab hoặc dấu phẩy), bao gồm cả dòng tiêu đề.",
+  "import.Paste rows, header included.": "Dán các dòng sao chép từ bảng tính (ngăn cách bằng tab hoặc dấu phẩy), bao gồm cả dòng tiêu đề.",
   "integrations.Set": "Đặt",
   "inventory.No inventory yet": "Chưa có tồn kho",
   "inventory.No items match": "Không có mặt hàng nào khớp",

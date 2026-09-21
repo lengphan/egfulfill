@@ -861,13 +861,16 @@ export function ImportOrdersDialog({
               <CheckCircle size={30} weight="fill" />
             </span>
             <div className="font-semibold">Imported {done.imported} {done.imported === 1 ? "order" : "orders"}</div>
-            <div className="text-sm text-muted-foreground">{tl("import", "They’re in your orders queue now.")}</div>
+            {/* NO "in your orders queue" LINE. The heading above already says the orders were
+                imported and a green tick is beside it; a sentence repeating that is read on
+                every successful import forever. What this screen is FOR is the failures below,
+                and they were competing with a restatement of the good news. */}
             {/* WHAT THE STITCH-FILE COLUMN DID, said here rather than left to be discovered.
                 An embroidered line that arrives without its file is the one failure on this
                 screen that looks exactly like success until the floor picks the job up. */}
             {done.mfAttached > 0 && (
               <div className="text-sm text-muted-foreground">
-                {done.mfAttached} machine {done.mfAttached === 1 ? "file" : "files"} attached, each to its own line.
+                {done.mfAttached} machine {done.mfAttached === 1 ? "file" : "files"} attached.
               </div>
             )}
             {done.mfFailed.length > 0 && (
@@ -879,7 +882,7 @@ export function ImportOrdersDialog({
                     reference, wrong print method, no such line). Collapsing them to a count
                     would throw away the only part anyone can act on. */}
                 {done.mfFailed.map((m, i) => <div key={i} className="text-xs text-muted-foreground">{m}</div>)}
-                <div className="text-xs text-muted-foreground">{tl("import", "The orders imported. Attach these from the line’s designer.")}</div>
+                <div className="text-xs text-muted-foreground">{tl("import", "Attach from the designer.")}</div>
               </div>
             )}
             <Button className="w-full" onClick={() => onOpenChange(false)}>{tl("import", "Done")}</Button>
@@ -887,7 +890,7 @@ export function ImportOrdersDialog({
         ) : (
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-sm text-muted-foreground">{tl("import", "Upload a CSV/XLSX, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.")}</p>
+              <p className="text-sm text-muted-foreground">{tl("import", "CSV, XLSX, paste, or a Google Sheet.")}</p>
               <Button variant="outline" size="sm" className="shrink-0" onClick={() => void downloadXlsxTemplate()}>
                 <DownloadSimple size={14} weight="bold" /> {tl("import", "Template (.xlsx)")}
               </Button>
@@ -1044,7 +1047,7 @@ export function ImportOrdersDialog({
                 >
                   <UploadSimple size={24} className="text-muted-foreground" />
                   <span className="text-sm font-medium">{tl("import", "Drop a .csv, .xlsx or .xls — or")} <span className="text-primary">browse</span></span>
-                  <span className="text-xs text-muted-foreground">{tl("import", "All three work here · uses the egful template format")}</span>
+                  <span className="text-xs text-muted-foreground">{tl("import", "Uses the egful template format")}</span>
                   <input type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => takeFile(e.target.files?.[0])} />
                 </label>
               </TabsContent>
@@ -1054,7 +1057,7 @@ export function ImportOrdersDialog({
                   value={paste}
                   onChange={(e) => setPaste(e.target.value)}
                   rows={6}
-                  placeholder={tl("import", "Paste rows copied from a spreadsheet (tab or comma separated), including the header row.")}
+                  placeholder={tl("import", "Paste rows, header included.")}
                   className="w-full rounded-md border border-input bg-transparent px-3 py-2 tabular-nums text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
                 <Button variant="outline" size="sm" onClick={ingestPaste} disabled={!paste.trim()}>{tl("import", "Preview rows")}</Button>
@@ -1125,7 +1128,7 @@ export function ImportOrdersDialog({
                       : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
                     <span>
                       {templatesFailed
-                        ? tl("import", "Templates couldn't be loaded — the Template ID column will apply nothing.")
+                        ? tl("import", "Templates didn’t load.")
                         : <>
                             {/* THE COUNT ONLY WHEN SOMETHING APPLIED. "0 of 1 line will take their
                                 blank and artwork from a saved template" is a sentence about
@@ -1133,7 +1136,7 @@ export function ImportOrdersDialog({
                                 the failure said twice, the long way round first. */}
                             {templateOutcome.applied > 0 && <>{templateOutcome.applied} of {templateOutcome.typed} {templateOutcome.typed === 1 ? "line" : "lines"} from a template.</>}
                             {templateOutcome.unmatched.length > 0 && <> {tl("import", "No template")} <span className="tabular-nums">{templateOutcome.unmatched.join(", ")}</span>.</>}
-                            {templateOutcome.ambiguous.length > 0 && <> <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span> {tl("import", "is ambiguous — use the TPL- number.")}</>}
+                            {templateOutcome.ambiguous.length > 0 && <> <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span> {tl("import", "is ambiguous — use TPL-.")}</>}
                           </>}
                     </span>
                   </div>
@@ -1172,14 +1175,18 @@ export function ImportOrdersDialog({
                       : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
                     <span>
                       {machineOutcome.failed
-                        ? tl("import", "Machine files couldn't be looked up — the Machine File ID column will attach nothing.")
+                        ? tl("import", "Machine files didn’t load.")
                         : <>
-                            {machineOutcome.ok} of {machineOutcome.typed} {machineOutcome.typed === 1 ? "line" : "lines"} will get
-                            their stitch file, attached to that line only.
-                            {machineOutcome.unknown.length > 0 && <> {tl("import", "Nothing in your library matches")} <span className="tabular-nums">{machineOutcome.unknown.join(", ")}</span> {tl("import", "— check the reference on the file’s card in Design Lab.")}</>}
-                            {/* Named separately from "unknown" because the fix is different:
-                                the reference is right and the ROW is wrong. */}
-                            {machineOutcome.wrongMethod.length > 0 && <> <span className="tabular-nums">{machineOutcome.wrongMethod.join(", ")}</span> {machineOutcome.wrongMethod.length === 1 ? tl("import", "is on a line") : tl("import", "are on lines")} that {machineOutcome.wrongMethod.length === 1 ? tl("import", "isn’t") : tl("import", "aren’t")} embroidered — a stitch file has no machine to run there, so it won&rsquo;t be attached.</>}
+                            {/* THE COUNT ONLY WHEN SOMETHING LANDED, like the two warnings above
+                                it: "0 of 1 line will get their stitch file" is the failure stated
+                                the long way round, immediately above the reason. */}
+                            {machineOutcome.ok > 0 && <>{machineOutcome.ok} of {machineOutcome.typed} {machineOutcome.typed === 1 ? "line" : "lines"} will get a stitch file.</>}
+                            {machineOutcome.unknown.length > 0 && <> {tl("import", "Not in your library:")} <span className="tabular-nums">{machineOutcome.unknown.join(", ")}</span>.</>}
+                            {/* Named separately from "unknown" because the fix is different: the
+                                reference is right and the PLACEMENT is wrong. It said "line",
+                                which stopped being true when the technique moved to the
+                                placement. */}
+                            {machineOutcome.wrongMethod.length > 0 && <> <span className="tabular-nums">{machineOutcome.wrongMethod.join(", ")}</span> {tl("import", "— not embroidered.")}</>}
                           </>}
                     </span>
                   </div>
