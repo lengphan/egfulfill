@@ -1,7 +1,7 @@
 "use client"
 
 import { useLabelT, useDateFormat } from "@/lib/i18n"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useRef, useState } from "react"
 import { FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1064,6 +1064,44 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
 
  const placed = placedRows(designs, items)
 
+  /**
+   * ALL OF ITEM 1, THEN ALL OF ITEM 2 (owner, 2026-09-21: "all files should be on item
+   * numbering first — don't push the emb file down").
+   *
+   * These were two lists stacked: every placed artwork, then every machine file. So a line's
+   * stitch file sat at the bottom of the panel, several rows below the pictures it belongs
+   * with, and reading "what do we have for item 1" meant scanning the whole list twice and
+   * matching badges by eye. The badge already says which item; the ORDER should say it too.
+   *
+   * ONE SEQUENCE, GROUPED BY THE ITEM'S POSITION — the same number the badge, the target
+   * dropdown and the item rows on the order page all use, so picking 3 there and reading 3
+   * here are the same 3. Within an item the placed artwork comes first and its machine files
+   * follow, because the picture is what someone recognises and the file is what we cut from
+   * it.
+   *
+   * A FILE FOR THE WHOLE ORDER HAS NO ITEM, so it cannot sit inside one. Those go last, under
+   * the "All" badge they already carry — appending them to item 1 would claim a scope they
+   * do not have.
+   */
+ const fileGroups = (() => {
+ const noOfFile = (f: DesignFileRow) => {
+ const it = items.find((x) =>
+        (f.lineId && x.line_id === f.lineId) || (!f.lineId && !!f.sku && x.sku === f.sku))
+ return it ? numberOf(it) + 1 : null
+    }
+ const ordered = orderFiles(files)
+    /* Item order, then the order-wide bucket. Built from `items` rather than from whatever
+       the files happen to mention, so the groups read 1, 2, 3 even when item 2 has nothing. */
+ const keys: (number | null)[] = [...items.map((_, i) => i + 1), null]
+ return keys
+      .map((no) => ({
+ no,
+ placed: placed.filter((r) => r.no === no),
+ rows: ordered.filter((f) => noOfFile(f) === no),
+      }))
+      .filter((g) => g.placed.length || g.rows.length)
+  })()
+
   // NOTHING TO BUY is a real state and it now says so. Returning null here left the card
   // above it showing a title and blank space — a promise of files with no files and no
   // explanation, which reads exactly like a fetch that failed.
@@ -1091,12 +1129,14 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  return (
     <div className="space-y-2">
       {notices}
-      <PlacedArtworkList rows={placed} onRemove={(r) => void detach(r)} busy={busy} />
+      {fileGroups.map((g) => (
+        <Fragment key={`grp-${g.no ?? "all"}`}>
+      <PlacedArtworkList rows={g.placed} onRemove={(r) => void detach(r)} busy={busy} />
       {/* SAME SHAPE AS THE ARTWORK ABOVE. These were bordered cards, one per file, stacked
  inside the panel's own card — a box per row inside a box — while the placed
  artwork above them was a plain divided list. Two lists of files on one order that
  did not look like the same kind of thing. Rows and hairlines for both. */}
-      {orderFiles(files).map((f) => (
+      {g.rows.map((f) => (
         <div key={f.designId} className="relative flex items-center gap-2.5 border-t border-border py-2 first:border-t-0">
           {/**
             * WHICH ITEM THIS FILE IS FOR — the number, not a glyph.
@@ -1235,6 +1275,8 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             </Button>
           )}
         </div>
+      ))}
+        </Fragment>
       ))}
       {/* Offered alongside existing files too, not only when the list is empty — a seller
  may send a corrected file after we've already delivered one. */}
