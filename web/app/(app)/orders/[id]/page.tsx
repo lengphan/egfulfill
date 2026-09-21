@@ -3495,7 +3495,11 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
               title="Summary"
               actions={<span className={"rounded-full px-2 py-0.5 text-2xs font-medium " + moneyState.tone}>{moneyState.label}</span>}
             >
-              <dl className="space-y-2 p-5 text-sm">
+              {/* pr-7, not p-5: the fee rows' pencil is positioned PAST the money column so it
+                  costs the figures no width (see DesignFeeAmount), and it needs a gutter to
+                  land in — SectionCard is overflow-hidden, so a glyph that overflowed the
+                  card would simply be cut in half. Every figure still ends at the same x. */}
+              <dl className="space-y-2 p-5 pr-7 text-sm">
                 {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
    the alternative is a card that looks like an order nobody has priced. */}
                 {quoteErr && submittable && (

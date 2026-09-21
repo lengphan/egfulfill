@@ -141,16 +141,30 @@ export function DesignFeeAmount({ orderId, fee, onChanged, show, whole }: {
     )
   }
 
+  /**
+   * THE FIGURE KEEPS THE COLUMN; THE PENCIL SITS PAST IT (owner, 2026-09-21: "put the pen but
+   * don't push the numbers inside").
+   *
+   * This was a flex row — figure, then "edited", then the button — so every editable fee's
+   * amount ended one glyph further left than the plain figures above and below it, and a
+   * column of money that should read straight down stepped sideways at every fee.
+   *
+   * It is the same rule the reverse ↩ on the charged rows already follows: a mark belongs
+   * PAST the end of the money column, not inside it. The button is taken out of flow and
+   * lands in the gutter the summary's own padding provides, so it costs the figure no width
+   * at all. `edited` moves to the LEFT of the amount for the same reason — it is an
+   * annotation, and the number is what the eye is tracking.
+   */
   return (
-    <dd className="flex shrink-0 items-center gap-1.5 tabular-nums">
+    <dd className="relative shrink-0 tabular-nums">
+      {/* Said only when true. An unusual figure beside a familiar label otherwise reads as a
+          pricing bug rather than as a decision somebody made. */}
+      {fee.overridden && <span className="mr-1.5 text-2xs font-normal text-muted-foreground">edited</span>}
       {/* To Be Determined is a real answer, not a missing one: a complex fee is quoted, and
           no figure exists until somebody names one — which typing here does. */}
       {fee.amount == null
         ? <span className="italic text-muted-foreground">{tl("designCharge", "To Be Determined")}</span>
         : usd(show ?? fee.amount)}
-      {/* Said only when true. An unusual figure beside a familiar label otherwise reads as a
-          pricing bug rather than as a decision somebody made. */}
-      {fee.overridden && <span className="text-2xs font-normal text-muted-foreground">edited</span>}
       <button
         type="button"
         disabled={locked}
@@ -159,7 +173,7 @@ export function DesignFeeAmount({ orderId, fee, onChanged, show, whole }: {
           : whole || tl("designCharge", "Change what this costs")}
         aria-label={`Edit ${fee.label}`}
         onClick={() => { setEditing(true); setDraft(fee.amount == null ? "" : String(fee.amount)) }}
-        className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+        className="absolute left-full top-1/2 ml-0.5 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
       >
         <PencilSimple size={12} weight="bold" />
       </button>
