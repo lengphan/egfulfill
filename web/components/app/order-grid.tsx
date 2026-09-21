@@ -443,6 +443,10 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * Opened by focus, the menu shows everything the cell allows; it filters once a key is
    * actually pressed.
    */
+  /* WHICH CELL HAS THE CARET. Separate from `editing`, which only turns true once somebody
+     TYPES — this flips on focus, because the blank column paints a shortened value and the
+     moment a cell is entered it has to show the real one. */
+  const [focusCell, setFocusCell] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ key: string; left: number; top: number; width: number; typed: boolean } | null>(null)
   /**
    * THE RIGHT-CLICK MENU — separate state from `menu`, which is the column's value picker.
@@ -1498,6 +1502,26 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                      */
                     const methodKey = METHOD_FOR[col.key]
                     const inert = !!methodKey && stitchDeadOn(row, methodKey)
+                    /**
+                     * A PICKED BLANK READS AS ITS CODE, THE SAME AS THE MENU IT CAME FROM
+                     * (owner, 2026-09-21: "dont show the selected name?").
+                     *
+                     * PAINTED OVER, NOT SWAPPED IN. The input's `value` stays the full
+                     * `code - name` contract at every moment — swapping it for a short one
+                     * on blur looked equivalent and is not: the click handler calls
+                     * `el.select()` to make typing replace the cell, and a controlled input
+                     * whose value prop changes in the same tick drops that selection, so the
+                     * next keystroke would APPEND to the contract string instead of
+                     * replacing it. Painting cannot touch the value, the caret or the
+                     * selection, because it is a second element.
+                     *
+                     * It lifts the moment the cell is focused, so anything you can type
+                     * into, arrow through or copy out of is showing you exactly what is
+                     * stored.
+                     */
+                    const raw = row[c] ?? ""
+                    const shortText = col.key === "blank" ? blankCode(raw) : raw
+                    const painted = shortText !== raw && focusCell !== `${r}-${c}`
                     return (
                       <td
                         key={col.key}
@@ -1550,6 +1574,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                                shift-click would make the NEXT ordinary click extend the
                                selection instead of starting a new one — a modifier that
                                outlives the gesture that pressed it. */
+                            setFocusCell(`${r}-${c}`)
                             const withShift = shiftRef.current
                             shiftRef.current = false
                             /**
@@ -1655,6 +1680,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                           }}
                           onBlur={() => {
                             setEditing((k) => (k === `${r}-${c}` ? null : k))
+                            setFocusCell((k) => (k === `${r}-${c}` ? null : k))
                             setMenu((m) => (m?.key === `${r}-${c}` ? null : m))
                           }}
                           /* The caret is the ONLY signal telling the two modes apart, so a
@@ -1681,8 +1707,21 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                              thing drawn. */
                           className={"h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none"
                             + (selWide && inSel(r, c) ? "" : " focus:ring-1 focus:ring-ring focus:bg-accent")
-                            + (inert ? " text-muted-foreground/50" : "")}
+                            + (inert ? " text-muted-foreground/50" : "")
+                            /* The real value is still IN the box and still selectable — it
+                               is only unpainted while the short form sits over it. */
+                            + (painted ? " text-transparent" : "")}
                         />
+                        {painted && (
+                          <span
+                            aria-hidden
+                            /* Same padding, same weight, same line box as the input under it,
+                               or the text jumps by a pixel every time a cell is entered. */
+                            className="pointer-events-none absolute inset-0 block truncate px-2 py-1 font-medium leading-normal"
+                          >
+                            {shortText}
+                          </span>
+                        )}
                         {/**
                           * THE SELECTION ITSELF. Shift-click extends the anchor sideways, and
                           * until this there was nothing on screen to show for it: the dot
@@ -1813,12 +1852,24 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         return (
           <div
             ref={menuRef}
-            style={{ position: "fixed", left: menu.left, top: menu.top, minWidth: Math.max(menu.width, 180), maxWidth: 320 }}
+            /**
+             * SIZED FOR THE PICTURE, now that the picture is what identifies the row.
+             *
+             * 240px minimum rather than 180: a code plus a 32px thumbnail needs about that
+             * much before the two start crowding, and a menu narrower than its own rows is
+             * a horizontal scrollbar nobody wants in a dropdown. maxWidth stays 320 — the
+             * rows are short now, so a wider menu would just be a column of whitespace.
+             */
+            style={{ position: "fixed", left: menu.left, top: menu.top, minWidth: Math.max(menu.width, 240), maxWidth: 320 }}
             /* Matches the cells it writes into: a menu whose options are smaller than the
                value they become is a size change on selection. */
             /* Matches the cells it writes into — a menu whose options are smaller than the
                value they become is a size change on selection. */
-            className="z-50 max-h-60 overflow-auto rounded-lg border border-border bg-popover py-1 text-sm "
+            /* max-h-80, not max-h-60. The rows grew from 30px to 44px to hold a thumbnail
+               you can actually read a garment from, so the old height showed five of them
+               where it used to show eight — a taller box keeps the same amount of list on
+               screen rather than trading legibility for scrolling. */
+            className="z-50 max-h-80 overflow-auto rounded-lg border border-border bg-popover py-1 text-sm "
           >
             {shown.map((o) => (
               <button
@@ -1848,9 +1899,14 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                            removed: the 20px slot stays, so one dead image cannot make its
                            row shorter than the rows above and below it. */
                         onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
-                        className="size-5 shrink-0 rounded-md object-cover"
+                        /* 32px, not 20. At 20 the thumbnail was a favicon — enough to show
+                           that a picture exists, not enough to tell a cap from a duffel from
+                           a tee, which is the whole job it took over from the name. 32 is
+                           also what a product picker normally runs at; past ~40 the list
+                           stops being a list and becomes a gallery you scroll. */
+                        className="size-8 shrink-0 rounded-md object-cover"
                       />
-                    : <span aria-hidden className="size-5 shrink-0 rounded-md bg-muted" />
+                    : <span aria-hidden className="size-8 shrink-0 rounded-md bg-muted" />
                 )}
                 <span className="min-w-0 truncate">{optLabel(o)}</span>
               </button>
