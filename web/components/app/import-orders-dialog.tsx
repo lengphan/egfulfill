@@ -721,20 +721,6 @@ export function ImportOrdersDialog({
                 : String(it.machineFileId || "").trim()
                   ? [{ ref: String(it.machineFileId).trim(), side: undefined as string | undefined }]
                   : []
-              for (const job of mfJobs) {
-                const mf = machineFiles?.[job.ref]
-                if (!mf) {
-                  mfFailed.push(`${job.ref} — no such file in your library`)
-                  continue
-                }
-                const a = await attachMachineFile(mf.id, { orderId, lineId: lineIds[li], side: job.side }).catch((e: unknown) => ({
-                  error: e instanceof Error ? e.message : "attach failed",
-                }))
-                // The face is NAMED in the failure. With up to five files on one line, "MF-13
-                // on a line — rejected" does not say which of them to go and fix.
-                if (a?.error) mfFailed.push(`${job.ref}${job.side ? ` (${job.side})` : ""} on ${it.name || it.sku || "a line"} — ${a.error}`)
-                else mfAttached++
-              }
               /**
                * WHICH FACES THIS LINE PRINTS ON — and the row's Placement outranks all of it.
                *
@@ -807,6 +793,35 @@ export function ImportOrdersDialog({
                   method: f.method || undefined,
                 }).catch(() => {})
               }
+              /**
+               * ATTACHED AFTER THE DESIGN ROWS, and the order is the whole fix.
+               *
+               * The server decides whether a stitch file may land by reading the PLACEMENT's
+               * technique — order_designs.method — falling back to the line's column only for
+               * a placement that says nothing. This loop ran BEFORE those rows existed, so
+               * every attach fell back to the line, and a sheet whose Type 2 column said
+               * Embroidery on the back still got "no machine to run it" because the LINE said
+               * DTG. The file was refused and nothing was stored.
+               *
+               * Moving it below postOrderDesign means the placement has already said what it
+               * is by the time the question is asked. Nothing else changes: the same jobs, the
+               * same per-face design_id, the same failures collected by name.
+               */
+              for (const job of mfJobs) {
+                const mf = machineFiles?.[job.ref]
+                if (!mf) {
+                  mfFailed.push(`${job.ref} — no such file in your library`)
+                  continue
+                }
+                const a = await attachMachineFile(mf.id, { orderId, lineId: lineIds[li], side: job.side }).catch((e: unknown) => ({
+                  error: e instanceof Error ? e.message : "attach failed",
+                }))
+                // The face is NAMED in the failure. With up to five files on one line, "MF-13
+                // on a line — rejected" does not say which of them to go and fix.
+                if (a?.error) mfFailed.push(`${job.ref}${job.side ? ` (${job.side})` : ""} on ${it.name || it.sku || "a line"} — ${a.error}`)
+                else mfAttached++
+              }
+
               // The stitch file the template carried, filed against the same line — an
               // embroidery import that arrives without one is a job the floor cannot start.
               if (it.templateMachineFile?.data) {
