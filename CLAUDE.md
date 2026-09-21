@@ -729,6 +729,30 @@ so one can never be used to probe for the other.
 
 ## 7. Verification
 
+**A CLEAN `tsc` IS NOT A PROMISE THE PAGE RENDERS (2026-09-21).** The order page threw
+`Cannot access 'n' before initialization` on every order carrying a design fee — the whole
+screen became the error boundary, which is indistinguishable from the site being down and
+was reported as exactly that. The cause was ordering: `ownFees` read `n` inside its filter
+callback seventeen lines before `const n` ran.
+
+- **TypeScript catches the direct shape and not the callback one.** `const bad = n + 1`
+  before `const n` is TS2448; the same reference moved inside `items.filter(x => x === n)`
+  compiles clean under `--strict`, because TS cannot know when a callback runs. Measured,
+  not assumed. So `tsc`, `eslint` and `next build` all passed and the page threw on first
+  render.
+- **`node tools/check-tdz.mjs` is the gate** — ESLint's `no-use-before-define`, which does
+  see the callback shape, against a recorded baseline (65 on the day it was written). FLOOR
+  fails if the count rises; WATCH prints the standing ones, because a `setState` inside a
+  handler is safe and a gate cannot tell that from a render-time read. **The dangerous ones
+  are the ones evaluated during render** — inside a `.map`/`.filter`/`.reduce` in a component
+  body. It earned itself: reintroducing the exact bug takes it to 66 and exits 1.
+- **An error boundary is not an outage, and the difference is measurable.** Probe a real
+  route before believing the stack is down: `/health` on the docker network and
+  `curl -s -o /dev/null -w "%{http_code}" https://app.egful.store/orders`. Both were 200
+  throughout this one. Then read the browser console — the stack frame names the chunk, and
+  the minified chunk can be fetched and searched, which is how the byte offsets of the read
+  (43370) and the declaration (43853) were found without reproducing anything.
+
 **Mocked tests have repeatedly produced false confidence here.** A mock that returned
 data regardless of the query hid a `SELECT` naming a column that didn't exist; it would
 have 500'd in production.
