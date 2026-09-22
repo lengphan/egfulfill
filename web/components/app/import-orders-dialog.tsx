@@ -505,9 +505,15 @@ export function ImportOrdersDialog({
    */
   const artworkOutcome = useMemo(() => {
     if (!records) return null
+    /* ALL FIVE ARTWORK CELLS, not just position 1's — the same gap the machine-file check
+       above had and closed. `hero_image` is pair 1's key; artwork_2..5 are the rest, and a
+       typo in any of them reaches the floor as a face with no picture. Reading one column
+       meant four of the five could not be answered before the import, which is the only
+       moment the reference is still cheap to fix. */
+    const ART_KEYS = ["hero_image", "artwork_2", "artwork_3", "artwork_4", "artwork_5"] as const
     const refs = records
       .filter((r) => r._valid)
-      .map((r) => String(r.hero_image || "").trim())
+      .flatMap((r) => ART_KEYS.map((k) => String((r as unknown as Record<string, unknown>)[k] ?? "").trim()))
       .filter((v) => /^IMG-/i.test(v))
     if (!refs.length) return null
     if (!library) return { typed: refs.length, ok: 0, unknown: [] as string[], pending: true }

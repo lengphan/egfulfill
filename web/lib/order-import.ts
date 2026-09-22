@@ -892,7 +892,10 @@ export type ImportOrder = {
 
 // Prefix for a grouping key we invented because the row had no Order Number. Internal only —
 // see the orderNumber field below for why it must never reach the saved order.
-const AUTO_KEY = " AUTO-"
+// The \u0000 is ESCAPED, not typed. A literal NUL in the source makes the whole file
+// BINARY to grep — `grep -n groupToOrders lib/order-import.ts` printed nothing at all,
+// silently, on the one file CLAUDE.md §2.2 most wants you to read before building.
+const AUTO_KEY = "\u0000AUTO-"
 
 // Group valid rows by Order Number into orders with aggregated line items.
 //
@@ -982,7 +985,29 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
          * the one spelling the catalogue uses. Anything it cannot place is kept verbatim
          * rather than dropped — an uncatalogued technique still has to be sayable.
          */
-        printType: normalizeMethods([S(r.print_type)])[0]?.label ?? S(r.print_type),
+        /**
+         * POSITION 1'S TYPE IS THE LINE'S TECHNIQUE — and reading `print_type` alone meant
+         * the line was DTG on every current sheet, whatever the seller typed.
+         *
+         * `print_type` is the LEGACY row-level method column. No sheet written since the
+         * five Placement/Type/Artwork blocks has one, so it is always the "DTG" default
+         * applied in rowsToRecords — and Type 1 lands on `print_method`, which nothing here
+         * read. The position's own method survived only on `sides`, and `sides` is dropped
+         * for a one-position row (see below), so a row reading Placement 1 = Front, Type 1 =
+         * Embroidery imported as a DTG line with nothing carrying the word "embroidery" at
+         * all. The server then refused that line's stitch file by name — "That line is DTG,
+         * a stitch file has no machine to run on it" — for a garment the sheet had said was
+         * embroidered, and rowsToRecords' own pre-import warning stayed silent because IT
+         * reads `print_method` and was looking at the right cell.
+         *
+         * Position 1 rather than some consensus of the five: a row printed one way at the
+         * front and another at the back has no single line technique, and the per-face
+         * methods on `sides` are what carry that. The line names what it leads with.
+         */
+        printType: (() => {
+          const m = S(r.print_method) || S(r.print_type)
+          return normalizeMethods([m])[0]?.label ?? m
+        })(),
         color: S(r.item_color),
         size: S(r.item_size),
         /* THE PRINTABLE ARTWORK, and it is NOT `img` even though one cell usually fills
