@@ -112,7 +112,7 @@ function ThreadSelect({ value, options, onChange }: {
 export function DesignStage({
  mockup, mockupFill, designUrl = "", pos = DEFAULT_POS, setPos, onRemove, onCopy, copyLabel, className,
  texts, updateText, images, updateImage, onEraseBg, eraseBusy, onUndoErase, selected, onSelect, picking, onPickColor,
- printZone, emptyHint,
+ printZone, emptyHint, readOnly,
 }: {
  mockup?: string
   /** True when `mockup` is the SELLER'S own photo rather than our catalogue blank — see the
@@ -150,6 +150,17 @@ export function DesignStage({
  printZone?: { x: number; y: number; w: number; h: number }
   /** Shown instead of a bare icon when there's no blank yet. */
  emptyHint?: React.ReactNode
+  /**
+   * NOBODY MAY MOVE ANYTHING — the whole stage, not one layer.
+   *
+   * `lockedIds` is a person pinning a placement they are happy with, which is theirs to
+   * undo. This is the other kind: the line is not yours to change right now, so every
+   * layer is pinned, the grips and the action strip are not drawn, and a drag does
+   * nothing. Passed by the order designer once the order is submitted and the reader is
+   * a seller — at which point the quote is frozen and a moved design would be work
+   * nobody is billed for.
+   */
+ readOnly?: boolean
 }) {
   const tl = useLabelT()
  const stageRef = useRef<HTMLDivElement>(null)
@@ -362,6 +373,10 @@ export function DesignStage({
   // target: "image" or a text-layer id. mode: move | resize | rotate.
   // `grip` — which of the eight was grabbed. Only read when mode is "resize".
  const startDrag = (target: string, mode: "move" | "resize" | "rotate", grip?: { ux: number; uy: number }) => (e: React.PointerEvent) => {
+    /* THE ONE PLACE A DRAG CAN START, which is why the read-only test is here and not on
+       each of the eight grips, the rotate handle and the two layer bodies. A guard bolted
+       onto every caller is a guard the next caller forgets. */
+ if (readOnly) return
  if (!stageRef.current) return
  e.preventDefault(); e.stopPropagation()
  select(target)
@@ -481,6 +496,10 @@ export function DesignStage({
  const stripBtn = "flex size-9 items-center justify-center rounded-md text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
  const stripIcon = 18
  const handles = (target: string) => {
+    /* NOTHING TO OFFER ON A LINE YOU MAY NOT CHANGE. Every control in this strip edits the
+       layer — rotate, pin, erase the background, copy, delete — so a read-only stage draws
+       none of them rather than eight buttons that refuse. */
+ if (readOnly) return null
     // Per LAYER. The design maker puts text on this same stage, and a single flag would
     // freeze the lettering because somebody pinned the picture.
  const locked = !!lockedIds[target]
@@ -619,11 +638,11 @@ export function DesignStage({
         <div
  key={im.id}
  onPointerDown={picking ? undefined
- : lockedIds[im.id]
+ : (lockedIds[im.id] || readOnly)
               ? (e) => { e.stopPropagation(); select(im.id) }
  : startDrag(im.id, "move")}
  style={{ left: `${im.pos.x}%`, top: `${im.pos.y}%`, width: `${im.pos.w}%`, transform: `translate(-50%,-50%) rotate(${im.pos.r}deg)` }}
- className={"absolute touch-none " + (picking ? "cursor-crosshair" : lockedIds[im.id] ? "cursor-default" : "cursor-move")}
+ className={"absolute touch-none " + (picking ? "cursor-crosshair" : (lockedIds[im.id] || readOnly) ? "cursor-default" : "cursor-move")}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={canvasReadableSrc(im.src)} alt="" className="pointer-events-none block w-full select-none" draggable={false} />
@@ -641,7 +660,7 @@ export function DesignStage({
       {designUrl && (
         <div
  onPointerDown={picking ? undefined
- : lockedIds.image
+ : (lockedIds.image || readOnly)
               // Locked: pick it up, don't move it. Without this the strip holding Unlock
               // could not be reached, and the lock would be a one-way door.
               ? (e) => { e.stopPropagation(); select("image") }
@@ -650,7 +669,7 @@ export function DesignStage({
  onMouseMove={picking ? (e) => moveLoupe(e, e.currentTarget) : undefined}
  onMouseLeave={picking ? () => setLoupe(null) : undefined}
  style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${drawW}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }}
- className={"absolute touch-none " + (picking ? "cursor-crosshair" : lockedIds.image ? "cursor-default" : "cursor-move")}
+ className={"absolute touch-none " + (picking ? "cursor-crosshair" : (lockedIds.image || readOnly) ? "cursor-default" : "cursor-move")}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -712,7 +731,7 @@ export function DesignStage({
 
       {(texts ?? []).map((t) => {
  const isEditing = editing === t.id
- const canEdit = !!updateText && !lockedIds[t.id] && !picking
+ const canEdit = !!updateText && !lockedIds[t.id] && !picking && !readOnly
  return (
         <div
           /* Remounted when editing opens or closes: the node is uncontrolled while the
@@ -721,7 +740,7 @@ export function DesignStage({
  key={t.id + (isEditing ? ":edit" : "")}
  onPointerDown={isEditing
             ? (e) => { e.stopPropagation() }   // a click inside places the caret; it must not drag the layer
- : lockedIds[t.id]
+ : (lockedIds[t.id] || readOnly)
               ? (e) => { e.stopPropagation(); select(t.id) }
  : (e) => {
                   // Already selected → this click is asking to type, not to pick it up.
@@ -749,7 +768,7 @@ export function DesignStage({
  if (e.key === "Escape") { e.preventDefault(); closeEdit(t.id, e.currentTarget, false) }
           } : undefined}
  style={{ left: `${t.x}%`, top: `${t.y}%`, transform: `translate(-50%,-50%) rotate(${t.r}deg)`, color: t.color, fontSize: `${t.size}cqw`, fontWeight: t.bold ? 800 : 600, whiteSpace: "nowrap", lineHeight: 1.1 }}
- className={"absolute touch-none outline-none " + (isEditing ? "cursor-text" : lockedIds[t.id] ? "cursor-default" : canEdit ? "cursor-move" : "cursor-move")}
+ className={"absolute touch-none outline-none " + (isEditing ? "cursor-text" : (lockedIds[t.id] || readOnly) ? "cursor-default" : canEdit ? "cursor-move" : "cursor-move")}
  title={canEdit && !isEditing ? tl("canvas", "Double-click to edit") : undefined}
         >
           {t.text || tl("canvas", "Text")}
@@ -2382,6 +2401,9 @@ export function DesignCanvasDialog({
    * composer uses, so one place decides what we accept and what gets re-encoded. */
  const setOwnMockup = async (file: File | undefined) => {
  if (!file) return
+    // Same rule as takeFiles, same reason — this replaces the garment the artwork sits on,
+    // which is a change to the line like any other.
+ if (filesLocked) { setErr(lockedWhy); return }
  setMockBusy(true); setErr(null)
  try {
  const up = await uploadChatAttachment(await fileToUploadUrl(file), file.name)
@@ -2464,6 +2486,27 @@ export function DesignCanvasDialog({
   const takeFiles = async (list: FileList | File[] | null | undefined) => {
     const files = Array.from(list ?? [])
     if (!files.length) return
+    /**
+     * THE LINE IS NOT YOURS TO CHANGE RIGHT NOW, and this is where that is enforced.
+     *
+     * `filesLocked` hid the Artwork panel and the template picker and nothing else — so a
+     * seller on a SUBMITTED order could still drag a file anywhere onto this dialog (the
+     * drop handler is on the whole window, deliberately), press the empty stage, or use the
+     * Files tab's own zone. Three routes past a lock that guarded two.
+     *
+     * A refusal at the chokepoint rather than a guard on each: this function is what every
+     * one of those routes ends in, the OS file inputs included, and a guard bolted onto
+     * each caller is the one the next caller forgets.
+     *
+     * It says WHY rather than doing nothing, because a drop that silently evaporates reads
+     * as a broken upload — which is the failure this window already had a message for.
+     */
+    if (filesLocked) {
+      setErr(getUser()?.role === "seller"
+        ? tl("canvas", "This order is submitted — ask the factory in chat to change the artwork.")
+        : tl("canvas", "Not submitted yet — the files on this line are still the seller's."))
+      return
+    }
 
     const machine: File[] = []
     const images: File[] = []
@@ -3152,6 +3195,11 @@ export function DesignCanvasDialog({
                would land somewhere arbitrary on it and read as fact. */
  printZone={ownMockups[sideKey] ? undefined : zone}
  pos={pos} setPos={setPos}
+            /* THE SURFACES ARE LOCKED TOO, not just the ways of adding a file. A submitted
+               order is quoted and charged; a design nudged across the print zone afterwards
+               is work nobody is billed for, and the seller has no way of knowing they moved
+               it. Same flag as the files, because it is the same fact about the same line. */
+ readOnly={filesLocked}
  onRemove={() => void removeArtwork()}
             /* ON THE LAYER, WITH THE REST. This was a labelled button parked in the corner of
  the stage while rotate, lock and delete sat in one strip above the selection —
@@ -3266,7 +3314,7 @@ export function DesignCanvasDialog({
  confused row of chips that did unrelated things. */}
             </div>
           )}
-          {!designUrl && (
+          {!designUrl && !filesLocked && (
             <button
  type="button"
  onClick={() => uploadRef.current?.click()}
@@ -3521,8 +3569,8 @@ export function DesignCanvasDialog({
             <Button
               type="button" size="sm" variant="outline"
               onClick={() => (ownMockups[sideKey] ? void clearOwnMockup() : mockupRef.current?.click())}
-              disabled={mockBusy}
-              title={ownMockups[sideKey]
+              disabled={mockBusy || filesLocked}
+              title={filesLocked ? lockedWhy : ownMockups[sideKey]
                 ? tl("canvas", "Put our product photo back")
                 : tl("canvas", "Use your own product photo as the backdrop — the design file is still needed")}
             >
@@ -3713,7 +3761,13 @@ export function DesignCanvasDialog({
               * onPick, NOT the zone's own input — opening the OS file dialog takes focus off
               * the page, and `uploadRef` lives at dialog level so it survives that.
               */}
-            <Dropzone
+            {/* A ZONE THAT REFUSES EVERY DROP IS WORSE THAN NO ZONE. The list of files
+                already on the line stays — reading what is attached is not editing it —
+                and the way to change one is the sentence, not a target that swallows a
+                drag and then says no. */}
+            {filesLocked
+              ? <p className="rounded-lg border border-border px-3 py-2.5 text-xs text-muted-foreground">{lockedWhy}</p>
+              : <Dropzone
               icon={UploadSimple}
               accept={"image/*," + MACHINE_EXT_LIST}
               label={tl("canvas", "Drop your files, or click to browse")}
@@ -3721,7 +3775,7 @@ export function DesignCanvasDialog({
               multiple
               onFiles={(f) => void takeFiles(f)}
               onPick={() => uploadRef.current?.click()}
-            />
+            />}
             {/* Saving a template is not ADDING a file, so it sits under the zone rather than
                 inside it — and only with artwork on the line, because there is otherwise
                 nothing to save. ABOVE the recent files, not below them: a row of Attach
@@ -4486,9 +4540,13 @@ export function DesignCanvasDialog({
           <div className="flex flex-wrap items-center justify-end gap-2">
             {(designUrl || latestMachine) && !!siblings?.length && (
               <div className="mr-auto flex flex-wrap gap-1.5">
+                {/* COPYING THIS IMAGE ONTO EVERY OTHER LINE IS A WRITE, and the biggest
+                    one in this window — so it answers to the same lock as the files. Save is
+                    deliberately left alone: with the stage read-only and every intake
+                    refusing, there is nothing left for it to write. */}
                 {designUrl && (
-                  <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}
- title={`Put this ${sideName} image on every other line of this order`}>
+                  <Button variant="outline" size="sm" disabled={applying || filesLocked} onClick={() => void applyToAll()}
+ title={filesLocked ? lockedWhy : `Put this ${sideName} image on every other line of this order`}>
                     {applying ? tl("canvas", "Applying…") : tl("canvas", "Apply All")}
                   </Button>
                 )}
