@@ -57,7 +57,7 @@ const WEB = join(dirname(dirname(fileURLToPath(import.meta.url))), 'web')
  * fixed — so it is a baseline of things that have NOT been shown to be bugs, not a tolerance
  * for the bug itself. Lower it when you fix one; never raise it to make the gate pass.
  */
-const BASELINE = 65
+const BASELINE = 64
 
 const DIRS = ['app', 'components', 'lib']
 const OUT = join(WEB, 'tdz.json')   // eslint -f json -o needs a path inside the project

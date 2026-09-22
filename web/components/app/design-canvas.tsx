@@ -1829,6 +1829,25 @@ export function DesignCanvasDialog({
    * without a second copy of the query. */
  /** How many cards this order already has — the next one is D<n+1>. */
  const [cardCount, setCardCount] = useState(0)
+  /**
+   * FACES ALREADY ON THE BOARD, so the button cannot offer to send them twice.
+   *
+   * Held here rather than derived from `boardCard`, which is ONE card — the line's most
+   * recent — and cannot say which faces it covers.
+   *
+   * It stores WHAT WAS SENT, not merely that something was: swap the artwork on a face that
+   * has already gone and it becomes sendable again, because that is a new design for the
+   * same position and the old card is about the old picture. A boolean would have made
+   * "sent" a property of the face rather than of the work.
+   *
+   * DECLARED HERE, ABOVE `loadCards`, AND THAT POSITION IS LOAD-BEARING. It used to sit
+   * ~170 lines below the callback that seeds it, which runs long after render and so never
+   * failed — but the React Compiler reads it as a use before declaration and refuses the
+   * whole component, exactly the way `printZone` did (see its note above). The file's own
+   * history is the argument: one unverifiable value silently drops this dialog — the
+   * heaviest surface in the app — out of compilation, and nothing on screen says so.
+   */
+ const [sentSides, setSentSides] = useState<Record<string, string>>({})
  const loadCards = useCallback(() => {
  if (!isStaff) return
  getOrderDesignCards(orderId)
@@ -2007,18 +2026,6 @@ export function DesignCanvasDialog({
   // order the drops happened in. Same list the Files tab prints, by construction.
  const sendable = artFaces
  const [skip, setSkip] = useState<Record<string, boolean>>({})
-  /**
-   * FACES ALREADY ON THE BOARD, so the button cannot offer to send them twice.
-   *
-   * Held here rather than derived from `boardCard`, which is ONE card — the line's most
-   * recent — and cannot say which faces it covers.
-   *
-   * It stores WHAT WAS SENT, not merely that something was: swap the artwork on a face that
-   * has already gone and it becomes sendable again, because that is a new design for the
-   * same position and the old card is about the old picture. A boolean would have made
-   * "sent" a property of the face rather than of the work.
-   */
- const [sentSides, setSentSides] = useState<Record<string, string>>({})
   /** WHY A SEND DID NOT HAPPEN, beside the button that tried. It used to set the dialog's
    *  shared `err`, which renders far below in the body — so a failed send left the button
    *  enabled with its message off where the eye was not, and the control read as doing
