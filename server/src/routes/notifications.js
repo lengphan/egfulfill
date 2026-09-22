@@ -10,6 +10,7 @@
 //  - notify() is fire-and-forget by contract: a notification must NEVER fail the
 //    business action that triggered it (shipping an order, sending a message).
 import { q } from '../db.js';
+import { isUserId } from '../auth.js';
 import { egSendTo } from '../events.js';
 import { pushToUsers } from './push.js';
 import { CHANNELS, pushableIds, mutedChannels, setMuted } from '../notify-prefs.js';
@@ -131,6 +132,9 @@ export function notificationRoutes(app, requireAuth) {
     const offset = Math.max(0, Number(req.query?.offset) || 0);
     const unreadOnly = String(req.query?.unread || '') === '1';
     const where = unreadOnly ? 'and read_at is null' : '';
+    /* A subject that is not a user row has no notifications — and asking Postgres would
+       raise 22P02 and 500 this poll forever. See isUserId. */
+    if (!isUserId(req.user.sub)) return { items: [], unread: 0 };
     const r = await q(
       `select id, type, title, body, href, entity_id, read_at, created_at
          from notifications where user_id=$1 ${where}

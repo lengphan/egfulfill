@@ -328,6 +328,27 @@ export async function login({ email, username, password }) {
 export const isStaff = (user) => !!user && ['operator', 'admin', 'warehouse', 'designer'].includes(user.role);
 
 /**
+ * IS THIS TOKEN'S SUBJECT A REAL USER ROW — asked BEFORE it reaches a uuid column.
+ *
+ * `users.id` is a uuid and half the app queries it straight from `req.user.sub`. A token
+ * whose sub is not a uuid therefore reaches Postgres as one, and Postgres refuses it with
+ * 22P02 — an UNCAUGHT DatabaseError, so the route 500s and leaks a driver error code to the
+ * browser. Observed on /api/notifications and /api/support/channels, which the shell POLLS:
+ * one such token turns every page into a steady stream of 500s.
+ *
+ * That is not only a malformed token. We MINT non-uuid subjects ourselves — tools/sanmar-sync
+ * signs `sub: 'sanmar-sync'` so a cron job never impersonates a person — and any of those
+ * wandering onto a user-scoped route does the same thing.
+ *
+ * A REFUSAL, NOT A 401. These are background polls, and lib/api.ts bounces ANY 401 to /login
+ * (CLAUDE.md §7) — so answering a poll with 401 would sign the person out mid-session over a
+ * notification count. The honest answer is that a subject which is not a user row HAS no
+ * notifications and no channels, which is what the callers below return.
+ */
+export const isUserId = (sub) =>
+  typeof sub === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sub);
+
+/**
  * Who may act ON another user's account — set a password, deactivate, promote.
  *
  * ADMIN ONLY. Deliberately narrower than isStaff (which admits operator and designer) and

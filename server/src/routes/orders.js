@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { orderLabel, orderLabelOf } from '../order-label.js';
 import { hashOf, hashBytes, isPhash } from '../fingerprint.js';
-import { isStaff, resolveSeller as _resolveSeller, canSurface, canSeeMoney } from '../auth.js';
+import { isStaff, isUserId, resolveSeller as _resolveSeller, canSurface, canSeeMoney } from '../auth.js';
 import { COST_TYPES } from '../costs.js';
 import { refreshStaleTracking } from './dispatch.js';
 import { egBroadcast } from '../events.js';
@@ -5530,6 +5530,10 @@ export function ordersRoutes(app, requireAuth) {
       if (await canSeeThread(req.user, channel)) allowed.push(channel);
     }
     if (!allowed.length) return [];
+    /* Same guard as /api/notifications: a subject that is not a user row cannot be matched
+       against a uuid column, and asking raises 22P02 — which 500s a poll the shell repeats
+       on every page. See isUserId. */
+    if (!isUserId(req.user.sub)) return [];
     const staff = isStaff(req.user);
     const r = await q(
       `select m.order_id,
