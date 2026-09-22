@@ -2849,6 +2849,10 @@ const vi: Dict = {
   "canvas.Click this, then click anywhere on your design to add that colour": "Bấm vào đây, rồi bấm vào bất kỳ chỗ nào trên thiết kế để thêm màu đó",
   "canvas.Remove the background — clears the backdrop connected to the edges, in your browser": "Xoá nền — loại bỏ phần nền liền với các cạnh, xử lý ngay trên trình duyệt của bạn",
   "canvas.Read the colours off your design again, undoing anything removed or changed here": "Đọc lại các màu từ thiết kế của bạn, huỷ mọi thay đổi hoặc màu đã xoá ở đây",
+  "canvas.No placement set": "Chưa gán vị trí",
+  "canvas.counts as every face until one is chosen": "tính cho mọi mặt cho đến khi chọn một vị trí",
+  "canvas.no stitch file": "chưa có tệp thêu",
+  "canvas.Which placement this stitch file is for": "Tệp thêu này dành cho vị trí nào",
   "canvas.no placement set": "chưa gán vị trí",
   "canvas.This order is submitted — ask the factory in chat to change the artwork.":
     "Đơn này đã gửi sản xuất — nhắn cho xưởng trong chat để đổi thiết kế.",

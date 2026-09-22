@@ -1,7 +1,7 @@
 "use client"
 
 import { useLabelT } from "@/lib/i18n"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react"
 import { Plus, Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -1622,6 +1622,29 @@ export function DesignCanvasDialog({
   /** Every file on this line, whatever kind — the list under the stage. Carries the id
    *  because a row you cannot open is a row that only tells you something is missing. */
  const [lineFiles, setLineFiles] = useState<{ designId: string; kind: string; name: string; side: string | null }[]>([])
+  /** Which row's face is being written, so only that select goes quiet. */
+ const [scoping, setScoping] = useState<string | null>(null)
+  /**
+   * MOVE A STITCH FILE ONTO A FACE — or off every face, which is the state it starts in.
+   *
+   * Optimistic on the row and reconciled from the server's answer, because `scope` is the
+   * one call that can legitimately return something other than what was asked: widening a
+   * file to the whole ORDER clears its face, and a list that kept showing the face it used
+   * to have would be arguing with the database.
+   */
+ const setFileSide = async (f: { designId: string; side: string | null }, side: string | null) => {
+ if (f.side === side) return
+ setScoping(f.designId); setErr(null)
+    try {
+ const r = await scopeDesignFile(f.designId, item.line_id ?? null, side)
+ if (r?.error) throw new Error(r.error)
+ const landed = r?.side ?? null
+ setLineFiles((prev) => prev.map((x) => (x.designId === f.designId ? { ...x, side: landed } : x)))
+ onSaved?.()
+    } catch (e) {
+ setErr(e instanceof Error ? e.message : "Couldn't move that file.")
+    } finally { setScoping(null) }
+  }
   /**
    * THE SELLER'S MACHINE-FILE LIBRARY — built, and reachable from neither editor until now.
    *
@@ -1709,6 +1732,45 @@ export function DesignCanvasDialog({
    */
  const surfaceFiles = useMemo(() => lineFiles.filter((f) => f.side === sideKey), [lineFiles, sideKey])
  const itemFiles = useMemo(() => lineFiles.filter((f) => !f.side), [lineFiles])
+  /**
+   * EVERY FILE ON THE LINE, UNDER THE FACE IT BELONGS TO (owner, today: "all front files
+   * then other face files").
+   *
+   * The list was two groups — this surface, then the whole item — which answers "what is on
+   * the face I am looking at" and cannot answer the question the panel is actually for:
+   * does EVERY embroidered face have its stitch file? Three faces and one .EMB read exactly
+   * like three faces and three, because a missing thing has no row.
+   *
+   * Grouped by face, every face, the garment's own order. A face short of its stitch file is
+   * then a visibly short group rather than an absence you have to count.
+   *
+   * A SIDE-LESS FILE IS TWO DIFFERENT FACTS and they are separated here. A picture or a size
+   * chart with no face belongs to the GARMENT — that is what "whole item" has always meant
+   * and it is fine. A MACHINE file with no face is not fine: the server reads it as covering
+   * every surface, so computeDesignFees marks them all `supplied` and waives the digitising
+   * on faces it was never cut for. One is a scope; the other is an unanswered question, and
+   * §4 forbids drawing them the same.
+   */
+  const filesByFace = useMemo(() => {
+    type Group = { key: string; kind: "face" | "stray" | "whole"; files: typeof lineFiles }
+    const seen = new Set<string>()
+    const groups: Group[] = faces.map((f) => {
+      const k = (f.side || "front").toLowerCase()
+      const mine = lineFiles.filter((x) => String(x.side || "").toLowerCase() === k)
+      for (const x of mine) seen.add(x.designId)
+      return { key: k, kind: "face", files: mine }
+    })
+    const loose = lineFiles.filter((x) => !x.side && !seen.has(x.designId))
+    const stray = loose.filter((x) => x.kind === "emb" || x.kind === "pes")
+    const whole = loose.filter((x) => x.kind !== "emb" && x.kind !== "pes")
+    /* The unplaced stitch files FIRST among the extras: it is the state that costs money, so
+       it is the one that has to be met before the panel is scrolled past. */
+    if (stray.length) groups.push({ key: "", kind: "stray", files: stray })
+    if (whole.length) groups.push({ key: "", kind: "whole", files: whole })
+    /* A face nobody has put anything on is not drawn. The rail already says the garment has
+       it, and an empty group per surface would be five headings over nothing on a cap. */
+    return groups.filter((g) => g.files.length > 0 || g.kind === "face")
+  }, [faces, lineFiles])
   /**
    * WHAT THE BADGE COUNTS — exactly what the tab shows, which is the only thing a badge is
    * allowed to count.
@@ -4048,21 +4110,37 @@ export function DesignCanvasDialog({
                 face" about both. That note was the panel making a claim the row never made.
                 The order page's Files tab stays the flat everything-view; this window is one
                 garment, and the first group is the surface in front of you. */}
-            {([
-              [surfaceFiles, `${tl("sides", sideKey)} · ${tl("canvas", "this placement")}`],
-              /* Named for what it IS, not for what it is not: a size chart or a customer's
-                 reference photo belongs to the garment however many faces it has. */
-              [itemFiles, tl("canvas", "Whole item")],
-            ] as const).filter(([list]) => list.length > 0).map(([list, heading]) => (
-            <div key={heading} className="flex flex-col gap-1">
-              {/* Only drawn when BOTH groups have something. One group needs no heading —
-                  a label over a list with nothing to distinguish it from is furniture. */}
-              {surfaceFiles.length > 0 && itemFiles.length > 0 && (
-                <div className="mt-1 text-2xs font-medium uppercase tracking-wide text-muted-foreground first:mt-0">{heading}</div>
-              )}
-              {list.map((f) => (
+            {filesByFace.map((g, gi) => {
+              /* EMBROIDERED, AND NOTHING TO RUN — the one gap on this panel that costs money.
+                 Only asked of a face that has ARTWORK: a surface nobody has placed a design
+                 on is not waiting for a stitch file, it is waiting for a picture, and the
+                 rail says so already. */
+              const isEmbFace = g.kind === "face"
+                && isEmbroidery(faceMethod[g.key] || item.print_type || "")
+              const hasArt = g.kind === "face" && artFaces.some((a) => a.side === g.key)
+              const needsFile = isEmbFace && hasArt
+                && !g.files.some((f) => f.kind === "emb" || f.kind === "pes")
+              const heading = g.kind === "face" ? tl("sides", g.key)
+                : g.kind === "stray" ? tl("canvas", "No placement set")
+                : tl("canvas", "Whole item")
+              /* An untouched face with nothing to say is not a heading over nothing. */
+              if (g.kind === "face" && !g.files.length && !needsFile) return null
+              return (
+            <div key={`${g.kind}-${g.key}-${gi}`} className="flex flex-col gap-1">
+              <div className={"mt-1 flex items-baseline gap-2 text-2xs font-medium uppercase tracking-wide first:mt-0 "
+                + (g.kind === "stray" ? "text-hold" : "text-muted-foreground")}>
+                <span>{heading}</span>
+                {/* WHAT IS MISSING, said on the group that is missing it. Not a price: this
+                    window cannot see which design-fee tier a face will land in, and a figure
+                    it cannot source is worse than the plain fact. */}
+                {needsFile && <span className="normal-case tracking-normal text-hold">{tl("canvas", "no stitch file")}</span>}
+                {g.kind === "stray" && (
+                  <span className="normal-case tracking-normal">{tl("canvas", "counts as every face until one is chosen")}</span>
+                )}
+              </div>
+              {g.files.map((f) => (
+                <Fragment key={f.designId}>
                 <FileRow
-                  key={f.designId}
                   file={{
                     name: f.name || "Untitled file",
                     /* The format, or what is happening to the row — the sub-line carries
@@ -4115,9 +4193,47 @@ export function DesignCanvasDialog({
                     onRemove: !filesLocked || isAdmin ? () => void removeLineFile(f) : undefined,
                   }}
                 />
+                {/**
+                  * AND A WAY TO PUT IT RIGHT (owner, today: "nowhere to assign to a
+                  * surface").
+                  *
+                  * Grouping shows the gap; this closes it. A panel that displays a problem
+                  * and then sends you somewhere else to fix it is half a feature — and there
+                  * was nowhere else: the Files panel's scope picker chooses a LINE and stops.
+                  *
+                  * The server has taken this since per-side artwork existed — scope reads
+                  * `side`, and clears it when a file is widened to the whole order, because a
+                  * file on every line cannot belong to one surface. So this is a control over
+                  * a route, not a new capability.
+                  *
+                  * MACHINE FILES ONLY, and only on a garment with more than one face. A
+                  * picture's face is decided by where it was PLACED, which is the canvas, not
+                  * a dropdown; and on a one-sided line there is no choice to offer.
+                  *
+                  * `.eg-control` because it is a FIELD — something you set, not an action
+                  * (§4: shape says kind). Locked with everything else: a submitted order's
+                  * files are the factory's.
+                  */}
+                {(f.kind === "emb" || f.kind === "pes") && faces.length > 1 && (
+                  <select
+                    className="eg-control ms-9 h-7 w-[calc(100%-2.25rem)] px-2 text-2xs"
+                    value={f.side ?? ""}
+                    disabled={filesLocked || scoping === f.designId}
+                    title={filesLocked ? lockedWhy : tl("canvas", "Which placement this stitch file is for")}
+                    onChange={(e) => void setFileSide(f, e.target.value || null)}
+                  >
+                    <option value="">{tl("canvas", "No placement set")}</option>
+                    {faces.map((x) => (
+                      <option key={x.side} value={(x.side || "front").toLowerCase()}>
+                        {tl("sides", (x.side || "front").toLowerCase())}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                </Fragment>
               ))}
             </div>
-            ))}
+            )})}
             {/* THE ONE PLACE A FILE ERROR IS SAID. It used to sit inside the `isEmb` block,
                 so a failed open on a DTG line set the message and nothing rendered it. */}
             {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
