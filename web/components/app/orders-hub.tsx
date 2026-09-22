@@ -3025,7 +3025,11 @@ export function OrdersHub() {
  describes and pushed the artwork off its position. It now
  overlays the image corner on hover (below), so it costs no
  space and stays where the image already is. */}
-                          <div className="group/art relative shrink-0 self-start">
+                          {/* self-STRETCH, and a flex box so the avatar inside takes the
+                              height: the tile's ground runs the full height of the line
+                              instead of stopping wherever its size constant landed. The
+                              picture inside stays square (see ItemAvatar's `stretch`). */}
+                          <div className="group/art relative flex shrink-0 self-stretch">
                           {/* THE SAME CONTROL THE OPEN ORDER HAS. The board is where the floor
                               actually stands, and the artwork and stitch file were reachable
                               only by opening the order first — one line at a time. Both pieces
@@ -3063,6 +3067,7 @@ export function OrdersHub() {
                             // title and a chip strip, and sizing them to the tall case is what
                             // would put the band back on the other side.
  size={canDesign && stage === "" ? 120 : 88}
+ stretch
  onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
                             /**
                              * A DROP LANDS ON THIS LINE, AND ONLY THIS LINE.

@@ -585,7 +585,15 @@ export function OrdersList() {
  item={it}
  designs={designs[o.id]}
  catalog={catalog}
+                                      // WIDTH, not height, now: `stretch` gives the tile the
+                                      // row's own height. At 76 the picture stopped three
+                                      // lines short of the text — the colour chip and part of
+                                      // the quantity sat under it, so the card had two bottom
+                                      // edges. Raising the number instead only re-dates it:
+                                      // this strip has already been re-measured by hand every
+                                      // time the meta line changed shape.
  size={76}
+ stretch
  onEdit={() => setEditing({ order: o, item: it })}
  onDropImage={(dataUrl) => {
  if (!it.sku) return

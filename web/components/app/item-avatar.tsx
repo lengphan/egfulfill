@@ -61,6 +61,26 @@ export type ItemAvatarProps = {
   /** Accept artwork dropped straight onto the thumb. Passed wherever a design can be
    *  attached — one handler here covers every surface that renders an item. */
   onDropImage?: (dataUrl: string, file: File) => void
+  /**
+   * FILL THE ROW instead of drawing a fixed square.
+   *
+   * `size` is a hard-coded number at every call site, so the tile's height cannot follow the
+   * text beside it — and the text is what moves. On the seller's list a line reading title,
+   * listing sku, blank sku, qty and a colour chip measures ~126px against a 76px tile, so
+   * the chip finishes below the picture and the card has two bottom edges. Every number in
+   * this component's call sites (136, then 120, then 104, then 88) is that gap being
+   * re-measured by hand after the meta strip changed shape again.
+   *
+   * THE COMPOSITE STAYS SQUARE. Only the tile's ground stretches; the picture is a square
+   * centred in it. `ArtLayer` positions artwork in percentages OF THE TILE, which maps onto
+   * the garment only while the tile matches the mockup's square aspect — a tall tile would
+   * crop the blank under `object-cover` and slide the artwork off it. That is the
+   * per-surface maths this component exists without (see Composite), so the stretch buys a
+   * single bottom edge, never a taller photograph.
+   *
+   * `size` still sets the WIDTH, so nothing to the right of the picture moves.
+   */
+  stretch?: boolean
   /** Drop the frame. A row's PRIMARY photo is the picture itself — a border around a
    *  small image reads as a chip, and a stack of them reads as a strip of chips rather
    *  than as the products. Kept as an opt-in so the 44px avatars inside an expanded line,
@@ -103,7 +123,7 @@ function blankOf(item: OrderItem, catalog?: CatalogProduct[], px?: number): { ur
   return { url: thumbSrc(own || item.img, px), missing: !!p && !own, chosen: !!p }
 }
 
-export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, bare, className }: ItemAvatarProps) {
+export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, bare, stretch, className }: ItemAvatarProps) {
   const tl = useLabelT()
   const [preview, setPreview] = useState(false)
   const [showListing, setShowListing] = useState(false)
@@ -238,10 +258,14 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
     <>
       <div
         {...dropProps}
-        className={"group/avatar relative shrink-0 transition-[width] duration-300 ease-out " + (over ? "rounded-md ring-2 ring-primary ring-offset-1 " : "") + (className ?? "")}
+        className={"group/avatar relative shrink-0 transition-[width] duration-300 ease-out " + (stretch ? "self-stretch " : "") + (over ? "rounded-md ring-2 ring-primary ring-offset-1 " : "") + (className ?? "")}
         // Wide enough for the print plus the listing's peek. Only when both are shown, so
         // every other caller's layout is exactly as it was.
-        style={{ width: showBoth ? Math.round(size * (1 + PEEK)) : size, height: size }}
+        //
+        // Stretching leaves the height to `align-self`, which resolves against the flex
+        // LINE — a percentage here would resolve against a row whose height is auto, which
+        // is no height at all, and the tile would collapse.
+        style={{ width: showBoth ? Math.round(size * (1 + PEEK)) : size, height: stretch ? undefined : size }}
       >
         {/* THE PRINT — full size, in front, offset right by exactly the listing's peek. */}
         <button
@@ -252,11 +276,20 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           // modes. Going from `size-full` in flow to absolutely positioned is a discrete
           // change nothing can tween, which is why the row jumped the moment the listing
           // photo slid behind.
-          className={"eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md bg-card transition-all duration-300 ease-out " + (bare ? "" : "border border-border hover:border-foreground/25")
+          className={"eg-tap absolute overflow-hidden rounded-md bg-card transition-all duration-300 ease-out " + (stretch ? "" : "top-1/2 -translate-y-1/2 ") + (bare ? "" : "border border-border hover:border-foreground/25")
             + (showBoth && !listingFront ? " z-20 border-2 border-background " : " z-0")}
-          style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
+          // Stretched: the ground runs the full height of the row and the width is still
+          // `size`, so the column costs exactly what it did before.
+          style={stretch
+            ? { left: showBoth ? Math.round(size * PEEK) : 0, right: 0, top: 0, bottom: 0 }
+            : { left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >
-          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} />
+          {/* THE PICTURE IS ALWAYS SQUARE — see `stretch` above. Centred in the tile, so a
+              row taller than the photo shows the card's own surface above and below it
+              rather than a cropped garment. */}
+          <span className={stretch ? "absolute inset-x-0 top-1/2 aspect-square -translate-y-1/2" : "block size-full"}>
+            <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} />
+          </span>
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
