@@ -3066,7 +3066,7 @@ export function OrdersHub() {
                             // The picker-less case keeps 88 deliberately. Those rows are a
                             // title and a chip strip, and sizing them to the tall case is what
                             // would put the band back on the other side.
- size={canDesign && stage === "" ? 120 : 88}
+ size={canDesign && stage === "" ? 140 : 112}
  stretch
  onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
                             /**

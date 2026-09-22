@@ -276,8 +276,28 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           // modes. Going from `size-full` in flow to absolutely positioned is a discrete
           // change nothing can tween, which is why the row jumped the moment the listing
           // photo slid behind.
-          className={"eg-tap absolute overflow-hidden rounded-md bg-card transition-all duration-300 ease-out " + (stretch ? "" : "top-1/2 -translate-y-1/2 ") + (bare ? "" : "border border-border hover:border-foreground/25")
-            + (showBoth && !listingFront ? " z-20 border-2 border-background " : " z-0")}
+          /**
+           * A HAIRLINE, AND THE SAME ONE IN FRONT AS BEHIND (owner, 2026-09-22).
+           *
+           * The front card wore `border-2 border-background` so it would read as being in
+           * front of the listing — a 2px white slab around a white photo on a white card,
+           * which is the "thick grey background" on the pair: three edges of chrome doing
+           * one job. The separation is now a white HALO outside the hairline (ring-2
+           * ring-card), which cannot be mistaken for the picture's own frame because it is
+           * the card's own colour.
+           */
+          /**
+           * STRETCHED: THE FRAME MOVES ONTO THE PICTURE.
+           *
+           * The tile spans the row, but the composite inside it is square — so a frame on
+           * the TILE draws a tall box with the photo floating in the middle of it, which is
+           * the grey slab the owner objected to (2026-09-22). A frame belongs to the
+           * picture; the leftover height is just card, and card with nothing drawn on it is
+           * invisible. So when stretching, the border and the ground go on the square below
+           * and this element carries neither.
+           */
+          className={"eg-tap absolute transition-all duration-300 ease-out " + (stretch ? "" : "overflow-hidden rounded-md bg-card top-1/2 -translate-y-1/2 " + (bare ? "" : "border border-border hover:border-foreground/25"))
+            + (showBoth && !listingFront ? " z-20 " + (stretch ? "" : "ring-2 ring-card ") : " z-0")}
           // Stretched: the ground runs the full height of the row and the width is still
           // `size`, so the column costs exactly what it did before.
           style={stretch
@@ -287,7 +307,9 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           {/* THE PICTURE IS ALWAYS SQUARE — see `stretch` above. Centred in the tile, so a
               row taller than the photo shows the card's own surface above and below it
               rather than a cropped garment. */}
-          <span className={stretch ? "absolute inset-x-0 top-1/2 aspect-square -translate-y-1/2" : "block size-full"}>
+          <span className={stretch
+            ? "absolute inset-x-0 top-1/2 aspect-square -translate-y-1/2 overflow-hidden rounded-md bg-card " + (bare ? "" : "border border-border group-hover/avatar:border-foreground/25 ") + (showBoth && !listingFront ? "ring-2 ring-card" : "")
+            : "block size-full"}>
             <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} />
           </span>
           {/* Affordance only where there's something to do — and only on hover, so the
@@ -320,7 +342,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             }}
             title={listingFront ? tl("itemAvatar", "View the buyer's listing photo") : tl("itemAvatar", "Bring the listing photo forward")}
             className={
-              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-card  transition-all hover:brightness-105 " +
+              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border border-border bg-card  transition-all hover:brightness-105 " +
               (listingFront ? "z-20" : "z-0")
             }
             // NO `transform` here. Tailwind v4 compiles -translate-y-1/2 to the `translate`

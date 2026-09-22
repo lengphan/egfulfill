@@ -592,7 +592,7 @@ export function OrdersList() {
                                       // edges. Raising the number instead only re-dates it:
                                       // this strip has already been re-measured by hand every
                                       // time the meta line changed shape.
- size={76}
+ size={112}
  stretch
  onEdit={() => setEditing({ order: o, item: it })}
  onDropImage={(dataUrl) => {
