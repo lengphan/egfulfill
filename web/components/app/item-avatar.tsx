@@ -385,7 +385,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             <DialogTitle className="pr-6 text-sm leading-snug">{item.name || item.sku || tl("itemAvatar", "Item")}</DialogTitle>
             {/* Shared by every board that renders a line, so the buyer's choice follows the
                 item wherever it is opened rather than only on the queue. */}
-            <OrderedVariant item={item} className="pr-6" />
+            <OrderedVariant item={item} className="pr-6" catalogReady={(catalog?.length ?? 0) > 0} />
           </DialogHeader>
           <div className="space-y-3 px-1 pb-1">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-card">

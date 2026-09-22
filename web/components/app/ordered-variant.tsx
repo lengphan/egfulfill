@@ -26,7 +26,7 @@ import { decodeEntities } from "@/lib/order-format"
  *
  * Renders nothing when the line carries neither, so a manual order gains no empty strip.
  */
-export function OrderedVariant({ item, className = "", after, blankSku, showQty = true }: {
+export function OrderedVariant({ item, className = "", after, blankSku, showQty = true, catalogReady = true }: {
   item: OrderItem
   className?: string
   /** One node, or an array — an array becomes separately dot-separated parts. */
@@ -54,6 +54,21 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
    * size and a count is the ambiguity that distinction exists to prevent.
    */
   blankSku?: string | null
+  /**
+   * HAS THE CATALOGUE ARRIVED — because "we have not looked yet" is not "no match".
+   *
+   * `blankSku` is resolved by the caller against a catalogue it fetches asynchronously, and
+   * every caller starts that state as `[]`. So for the first few hundred milliseconds — and
+   * FOREVER if that fetch fails, which each of them swallows — nothing resolves, and this
+   * row printed "Blank not linked to a product" over a line whose blank is linked perfectly
+   * well. The mockup vanishes at the same moment for the same reason (`blankOf` gates on
+   * `catalog?.length`), so the row reads as a broken product rather than a page still
+   * loading, and sends someone to fix a line that has nothing wrong with it.
+   *
+   * Default TRUE so a caller with no catalogue at all is unaffected; the four that resolve
+   * against one pass their own readiness.
+   */
+  catalogReady?: boolean
 }) {
   const tl = useLabelT()
   // Entities arrive HTML-encoded from the marketplaces (&amp;, &#39;) — the same decode the
@@ -166,6 +181,17 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
     <span key="b">
       <span className="font-medium text-foreground/70">{tl("orderedVariant", "Blank SKU:")}</span>{" "}
       <span className="tabular-nums">{blankSku}</span>
+    </span>
+  )
+  /**
+   * STILL LOADING IS ITS OWN ANSWER, and it is neither a sku nor a fault — see
+   * `catalogReady`. A bar holds the row's height so the line does not jump when the real
+   * code lands, and says plainly that nothing has been decided yet.
+   */
+  else if (!catalogReady && blank) ids.push(
+    <span key="b">
+      <span className="font-medium text-foreground/70">{tl("orderedVariant", "Blank SKU:")}</span>{" "}
+      <span className="inline-block h-3 w-20 rounded bg-muted align-middle motion-safe:animate-pulse" aria-label={tl("orderedVariant", "Loading")} />
     </span>
   )
   else if (blank) ids.push(
