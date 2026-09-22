@@ -1246,6 +1246,21 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
    * and the rows the ledger owns are not drawn. A face then has no children and stays the
    * single line it always was, which is what the grouping rule already asks for.
    */
+  /**
+   * THE ORDER'S DISCOUNT RATE — ONE definition, read in two places.
+   *
+   * The plan's rate when the discount came from a plan, else the volume tier's;
+   * `discountFrom` is the server's own word for which one won, and they are a BEST-OF rather
+   * than a sum. Shown for the LABEL only — the money always comes from the ratio the charge
+   * itself used, because a rate rounded for display and then re-applied is how a breakdown
+   * stops adding up.
+   *
+   * Declared here rather than inside itemGroups because the ledger's Discount row names it
+   * too, and a second computation of one rate is how the heading and the row come to
+   * disagree about the same deduction (§5).
+   */
+  const dpct = quote?.discountFrom === "plan" ? (Number(quote?.planPct) || 0) : (Number(quote?.volumePct) || 0)
+
   const itemGroups = (lines: NonNullable<OrderQuote["lines"]>, goodsOnly = false) => (
     <>
                       {/**
@@ -1294,8 +1309,9 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                          */
                         /* THE RATE THAT ACTUALLY APPLIED — best-of plan vs volume, never the
                            sum, and `discountFrom` is the server's own word for which one won.
-                           Shown for the label only. */
-                        const dpct = quote?.discountFrom === "plan" ? (Number(quote?.planPct) || 0) : (Number(quote?.volumePct) || 0)
+                           Shown for the label only. See `dpct` above itemGroups — it is read
+                           by the ledger's Discount row as well now, and two computations of
+                           one rate is how the heading and the row come to disagree (§5). */
                         /* THE MONEY comes from the ratio the charge itself used, not from that
                            percentage. A rate rounded for display and then re-applied is how a
                            breakdown ends up a cent away from the total it is breaking down. */
@@ -1385,7 +1401,22 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                     every row below drop the words and keep only its own figures.
                                     `discOwn`, not `dpct` alone: a rate shown on an item that earned no
                                     deduction would be a promise the rows underneath do not keep. */}
-                                {discOwn > 0.005 && dpct > 0 && (
+                                {/**
+                                  * THE RATE GOES WHERE THE MONEY IS (owner, today: "should
+                                  * have 20% off next to discount below").
+                                  *
+                                  * Before the charge there is no separate discount row — the
+                                  * deduction is struck through on this item's own rows — so the
+                                  * heading is the only place that can name the rate, and it
+                                  * still does.
+                                  *
+                                  * AFTER the charge the ledger carries "Discount −$8.80" as a
+                                  * row of its own, and `goodsOnly` has already stopped this
+                                  * block striking anything through. A heading still reading
+                                  * "· 20% off" then announced a rate whose money is somewhere
+                                  * else entirely, above the row that actually holds it.
+                                  */}
+                                {!goodsOnly && discOwn > 0.005 && dpct > 0 && (
                                   <span className="font-semibold text-success"> · {dpct}% {tl("order", "off")}</span>
                                 )}
                               </dt>
@@ -2210,6 +2241,20 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
  return n >= 0 ? <span className="opacity-70"> · Item {n + 1}</span> : null
                               })()
                             : null}
+                          {/**
+                            * THE RATE, ON THE ROW THAT HOLDS THE MONEY (owner, today).
+                            *
+                            * It used to sit on each item heading, which was right while the
+                            * deduction was struck through on those items' own rows. The ledger
+                            * carries it as a line of its own, so a reader looking at "−$8.80"
+                            * had to go back up to two headings to learn what rate produced it
+                            * — and those headings no longer strike anything through.
+                            *
+                            * Same green as the figure beside it, because they are one fact.
+                            */}
+                          {l.part === "discount" && dpct > 0 && (
+                            <span className="font-semibold text-success"> · {dpct}% {tl("order", "off")}</span>
+                          )}
                           {/**
                             * THE NOTE GOES UNDERNEATH (owner, 2026-09-10).
                             *
