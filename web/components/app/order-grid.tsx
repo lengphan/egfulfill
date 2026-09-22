@@ -520,6 +520,11 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * one control where choosing wrong costs a garment.
    */
   const [peek, setPeek] = useState<{ src: string; left: number; top: number } | null>(null)
+  /* SEPARATE FROM `peek`, and that separation is the whole of the smoothness.
+     `peek` keeps the picture and its position after the cursor has left, so the card fades
+     out WHERE IT WAS instead of vanishing; `peekOn` is the only thing the hover toggles.
+     Moving between two rows therefore never unmounts anything — the same card glides. */
+  const [peekOn, setPeekOn] = useState(false)
   const gridRef = useRef<HTMLDivElement | null>(null)
 
   /**
@@ -1248,7 +1253,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
     requestAnimationFrame(() => {
       if (!el.isConnected) return
       const r = el.getBoundingClientRect()
-      setPeek(null) // never reopen a menu with the previous one's zoom still on screen
+      setPeek(null); setPeekOn(false) // never reopen a menu with the previous one's zoom still on screen
       setMenu({ key, left: r.left, top: r.bottom, width: r.width, typed })
     })
   }, [setMenu])
@@ -1950,16 +1955,32 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
          * box, not the row's: beside the list on whichever side the viewport has room for,
          * so it never lands on top of the thing you are reading.
          */
-        const PEEK = 208
+        const PEEK = 180
+        const GAP = 8
+        /**
+         * BESIDE THE THUMBNAIL, ON THE SIDE THE LIST IS NOT.
+         *
+         * Two wrong answers before this one. Hung off the MENU's right edge it sat a third
+         * of a screen from the 32px square it was enlarging — you looked somewhere else to
+         * see the bigger version of what was under your cursor. Moved to the thumbnail's
+         * right edge it was adjacent and covered every label in the list, because the
+         * thumbnail is the first 32px of a 240px menu.
+         *
+         * LEFT is where both are satisfied: the thumbnail is at the menu's left edge, so a
+         * card ending 8px before it is adjacent to the picture AND outside the list. Right
+         * of the whole MENU is the fallback when the left would run off the viewport —
+         * further away, but never on top of the words.
+         */
         const showPeek = (e: React.MouseEvent<HTMLImageElement>) => {
           const r = e.currentTarget.getBoundingClientRect()
           const m = menuRef.current?.getBoundingClientRect()
-          const right = (m?.right ?? r.right) + 10
+          const onLeft = r.left - GAP - PEEK
           setPeek({
             src: e.currentTarget.src,
-            left: right + PEEK <= window.innerWidth - 8 ? right : Math.max(8, (m?.left ?? r.left) - 10 - PEEK),
+            left: onLeft >= 8 ? onLeft : Math.min((m?.right ?? r.right) + GAP, window.innerWidth - PEEK - 8),
             top: Math.min(Math.max(8, r.top + r.height / 2 - PEEK / 2), window.innerHeight - PEEK - 8),
           })
+          setPeekOn(true)
         }
         return (
         <>
@@ -1967,7 +1988,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
             ref={menuRef}
             /* SCROLLING MOVES THE ROW OUT FROM UNDER THE CURSOR and no mouseleave fires,
                so the card would hang beside a picture that is no longer there. */
-            onScroll={() => setPeek(null)}
+            onScroll={() => setPeekOn(false)}
             /**
              * SIZED FOR THE PICTURE, now that the picture is what identifies the row.
              *
@@ -1992,11 +2013,13 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                 key={optValue(o)}
                 type="button"
                 /* The NAME did not disappear, it moved to the tooltip — a row showing
-                   "EG-1002" beside a cap still has to be able to say which cap. */
-                title={optTitle(o)}
+                   "EG-1002" beside a cap still has to be able to say which cap. It sits on
+                   the LABEL and not on the button, so the browser's own tooltip cannot open
+                   on top of the zoom card: hovering the picture is answered by the picture,
+                   hovering the words is answered by the words. */
                 /* mousedown, not click: the input blurs first and would close this menu
                    before a click ever landed. preventDefault keeps the caret where it is. */
-                onMouseDown={(e) => { e.preventDefault(); setPeek(null); setCell(mr, mc, optValue(o)); setMenu(null) }}
+                onMouseDown={(e) => { e.preventDefault(); setPeekOn(false); setCell(mr, mc, optValue(o)); setMenu(null) }}
                 className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-accent"
               >
                 {optImg(o) !== null && (
@@ -2014,12 +2037,12 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                         /* A MOCKUP URL THAT 404s MUST NOT DRAW A BROKEN GLYPH. Hidden, not
                            removed: the 20px slot stays, so one dead image cannot make its
                            row shorter than the rows above and below it. */
-                        onError={(e) => { e.currentTarget.style.visibility = "hidden"; setPeek(null) }}
+                        onError={(e) => { e.currentTarget.style.visibility = "hidden"; setPeekOn(false) }}
                         /* The zoom hangs off the PICTURE, not the row: the row's job is to be
                            pressed, and a preview that follows the cursor across the whole
                            option would be up the entire time you are reading the list. */
                         onMouseEnter={showPeek}
-                        onMouseLeave={() => setPeek(null)}
+                        onMouseLeave={() => setPeekOn(false)}
                         /* 32px, not 20. At 20 the thumbnail was a favicon — enough to show
                            that a picture exists, not enough to tell a cap from a duffel from
                            a tee, which is the whole job it took over from the name. 32 is
@@ -2036,7 +2059,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                   <span aria-hidden style={optChip(o) as React.CSSProperties}
                     className="size-4 shrink-0 rounded-full ring-1 ring-border" />
                 )}
-                <span className="min-w-0 truncate">{optLabel(o)}</span>
+                <span title={optTitle(o)} className="min-w-0 truncate">{optLabel(o)}</span>
               </button>
             ))}
             {/* THE CAP, SAID OUT LOUD. 50 of several hundred blanks were rendered and the
@@ -2052,15 +2075,25 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
           </div>
           {/* OUTSIDE the menu div, because the menu is `overflow-auto` and anything drawn
               inside it would be clipped to the list. pointer-events-none so moving toward
-              the card never counts as leaving the thumbnail that opened it. */}
+              the card never counts as leaving the thumbnail that opened it.
+ 
+              MOUNTED FOR THE LIFE OF THE MENU, faded rather than added and removed. A card
+              that mounts at its final opacity cannot fade IN, and one that unmounts on
+              mouseleave cannot fade OUT — so the old one appeared and vanished, twice per
+              row, which is what reads as flicker when you run down a list. Opacity, scale
+              and POSITION all transition, so moving from one thumbnail to the next glides
+              the same card instead of blinking a new one into place.
+ 
+              Opt-out, per §4: `motion-reduce:transition-none` leaves it instant. */}
           {peek && (
             <div
               aria-hidden
               style={{ position: "fixed", left: peek.left, top: peek.top, width: PEEK, height: PEEK }}
-              className="pointer-events-none z-[60] overflow-hidden rounded-xl border border-border bg-popover p-2"
+              className={"pointer-events-none z-[60] origin-center overflow-hidden rounded-xl border border-border bg-popover p-2 transition-[opacity,transform,left,top] duration-150 ease-out motion-reduce:transition-none "
+                + (peekOn ? "scale-100 opacity-100" : "scale-95 opacity-0")}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={peek.src} alt="" className="size-full object-contain" onError={() => setPeek(null)} />
+              <img src={peek.src} alt="" className="size-full object-contain" onError={() => setPeekOn(false)} />
             </div>
           )}
         </>
