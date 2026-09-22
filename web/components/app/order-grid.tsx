@@ -40,7 +40,7 @@ import {
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
 import { resolveProduct, productLabel, setTypeMockups, offeredSides, bestMockup, blankCode } from "@/lib/variant-resolve"
-import { thumbSrc } from "@/lib/order-image"
+import { thumbSrc, proxiedImageSrc } from "@/lib/order-image"
 import { normalizeMethods } from "@/lib/print-method"
 import { platformName } from "@/shared/order-rules"
 import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles, getProductTypes,
@@ -88,11 +88,26 @@ const blankRow = () => CSV_COLUMNS.map(() => "")
  * list is twelve of these telling you nothing about which stitch file each one is. So an
  * option may carry a label; the cell still gets the value.
  */
-type Opt = string | { value: string; label: string; img?: string | null }
+type Opt = string | { value: string; label: string; img?: string | null; fit?: "cover" | "contain" }
 const optValue = (o: Opt) => (typeof o === "string" ? o : o.value)
 const optLabel = (o: Opt) => (typeof o === "string" ? o : o.label)
-/** The option's picture, when it has one — only the Blank column does. */
+/**
+ * The option's picture, when the column has one — Blank, and now Artwork/Template.
+ *
+ * `""` MEANS "this row gets a square and nothing arrived", which is not the same as `null`,
+ * "this column has no pictures at all". The distinction is what keeps a list aligned: one
+ * blank with no mockup among forty that have one must still occupy the same 32px, or its
+ * row is narrower than its neighbours and the column of codes steps left.
+ */
 const optImg = (o: Opt) => (typeof o === "string" ? null : o.img ?? null)
+/**
+ * A GARMENT PHOTO FILLS ITS SQUARE; A DESIGN MUST NOT BE CROPPED TO ONE.
+ *
+ * A mockup is shot square and `cover` is free. Artwork is whatever shape the artist made —
+ * a sleeve print is a long strip — and cover on that shows the middle third, which at 32px
+ * is a swatch of colour rather than the picture you are picking by.
+ */
+const optFit = (o: Opt) => (typeof o === "string" ? "cover" : o.fit ?? "cover")
 
 /**
  * 1–20, AS A PICKER, on a column that is typed far more often than any other.
@@ -650,9 +665,18 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * printable is worse than not offering it.
    */
   const refOptions = useMemo<Record<string, Opt[]>>(() => {
+    /* THE COMPOSITE IS THE TEMPLATE'S FACE — artwork already on its blank, which is what
+       tells two templates apart at any size (templates-panel and library-picker both draw
+       this same field). A template saved before the composite existed gets the empty square
+       rather than no square, so the list stays a column. */
     const tpls = templates
       .filter((t) => t.seq != null)
-      .map((t) => ({ value: `TPL-${t.seq}`, label: `TPL-${t.seq}${t.name ? ` · ${t.name}` : ""}` }))
+      .map((t) => ({
+        value: `TPL-${t.seq}`,
+        label: `TPL-${t.seq}${t.name ? ` · ${t.name}` : ""}`,
+        img: t.composite || "",
+        fit: "contain" as const,
+      }))
     const mfs = machineFiles
       .filter((m) => m.ref)
       .map((m) => ({ value: m.ref, label: `${m.ref}${m.name ? ` · ${m.name}` : ""}` }))
@@ -711,9 +735,20 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
            * `content_hash` is what makes a design resolvable and all 44 have one; an entry
            * without one cannot answer, so that is the guard now.
            */
+          /* AND THE DESIGN ITSELF, at the size the Blank column shows a garment. A row
+             reading `IMG-26 · Route 66 100th Anniversary Hat,…` truncates exactly where two
+             of a seller's designs stop looking alike — the same defect the blank menu had
+             and for the same reason, so it gets the same answer. proxiedImageSrc because a
+             marketplace-sourced thumb hotlinks and would draw a broken tile; a library
+             `data:` thumb passes through it untouched. */
           ...images
             .filter((d) => d.id != null && String(d.content_hash ?? "").trim() !== "")
-            .map((d) => ({ value: `IMG-${d.id}`, label: `IMG-${d.id}${d.name ? ` · ${d.name}` : ""}` })),
+            .map((d) => ({
+              value: `IMG-${d.id}`,
+              label: `IMG-${d.id}${d.name ? ` · ${d.name}` : ""}`,
+              img: d.thumb ? proxiedImageSrc(d.thumb) : "",
+              fit: "contain" as const,
+            })),
           ...tpls,
         ],
       ]),
@@ -808,9 +843,12 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         const value = productLabel(c)
         if (!value) return null
         const img = bestMockup(c, "", "")
-        return { value, label: blankCode(value), img: img ? thumbSrc(img, 48) : null }
+        /* "" and not null for a blank with no mockup — see optImg. This said null, so the
+           handful of products without a photo rendered no square at all and their codes sat
+           8px left of every other row's. */
+        return { value, label: blankCode(value), img: img ? thumbSrc(img, 48) : "" }
       })
-      .filter((o): o is { value: string; label: string; img: string | null } => !!o)
+      .filter((o): o is { value: string; label: string; img: string } => !!o)
       .sort((a, b) => a.value.localeCompare(b.value)),
     [catalog],
   )
@@ -1904,7 +1942,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                            a tee, which is the whole job it took over from the name. 32 is
                            also what a product picker normally runs at; past ~40 the list
                            stops being a list and becomes a gallery you scroll. */
-                        className="size-8 shrink-0 rounded-md object-cover"
+                        className={"size-8 shrink-0 rounded-md bg-muted " + (optFit(o) === "contain" ? "object-contain" : "object-cover")}
                       />
                     : <span aria-hidden className="size-8 shrink-0 rounded-md bg-muted" />
                 )}
