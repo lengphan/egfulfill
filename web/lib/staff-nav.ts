@@ -11,6 +11,15 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Board", href: "/designer", icon: Cards, roles: ["operator", "designer", "admin"] },
   // Earnings = a designer's own payout view. Admin sees designer credits in Wallet instead.
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer"] },
+  // Artwork — every picture that reached an order line, once each, keyed on the artwork
+  // itself rather than on the order. It answers "have we digitised this before", which is
+  // the question the Board asks too late: by the time a card is on it somebody has already
+  // decided to spend a designer.
+  //
+  // WAREHOUSE IS NOT HERE. The floor's work starts at the print queue — same line the Board
+  // above is drawn on — and this page names which sellers ordered a design, which is the
+  // narrowest §6 surface in the app.
+  { label: "Artwork", href: "/artwork", icon: PenNib, roles: ["operator", "designer", "admin"] },
   // Shipping = Dispatch (today's out-queue) + Shipments (parcel archive) as two tabs.
   // They stay distinct tabs, NOT one merged list: Dispatch is a short queue emptied by
   // evening, Shipments is an ever-growing archive — merging the lists would bury the queue.

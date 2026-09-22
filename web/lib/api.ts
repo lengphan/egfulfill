@@ -2022,8 +2022,54 @@ export function uploadDesignFile(body: { designId: string; orderId?: string; sku
    * ignored without a `lineId`, because a file that applies to the whole order cannot belong
    * to one surface of one garment.
    */
-  side?: string | null }) {
+  side?: string | null
+  /**
+   * WHICH ARTWORK this file is the stitch file FOR — a sha256, the same one order_designs
+   * carries. Send it when the caller knows and there is no order to infer it from, which
+   * is the factory library's whole situation. Omitted on an ordinary per-order upload,
+   * which keeps resolving through the order's own line exactly as before.
+   */
+  artHash?: string | null }) {
   return api<{ ok?: boolean; stored?: string; error?: string }>(`/api/design_files`, { method: "POST", body: JSON.stringify(body) })
+}
+
+/**
+ * THE FACTORY'S DESIGN LIBRARY — every piece of artwork that reached an order line, once
+ * each, with whether we already hold a machine file for it.
+ *
+ * STAFF ONLY, and the server refuses a seller outright: the row names every shop that
+ * ordered a design and §6 forbids a seller learning theirs was used by another. There is
+ * no seller-facing shape of this and there must not be one.
+ */
+export type FactoryDesign = {
+  art_hash: string
+  /** DSN-####, minted from the same hash — the number on the board card and in the designer. */
+  design_no: number | null
+  /** An ADDRESS, never the bytes: a page of sixty base64 images is the mistake the seller
+   *  library's own listing note already describes. */
+  thumb: string
+  name: string | null
+  orders: number
+  sellers: number
+  seller_names: string[]
+  /** Reads both links — a file naming this artwork, and one attributed through the order it
+   *  was uploaded against — so the library cannot say "no file" about artwork the reuse
+   *  panel offers a file for. */
+  has_file: boolean
+  first_seen?: string | null
+  last_seen?: string | null
+}
+export function getFactoryDesigns(opts: { seller?: string | null; q?: string; limit?: number; offset?: number } = {}) {
+  const p = new URLSearchParams()
+  if (opts.seller) p.set("seller", opts.seller)
+  if (opts.q) p.set("q", opts.q)
+  if (opts.limit != null) p.set("limit", String(opts.limit))
+  if (opts.offset) p.set("offset", String(opts.offset))
+  const qs = p.toString()
+  return api<{ designs: FactoryDesign[]; more: boolean }>(`/api/design_files/library${qs ? `?${qs}` : ""}`)
+}
+export function getFactoryDesignSellers() {
+  return api<{ sellers: { id: string; name: string; designs: number }[] }>(`/api/design_files/library/sellers`)
 }
 export function setDesignFilePrice(designId: string, price: number) {
   return api<{ ok?: boolean; price?: number; error?: string }>(`/api/design_files/${encodeURIComponent(designId)}/price`, { method: "PATCH", body: JSON.stringify({ price }) })
