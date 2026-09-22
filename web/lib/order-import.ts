@@ -903,7 +903,16 @@ const AUTO_KEY = "\u0000AUTO-"
 // become one order with several lines; a row without one can only ever be its own order,
 // because there is nothing to group it by. That is why a multi-line order must carry the
 // number even though the column is otherwise skippable.
-export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkResolver): ImportOrder[] {
+/**
+ * `EG-108084` -> "Transfer Duffel". Injected, exactly as the artwork resolver is, because
+ * this module is pure and the catalogue lives in the caller.
+ */
+export type BlankNameResolver = (cell: string) => string
+export function groupToOrders(
+  records: ImportRecord[],
+  resolveArtwork?: ArtworkResolver,
+  resolveBlankName?: BlankNameResolver,
+): ImportOrder[] {
   const valid = records.filter((r) => r._valid)
   const groups: Record<string, ImportRecord[]> = {}
   const order: string[] = []
@@ -966,7 +975,22 @@ export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkR
         // Tee"; the name is the half after the dash, so the board shows the garment rather
         // than a code. "Item" is what is left when a row has nothing at all, which the
         // required Blank Product now makes unreachable through the template.
-        name: S(r.product_title) || S(r.item_name) || blankName(S(r.blank)) || S(r.item_sku) || "Item",
+        /**
+         * AND THE CATALOGUE ANSWERS BEFORE blankName DOES, now that the Blank Product cell
+         * can be a bare code.
+         *
+         * blankName takes the half after " - ", which was the whole name while the cell held
+         * `108084 - Transfer Duffel`. The grid writes `EG-108084` now (owner's call), and
+         * there is no half after the dash — so the fallback returned the CODE and every
+         * sheet-imported line would have arrived on the board, the pick list and its wallet
+         * note called "EG-108084". A code is not a name.
+         *
+         * blankName stays as the fallback for the older shape and for a cell naming a
+         * product the catalogue does not list.
+         */
+        name: S(r.product_title) || S(r.item_name)
+          || (resolveBlankName ? resolveBlankName(S(r.blank)) : "")
+          || blankName(S(r.blank)) || S(r.item_sku) || "Item",
         // The picture, which is the artwork unless the row supplied a separate listing photo.
         img: url(S(r.listing_image)) || artwork,
         qty: Math.max(1, parseInt(S(r.item_quantity)) || 1),

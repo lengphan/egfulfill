@@ -3392,17 +3392,43 @@ export function ordersRoutes(app, requireAuth) {
      */
     if (b.blank !== undefined) {
       const had = String((wasRow && wasRow.name) || '').trim();
-      if (!had || had.toLowerCase() === 'new item') {
-        try {
-          const idx = await catalogIndex({ withImages: false });
-          const row = matchProduct(idx, { blank: String(b.blank || ''), sku: (wasRow && wasRow.sku) || sku || null });
-          const nm = row && row.data && row.data.name;
+      try {
+        const idx = await catalogIndex({ withImages: false });
+        const nameOfBlank = (cell, withSku) => {
+          const c = String(cell || '').trim();
+          if (!c) return '';
+          const row = matchProduct(idx, { blank: c, sku: withSku ? ((wasRow && wasRow.sku) || sku || null) : null });
+          return row && row.data && row.data.name ? String(row.data.name).trim() : '';
+        };
+        /**
+         * A NAME THE PREVIOUS BLANK PRODUCED FOLLOWS THE NEW ONE (owner, today: "when i
+         * repicked it still keeps the name of the previous imported sheet product").
+         *
+         * A sheet-imported line is named after its Blank Product cell — the importer has no
+         * listing title to use — so re-picking the blank to a beanie left a line still
+         * reading "Transfer Duffel. 108084". This route already renamed the "New item"
+         * placeholder for exactly the same reason; an imported line was simply a second
+         * placeholder nobody had recognised as one.
+         *
+         * ONLY WHEN THE NAME IS DEMONSTRABLY DERIVED, which is why the OLD blank is resolved
+         * rather than the name merely being overwritten. Two spellings, because the sheet
+         * cell has had two shapes: the tail of `108084 - Transfer Duffel` and, since the
+         * grid began writing a bare code, the catalogue's own name for it. Anything else —
+         * a marketplace listing title, a name somebody typed — is left exactly alone, and
+         * so is the case where the old blank no longer resolves.
+         */
+        const wasBlank = String((wasRow && wasRow.blank) || '').trim();
+        const tail = (v) => { const t = String(v || ''); const i = t.indexOf(' - '); return (i > 0 ? t.slice(i + 3) : t).trim(); };
+        const derived = !!had && !!wasBlank
+          && (had === tail(wasBlank) || (nameOfBlank(wasBlank, false) && had === nameOfBlank(wasBlank, false)));
+        if (!had || had.toLowerCase() === 'new item' || derived) {
+          const nm = nameOfBlank(b.blank, true);
           if (nm) {
             await q(`update order_items set name=$1 where order_id=$2 and ${lineId ? 'line_id' : 'sku'}=$3`,
                     [String(nm), req.params.id, lineId || sku]);
           }
-        } catch { /* a name is a nicety; never fail the pick over it */ }
-      }
+        }
+      } catch { /* a name is a nicety; never fail the pick over it */ }
     }
     audit(req, 'item.setup', {
       entityType: 'order', entityId: req.params.id,

@@ -28,9 +28,9 @@ import {
   type ImportRecord,
   looksLikeTemplate,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getTemplates, getCatalogProducts, getDesignLibrary, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile, type LibraryDesign } from "@/lib/api"
+import { createOrder, getOrders, getTemplates, getCatalogProducts, getDesignLibrary, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile, type LibraryDesign, type CatalogProduct } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
-import { productLabel } from "@/lib/variant-resolve"
+import { productLabel, resolveProduct } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
@@ -253,6 +253,7 @@ export function ImportOrdersDialog({
    * design bytes are not in this response.
    */
   const [library, setLibrary] = useState<LibraryDesign[] | null>(null)
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([])
 
 
   useEffect(() => {
@@ -264,6 +265,10 @@ export function ImportOrdersDialog({
       // A failure leaves it null, and resolveArtwork then treats every reference as
       // unresolved — the pre-existing behaviour, not a blank import that looks fine.
       getDesignLibrary().then(setLibrary).catch(() => setLibrary([]))
+      /* THE CATALOGUE, so a bare `EG-108084` in the Blank Product cell can become the
+         garment's NAME on the line. A failure leaves it empty and blankName answers as it
+         did before — a line named after its code is poor, not broken. */
+      getCatalogProducts().then((c) => setCatalog(c ?? [])).catch(() => setCatalog([]))
     }, 0)
     return () => clearTimeout(id)
   }, [open])
@@ -297,6 +302,22 @@ export function ImportOrdersDialog({
   const TEMPLATE_CELLS = ["template_id", "hero_image", "artwork_2", "artwork_3", "artwork_4", "artwork_5"] as const
   const templateRefsOn = useCallback((r: Record<string, unknown>) =>
     TEMPLATE_CELLS.map((k) => String(r[k] ?? "").trim()).filter((v) => looksLikeTemplate(v)), [])
+
+  /**
+   * THE CELL -> THE GARMENT'S NAME, through the canonical matcher rather than a private
+   * split. resolveProduct already knows the cell may be a code, a name, or `code - name`
+   * (§5: import, don't re-implement), and blankCandidates inside it also tries the bare
+   * number behind a painted `EG-` prefix.
+   */
+  const resolveBlankName = useCallback(
+    (cell: string) => {
+      const v = String(cell || "").trim()
+      if (!v || !catalog.length) return ""
+      const p = resolveProduct({ blank: v } as never, catalog)
+      return String((p as { name?: string } | null)?.name ?? "").trim()
+    },
+    [catalog],
+  )
 
   const resolveArtwork = useCallback(
     (ref: string) => {
@@ -336,7 +357,7 @@ export function ImportOrdersDialog({
     const valid = list.filter((r) => r._valid).length
     // Rows that will import but split, because they carry no Order Number to group by.
     const ungrouped = list.filter((r) => r._valid && !r.order_number).length
-    return { total: list.length, valid, invalid: list.length - valid, ungrouped, orders: valid ? groupToOrders(list, resolveArtwork).length : 0 }
+    return { total: list.length, valid, invalid: list.length - valid, ungrouped, orders: valid ? groupToOrders(list, resolveArtwork, resolveBlankName).length : 0 }
   }, [records, resolveArtwork])
 
   const ingest = (rows: string[][]) => {
@@ -543,7 +564,7 @@ export function ImportOrdersDialog({
      */
     const typed = records.filter((r) => r._valid && templateRefsOn(r as unknown as Record<string, unknown>).length > 0).length
     if (!typed) return null
-    const r = applyTemplates(groupToOrders(records, resolveArtwork), templates)
+    const r = applyTemplates(groupToOrders(records, resolveArtwork, resolveBlankName), templates)
     return { typed, applied: r.applied, unmatched: r.unmatched, ambiguous: r.ambiguous }
   }, [records, templates, resolveArtwork])
 
@@ -595,7 +616,7 @@ export function ImportOrdersDialog({
     try {
       // Templates fill the blank and the artwork the row left empty. Applied here, once,
       // on the same resolver the preview used — so what was shown is what is created.
-      const orders = templates ? applyTemplates(groupToOrders(records, resolveArtwork), templates).orders : groupToOrders(records, resolveArtwork)
+      const orders = templates ? applyTemplates(groupToOrders(records, resolveArtwork, resolveBlankName), templates).orders : groupToOrders(records, resolveArtwork, resolveBlankName)
       const existing = await getOrders().catch(() => [])
       const baseSeq = nextSellerSeq(existing ?? [])
       /* One seed per RUN, so two imports of the same sheet cannot mint the same line ids —
