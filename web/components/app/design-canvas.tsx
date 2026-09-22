@@ -1768,7 +1768,9 @@ export function DesignCanvasDialog({
  const [boardCard, setBoardCard] = useState<OrderDesignCard | null>(null)
   /** Already with an outside partner. `vendor` is only ever set by a successful push, so
    * this is the fact that a task exists on their board — not a guess from the lane. */
- const sentToPartner = !!boardCard?.vendor
+  /* `sentToPartner` lived here and is gone with its only consumer. A partner push writes the
+     same board card a direct send does, so staleFaces below already covers "an outside
+     partner is holding artwork we have replaced" without a second flag to keep in step. */
   /**
    * THE ARTWORK THE PARTNER ACTUALLY HAS.
    *
@@ -1819,7 +1821,7 @@ export function DesignCanvasDialog({
     }, 0)
  return () => { live = false; clearTimeout(t) }
   }, [open, orderId, item.line_id, item.sku])
- const artworkChangedSinceSend = sentToPartner && designUrl !== artAtOpen
+
   /** The partner send, for print methods. A dialog rather than an inline form because it
    * asks for Pink's own fields (product type, design type, board) that mean nothing here. */
  const [pinkOpen, setPinkOpen] = useState(false)
@@ -2028,6 +2030,27 @@ export function DesignCanvasDialog({
   *  of the comparison go through here so a send and a seed can never key on different things. */
  const sentKey = (art: FaceArt) => (art.no != null ? `no:${art.no}` : art.data)
  const going = sendable.filter((r) => !skip[r.side] && sentSides[r.side] !== sentKey(r.art))
+  /**
+   * THE BOARD IS HOLDING A PICTURE WE HAVE SINCE REPLACED.
+   *
+   * This was `sentToPartner && designUrl !== artAtOpen` — computed, never rendered, and
+   * eslint had been reporting it unused the whole time. The comment above `artAtOpen`
+   * describes the failure at length ("a finished tick over stale artwork is the worst kind
+   * of wrong: it reads as handled, so nobody re-sends") and then nothing said it out loud.
+   * A rule with no component is a wish (§4).
+   *
+   * Computed from `sentSides`, not from `artAtOpen`, and that is the whole improvement:
+   * `artAtOpen` is ONE face and only this session's changes, while sentSides is seeded from
+   * the board's own cards on open and keys on the design NUMBER — so it survives closing
+   * the dialog and it answers per face. `going` already uses it to re-arm the Send button;
+   * a re-armed button reads as "not sent yet", which is the opposite of what is true.
+   *
+   * A face is stale when the board HAS a card for it and the artwork on it is no longer the
+   * artwork that went. A face nobody has sent is not stale, it is simply unsent.
+   */
+ const staleFaces = sendable
+    .filter((r) => sentSides[r.side] && sentSides[r.side] !== sentKey(r.art))
+    .map((r) => r.side)
 
   /**
    * ONE CARD PER FACE (owner's call, 2026-09-09).
@@ -4622,6 +4645,24 @@ export function DesignCanvasDialog({
  they sat in was already the last thing read before Save. One Apply in the
  bar; the machine file's version is with the machine file. */}
               </div>
+            )}
+            {/**
+              * SAID IN THE ACTION BAR, where the swap is being finished — not in the Board
+              * tab, which is a click away and staff-only, and not beside the Send button,
+              * whose re-armed state is the very thing that reads as "not sent yet".
+              *
+              * It is a STATEMENT, not a refusal: replacing artwork on a line already on the
+              * board is a legitimate thing to do (owner, today — the factory swaps, the
+              * seller asks in chat). What must not happen is doing it without knowing a card
+              * is out there holding the old picture, which is how a designer returns a
+              * digitised version of the design you replaced.
+              */}
+            {staleFaces.length > 0 && (
+              <p className="mr-auto max-w-[22rem] text-xs text-amber-700 dark:text-amber-400">
+                {staleFaces.length === 1
+                  ? `The board has a card for the ${tl("sides", staleFaces[0])} with the artwork this replaced — send it again.`
+                  : `The board has cards for ${staleFaces.map((f) => tl("sides", f)).join(", ")} with the artwork this replaced — send them again.`}
+              </p>
             )}
             <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("canvas", "Cancel")}</Button>
             {/* "Save", not "Save design" — it saves the item: every face's artwork at once,
