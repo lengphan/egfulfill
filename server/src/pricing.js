@@ -1316,7 +1316,13 @@ export async function repriceDelta(orderId, lineId, pending = null) {
   if (!stamp || stamp.base == null) return { delta: 0, reason: 'no-stamp' };
 
   const [fees, idx, rows] = await Promise.all([
-    feeSettings(), catalogIndex(),
+    /* WITHOUT IMAGES. This runs on the ARTWORK SAVE path — every time somebody places a
+       design on a charged order — and the full index carries every product's img, images and
+       side_mockups: measured at 71% of the catalogue payload, ~1MB for 34 products, none of
+       which pricing reads. It made saving a design visibly slow (owner, 2026-09-22: "saving
+       is very very slow, keeps loading"). The columns are stripped in SQL, so the bytes never
+       reach node. */
+    feeSettings(), catalogIndex({ withImages: false }),
     q(`select lower(coalesce(side,'front')) as side, method from order_designs
         where order_id=$1 and line_id=$2 and (data is not null or storage_key is not null)`,
       [orderId, lineId]).then((r) => r.rows).catch(() => []),

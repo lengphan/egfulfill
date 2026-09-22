@@ -168,7 +168,7 @@ const stamp = (sides, method, billed, methods) => JSON.stringify({
 await db.query(
   `insert into order_items (order_id, line_id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee, cost_parts)
    values ($1,'L-emb','EG-GATE','Gate Crewneck',1,'M','EG-GATE - Gate Crewneck','DTG',28,9.95,$2::jsonb),
-          ($1,'L-dtf','EG-GATE','Gate Crewneck',2,'M','EG-GATE - Gate Crewneck','DTG',21,9.95,$3::jsonb)`,
+          ($1,'L-dtf','EG-GATE','Gate Crewneck',2,'M','EG-GATE - Gate Crewneck','Embroidery',21,9.95,$3::jsonb)`,
   [ORDER,
    stamp([{ face: 'front', amount: 3, method: 'Embroidery' }, { face: 'back', amount: 3, method: 'Embroidery' }, { face: 'left', amount: 3, method: 'Embroidery' }], 4, 'Embroidery', ['Embroidery']),
    stamp([{ face: 'front', amount: 3, method: 'DTF' }, { face: 'left', amount: 3, method: 'DTG' }], 0, 'DTF', ['DTF', 'DTG'])])
@@ -196,16 +196,34 @@ const faceCount = (line) => db.query(
   `select count(*)::int as n from order_designs where order_id=$1 and line_id=$2 and (data is not null or storage_key is not null)`,
   [ORDER, line]).then((r) => r.rows[0].n)
 
-console.log('\nA METHOD IS STATED, NOT INHERITED — the face is about to be billed')
+console.log('\nA FREE FACE WITH NO METHOD JUST SAVES — nothing to ask about')
 {
+  /* The refusal used to fire on EVERY method-less face. Right when a placement was charged
+     per face; a placement is one per LINE now, so the common case costs nothing and stopping
+     to settle a question with no money behind it is friction (owner, 2026-09-22). */
   const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-emb', side: 'right', data: 'https://x/new.png', name: 'new' })
-  check('refused with 400', r.status, 400)
-  check('and says what is missing', r.body.needsMethod, true)
-  check('nothing was written', await faceCount('L-emb'), 3)
+  check('saved', r.status, 200)
+  check('no surcharge', r.body.surcharge, undefined)
+  check('the artwork landed', await faceCount('L-emb'), 4)
   check('no money moved', (await feeRows()).length, 0)
 }
 
-console.log('\nA NEW FACE COSTS NOTHING — THE PLACEMENT IS ALREADY PAID (2026-09-21)')
+console.log('\nBUT A FACE THAT WILL BILL STOPS TO ASK')
+{
+  /* L-dtf's print_type says Embroidery while its stamp was billed at DTF, method 0 — the
+     drift EGF-002155 showed. A face with no method INHERITS that, which moves the line's
+     dearest technique and bills $4/unit. There the technique IS what is being charged for,
+     so a guess would be a wrong charge rather than a wrong label. */
+  const before = await faceCount('L-dtf')
+  const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-dtf', side: 'right', data: 'https://x/emb.png', name: 'emb' })
+  check('refused with 400', r.status, 400)
+  check('and says what is missing', r.body.needsMethod, true)
+  check('and names the figure it would charge', r.body.amount, 8)
+  check('nothing was written', await faceCount('L-dtf'), before)
+  check('no money moved', (await feeRows()).length, 0)
+}
+
+console.log('\nSTATING THE METHOD ON A FREE FACE CHANGES NOTHING')
 {
   /* One placement per LINE now, not one per face. This line's front already carries it, so a
      fourth surface adds no money — what a second picture costs is a design fee, billed per
@@ -213,7 +231,7 @@ console.log('\nA NEW FACE COSTS NOTHING — THE PLACEMENT IS ALREADY PAID (2026-
   const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-emb', side: 'right', data: 'https://x/new.png', name: 'new', method: 'Embroidery' })
   check('saved', r.status, 200)
   check('no surcharge', r.body.surcharge, undefined)
-  check('the artwork landed', await faceCount('L-emb'), 4)
+  check('still four faces', await faceCount('L-emb'), 4)
   const it = await itemOf('L-emb')
   check('unit_cost untouched', Number(it.unit_cost), 28)
   check('the stamp is unchanged', it.cost_parts.sides.length, 3)

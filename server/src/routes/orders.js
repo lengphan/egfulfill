@@ -4034,14 +4034,36 @@ export function ordersRoutes(app, requireAuth) {
          * invention. Only for a face about to be BILLED: an unpaid order still inherits, since
          * its price is re-read from the artwork on every quote and nothing is settled yet.
          */
-        if (!method) {
-          reply.code(400);
-          return { error: `Say how the ${side} is decorated before placing artwork on it. This order is already charged, so the placement is billed now and its price depends on the technique.`,
-                   needsMethod: true, side };
-        }
+        /* PRICED FIRST, ASKED SECOND. The refusal below costs nothing to reach and the
+           question is only worth asking when the answer changes the bill. */
         const d = await repriceDelta(req.params.id, lineId, { side, method })
           .catch((e) => ({ delta: 0, reason: 'failed', error: e.message }));
         if (d.delta > 0.005) {
+          /**
+           * ONLY WHEN THE GUESS COSTS SOMETHING (owner, 2026-09-22: "the warning here is not
+           * intuitive at all… just a warning to save/charge the order for extra if there is,
+           * if not save would be fine").
+           *
+           * This refused EVERY new face on a charged order until somebody named a technique.
+           * That was right when a placement was charged per face — the method decided a real
+           * figure. It stopped being right the moment a placement became one per LINE, because
+           * the common case is now a delta of ZERO: a second face costs nothing, and the save
+           * was being blocked to settle a question with no money behind it.
+           *
+           * So the price is computed FIRST, from the method the face states or inherits. Free
+           * saves go straight through and say nothing. Only a save that will actually bill
+           * stops to ask — and there, the technique is precisely what it is billing for, so a
+           * guess would be a wrong charge rather than a wrong label (§6: a blank a human
+           * fills is cheaper than a confident invention).
+           *
+           * An inherited guess that prices to zero is safe to accept: correcting the face's
+           * method later goes through the method-change path above, which bills its own delta.
+           */
+          if (!method) {
+            reply.code(400);
+            return { error: `This adds $${d.delta.toFixed(2)} to the order. Say how the ${side} is decorated first — that is what the charge is for.`,
+                     needsMethod: true, side, amount: d.delta };
+          }
           /* "Item N", the position — the same word the Summary's other rows use, and for the
              same reason the method change gives: a trade name wraps this row to three lines. */
           const pos = (await q(
