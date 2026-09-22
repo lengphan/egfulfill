@@ -1751,6 +1751,71 @@ export function DesignCanvasDialog({
    * on faces it was never cut for. One is a scope; the other is an unanswered question, and
    * §4 forbids drawing them the same.
    */
+  /**
+   * ONE FACE'S ARTWORK ROW, as a function rather than a mapped list.
+   *
+   * The panel used to print every face's artwork above, then the file groups below —
+   * two stacked lists each naming the same faces, so a three-face garment said
+   * "front / back / left" twice and the group headings read as orphaned words over
+   * nothing (owner: "looks very messy"). Called from inside its own group now, so a
+   * face is one heading with everything that belongs to it underneath.
+   *
+   * A function that is CALLED, not a component that is rendered — defining one inside
+   * render is what react-hooks/static-components forbids, and this returns JSX from a
+   * plain call.
+   */
+const artworkRow = (r: { side: string; art: FaceArt }) => {
+const here = r.side === sideName
+const unsaved = here ? artUnsaved : !savedFaces[r.side]
+return (
+  <div key={r.side} className="mb-1">
+    <FileRow
+      file={{
+        /*
+         * THE DESIGN NUMBER IS THE NAME — DSN-1042.
+         *
+         * This printed the filename the image arrived under, falling back to
+         * "Untitled artwork". Neither identifies anything: most artwork has no
+         * name at all, and "Screenshot 2026-08-24 at 10.14.42" names the
+         * moment somebody pressed a key. Two orders printing the SAME picture
+         * showed two unrelated strings.
+         *
+         * `designNo` already existed for exactly this — its own declaration
+         * says it is there "so a design can be referred to at all: most carry
+         * no name, and 'the octopus one' is not something you can type into a
+         * search box" — and it was rendered nowhere. The same number is on the
+         * board card and in the search index (designSearchTerms), so DSN-1042
+         * here and DSN-1042 there are the same picture.
+         *
+         * The filename is not lost: it moves to the note, where it is a useful
+         * hint and not the row's identity. Artwork with no number yet is
+         * unsaved, and the note already says so.
+         */
+        name: designLabel(here ? designNo : r.art.no)
+          || (here ? designName || fileNameFrom(designUrl) : r.art.name)
+          || "Untitled artwork",
+        size: here ? designSize : undefined,
+        thumb: r.art.data,
+        status: here && saving ? "uploading" : "done",
+        /* THE FACE IS NOT REPEATED HERE. It was the first thing on this note — right,
+           when every face's artwork was printed in one flat list — and the row now sits
+           under a heading that says it. "front" above "front" is the duplication that
+           made the panel read as messy. */
+        note: [
+          unsaved ? "Not saved yet" : null,
+          /* The human filename, once the number has taken the headline — a
+             hint about which file this was, not the thing that identifies it. */
+          designLabel(here ? designNo : r.art.no)
+            ? (here ? designName || fileNameFrom(designUrl) : r.art.name) || null
+            : null,
+        ].filter(Boolean).join(" · "),
+        onRemove: () => void removeArtwork(r.side),
+      }}
+    />
+  </div>
+)
+}
+
   const filesByFace = useMemo(() => {
     type Group = { key: string; kind: "face" | "stray" | "whole"; files: typeof lineFiles }
     const seen = new Set<string>()
@@ -4048,56 +4113,7 @@ export function DesignCanvasDialog({
 
                 The ✕ takes THAT face off, not the one on screen. A row that names the back
                 and removes the front would be worse than no row. */}
-            {artFaces.map((r) => {
-              const here = r.side === sideName
-              const unsaved = here ? artUnsaved : !savedFaces[r.side]
-              return (
-                <div key={r.side} className="mb-1">
-                  <FileRow
-                    file={{
-                      /*
-                       * THE DESIGN NUMBER IS THE NAME — DSN-1042.
-                       *
-                       * This printed the filename the image arrived under, falling back to
-                       * "Untitled artwork". Neither identifies anything: most artwork has no
-                       * name at all, and "Screenshot 2026-08-24 at 10.14.42" names the
-                       * moment somebody pressed a key. Two orders printing the SAME picture
-                       * showed two unrelated strings.
-                       *
-                       * `designNo` already existed for exactly this — its own declaration
-                       * says it is there "so a design can be referred to at all: most carry
-                       * no name, and 'the octopus one' is not something you can type into a
-                       * search box" — and it was rendered nowhere. The same number is on the
-                       * board card and in the search index (designSearchTerms), so DSN-1042
-                       * here and DSN-1042 there are the same picture.
-                       *
-                       * The filename is not lost: it moves to the note, where it is a useful
-                       * hint and not the row's identity. Artwork with no number yet is
-                       * unsaved, and the note already says so.
-                       */
-                      name: designLabel(here ? designNo : r.art.no)
-                        || (here ? designName || fileNameFrom(designUrl) : r.art.name)
-                        || "Untitled artwork",
-                      size: here ? designSize : undefined,
-                      thumb: r.art.data,
-                      status: here && saving ? "uploading" : "done",
-                      /* THE FACE FIRST, because that is the fact this row was missing.
-                         "Front · Not saved yet" answers both questions a glance has. */
-                      note: [
-                        tl("sides", r.side),
-                        unsaved ? "Not saved yet" : null,
-                        /* The human filename, once the number has taken the headline — a
-                           hint about which file this was, not the thing that identifies it. */
-                        designLabel(here ? designNo : r.art.no)
-                          ? (here ? designName || fileNameFrom(designUrl) : r.art.name) || null
-                          : null,
-                      ].filter(Boolean).join(" · "),
-                      onRemove: () => void removeArtwork(r.side),
-                    }}
-                  />
-                </div>
-              )
-            })}
+
             {/* ONE ROW SHAPE for every file on the line, whatever it is and wherever it came
                 from — the same FileRow the drop zones and the order page print. The artwork
                 above and a stitch file below were two different rows for two files doing the
@@ -4123,8 +4139,14 @@ export function DesignCanvasDialog({
               const heading = g.kind === "face" ? tl("sides", g.key)
                 : g.kind === "stray" ? tl("canvas", "No placement set")
                 : tl("canvas", "Whole item")
-              /* An untouched face with nothing to say is not a heading over nothing. */
-              if (g.kind === "face" && !g.files.length && !needsFile) return null
+              /* THE FACE'S ARTWORK BELONGS IN ITS OWN GROUP, which is the whole of the
+                 fix: it used to be printed in a separate list above, so the headings sat
+                 over files alone and a face with a picture and no stitch file looked like
+                 a heading with nothing under it. */
+              const art = g.kind === "face" ? artFaces.find((a) => a.side === g.key) : null
+              /* An untouched face — no picture, no file, nothing missing — is not a heading
+                 over nothing. */
+              if (g.kind === "face" && !art && !g.files.length && !needsFile) return null
               return (
             <div key={`${g.kind}-${g.key}-${gi}`} className="flex flex-col gap-1">
               <div className={"mt-1 flex items-baseline gap-2 text-2xs font-medium uppercase tracking-wide first:mt-0 "
@@ -4138,6 +4160,7 @@ export function DesignCanvasDialog({
                   <span className="normal-case tracking-normal">{tl("canvas", "counts as every face until one is chosen")}</span>
                 )}
               </div>
+              {art && artworkRow(art)}
               {g.files.map((f) => (
                 <Fragment key={f.designId}>
                 <FileRow
@@ -4170,8 +4193,12 @@ export function DesignCanvasDialog({
                       ? "Working…"
                       : [
                           fileRoleLabel(f.kind),
-                          f.side
-                            ? tl("sides", f.side)
+                          /* The face is on the HEADING for a placed file, and in the picker
+                             below for one that can be moved — so it is said here only where
+                             neither of those speaks: a file with no face on a line whose
+                             faces cannot be chosen between. */
+                          f.side || faces.length > 1
+                            ? null
                             : artFaces.length > 1
                               ? (f.kind === "emb" || f.kind === "pes"
                                   ? tl("canvas", "no placement set")
@@ -4216,7 +4243,9 @@ export function DesignCanvasDialog({
                   */}
                 {(f.kind === "emb" || f.kind === "pes") && faces.length > 1 && (
                   <select
-                    className="eg-control ms-9 h-7 w-[calc(100%-2.25rem)] px-2 text-2xs"
+                    /* ON THE ROW'S OWN INDENT AND ONLY AS WIDE AS IT NEEDS. Full-width under
+                       the file, it read as a second row rather than as that row's field. */
+                    className="eg-control ms-9 h-6 w-auto max-w-[11rem] px-1.5 text-2xs"
                     value={f.side ?? ""}
                     disabled={filesLocked || scoping === f.designId}
                     title={filesLocked ? lockedWhy : tl("canvas", "Which placement this stitch file is for")}
