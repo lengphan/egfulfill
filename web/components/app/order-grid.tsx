@@ -41,6 +41,7 @@ import {
 import { productColors, productSizes } from "@/lib/variant-sku"
 import { resolveProduct, productLabel, setTypeMockups, offeredSides, bestMockup, blankCode } from "@/lib/variant-resolve"
 import { thumbSrc, proxiedImageSrc } from "@/lib/order-image"
+import { swatchChipStyle } from "@/lib/color-swatch"
 import { normalizeMethods } from "@/lib/print-method"
 import { platformName } from "@/shared/order-rules"
 import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles, getProductTypes,
@@ -88,9 +89,41 @@ const blankRow = () => CSV_COLUMNS.map(() => "")
  * list is twelve of these telling you nothing about which stitch file each one is. So an
  * option may carry a label; the cell still gets the value.
  */
-type Opt = string | { value: string; label: string; img?: string | null; fit?: "cover" | "contain" }
+type Opt = string | {
+  value: string
+  label: string
+  /** What the row TRUNCATES, for the tooltip. Defaults to the label. */
+  title?: string
+  img?: string | null
+  fit?: "cover" | "contain"
+  /** A colourway's own colour, as CSS. See optChip. */
+  chip?: { background?: string; backgroundImage?: string; backgroundSize?: string } | null
+}
 const optValue = (o: Opt) => (typeof o === "string" ? o : o.value)
 const optLabel = (o: Opt) => (typeof o === "string" ? o : o.label)
+/**
+ * THE TOOLTIP SAYS WHAT THE ROW COULD NOT.
+ *
+ * It was `optValue`, which was right for exactly one column and wrong for the rest: a blank's
+ * value is the long `code - name` the row shortens, so the tooltip completed it — but an
+ * artwork's value is the short `IMG-26` while its LABEL is the long line, so hovering a
+ * truncated design name produced a tooltip saying less than the row it covered.
+ */
+const optTitle = (o: Opt) => (typeof o === "string" ? o : o.title ?? o.label)
+/**
+ * A COLOURWAY IS A COLOUR, AND A LIST OF WORDS MAKES YOU IMAGINE IT.
+ *
+ * `swatchChipStyle` is the app's one answer for this — the name's own hex, else a close crop
+ * of that colourway's photograph, else a neutral, in that order — so the chip in this menu is
+ * the chip on the catalogue grid and the product page rather than a fourth opinion (§5).
+ */
+const optChip = (o: Opt) => (typeof o === "string" ? null : o.chip ?? null)
+/** A colourway as an option: the name is still the value the cell holds. */
+const colorOpt = (name: string, images?: Record<string, string> | null): Opt =>
+  ({ value: name, label: name, chip: swatchChipStyle(name, images?.[name] ?? null) })
+/** The per-colourway photographs a resolved product carries, when it carries any. */
+const colorImagesOf = (p: unknown): Record<string, string> | null =>
+  (p as { colorImages?: Record<string, string> | null } | null)?.colorImages ?? null
 /**
  * The option's picture, when the column has one — Blank, and now Artwork/Template.
  *
@@ -475,6 +508,18 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
   /** The popup's own node, so the close-on-scroll listener can tell the sheet scrolling
    *  (which must close it) from the LIST scrolling (which must not). */
   const menuRef = useRef<HTMLDivElement | null>(null)
+  /**
+   * THE ZOOM, WHILE THE CURSOR IS ON THE PICTURE AND NOT A MOMENT LONGER.
+   *
+   * 32px says which garment; it does not say whether this is the right artwork — two of a
+   * seller's designs can be the same crest at two sizes. So the thumbnail answers that on
+   * hover, beside the menu rather than over it, and the answer leaves with the cursor.
+   *
+   * It is a HOVER, deliberately, not a click: a click in this menu means "pick", and a
+   * second click target inside the row would put the two gestures a few pixels apart on the
+   * one control where choosing wrong costs a garment.
+   */
+  const [peek, setPeek] = useState<{ src: string; left: number; top: number } | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
 
   /**
@@ -767,15 +812,23 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
          chosen blank can actually be decorated with, not just the first. */
       const isMethod = METHOD_KEYS.includes(colKey)
       const dependent = colKey === "item_color" || colKey === "item_size" || isMethod || isPlacement
-      if (!dependent) return FIXED_OPTIONS[colKey] ?? null
+      /* THE FALLBACK LIST IS CHIPPED AS WELL. Without this the Color column drew swatches
+         only once a blank had been chosen and bare words before it — the same menu in two
+         appearances, which reads as a rendering fault rather than as a narrowing. */
+      const fixed = (k: string): Opt[] | null =>
+        (k === "item_color" ? FIXED_OPTIONS[k]?.map((n) => colorOpt(n)) : FIXED_OPTIONS[k]) ?? null
+      if (!dependent) return fixed(colKey)
       // resolveProduct, not a private name match — it is the canonical matcher and it is what
       // knows the cell may be "SKU - Name" (CLAUDE.md §5: import, don't re-implement). A
       // hand-rolled equality here is exactly why the labelled option would have narrowed
       // nothing: every colour cell would have fallen back to the fixed list.
       const cell = (row[IDX.blank] || "").trim()
       const p = cell ? resolveProduct({ blank: cell } as never, catalog) : null
-      if (!p) return FIXED_OPTIONS[colKey] ?? null
-      if (colKey === "item_color") return productColors(p as never)
+      if (!p) return fixed(colKey)
+      /* THE COLOURWAY'S PHOTO IS THE FALLBACK, so it has to come from the product rather
+         than from the name alone: "Dk.Grn/Kha" places nowhere as a word and is a real
+         garment in `colorImages`. */
+      if (colKey === "item_color") return productColors(p as never).map((name) => colorOpt(name, colorImagesOf(p)))
       if (colKey === "item_size") return productSizes(p as never)
       /* The faces this garment's TYPE prints, spelled the way the dropdown spells them —
          SIDE_LABEL, so the cell holds "Left sleeve" and never the bare "left" that would
@@ -791,7 +844,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         const declared = offeredSides(p as never)
         return declared
           ? declared.map((sd) => SIDE_LABEL[sd] ?? sd)
-          : FIXED_OPTIONS[colKey] ?? null
+          : fixed(colKey)
       }
       /* BOTH FIELDS, NOT ONE. This read `method` alone, and CatalogProduct's own note on
          `methods` says to read it alongside — "or a product that has both loses half its
@@ -801,7 +854,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
          did not happen. Anything that resolves to no method at all still falls back, since
          an empty list would be worse than an unfiltered one. */
       const own = normalizeMethods([p.method, ...(p.methods ?? [])]).map((m) => m.label)
-      return own.length ? own : FIXED_OPTIONS[colKey] ?? null
+      return own.length ? own : fixed(colKey)
     },
     /* `productTypes` is no longer read here — offeredSides consults the type map directly.
        It is still fetched above, because filling that map is what lets it answer. */
@@ -840,15 +893,15 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
       // productLabel is the one spelling of this string — the line strip and the .xlsx
       // template read the same helper, so the three can no longer drift apart.
       .map((c) => {
-        const value = productLabel(c)
-        if (!value) return null
+        const full = productLabel(c)
+        if (!full) return null
         const img = bestMockup(c, "", "")
         /* "" and not null for a blank with no mockup — see optImg. This said null, so the
            handful of products without a photo rendered no square at all and their codes sat
            8px left of every other row's. */
-        return { value, label: blankCode(value), img: img ? thumbSrc(img, 48) : "" }
+        return { value: blankCode(full), label: blankCode(full), title: full, img: img ? thumbSrc(img, 48) : "" }
       })
-      .filter((o): o is { value: string; label: string; img: string } => !!o)
+      .filter((o): o is { value: string; label: string; title: string; img: string } => !!o)
       .sort((a, b) => a.value.localeCompare(b.value)),
     [catalog],
   )
@@ -1195,6 +1248,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
     requestAnimationFrame(() => {
       if (!el.isConnected) return
       const r = el.getBoundingClientRect()
+      setPeek(null) // never reopen a menu with the previous one's zoom still on screen
       setMenu({ key, left: r.left, top: r.bottom, width: r.width, typed })
     })
   }, [setMenu])
@@ -1883,13 +1937,37 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         const typed = menu.typed ? (rows[mr]?.[mc] ?? "").trim().toLowerCase() : ""
         /* Matched on BOTH halves: a machine file is found by its reference (MF-12) and by
            its name (logo.emb), and which of the two you remember is not ours to decide. */
+        /* THE TITLE IS MATCHED TOO, and for the Blank column it is the only half that can
+           answer: the row and the cell are both the CODE now, so "duffel" appears in neither
+           and typing the garment's name would find nothing. */
         const matched = (all ?? []).filter((o) =>
-          !typed || optLabel(o).toLowerCase().includes(typed) || optValue(o).toLowerCase().includes(typed))
+          !typed || optLabel(o).toLowerCase().includes(typed) || optValue(o).toLowerCase().includes(typed)
+          || optTitle(o).toLowerCase().includes(typed))
         const shown = matched.slice(0, 50)
         if (!shown.length) return null
+        /**
+         * THE ZOOM CARD, sized and placed here because both answers depend on the MENU's
+         * box, not the row's: beside the list on whichever side the viewport has room for,
+         * so it never lands on top of the thing you are reading.
+         */
+        const PEEK = 208
+        const showPeek = (e: React.MouseEvent<HTMLImageElement>) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          const m = menuRef.current?.getBoundingClientRect()
+          const right = (m?.right ?? r.right) + 10
+          setPeek({
+            src: e.currentTarget.src,
+            left: right + PEEK <= window.innerWidth - 8 ? right : Math.max(8, (m?.left ?? r.left) - 10 - PEEK),
+            top: Math.min(Math.max(8, r.top + r.height / 2 - PEEK / 2), window.innerHeight - PEEK - 8),
+          })
+        }
         return (
+        <>
           <div
             ref={menuRef}
+            /* SCROLLING MOVES THE ROW OUT FROM UNDER THE CURSOR and no mouseleave fires,
+               so the card would hang beside a picture that is no longer there. */
+            onScroll={() => setPeek(null)}
             /**
              * SIZED FOR THE PICTURE, now that the picture is what identifies the row.
              *
@@ -1915,10 +1993,10 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                 type="button"
                 /* The NAME did not disappear, it moved to the tooltip — a row showing
                    "EG-1002" beside a cap still has to be able to say which cap. */
-                title={optValue(o)}
+                title={optTitle(o)}
                 /* mousedown, not click: the input blurs first and would close this menu
                    before a click ever landed. preventDefault keeps the caret where it is. */
-                onMouseDown={(e) => { e.preventDefault(); setCell(mr, mc, optValue(o)); setMenu(null) }}
+                onMouseDown={(e) => { e.preventDefault(); setPeek(null); setCell(mr, mc, optValue(o)); setMenu(null) }}
                 className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-accent"
               >
                 {optImg(o) !== null && (
@@ -1936,7 +2014,12 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                         /* A MOCKUP URL THAT 404s MUST NOT DRAW A BROKEN GLYPH. Hidden, not
                            removed: the 20px slot stays, so one dead image cannot make its
                            row shorter than the rows above and below it. */
-                        onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
+                        onError={(e) => { e.currentTarget.style.visibility = "hidden"; setPeek(null) }}
+                        /* The zoom hangs off the PICTURE, not the row: the row's job is to be
+                           pressed, and a preview that follows the cursor across the whole
+                           option would be up the entire time you are reading the list. */
+                        onMouseEnter={showPeek}
+                        onMouseLeave={() => setPeek(null)}
                         /* 32px, not 20. At 20 the thumbnail was a favicon — enough to show
                            that a picture exists, not enough to tell a cap from a duffel from
                            a tee, which is the whole job it took over from the name. 32 is
@@ -1945,6 +2028,13 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                         className={"size-8 shrink-0 rounded-md bg-muted " + (optFit(o) === "contain" ? "object-contain" : "object-cover")}
                       />
                     : <span aria-hidden className="size-8 shrink-0 rounded-md bg-muted" />
+                )}
+                {/* ROUND, because a colourway chip genuinely is — §4 reserves the circle for
+                    exactly this and for avatars and counts. The ring is what keeps White and
+                    Natural from disappearing into a white menu. */}
+                {optChip(o) && (
+                  <span aria-hidden style={optChip(o) as React.CSSProperties}
+                    className="size-4 shrink-0 rounded-full ring-1 ring-border" />
                 )}
                 <span className="min-w-0 truncate">{optLabel(o)}</span>
               </button>
@@ -1960,6 +2050,20 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
               </div>
             )}
           </div>
+          {/* OUTSIDE the menu div, because the menu is `overflow-auto` and anything drawn
+              inside it would be clipped to the list. pointer-events-none so moving toward
+              the card never counts as leaving the thumbnail that opened it. */}
+          {peek && (
+            <div
+              aria-hidden
+              style={{ position: "fixed", left: peek.left, top: peek.top, width: PEEK, height: PEEK }}
+              className="pointer-events-none z-[60] overflow-hidden rounded-xl border border-border bg-popover p-2"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={peek.src} alt="" className="size-full object-contain" onError={() => setPeek(null)} />
+            </div>
+          )}
+        </>
         )
       })()}
 
