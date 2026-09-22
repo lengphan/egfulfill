@@ -2352,6 +2352,8 @@ export function DesignCanvasDialog({
  const applyToAll = useCallback(async () => {
  const others = siblings ?? []
  if (!designUrl || !others.length) return
+    // The lock, at the function rather than only on the button — see removeArtwork.
+ if (filesLocked) { setErr(lockedWhy); return }
  const willReplace = others.filter((it) => !!designs?.[(it.line_id ?? it.sku) as string]?.data).length
  const ok = await confirm({
  title: `Put this ${sideName} artwork on all ${others.length} other line${others.length === 1 ? "" : "s"}?`,
@@ -2382,7 +2384,10 @@ export function DesignCanvasDialog({
  if (failed.length) setErr(`Couldn't apply to: ${failed.join(", ")}`)
  const done = others.length - failed.length
  if (done > 0) { setNotice(`Applied to ${done} other line${done === 1 ? "" : "s"}.`); onSaved?.() }
-  }, [designUrl, designName, sideName, siblings, designs, orderId, item.name, pos, onSaved, confirm])
+    /* `filesLocked` and `lockedWhy` ARE dependencies. Without them this callback would hold
+       the value they had when it was last built — a memoised gate reading a stale lock is a
+       gate that opens by itself. */
+  }, [designUrl, designName, sideName, siblings, designs, orderId, item.name, pos, onSaved, confirm, filesLocked, lockedWhy])
 
   /**
    * TAKE IT OFF, for real.
@@ -2422,6 +2427,7 @@ export function DesignCanvasDialog({
   }
 
  const clearOwnMockup = async () => {
+    if (filesLocked) { setErr(lockedWhy); return }
  setMockBusy(true); setErr(null)
  try {
  const r = await setItemMockup(orderId, { line_id: item.line_id, sku: item.line_id ? undefined : item.sku, side: sideKey, url: null })
@@ -2641,6 +2647,11 @@ export function DesignCanvasDialog({
    * Defaults to the current face, so both older callers are unchanged.
    */
  const removeArtwork = async (target?: string) => {
+    /* THE SAME GUARD takeFiles CARRIES, and for the reason the "Use this" button just
+       demonstrated: a control that is hidden or disabled is a gate on ONE route, and the
+       routes are only as complete as the last enumeration of them. The function is the
+       thing that writes, so the function is where the lock belongs. */
+    if (filesLocked) { setErr(lockedWhy); return }
  if (removing) return   // a second click would open a second confirm over the first
  const sd = String(target || sideName).toLowerCase()
  const here = sd === sideName
@@ -2711,6 +2722,10 @@ export function DesignCanvasDialog({
    * multi-face garment is megabytes of base64 for no edit.
    */
  const save = async (close = true): Promise<boolean> => {
+    /* THE LAST GATE, and the only one that persists anything. Every other guard in this
+       file stops a change being MADE; this stops one being written even if a route nobody
+       has thought of made it. */
+ if (filesLocked) { setErr(lockedWhy); return false }
     // Everything on screen belongs to the face it is on before anything is compared.
  const pending: Record<string, FaceArt | null> = {
       ...(faceArt ?? {}),
@@ -4144,7 +4159,13 @@ export function DesignCanvasDialog({
               <div className="mt-2 flex items-start gap-3 border-t border-primary/20 pt-2">
                 <CustomerFileThumb src={item.design_src} />
                 <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-                  <button onClick={() => {
+                  {/* READING THE BUYER'S FILE IS NOT PLACING IT. The thumbnail and Open stay
+                      on a locked line — knowing what the customer sent is not a change — but
+                      "Use this" sets the line's artwork, which is the very thing the lock is
+                      about. It was the one placement route the first pass missed, and it is
+                      why Save is now disabled as well: an enumeration of entry points is only
+                      as good as the last person who enumerated. */}
+                  {!filesLocked && <button onClick={() => {
                     setErr(null); setDesignUrl(item.design_src!); setPos(DEFAULT_POS); noteArtSource(sideName, "")
                     /* NAME IT. These three routes in — the buyer's file, the library and a
                        template — all set the artwork and left `designName` holding whatever
@@ -4152,7 +4173,7 @@ export function DesignCanvasDialog({
                        the row under the stage would have shown it. */
                     setDesignName(fileNameFrom(item.design_src!) ?? "Customer's file"); setDesignSize(null)
                   }}
-                    className="h-7 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:opacity-90">{tl("canvas", "Use this")}</button>
+                    className="h-7 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:opacity-90">{tl("canvas", "Use this")}</button>}
                   <a href={item.design_src} target="_blank" rel="noopener noreferrer"
                     className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium hover:bg-accent">
                     {tl("canvas", "Open")} <ArrowSquareOut size={11} weight="bold" />
@@ -4562,7 +4583,27 @@ export function DesignCanvasDialog({
  and the threads with it. And enabled whenever ANY face carries artwork, not
  just the visible one: standing on an empty back with a finished front is not
  a reason to grey out Save. */}
-            <Button onClick={() => void save()} disabled={saving || !canSave}>{saving ? <CircleNotch size={15} className="animate-spin" /> : tl("canvas", "Save")}</Button>
+            {/**
+              * SAVE IS THE BACKSTOP, and it earned the name the same day it was argued
+              * against.
+              *
+              * The first pass left it enabled on the reasoning that with the stage read-only
+              * and every intake refusing there was nothing left to write. Then "Use this" on
+              * the buyer's file turned out to set the artwork directly, so there was — and
+              * the reasoning was only ever as good as the enumeration behind it. A control
+              * that PERSISTS is the one place a missed entry point becomes a stored change,
+              * so it answers to the lock too.
+              *
+              * It also closes the thread picks, which ride along in the same save: a colour
+              * list is what the floor loads, and changing one after the order is charged is
+              * a production instruction nobody agreed to. For staff that means a draft
+              * cannot be saved from here — which is the rule as stated, not a side effect:
+              * before submit the line is the seller's. If picking threads on a draft turns
+              * out to be a real staff workflow, the fix is to give threads their own save,
+              * never to reopen this.
+              */}
+            <Button onClick={() => void save()} disabled={saving || !canSave || filesLocked}
+              title={filesLocked ? lockedWhy : undefined}>{saving ? <CircleNotch size={15} className="animate-spin" /> : tl("canvas", "Save")}</Button>
           </div>
         </div>
         <LibraryPickerDialog
