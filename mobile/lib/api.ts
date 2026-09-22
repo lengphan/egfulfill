@@ -209,6 +209,11 @@ export type Order = {
      looks like a broken feature. */
   carrier?: string | null
   tracking?: string | null
+  /** THE CARRIER'S OWN WORD, and for a seller it takes over the status column once a parcel
+   *  exists — see sellerStatus in @shared/order-status. The phone carried the tracking NUMBER
+   *  and not the state, so a seller on their phone read "Draft" on a delivered parcel while
+   *  the web was about to read "Delivered": exactly the divergence web-is-canonical is for. */
+  delivery_status?: string | null
   status?: string | null
   total?: number | string | null
   /** What the order costs the SELLER, computed server-side on the list (attachCost in

@@ -15,7 +15,12 @@ export type { SellerGroup, SellerFilter } from "@/shared/order-status"
 
 export type SellerStatusInfo = { label: string; tone: string; group: SellerStatus["group"] }
 
-export function sellerStatus(o: { factory_status?: string | null; status?: string | null }): SellerStatusInfo {
+/* `delivery_status` rides through: the shared vocabulary hands the column to the carrier
+   once a parcel exists, and a narrower signature here would quietly drop it — the caller
+   passes a whole order, so the field is already there and only the type was in the way. */
+export function sellerStatus(
+  o: { factory_status?: string | null; status?: string | null; delivery_status?: string | null },
+): SellerStatusInfo {
   const s = vocabulary(o)
   return { label: s.label, tone: STATUS_TONE[s.register], group: s.group }
 }

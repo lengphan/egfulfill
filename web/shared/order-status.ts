@@ -78,13 +78,62 @@ const MAP: Record<string, SellerStatus> = {
   fulfilled: P("Fulfilled", "settled", "shipped"),
 }
 
+/**
+ * ONCE A PARCEL EXISTS, THE CARRIER IS THE ANSWER (owner, 2026-09-22).
+ *
+ * A seller's question is always "where is it". Before it ships that is our pipeline; after
+ * it ships it is the carrier's, and there is no moment where both matter at once — so this
+ * stays ONE column and the carrier takes it over rather than earning a second one.
+ *
+ * WHAT IT FIXES. `sellerStatus` read `factory_status || status` and nothing else, so the
+ * carrier's answer was thrown away at the point of display. Measured on the live database:
+ * 120 orders read as **"Draft"** to a seller while their parcel had shipped — 65 of them
+ * already DELIVERED, 21 belonging to a real seller. Not merely "one status": the worst
+ * available wrong one, because Draft means *you never submitted this*.
+ *
+ * Those are marketplace orders the seller fulfilled themselves. They never entered our
+ * production ladder, so factory_status stayed `new` while tracking and delivery arrived from
+ * the carrier sync — the two facts diverged exactly as they should, and the display collapsed
+ * them into the one that had not moved.
+ *
+ * THE VOCABULARY IS THE ONE WE ALREADY STORE — DELIVERY_MAP in routes/shipping.js, which maps
+ * Shippo's states to ours. It is not re-derived here; these keys ARE those values, and a
+ * state that file stops emitting simply stops appearing.
+ *
+ * `returned` and `failed` are mapped there and have NEVER fired in production, so they are
+ * the two a seller will meet first with no history behind them. Both read as attention
+ * rather than as an outcome: neither is "delivered" and both need a person.
+ */
+const CARRIER: Record<string, SellerStatus> = {
+  awaiting_pickup: P("Awaiting pickup", "live", "shipped"),
+  in_transit: P("In transit", "live", "shipped"),
+  delivered: P("Delivered", "settled", "shipped"),
+  returned: P("Returned", "attention", "attention"),
+  failed: P("Delivery failed", "attention", "attention"),
+}
+
+/**
+ * OUR WORD WINS OVER THE CARRIER'S for these, and only these.
+ *
+ * A refunded order is refunded wherever the parcel went, and a cancelled one cannot be
+ * "In transit" — those are facts about the AGREEMENT, not about the box. Everything else
+ * yields: a shipped parcel's whereabouts is the more useful answer than our own ladder
+ * repeating that we finished with it.
+ */
+const OURS_WINS = new Set(["cancelled", "refunded", "on_hold", "flagged", "unfunded"])
+
 /** An unknown non-empty status is mid-pipeline, which is the old app's default and the
  *  safe one: telling a seller their order is "In Process" when it is in some state we do
  *  not recognise is better than telling them it is finished. */
 const FALLBACK = P("In Process", "live", "production")
 
-export function sellerStatus(o: { factory_status?: string | null; status?: string | null }): SellerStatus {
+export function sellerStatus(
+  o: { factory_status?: string | null; status?: string | null; delivery_status?: string | null },
+): SellerStatus {
   const raw = String(o?.factory_status || o?.status || "new").toLowerCase()
+  if (OURS_WINS.has(raw)) return MAP[raw] ?? FALLBACK
+  const carrier = String(o?.delivery_status || "").toLowerCase()
+  if (carrier && CARRIER[carrier]) return CARRIER[carrier]
   return MAP[raw] ?? FALLBACK
 }
 
