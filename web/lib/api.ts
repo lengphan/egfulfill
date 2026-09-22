@@ -1977,10 +1977,31 @@ export type DesignFileRow = { designId: string; sku?: string | null; lineId?: st
 export function filesForLine(files: DesignFileRow[] | undefined, line: { line_id?: string | null; sku?: string | null }): DesignFileRow[] {
   const list = files ?? []
   const own = line.line_id ? list.filter((f) => f.lineId === line.line_id) : []
-  if (own.length) return own
   // Order-wide files. `sku` is the LEGACY fallback only — rows written before line_id
   // existed carry a sku and no line, and dropping them would hide real files on live orders.
-  return list.filter((f) => !f.lineId && (!f.sku || !line.sku || f.sku === line.sku))
+  const wide = list.filter((f) => !f.lineId && (!f.sku || !line.sku || f.sku === line.sku))
+  /**
+   * BOTH, NOT EITHER (owner, 2026-09-22: "the download arrow only has 1 file — while in
+   * reality, 3 files are in this item").
+   *
+   * This returned `own` and stopped the moment the line had one file of its own, so an
+   * order-wide file — which belongs to EVERY line by definition — became invisible the
+   * instant anybody scoped a file to that line. A line with one machine file of its own and
+   * two order-wide ones reported one.
+   *
+   * The early return read as a preference ("its own files win"), but there is nothing to
+   * prefer BETWEEN: the two sets are disjoint and both are genuinely on this line. Deduped
+   * by designId anyway, because the same row must never be listed twice if the scoping rules
+   * ever overlap.
+   */
+  const seen = new Set<string>()
+  return [...own, ...wide].filter((f) => {
+    const k = String(f.designId ?? "")
+    if (!k) return true
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
 }
 /** A prior deliverable made from the same artwork. `distance` is set only on fuzzy hits. */
 export type ReuseMatch = { design_id: string; file_name?: string | null; kind?: string; order_id?: string; seller?: string; created_at?: string; distance?: number }
@@ -2066,7 +2087,10 @@ export function getFactoryDesigns(opts: { seller?: string | null; q?: string; li
   if (opts.limit != null) p.set("limit", String(opts.limit))
   if (opts.offset) p.set("offset", String(opts.offset))
   const qs = p.toString()
-  return api<{ designs: FactoryDesign[]; more: boolean }>(`/api/design_files/library${qs ? `?${qs}` : ""}`)
+  return api<{ designs: FactoryDesign[]; more: boolean
+    /** Design rows carrying artwork but no fingerprint, so an empty library can say WHICH
+     *  kind of empty it is: nothing printed, or nothing hashed yet. */
+    unhashed?: number }>(`/api/design_files/library${qs ? `?${qs}` : ""}`)
 }
 export function getFactoryDesignSellers() {
   return api<{ sellers: { id: string; name: string; designs: number }[] }>(`/api/design_files/library/sellers`)

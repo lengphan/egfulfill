@@ -43,6 +43,8 @@ export default function ArtworkLibraryPage() {
   /** THREE STATES, not two — "still loading", "nothing matched" and "we could not ask" are
    *  different facts and §4 forbids drawing them the same. */
   const [state, setState] = useState<"loading" | "ok" | "error">("loading")
+  /** Artwork we hold but have never fingerprinted — see the note on the empty state. */
+  const [unhashed, setUnhashed] = useState(0)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const lightbox = useLightbox()
@@ -65,6 +67,7 @@ export default function ArtworkLibraryPage() {
       const r = await getFactoryDesigns({ seller: seller || null, q: term || undefined, limit: PAGE, offset: at })
       setRows((prev) => (append ? [...(prev ?? []), ...(r.designs ?? [])] : (r.designs ?? [])))
       setMore(!!r.more)
+      setUnhashed(Number(r.unhashed) || 0)
       setState("ok")
     } catch {
       if (!append) setRows([])
@@ -176,10 +179,19 @@ export default function ArtworkLibraryPage() {
         ) : !rows?.length ? (
           <EmptyState
             icon={PenNib}
-            title={seller || term ? "Nothing matches that" : "No artwork has reached an order yet"}
+            /* THREE EMPTIES, NOT ONE. A filter that matched nothing, a floor that has
+               printed nothing, and artwork we hold but have never fingerprinted are three
+               different facts, and only the last one is ours to fix. */
+            title={seller || term
+              ? "Nothing matches that"
+              : unhashed > 0
+                ? "No artwork here has been fingerprinted yet"
+                : "No artwork has reached an order yet"}
             note={seller || term
               ? "Clear the filter to see every design the floor has been asked to print."
-              : "A design appears here once it is placed on an order line."}
+              : unhashed > 0
+                ? `${unhashed} ${unhashed === 1 ? "design carries" : "designs carry"} artwork with no fingerprint, so they cannot be matched to each other yet.`
+                : "A design appears here once it is placed on an order line."}
             action={(seller || term)
               ? <Button variant="outline" size="sm" onClick={() => { setSeller(""); setTerm("") }}>Clear filter</Button>
               : undefined}

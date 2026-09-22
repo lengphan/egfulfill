@@ -328,6 +328,8 @@ export function designFilesRoutes(app, requireAuth) {
    * is no seller-facing shape of this endpoint and there must not be one.
    */
   app.get('/api/design_files/library', { preHandler: requireAuth }, async (req, reply) => {
+    /* The handler is wrapped below rather than each query catching for itself — one place
+       that decides what a failure looks like, and it is never an empty list. */
     /* REFUSED EXPLICITLY, not by a middleware name. designFilesRoutes is handed requireAuth
        and nothing else, and §6 is not a convention worth hiding behind a preHandler: this
        row names every seller who ordered a design. */
@@ -383,8 +385,29 @@ export function designFilesRoutes(app, requireAuth) {
         order by has_file asc, a.orders desc, a.last_seen desc
         limit $4 offset $5`,
       [sellerId, dsn, dsn ? null : (term || null), limit, offset]
-    ).then((r) => r.rows).catch(() => []);
+    /**
+     * NOT SWALLOWED. `.catch(() => [])` rendered a failing query as "no artwork has ever
+     * reached an order" — the exact shape CLAUDE.md names ("a swallowed error is not an
+     * empty order"), and I wrote it, and it is what made the first look at this page
+     * unexplainable: an empty list is a fact, and it must not also be what a broken one
+     * looks like.
+     */
+    ).then((r) => r.rows);
+    /**
+     * HOW MANY DESIGN ROWS HAVE NO FINGERPRINT — the one number that explains an empty page.
+     *
+     * `art_hash` is computed on save, and the boot backfill only covers rows that still
+     * carry inline `data`; artwork in object storage from before the column existed has
+     * `storage_key` and no hash, and this listing cannot see it. An empty library is
+     * therefore two different facts — "nothing has been printed" and "nothing we printed
+     * has been fingerprinted yet" — and §4 forbids drawing them the same.
+     */
+    const unhashed = await q(
+      `select count(*)::int as n from order_designs
+        where art_hash is null and (data is not null or storage_key is not null)`
+    ).then((r) => r.rows[0]?.n || 0).catch(() => 0);
     return {
+      unhashed,
       designs: rows.map((r) => ({
         art_hash: r.art_hash,
         design_no: r.design_no == null ? null : Number(r.design_no),
