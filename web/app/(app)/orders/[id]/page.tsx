@@ -1199,7 +1199,26 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
    * disagree the aggregate stays, because a column that does not add up is unreadable however
    * correct its total is.
    */
-  const itemGroups = (lines: NonNullable<OrderQuote["lines"]>) => (
+  /**
+   * `goodsOnly` — THE SAME ITEM BLOCK, AS A LEDGER ENTRY RATHER THAN AS A QUOTE.
+   *
+   * Before the charge this block is the WHOLE price: its heading is goods + shipping −
+   * discount + fees, and Σ(headings) is quote.total. After the charge it is substituted for
+   * one ledger line — `product`, which is Σ(unitCost × qty) and nothing else — while
+   * shipping, the design fee and the discount are ledger lines of their OWN, listed
+   * immediately underneath.
+   *
+   * So the all-in block swallowed three entries the ledger then printed again. Measured on
+   * EGF-002188: `Shipping · first item $5.00` inside the item, `Shipping $5.00` under it,
+   * `Design fee $2.00` inside the item, `Design service · Item 1 $2.00` under it — a column
+   * reading $28 beneath a heading of $23 beneath a total of $23. Nothing was charged twice;
+   * the card said it was.
+   *
+   * In this mode the heading is the goods alone, so it equals the ledger line it replaces,
+   * and the rows the ledger owns are not drawn. A face then has no children and stays the
+   * single line it always was, which is what the grouping rule already asks for.
+   */
+  const itemGroups = (lines: NonNullable<OrderQuote["lines"]>, goodsOnly = false) => (
     <>
                       {/**
                         * SHIPPING, SPLIT OVER THE ITEMS THAT CAUSED IT (owner, 2026-09-17).
@@ -1348,7 +1367,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                   would no longer be the sum of its own children — and a
                                   breakdown whose parts do not reach its total is worse than one
                                   that never broke the figure down. Σ(headings) is quote.total. */}
-                              <dd className="shrink-0 tabular-nums">{usd(goods + shipOwn - discOwn + ownFees)}</dd>
+                              <dd className="shrink-0 tabular-nums">{usd(goodsOnly ? goods : goods + shipOwn - discOwn + ownFees)}</dd>
                             </div>
                             {split && (
                               <>
@@ -1417,7 +1436,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    * stays at order level, where it can name every item it covers
                                    * without being counted twice.
                                    */
-                                  const mine = (designFees?.items ?? [])
+                                  const mine = goodsOnly ? [] : (designFees?.items ?? [])
                                     .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
                                   const feesFor = (face: string) =>
                                     mine.filter((f) => (f.sides ?? []).some((sd) => sd.toLowerCase() === face.toLowerCase()))
@@ -1615,7 +1634,10 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    * No rounding to spread and so no remainder to absorb: one row takes
                                    * the whole figure, and the figure is already the item's exact share.
                                    */
-                                  const cut = goodsRows.map((r) => (r.face === null && discOwn > 0.005 ? discOwn : 0))
+                                  /* NOT IN THE LEDGER VIEW: `itemsSumToCharge` matches against
+                                     GROSS goods, so the volume discount is a ledger line of its
+                                     own and striking a row through here would deduct it twice. */
+                                  const cut = goodsRows.map((r) => (!goodsOnly && r.face === null && discOwn > 0.005 ? discOwn : 0))
 
                                   /**
                                    * A FACE IS SAID ONCE (owner, 2026-09-21: "i want Front once,
@@ -1825,7 +1847,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                         by the biggest thing in it, so one line carries the
                                         postage and the rest carry only what they add to the box.
                                         The hover splits a line that does both. */}
-                                    {shipOwn > 0.005 && (
+                                    {!goodsOnly && shipOwn > 0.005 && (
                                       <div className="flex justify-between">
                                         <dt
                                           className="pl-3 text-muted-foreground"
@@ -2140,7 +2162,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                          two sides of the charge read identically and the half below — which is
                          already per item — lines up with the half above. */
                       : l.part === "product" && itemsSumToCharge ? (
-                        <Fragment key={`${l.part}-${i}`}>{itemGroups(byItemNo(quote?.lines ?? []))}</Fragment>
+                        <Fragment key={`${l.part}-${i}`}>{itemGroups(byItemNo(quote?.lines ?? []), true)}</Fragment>
                       ) : (
                       <Fragment key={`${l.part}-${i}`}>
                       {/* `items-baseline`, so the FIGURE sits on the label's first line even
