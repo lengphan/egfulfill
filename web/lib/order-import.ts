@@ -1095,9 +1095,14 @@ export function groupToOrders(
                chain is: this position said so > the sheet's old row-level column said so >
                the default. Normalised to a LABEL, the same shape the row-level value carries,
                so nothing downstream has to know which of the three answered. */
-            const method = normalizeMethods([String(rawMethod || "").trim()])[0]?.label
-              || String(rawMethod || "").trim()
-              || S(r.print_type)
+            /* NORMALISED AFTER THE FALLBACK, NOT BEFORE IT. This normalised only the
+               position's OWN cell and then fell through to `r.print_type` raw — so a
+               position with no Type stored the bare "DTG" where every other surface in the
+               app spells it "DTG printing", which is the label normalizeMethods answers
+               with and the one the catalogue, the picker and the .xlsx template all use.
+               Resolve which value applies first, then spell it once. */
+            const rawM = String(rawMethod || "").trim() || S(r.print_type)
+            const method = normalizeMethods([rawM])[0]?.label || rawM
             out.push({ side: key, artwork: url(rawArt), templateId, machineFileId: mfRef, method })
           }
           add(S(r.print_side), S(r.design_file_url) || S(r.hero_image), S(r.machine_file_id), S(r.print_method))

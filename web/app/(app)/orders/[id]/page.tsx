@@ -1744,11 +1744,6 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                        * not a total, and claiming otherwise would understate a
                                        * bill the seller has not been given yet.
                                        */
-                                      const tbd = fees.some((fe) => fe.amount == null)
-                                      /* THIS FACE'S SHARE of each fee, not the fee. A fee covering
-                                         three designs on three faces used to add its whole figure to
-                                         all three subtotals — see shareOf. */
-                                      const sub = (r.amount - cut[j]) + fees.reduce((n, fe) => n + (shareOf(fe, f) ?? 0), 0)
                                       return [
                                         <div key={`fh-${i}-${j}`} className="flex justify-between gap-2 pt-0.5">
                                           <dt className="min-w-0 truncate pl-3 font-medium capitalize text-foreground">
@@ -1762,9 +1757,32 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                                 The floor still reads it, one line below. */}
                                             {tl("sides", f)}
                                           </dt>
-                                          <dd className="shrink-0 font-medium tabular-nums text-foreground">
-                                            {tbd && <span className="text-muted-foreground">+ </span>}{usd(sub)}
-                                          </dd>
+                                          {/**
+                                            * ONLY CHARGES CARRY MONEY (owner, today).
+                                            *
+                                            * This heading printed the face's subtotal — the charge plus
+                                            * every fee under it — and a row whose figure is a SUM of the
+                                            * rows beneath it was drawn almost exactly like a row carrying
+                                            * its own charge: same column, same indent step, only a
+                                            * difference in weight. So `Front $8.00` over `Embroidery
+                                            * $6.00` and `Design fee $2.00` read as a third charge, and the
+                                            * reader had to stop and work out whether $8 was contained or
+                                            * additional. It was contained — the arithmetic was never
+                                            * wrong — but a breakdown you have to verify is a breakdown
+                                            * that failed.
+                                            *
+                                            * With the figure gone, every number on this card is money
+                                            * somebody is billed, and they add to the item's heading and to
+                                            * the Total. The face keeps its job, which was never to price
+                                            * itself: it names the surface once so its charges do not each
+                                            * have to repeat it.
+                                            *
+                                            * WHAT THIS GIVES UP, said plainly: "what did the back cost
+                                            * me" is now a sum the reader does rather than one the card
+                                            * states. Weighed and chosen — a figure that is read wrong is
+                                            * worth less than one that isn't there.
+                                            */}
+                                          <dd aria-hidden className="shrink-0" />
                                         </div>,
                                         row,
                                         ...fees.map((fe, k) => {

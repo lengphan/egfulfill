@@ -65,7 +65,13 @@ const mixed = parse(csv({
 t('the mixed row is valid', mixed.records?.[0]?._valid, true);
 const sides = mixed.item?.sides;
 t('both positions come through', sides?.map((s) => s.side), ['front', 'back']);
-t('each position keeps its own method', sides?.map((s) => s.method), ['Embroidery', 'DTG printing']);
+/* THE EXPECTED SPELLING IS THE DECLARED ONE. This wanted "DTG printing", which stopped
+   being a label in f12bc16c ("a method label is the technique's name and nothing else") —
+   the gate was never updated, so it has been failing on a vocabulary change rather than on
+   a defect, and a gate that is always red reports nothing. The INPUT stays as the old
+   phrasing on purpose: normalizeMethods has to keep reading a sheet somebody filled before
+   the rename. */
+t('each position keeps its own method', sides?.map((s) => s.method), ['Embroidery', 'DTG']);
 t('a stitch file on the embroidered face raises nothing', mixed.records[0]._warnings, '');
 
 /* ── 3. THE CHECK THAT COULD NOT BE ASKED BEFORE ─────────────────────────────────────── */
@@ -101,7 +107,7 @@ t('its one method reaches every position',
 const silent = parse(csv({
   ...shipTo, 'Placement 1': 'Front', 'Artwork/Template 1': 'IMG-30',
 }));
-t('no method anywhere still means DTG', silent.item?.printType, 'DTG printing');
+t('no method anywhere still means DTG', silent.item?.printType, 'DTG');
 
 /* ── 6. A TYPE ALONE IS NOT A FACE ───────────────────────────────────────────────────── */
 // Five Type cells ride on every row; a filled one in an unused block must not invent a
