@@ -2669,9 +2669,29 @@ export function DesignCanvasDialog({
  setFaceArt((prev) => ({ ...(prev ?? {}), [sd]: null }))
  return
     }
+    /**
+     * SAY WHAT HAPPENS TO THE MONEY, because it is knowable (owner's call, today: the fee
+     * stays and buys a replacement).
+     *
+     * It said "ask us if it needs reversing", which is a dead end — ask whom, where — and
+     * it pointed at the wrong outcome. `chargeDesign` stamps `design_charged_at` on the
+     * LINE and refuses any further design charge on a stamped one, so a fee already paid
+     * covers whatever goes on this face next. That is not a policy written here; it is what
+     * the ledger already does, stated where the decision is being made.
+     *
+     * The figure comes from faceChargesFor, so the sentence names this face's own money
+     * rather than gesturing at "any design charge". No figure — a fee still under review,
+     * or a face that carries none — and the sentence simply is not made.
+     *
+     * Only staff read this: the route 409s a seller post-submit and filesLocked stops them
+     * reaching it at all, so it speaks to the person who can actually act on it.
+     */
+ const owedHere = faceCharges ? faceCharges[sd] : undefined
  if (!(await confirm({
  title: tl("canvas", "Take this artwork off the item?"),
- body: "It comes off this line. Any design charge already made stays — ask us if it needs reversing.",
+ body: owedHere != null && owedHere > 0.005
+        ? `It comes off this line. The ${owedHere.toLocaleString("en-US", { style: "currency", currency: "USD" })} already charged for this face stays and covers whatever replaces it — a new design here is not charged again.`
+        : "It comes off this line.",
  confirmLabel: "Remove artwork",
  destructive: true,
     }))) return
