@@ -1799,9 +1799,28 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                                 words that used to sit in this column described a rule
                                                 that no longer applies, and a column of money with a
                                                 sentence in the middle of it cannot be scanned. */}
+                                            {/**
+                                              * "FREE", NOT "$0.00" (owner, today: "easier to
+                                              * read").
+                                              *
+                                              * This reverses §4's "a figure, ALWAYS — never a
+                                              * phrase where money goes", and the reason that
+                                              * rule was written no longer applies: the words it
+                                              * banned ("included") stated a pricing rule the
+                                              * reader had to already know. "Free" states
+                                              * nothing but the amount, and a column of figures
+                                              * scans BETTER with a word at the zeroes than with
+                                              * $0.00 repeated — the eye stops looking for cents
+                                              * that are not there.
+                                              *
+                                              * Only a true zero. A discounted row still prints
+                                              * both figures, because something was charged.
+                                              */}
                                             {off > 0.005
                                               ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
-                                              : usd(r.amount)}
+                                              : net <= 0.005
+                                                ? <span className="text-muted-foreground">{tl("order", "Free")}</span>
+                                                : usd(r.amount)}
                                           </dd>
                                         </div>
                                       )

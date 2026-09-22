@@ -1462,6 +1462,7 @@ const vi: Dict = {
   "order.in the blank": "trong giá phôi",
   "order.This order was charged when one placement came inside the blank's price. Every placement is charged now.": "Giá phôi đã gồm một mặt in; mỗi mặt thêm sẽ tính phí.",
   "order.Base cost": "Giá gốc",
+  "order.Free": "Miễn phí",
   "order.Blank": "Phôi",
   "order.included": "đã bao gồm",
   "order.extra placement": "mặt in thêm",

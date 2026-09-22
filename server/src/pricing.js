@@ -614,17 +614,48 @@ function sideDetail(faces, fees, d, lineMethod = null) {
    * CHARGED ORDERS DO NOT MOVE. unit_cost and cost_parts are stamped at submit and this never
    * re-reads them, so an order billed under the old rule keeps the price it was billed at.
    */
+  /**
+   * AN EXTRA FACE PAYS FOR ITS OWN MACHINE RUN (owner, today: "per added design on another
+   * face, we will charge the method fees… for my previous models the extra design per face
+   * will be based on the methods, so it was easier to calculate").
+   *
+   * The third statement of this rule, and it lands back on the model costPartsOf has
+   * described all along — `price = blank + Σ per face ( placement + that face's method )` —
+   * with the one amendment 2026-09-21 made and this keeps: the PLACEMENT is paid once.
+   *
+   *   first face       placement + its method
+   *   every face after              its method
+   *
+   * WHY THE METHOD AND NOT THE PLACEMENT. They are different purchases. A placement is the
+   * setup — hooping, aligning, one act per garment however many surfaces it ends up with —
+   * so charging it per face billed one act several times, which is what read as a double
+   * charge in September. The METHOD is the run: a second embroidered face is a second pass
+   * through the machine, and it costs what the first one did.
+   *
+   * WHICH IS ALSO WHY IT IS EASY TO READ. Every face after the first is its technique's
+   * price, the same number on every one of them, and a garment printed three times shows
+   * three figures a person can add up without knowing which face was free.
+   *
+   * THE FIRST FACE'S METHOD IS NOT HERE. costPartsOf charges it once as `method`, and
+   * unitCostOf is base + method + sideAddOn — so adding it again on face one would bill the
+   * first run twice. The client attaches that figure to the billed face, which is why the
+   * front reads placement + method while the rest read method alone.
+   *
+   * CHARGED ORDERS DO NOT MOVE: unit_cost and cost_parts are stamped at submit and nothing
+   * here re-reads them.
+   */
   const parts = [];
   let charged = false;
   for (const face of ordered) {
     /* THE FACE'S OWN TECHNIQUE, else the LINE's. A face that says nothing is decorated the
        way the line is, which is the same inheritance every other reader of this column uses —
        and getting it wrong here is a wrong PRICE now that the rate follows the method. */
-    const rate = faceRate(face, ownMap, flat, fees, methodKey(methodOf.get(face) || lineMethod));
+    const tech = methodOf.get(face) || lineMethod;
+    const rate = faceRate(face, ownMap, flat, fees, methodKey(tech));
     /* The face's own technique when it has one, else null — NOT the line's. A face that says
        nothing inherits, and the caller already knows the line's method; filling it in here
        would make an inherited face indistinguishable from one somebody chose. */
-    const amount = charged ? 0 : money(rate);
+    const amount = charged ? money(methodAddOn(d, tech, fees)) : money(rate);
     if (rate > 0) charged = true;
     parts.push({ face, amount, method: methodOf.get(face) || null });
   }
@@ -903,8 +934,12 @@ function methodAddOn(d, printType, fees) {
   const tech = String(printType || '').toUpperCase();
   if (!tech) return 0;
   const k = methodKey(printType);
-  // A product may override the surcharge for its own method mix.
-  if (d.methodPrices) {
+  /* `d` MAY BE NULL. Every caller until now reached this through costPartsOf, which is
+     handed `row.data || {}`; sideDetail is handed `(row && row.data) || null` and passes it
+     straight down, so a line whose product has no data row threw here the moment an extra
+     face started asking for its method. A product we know nothing about has no override —
+     which is the platform default, not a crash. */
+  if (d && d.methodPrices) {
     const mp = num(d.methodPrices[k] != null ? d.methodPrices[k] : d.methodPrices[tech]);
     if (mp != null && mp > 0) return mp;
   }

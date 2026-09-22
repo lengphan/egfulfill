@@ -116,18 +116,38 @@ console.log('\nMORE DESIGNS ON ONE FACE IS STILL ONE PLACEMENT')
 /**
  * THE SECOND FACE COSTS A DESIGN FEE, NOT A PLACEMENT.
  *
- * This is the whole of the 2026-09-21 reversal, stated as arithmetic: adding artwork to
- * another surface must not raise the garment's price. What it DOES raise is the design fee,
- * which is billed per picture by computeDesignFees and is not this function's business.
+ * THE PLACEMENT is paid once — adding a surface must not bill the setup again. THE METHOD
+ * is not: a second embroidered face is a second pass through the machine (owner, today,
+ * amending 2026-09-21). The design fee is billed per picture by computeDesignFees and is
+ * still not this function's business.
+ *
+ * THIS BLOCK USED TO ASSERT "four faces, same placement money" AND IT STILL PASSED after the
+ * rule changed, because its fixture has no method surcharge at all — every extra face added
+ * zero either way. A gate that cannot fail on the thing it names is not guarding it, so the
+ * surcharge is in the fixture now and both halves are checked.
  */
-console.log('\nADDING A FACE DOES NOT RAISE THE GARMENT')
+console.log('\nTHE PLACEMENT IS PAID ONCE, THE MACHINE RUN IS NOT')
 {
-  const one = sideAddOn([{ side: 'front', method: 'Embroidery' }], fees, null, 'Embroidery')
-  const four = sideAddOn(
-    ['front', 'back', 'left', 'right'].map((side) => ({ side, method: 'Embroidery' })), fees, null, 'Embroidery')
-  check('one face', one, 3)
-  check('four faces, same placement money', four, one)
+  const priced = { methodPrices: { EMB: 4 } }
+  const faces = (n) => ['front', 'back', 'left', 'right'].slice(0, n).map((side) => ({ side, method: 'Embroidery' }))
+  check('one face — placement only', sideAddOn(faces(1), fees, priced, 'Embroidery'), 3)
+  check('two faces — one placement, two runs', sideAddOn(faces(2), fees, priced, 'Embroidery'), 7)
+  check('four faces', sideAddOn(faces(4), fees, priced, 'Embroidery'), 15)
+  const r = sideBreakdown(faces(3), fees, priced, 'Embroidery')
+  check('the front carries the placement', r.parts[0].amount, 3)
+  check('and every face after carries its run', r.parts.slice(1).map((p) => p.amount), [4, 4])
+
+  /* A METHOD WITH NO SURCHARGE STILL ADDS NOTHING, which is the half the old fixture was
+     accidentally testing: plain print is free, so a second DTG face is still free. */
+  check('a second DTG face is free',
+    sideAddOn([{ side: 'front', method: 'DTG' }, { side: 'back', method: 'DTG' }], fees, priced, 'DTG'), 3)
+
+  /* A PRODUCT WE KNOW NOTHING ABOUT does not crash. sideDetail is handed
+     `(row && row.data) || null` while every other caller of methodAddOn passes an object,
+     so the extra face asking for its method was the first to meet a null. */
+  check('no product data — platform default, not a throw',
+    sideAddOn(faces(2), fees, null, 'Embroidery'), 3)
 }
 
-console.log(bad ? `\n${bad} failure(s).` : '\nOne placement per line, the rest free, and nothing else moved.')
+console.log(bad ? `\n${bad} failure(s).` : '\nOne placement per line, one machine run per face, and nothing else moved.')
 process.exit(bad ? 1 : 0)
