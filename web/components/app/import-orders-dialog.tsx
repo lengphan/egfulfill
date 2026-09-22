@@ -737,16 +737,28 @@ export function ImportOrdersDialog({
                * `on conflict (design_id) do update` silently OVERWROTE the first file with
                * the second. Unreachable while a row could name one placement; real now.
                *
-               * A row with no positions (the single-face path) still sends ONE attach with
-               * no side, which is exactly what every caller meant before today — so nothing
-               * already stored moves and an old sheet behaves identically.
+               * A ROW WITH ONE POSITION SENDS THAT POSITION, and it used to send nothing.
+               *
+               * `sides` is only set when the row names MORE than one, so a sheet reading
+               * Placement 1 = Front, Machine File 1 = MF-11 took the branch below and
+               * attached the file with no face at all. That was written when a side-less
+               * file simply meant "this line", and it has stopped being harmless: the server
+               * treats a machine file with no side as covering EVERY face, so
+               * computeDesignFees marks all of them `supplied` and waives the digitising on
+               * surfaces the file was never cut for. One unscoped .EMB, and a three-face
+               * garment is billed for none of its design work.
+               *
+               * The row already says which face — it is the Placement cell beside the
+               * Machine File cell — so this is reading what was typed rather than guessing.
+               * `printSide` is normalised ("Front" -> "front") by the parser, which is the
+               * spelling the server matches on.
                */
               const mfJobs = it.sides?.length
                 ? it.sides
                     .filter((f) => String(f.machineFileId || "").trim())
                     .map((f) => ({ ref: String(f.machineFileId).trim(), side: f.side }))
                 : String(it.machineFileId || "").trim()
-                  ? [{ ref: String(it.machineFileId).trim(), side: undefined as string | undefined }]
+                  ? [{ ref: String(it.machineFileId).trim(), side: (it.printSide || undefined) as string | undefined }]
                   : []
               /**
                * WHICH FACES THIS LINE PRINTS ON — and the row's Placement outranks all of it.
@@ -859,6 +871,16 @@ export function ImportOrdersDialog({
                   // whichever sibling shared the name — or, when the sheet gave a blank and no
                   // Item SKU, on nothing at all.
                   orderId, sku: it.sku || it.name, lineId: lineIds[li],
+                  /**
+                   * AND THE FACE THE TEMPLATE WAS PLACED ON — same reason as the mfJobs
+                   * above. A template's stitch file went in with no side, so it read as
+                   * covering every surface of a line it only ever belonged to one of.
+                   *
+                   * Only when the row names a placement. A template that brings several
+                   * faces has no single answer here, and inventing "front" for it would be
+                   * the same over-claim in the other direction.
+                   */
+                  side: it.printSide || undefined,
                   name: it.templateMachineFile.name, data: it.templateMachineFile.data,
                 }).catch(() => {})
               }

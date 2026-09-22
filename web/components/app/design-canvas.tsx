@@ -4072,10 +4072,34 @@ export function DesignCanvasDialog({
                        on the back looked like a bug and the note explained it away. A file
                        that says which face it is for is not on every face, and only the
                        line-scoped group can still honestly claim to be. */
+                    /**
+                     * WHICH FACE, SAID OUT LOUD (owner, today: "no where to assign to a
+                     * surface — how do we even know which files belong to which").
+                     *
+                     * The artwork rows in this list print `front` / `back` / `left`; a
+                     * machine file printed only "MACHINE", so the one row whose face decides
+                     * money was the one row that would not say what it was. A stitch file
+                     * with no side is treated by computeDesignFees as covering EVERY face —
+                     * it waives the digitising on all of them — so "unassigned" is not a
+                     * cosmetic gap here, it is the most expensive state a file can be in.
+                     *
+                     * Three answers, and they are not the same: the face it is FOR, "every
+                     * placement" when it deliberately covers a multi-face line, and
+                     * "no placement set" when nobody has said — which reads as the question
+                     * it is rather than as a fact.
+                     */
                     note: dlBusy === f.designId
                       ? "Working…"
-                      : [fileRoleLabel(f.kind), !f.side && artFaces.length > 1 ? tl("canvas", "every placement") : null]
-                          .filter(Boolean).join(" · "),
+                      : [
+                          fileRoleLabel(f.kind),
+                          f.side
+                            ? tl("sides", f.side)
+                            : artFaces.length > 1
+                              ? (f.kind === "emb" || f.kind === "pes"
+                                  ? tl("canvas", "no placement set")
+                                  : tl("canvas", "every placement"))
+                              : null,
+                        ].filter(Boolean).join(" · "),
                     /* NO status here. FileRow's "uploading" prints "Uploading…" under the
                        name, and this row is DOWNLOADING — the same spinner would be saying
                        the opposite of what is happening. */
