@@ -49,6 +49,21 @@ export function designFilesRoutes(app, requireAuth) {
      * file was really meant for — it keeps doing what it already did, and only new per-item
      * uploads are scoped.
      */
+    /**
+     * WHICH ARTWORK this file is the stitch file FOR — as a fact about the file, not one
+     * inferred from whichever order it happened to be uploaded against.
+     *
+     * Until now that link was only ever a JOIN: a file belonged to an order, the order's
+     * line carried an art_hash, and reuse matched through both. That works for a file
+     * uploaded on an order and cannot express the thing the factory library needs — "here
+     * is the .EMB for this picture", filed once, with no order in sight.
+     *
+     * NULL on every existing row, and the join below is kept exactly as it was, so nothing
+     * already stored changes meaning. The two are read together: this column when the file
+     * says so itself, the join when only the order can say.
+     */
+    .then(() => q('alter table design_file_data add column if not exists art_hash text'))
+    .then(() => q('create index if not exists design_file_data_art_hash on design_file_data (art_hash)'))
     .then(() => q('alter table design_file_data add column if not exists line_id text'))
     /**
      * WHICH FACE, when the line prints on more than one. NULL means "the whole line",
@@ -220,7 +235,21 @@ export function designFilesRoutes(app, requireAuth) {
            )
          left join users u on u.id = f.seller_id
         where d.art_hash = any($1::text[]) and f.order_id <> $2 and f.kind in ('pes','emb')
-        order by f.created_at desc limit 200`,
+          and f.art_hash is null
+        union all
+        /* AND THE FILES THAT NAME THEIR OWN ARTWORK — the factory library's, which have no
+           order to join through. The art_hash-is-null test above keeps the two halves
+           disjoint (and backticks stay OUT of this comment: it sits inside a JS template
+           literal, and one of them ends the string mid-query),
+           so a file that carries the column is offered once and through the better of the
+           two links rather than twice. */
+        select f.art_hash, f.design_id, f.file_name, f.kind, f.order_id, f.created_at,
+               coalesce(u.store_name, u.name, u.email, '—') as seller
+          from design_file_data f
+          left join users u on u.id = f.seller_id
+         where f.art_hash = any($1::text[])
+           and coalesce(f.order_id,'') <> $2 and f.kind in ('pes','emb')
+        order by created_at desc limit 200`,
       [hashes, orderId]).then((r) => r.rows).catch(() => []);
     const byHash = new Map();
     for (const r of exactRows) {
@@ -278,6 +307,121 @@ export function designFilesRoutes(app, requireAuth) {
    * board"). This is read whenever staff open the order, so artwork a seller dropped
    * overnight is answered the moment anybody looks.
    */
+  /**
+   * THE FACTORY'S DESIGN LIBRARY — one row per piece of artwork we have ever had to print.
+   *
+   * The question it answers is the expensive one: HAVE WE DIGITISED THIS BEFORE. A design
+   * briefed twice is paid for twice, and until now the only way to ask was per order, at
+   * the moment somebody pressed Send to board — which is the last moment, not the first.
+   *
+   * KEYED ON art_hash, so the same picture ordered by six shops is ONE row and not six.
+   * That is the same identity design_ids issues DSN-#### from, so the number on this page
+   * is the number on the board card and in the designer.
+   *
+   * SOURCED FROM order_designs, NOT design_library. The seller's library is a scratch
+   * gallery — it holds uploads that were never ordered, and its per-seller listing is
+   * capped. This is the artwork that actually reached a line, which is the only artwork
+   * the floor can be asked to make.
+   *
+   * STAFF ONLY, and §6 is the reason rather than a convention: the row names every seller
+   * who ordered a design, and a seller must never learn theirs was used by another. There
+   * is no seller-facing shape of this endpoint and there must not be one.
+   */
+  app.get('/api/design_files/library', { preHandler: requireAuth }, async (req, reply) => {
+    /* REFUSED EXPLICITLY, not by a middleware name. designFilesRoutes is handed requireAuth
+       and nothing else, and §6 is not a convention worth hiding behind a preHandler: this
+       row names every seller who ordered a design. */
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const qy = req.query || {};
+    const sellerId = /^[0-9a-f-]{36}$/i.test(String(qy.seller || '')) ? String(qy.seller) : null;
+    /* Free text over the design NUMBER and the artwork's name. A hash is 64 characters
+       nobody types, so DSN-1042 and "route 66" are what search has to accept. */
+    const term = String(qy.q || '').trim().slice(0, 80);
+    const dsn = (term.match(/^\s*(?:dsn-)?(\d{3,})\s*$/i) || [])[1] || null;
+    const limit = Math.min(200, Math.max(1, parseInt(qy.limit, 10) || 60));
+    const offset = Math.max(0, parseInt(qy.offset, 10) || 0);
+    /**
+     * ONE ROW PER ARTWORK, and every aggregate computed in the same pass so the counts
+     * cannot disagree with the list they describe.
+     *
+     * `has_file` reads BOTH links — a file that names its own artwork, and one attributed
+     * through the order it was uploaded against — for the same reason reuseForOrder does.
+     * A library that said "no file" about artwork the reuse panel offers a file for would
+     * be worse than no library.
+     */
+    const rows = await q(
+      `with art as (
+         select d.art_hash,
+                min(d.updated_at) as first_seen,
+                max(d.updated_at) as last_seen,
+                count(distinct d.order_id) as orders,
+                count(distinct o.seller_id) as sellers,
+                array_agg(distinct coalesce(u.store_name, u.name, u.email, '—')) as seller_names,
+                max(d.name) as name
+           from order_designs d
+           join orders o on o.id = d.order_id
+           left join users u on u.id = o.seller_id
+          where d.art_hash is not null
+            and ($1::uuid is null or o.seller_id = $1)
+          group by d.art_hash
+       )
+       select a.*, i.design_no,
+              exists (
+                select 1 from design_file_data f
+                 where f.kind in ('pes','emb')
+                   and ( f.art_hash = a.art_hash
+                      or exists (select 1 from order_designs d2
+                                  where d2.order_id = f.order_id and d2.art_hash = a.art_hash) )
+              ) as has_file
+         from art a
+         left join design_ids i on i.art_hash = a.art_hash
+        where ($2::bigint is null or i.design_no = $2)
+          and ($3::text is null or a.name ilike '%' || $3 || '%')
+        /* FILES FIRST BY THEIR ABSENCE. The page exists to stop work being redone, so the
+           artwork nobody has digitised yet, ordered by how many orders are waiting on it,
+           is what has to be at the top. */
+        order by has_file asc, a.orders desc, a.last_seen desc
+        limit $4 offset $5`,
+      [sellerId, dsn, dsn ? null : (term || null), limit, offset]
+    ).then((r) => r.rows).catch(() => []);
+    return {
+      designs: rows.map((r) => ({
+        art_hash: r.art_hash,
+        design_no: r.design_no == null ? null : Number(r.design_no),
+        /* The picture at an address, never its bytes — a page of 60 base64 images is the
+           same mistake the seller library's own listing note describes. */
+        thumb: `/api/order_designs/art/${r.art_hash}`,
+        name: r.name || null,
+        orders: Number(r.orders) || 0,
+        sellers: Number(r.sellers) || 0,
+        seller_names: (r.seller_names || []).filter(Boolean),
+        has_file: !!r.has_file,
+        first_seen: r.first_seen,
+        last_seen: r.last_seen,
+      })),
+      /* Whether there is another page, without a second count(*) over the whole table:
+         a full page is the only thing that can have one. */
+      more: rows.length === limit,
+    };
+  });
+
+  /** The sellers who have ordered printed artwork, for the library's filter. Staff only,
+   *  same §6 reason as the listing it feeds. */
+  app.get('/api/design_files/library/sellers', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const r = await q(
+      `select o.seller_id as id,
+              coalesce(u.store_name, u.name, u.email, '—') as name,
+              count(distinct d.art_hash) as designs
+         from order_designs d
+         join orders o on o.id = d.order_id
+         left join users u on u.id = o.seller_id
+        where d.art_hash is not null and o.seller_id is not null
+        group by o.seller_id, u.store_name, u.name, u.email
+        order by designs desc, name asc`).then((x) => x.rows).catch(() => []);
+    return { sellers: r.map((x) => ({ id: x.id, name: x.name, designs: Number(x.designs) || 0 })) };
+  });
+
   app.get('/api/orders/:id/design_reuse', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     return { lines: await reuseForOrder(String(req.params.id)) };
@@ -410,8 +554,8 @@ export function designFilesRoutes(app, requireAuth) {
       } catch (e) { /* storage failed → keep inline */ }
     }
     await q(
-      `insert into design_file_data (design_id, order_id, sku, line_id, side, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, source, created_at, updated_at)
-       values ($1,$2,$3,$12,$15,$4,$5,$6,$7,$8,$13,$9, coalesce($10, 0), $11, $14, now(), now())
+      `insert into design_file_data (design_id, order_id, sku, line_id, side, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, source, art_hash, created_at, updated_at)
+       values ($1,$2,$3,$12,$15,$4,$5,$6,$7,$8,$13,$9, coalesce($10, 0), $11, $14, $16, now(), now())
        on conflict (design_id) do update set
          -- Whoever wrote it LAST owns the row's provenance: staff replacing a seller's file
          -- with a cut version makes it a factory file, which is exactly what it now is.
@@ -431,7 +575,10 @@ export function designFilesRoutes(app, requireAuth) {
          seller_id=coalesce(excluded.seller_id, design_file_data.seller_id),
          file_name=excluded.file_name, mime=excluded.mime, data=excluded.data, url=excluded.url,
          storage_key=excluded.storage_key, content_hash=excluded.content_hash,
-         price=coalesce($10, design_file_data.price), kind=excluded.kind, updated_at=now()`,
+         price=coalesce($10, design_file_data.price), kind=excluded.kind,
+         /* COALESCED, not overwritten: a re-upload that does not say which artwork it is for
+            must not forget the answer an earlier one gave. */
+         art_hash=coalesce(excluded.art_hash, design_file_data.art_hash), updated_at=now()`,
       [String(b.designId), b.orderId || null, b.sku || null, seller || null, b.name || null, b.mime || null, data, url, b.hash || null,
        priceFor(req.user, b, defaultPrice),
        kindOf(b.name, b.mime),
@@ -450,6 +597,18 @@ export function designFilesRoutes(app, requireAuth) {
         */
        ((b.lineId || b.line_id) && b.side)
          ? String(b.side).trim().toLowerCase().slice(0, 24) || null
+         : null,
+       /**
+        * $16 — WHICH ARTWORK, when the caller knows. The factory library sends it because it
+        * has no order to infer from; an ordinary per-order upload sends nothing and keeps
+        * resolving through the join, exactly as before.
+        *
+        * Validated rather than trusted: this is the key reuse matches on, and a caller that
+        * sent the wrong shape would attach a file to nothing in a way that looks like "no
+        * matches found".
+        */
+       /^[0-9a-f]{64}$/.test(String(b.artHash || '').toLowerCase())
+         ? String(b.artHash).toLowerCase()
          : null]);
     /**
      * Record it + wake the boards. Without these two lines the file lands in storage but
