@@ -3174,16 +3174,46 @@ export function DesignCanvasDialog({
                  * knowable, because it is priced from the artwork nobody has added yet, and
                  * a guess here is the same defect one step earlier.
                  */
- const owed = art ? (faceCharges ? faceCharges[k] : undefined) : undefined
- const shown = owed != null ? owed : art ? (costingFaces[k] ? rate : 0) : (anyFaceHasArt ? 0 : rate)
- const charges = shown > 0.005
+                /**
+                 * THE QUOTE'S FIGURE IS NOT GATED ON WHAT THIS WINDOW HAS OPEN.
+                 *
+                 * This read `art ? faceCharges[k] : undefined`, so a face the invoice is
+                 * ALREADY charging showed nothing whenever the editor held no artwork for
+                 * it — a design fee whose `sides` cover front and back printed on Front
+                 * alone, and the seller saw one number for two charged faces (owner: "if
+                 * it's there, must have design fees shown"). What a face costs is the
+                 * quote's business; whether this window has its picture loaded is not.
+                 */
+ const owed = faceCharges ? faceCharges[k] : undefined
+                /**
+                 * EVERY FACE SAYS SOMETHING, and the three answers are different facts:
+                 *
+                 *  - a NUMBER — what this face is charged, from the quote where there is one.
+                 *  - "Included" — printed and costing nothing more: the placement the line
+                 *    price already carries.
+                 *  - "+ design fee" — EMPTY, and the line has already taken its placement.
+                 *    Since ba6dbe91 a further face pays only for the design work on it, and
+                 *    that is priced from artwork nobody has added yet. The placement RATE is
+                 *    the wrong number here and printing it is the bug that was just fixed on
+                 *    this rail; a word is the honest answer, not a guess.
+                 *
+                 * An empty face on a line with NO artwork at all still quotes the placement,
+                 * because that is exactly what the first printed face costs.
+                 */
+ const shown = owed != null ? owed
+                  : art ? (costingFaces[k] ? rate : 0)
+                  : (anyFaceHasArt ? null : rate)
  return (
                   <FaceTile
  key={f.side} url={f.url} label={f.side || "front"}
                     /* One artwork per face is this window's model, so: a list of one. */
  layers={art ? [{ src: art.data, pos: art.pos }] : []}
  active={i === side} onSelect={() => goToSide(i)}
- extra={charges ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}` : null}
+ extra={shown == null
+                      ? tl("designCanvas", "+ design fee")
+ : shown > 0.005
+                        ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}`
+                        : tl("designCanvas", "Included")}
                   />
                 )
               })}

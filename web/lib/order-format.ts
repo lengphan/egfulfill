@@ -478,8 +478,16 @@ export const addressSourceLabel = (o: OrderRow): string => {
  */
 export function faceChargesFor(
   quote: {
+    /**
+     * A PART IS KEYED `face`, NOT `side` — `sideDetail` in server/src/pricing.js pushes
+     * `{ face, amount, method }`, and the order page's own breakdown reads `pt.face`. This
+     * read `p.side`, which is undefined on every part the server has ever sent, so every
+     * PLACEMENT charge was dropped on the floor here and the rail showed design fees only:
+     * a face the invoice bills for printed nothing at all (owner: "all surfaces should have
+     * fees shown"). `side` stays as a fallback and costs nothing.
+     */
     lines?: { line_id?: string | null; sku?: string | null
-              sideParts?: { parts?: { side?: string | null; amount?: number | null }[] } | null }[]
+              sideParts?: { parts?: { face?: string | null; side?: string | null; amount?: number | null }[] } | null }[]
     designFees?: { items?: { line_id?: string | null; sku?: string | null
                              amount?: number | null; sides?: string[] | null
                              perSide?: Record<string, number> | null }[] } | null
@@ -496,7 +504,7 @@ export function faceChargesFor(
     out[k] = Math.round(((out[k] ?? 0) + Number(amount)) * 100) / 100
   }
   const line = (quote?.lines ?? []).find(mine)
-  for (const p of line?.sideParts?.parts ?? []) add(p.side, p.amount)
+  for (const p of line?.sideParts?.parts ?? []) add(p.face ?? p.side, p.amount)
   for (const f of (quote?.designFees?.items ?? []).filter(mine)) {
     const sides = f.sides ?? []
     if (!sides.length || f.amount == null) continue

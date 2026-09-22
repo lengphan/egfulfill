@@ -29,8 +29,15 @@ export function FaceTile({ url, layers, label, active, extra, onSelect }: {
   layers: { src: string; pos: Pos }[]
   label: string
   active: boolean
-  /** What this face ADDS per unit, when it is not the first printed one. Null → free, and
-   *  nothing is said: a price of nothing is noise on every single-sided line. */
+  /**
+   * WHAT THIS FACE COSTS — a figure, or the word that stands in for one.
+   *
+   * It used to be null on anything free, on the reasoning that "a price of nothing is noise
+   * on every single-sided line". The rail then went silent on exactly the faces a seller is
+   * deciding about: three empty tiles under a Front reading "+$2.00" say nothing about
+   * whether printing them is free, and a charged face whose picture this window had not
+   * loaded said nothing either. The caller answers for every face now.
+   */
   extra?: string | null
   onSelect: () => void
 }) {
@@ -64,8 +71,18 @@ export function FaceTile({ url, layers, label, active, extra, onSelect }: {
       </span>
       <span className={"w-full truncate text-center text-[10px] font-medium capitalize leading-none "
         + (active ? "" : "text-muted-foreground")}>{label}</span>
+      {/* MONEY IS A VALUE, A WORD IS A LABEL, and they are sized by what they ARE rather
+          than by how small the tile is (CLAUDE.md §4). This was 9px — below the scale
+          entirely — on the one thing in the rail somebody has to read a digit of. */}
       {extra && (
-        <span className="text-[9px] leading-none tabular-nums text-muted-foreground">{extra}</span>
+        <span className={"w-full text-center leading-tight "
+          + (/\d/.test(extra)
+            ? "truncate text-xs font-medium tabular-nums text-foreground"
+            /* A WORD WRAPS, a figure does not. "+ design fee" truncated to "+ design…" in a
+               72px tile, which is the half that says nothing — the whole value of the line
+               is the word "fee". Two short lines cost the empty tiles a few pixels of
+               height and say the thing. */
+            : "text-2xs text-muted-foreground")}>{extra}</span>
       )}
     </button>
   )
