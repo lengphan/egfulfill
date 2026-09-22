@@ -3,6 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import type { OrderItem } from "@/lib/api"
 import { decodeEntities } from "@/lib/order-format"
+import { ourSku } from "@/lib/our-sku"
 
 /**
  * WHAT THE CUSTOMER ACTUALLY ORDERED, kept on screen while you pick the blank.
@@ -136,7 +137,32 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
    * added by hand, or a listing that carries no SKU of its own — is in the title, since the
    * row itself cannot tell them apart and neither can be asserted from what it holds.
    */
-  ids.push(
+  /**
+   * ...EXCEPT WHEN IT IS THE BLANK'S CODE WEARING THE OTHER LABEL (owner, today).
+   *
+   * A sheet whose Listing SKU column was filled with OUR product code — easily done, since
+   * `sku` and `product_sku` both alias to that column while `blank_sku` and `catalog_sku`
+   * go to the blank — produces a line reading
+   *
+   *     Listing SKU: EG-18000
+   *     Blank SKU:   EG-18000
+   *
+   * Two rows, two labels, one code, and the distinction the labels exist to draw
+   * (§5: the seller's code for what was SOLD against the garment we BUY) collapses into
+   * noise that makes the reader check whether they are the same string.
+   *
+   * So the row is dropped when it would only repeat the blank. Nothing is hidden: the code
+   * is still on screen one line down, under the label that is actually true of it. And this
+   * is a DISPLAY test only — order_items.sku is untouched, because a value somebody typed
+   * is theirs and a rename of the blank later would make these two differ again.
+   *
+   * Compared case-insensitively and through ourSku, so `18000`, `eg-18000` and `EG-18000`
+   * all count as the same code — the paint is applied at display time and the stored halves
+   * genuinely do differ in case and prefix.
+   */
+  const sameAsBlank = !!sku && !!blankSku
+    && ourSku(sku).toLowerCase() === ourSku(blankSku).toLowerCase()
+  if (!sameAsBlank) ids.push(
     <span key="s" title={sku ? undefined : tl("orderedVariant", "Not sold from a listing — added by hand, or the listing carries no SKU of its own.")}>
       <span className="font-medium text-foreground/70">{tl("orderedVariant", "Listing SKU:")}</span>{" "}
       {sku
