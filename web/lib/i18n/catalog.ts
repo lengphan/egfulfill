@@ -1431,6 +1431,7 @@ const vi: Dict = {
   /* Said BEFORE a shop is connected — see the note in stores-manager.tsx. */
   "stores.Buyer addresses arrive separately.": "Địa chỉ người mua đến theo cách riêng.",
   "stores.Etsy does not release the street and postcode to our app, so orders import without them and cannot be shipped until they are filled in. Our browser extension reads them from your own Etsy orders page. Everything else — items, sizes, artwork, tracking back to Etsy — works from this connection.": "Etsy không cung cấp địa chỉ và mã bưu chính cho ứng dụng của chúng tôi, nên đơn hàng nhập về sẽ thiếu các thông tin này và chưa thể giao cho đến khi được điền vào. Tiện ích trình duyệt của chúng tôi đọc chúng từ chính trang đơn hàng Etsy của bạn. Mọi thứ khác — sản phẩm, kích cỡ, thiết kế, mã vận đơn gửi lại Etsy — đều hoạt động nhờ kết nối này.",
+  "order.One placement is charged per item — this face adds nothing to the garment.": "Mỗi sản phẩm chỉ tính một lần phí đặt hình — mặt này không cộng thêm.",
   "order.Shipping": "Vận chuyển",
   "order.Discount": "Giảm giá",
   "order.extra in the box": "thêm vào kiện",

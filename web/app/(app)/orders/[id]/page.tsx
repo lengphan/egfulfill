@@ -1641,16 +1641,19 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                       const net = r.amount - off
                                       return (
                                         <div key={`g-${i}-${j}`} className="flex justify-between gap-2">
-                                          {/* WHY A ROW READS "in the blank", on the row itself.
-                                              It states a pricing rule — one face is inside the
-                                              blank's price and the rest are charged — that nobody
-                                              can infer from a list of the others, and it was
-                                              asked about twice. */}
+                                          {/* WHY A FACE CAN READ $0.00, in the title rather than as a
+                                              label (§4). It used to say "in the blank", which stated
+                                              the rule that ONE face was inside the blank's price —
+                                              retired on 2026-09-21, when the placement became one per
+                                              LINE. A free face is now free because the line's single
+                                              placement is already charged on another face, and
+                                              "in the blank" said something that had stopped being
+                                              true of any unpaid order. */}
                                           <dt
                                             className={`min-w-0 truncate text-muted-foreground ${r.face && groupedFaces.has(r.face) ? "pl-6" : "pl-3"}`}
                                             title={r.hover
                                               || (r.surfaceFree && r.face
-                                                ? tl("order", "This order was charged when one placement came inside the blank's price. Every placement is charged now.")
+                                                ? tl("order", "One placement is charged per item — this face adds nothing to the garment.")
                                                 : undefined)}
                                           >
                                             {r.face
@@ -1710,15 +1713,14 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                             * and appearing to disagree.
                                             */}
                                           <dd className="shrink-0 tabular-nums text-muted-foreground">
-                                            {r.amount <= 0.005
-                                              ? tl("order", "in the blank")
-                                              : r.surfaceFree && (r.methodFee ?? 0) > 0.005
-                                                ? (<>{tl("order", "in the blank")}{" + "}{off > 0.005
-                                                    ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
-                                                    : usd(r.amount)}</>)
-                                                : off > 0.005
-                                                  ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
-                                                  : usd(r.amount)}
+                                            {/* A FIGURE, ALWAYS — never a phrase where money goes.
+                                                A free face prints $0.00 and the title says why; the
+                                                words that used to sit in this column described a rule
+                                                that no longer applies, and a column of money with a
+                                                sentence in the middle of it cannot be scanned. */}
+                                            {off > 0.005
+                                              ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
+                                              : usd(r.amount)}
                                           </dd>
                                         </div>
                                       )
