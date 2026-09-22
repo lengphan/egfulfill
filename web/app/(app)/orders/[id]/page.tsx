@@ -51,6 +51,7 @@ import {
  ALL_SIDES,
  getOrderDesigns,
  getDesignReuse,
+ getOrderDesignReuse,
  getDesignFiles,
  type DesignFileRow,
  getOrderMessages,
@@ -455,6 +456,20 @@ export default function OrderDetailPage() {
   /** Reuse hits for one line — SHOWN, never acted on. §6: a perceptual match suggests and a
    *  human confirms; auto-attaching one is how another seller's work reaches this order. */
  const [boardReuse, setBoardReuse] = useState<{ key: string; exact: ReuseMatch[]; similar: ReuseMatch[] } | null>(null)
+  /**
+   * WHAT WE ALREADY HOLD, ASKED ON ARRIVAL (owner, 2026-09-21: "surfaces when file is
+   * submitted, not after press send to board").
+   *
+   * That was half-built. `getOrderDesignReuse` was written for exactly this and its own note
+   * says it is "read whenever staff open the order" — but its only consumer was
+   * DesignFilesPanel, which mounts inside a BOARD CARD. So the answer existed and lived
+   * behind the decision it was meant to pre-empt: you reached it by opening a card, which
+   * you open after deciding to spend a designer.
+   *
+   * The per-line lookup below still runs on the way to the board and still gates the send.
+   * This one is only for SAYING SO, on the line, from the moment the page loads.
+   */
+ const [ownedFiles, setOwnedFiles] = useState<Record<string, { exact: ReuseMatch[]; similar: ReuseMatch[]; hashed: boolean }>>({})
 
   /**
    * WHICH LINE AND FACE THE SEND DIALOG IS OPEN FOR.
@@ -488,6 +503,19 @@ export default function OrderDetailPage() {
  setBoardReuse(null)
  setBoardSend({ item: it, side })
   }
+
+  /* STAFF ONLY, and the server agrees with a 403: the answer is drawn from other sellers'
+     orders, and §6 forbids a seller ever learning theirs was used by another. A failure is
+     silent here because this is an ADDITION to the row — the line renders without it
+     exactly as it did, and an error banner about an optimisation is noise. */
+  useEffect(() => {
+    if (!order || !isStaff) return
+    let live = true
+    const t = setTimeout(() => {
+      getOrderDesignReuse(String(id)).then((r) => { if (live) setOwnedFiles(r?.lines ?? {}) }).catch(() => {})
+    }, 0)
+    return () => { live = false; clearTimeout(t) }
+  }, [order, isStaff, id])
 
   // The quote is fetched HERE rather than inside the submit button because two places
   // render it: the Summary card (the breakdown) and the confirm dialog (the amount).
@@ -2991,6 +3019,13 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                     const art = (side ? sidesForLine(designSides, it)?.[side]?.data : null) || boardArtworkFor(designs, it)
                     const busy = boardBusy === key
                     const hits = boardReuse?.key === key ? boardReuse : null
+                    /**
+                     * WHAT WE ALREADY HOLD FOR THIS LINE — read on arrival, not on the way
+                     * to the board. Keyed exactly as the server keys it: line first, sku
+                     * only for rows written before line_id existed (§5).
+                     */
+                    const owned = ownedFiles[it.line_id ? `L:${it.line_id}` : it.sku ? `S:${it.sku}` : ""] ?? null
+                    const ownedHit = owned && (owned.exact[0] ?? owned.similar[0]) ? owned : null
                     return (
                       <div key={key} className="py-3">
                         <div className="flex items-center gap-3">
@@ -3013,6 +3048,31 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                               {variantOf(it)}
                             </div>
                           </div>
+                          {/**
+                            * WE ALREADY HAVE THIS FILE — the thing the owner asked to surface
+                            * on 2026-09-21 and which has been computable ever since.
+                            *
+                            * On the row, before anyone reaches for Send to board, because the
+                            * whole value is stopping the press rather than interrupting it.
+                            * Hidden once the line is ON the board: by then the question has
+                            * been answered one way or the other and a suggestion is noise.
+                            *
+                            * THE OTHER SELLER IS NEVER NAMED. The factory may know two shops
+                            * ordered the same picture; this page must not be where that leaks
+                            * (§6). The row says what we can DO, never whose work it was.
+                            */}
+                          {!card && ownedHit && (
+                            <span
+                              className="shrink-0 text-xs font-medium text-success"
+                              title={ownedHit.exact.length
+                                ? tl("order", "An identical design has already been digitised — open the line to use that file.")
+                                : tl("order", "A similar design has already been digitised — a person confirms before it is used.")}
+                            >
+                              {ownedHit.exact.length
+                                ? tl("order", "Already digitised")
+                                : tl("order", "Similar on file")}
+                            </span>
+                          )}
                           {/* THREE STATES, AND THEY ARE NOT THE SAME. On the board already;
                               nothing to send; ready. §4 forbids drawing "can't" and "done" alike. */}
                           {card

@@ -22,7 +22,22 @@ export function hashOf(dataUrl) {
     const s = String(dataUrl || '');
     if (!s) return null;
     const b64 = s.indexOf(',') >= 0 ? s.slice(s.indexOf(',') + 1) : s;
-    return createHash('sha256').update(Buffer.from(b64, 'base64')).digest('hex');
+    return hashBytes(Buffer.from(b64, 'base64'));
+  } catch { return null; }
+}
+
+/**
+ * THE SAME FINGERPRINT, FROM BYTES YOU ALREADY HOLD.
+ *
+ * hashOf above decodes a data URL and hashes what comes out; artwork read back from object
+ * storage arrives as a Buffer and has nothing to decode. Both end here, so a row hashed at
+ * upload and the same row hashed later by the backfill cannot disagree — which they would
+ * have to, for reuse to start offering the wrong file.
+ */
+export function hashBytes(buf) {
+  try {
+    if (!buf || !buf.length) return null;
+    return createHash('sha256').update(buf).digest('hex');
   } catch { return null; }
 }
 

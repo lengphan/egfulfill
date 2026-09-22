@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { orderLabel, orderLabelOf } from '../order-label.js';
-import { hashOf, isPhash } from '../fingerprint.js';
+import { hashOf, hashBytes, isPhash } from '../fingerprint.js';
 import { isStaff, resolveSeller as _resolveSeller, canSurface, canSeeMoney } from '../auth.js';
 import { COST_TYPES } from '../costs.js';
 import { refreshStaleTracking } from './dispatch.js';
@@ -1530,6 +1530,51 @@ export function ordersRoutes(app, requireAuth) {
         if (h) await q('update order_designs set art_hash=$1 where order_id=$2 and sku=$3 and kind=$4',
           [h, row.order_id, row.sku, row.kind]).catch(() => {});
       }
+    })
+    /**
+     * AND THE ARTWORK THAT LIVES IN OBJECT STORAGE — which is most of it.
+     *
+     * The backfill above is scoped to rows that still carry inline `data`, and once storage
+     * was switched on `data` is null on every new row. So every design written to R2 before
+     * `art_hash` existed has a storage_key and no fingerprint: invisible to reuse, invisible
+     * to the factory library, and invisible in a way that looks exactly like "we have never
+     * printed anything" rather than like a gap.
+     *
+     * BOUNDED AND RESUMABLE. 200 a boot, because each row is a network read — a row that
+     * gets its hash stops matching, so the queue drains over successive starts rather than
+     * holding up one. Ordered oldest first so the drain is predictable and not a lottery.
+     *
+     * It MINTS THE NUMBER TOO. DSN-#### is the handle the library, the board card and the
+     * designer all call a picture by, and hashing without numbering would fill the page with
+     * rows reading "Not numbered" — the artwork identified and then not named. designNoFor
+     * is idempotent on the hash, so this cannot issue a second number for a design that
+     * already has one.
+     *
+     * Every failure is per row: a key that 404s, a bucket that refuses, a file we can no
+     * longer read. One unreadable design must not stop the other 199.
+     */
+    .then(async () => {
+      if (!storageEnabled()) return;
+      const r = await q(
+        `select order_id, sku, kind, storage_key from order_designs
+          where art_hash is null and storage_key is not null
+          order by updated_at asc nulls first limit 200`).catch(() => ({ rows: [] }));
+      if (!r.rows.length) return;
+      let done = 0;
+      for (const row of r.rows) {
+        try {
+          const obj = await getObject(row.storage_key);
+          const h = obj && obj.body ? hashBytes(obj.body) : null;
+          if (!h) continue;
+          await q('update order_designs set art_hash=$1 where order_id=$2 and sku=$3 and kind=$4',
+            [h, row.order_id, row.sku, row.kind]);
+          await designNoFor(h, row.order_id);
+          done += 1;
+        } catch { /* per row — see the note above */ }
+      }
+      /* Said out loud, because the whole point is that this gap was silent. A count on
+         boot is how anyone knows the drain is running and roughly how much is left. */
+      if (done) console.log(`[order_designs] fingerprinted ${done} stored designs (${r.rows.length} attempted)`);
     })
     .catch(() => {});
   // What the seller was CHARGED per unit, frozen at submit (see pricing.js). Distinct
