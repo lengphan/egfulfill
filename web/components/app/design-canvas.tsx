@@ -1751,71 +1751,6 @@ export function DesignCanvasDialog({
    * on faces it was never cut for. One is a scope; the other is an unanswered question, and
    * §4 forbids drawing them the same.
    */
-  /**
-   * ONE FACE'S ARTWORK ROW, as a function rather than a mapped list.
-   *
-   * The panel used to print every face's artwork above, then the file groups below —
-   * two stacked lists each naming the same faces, so a three-face garment said
-   * "front / back / left" twice and the group headings read as orphaned words over
-   * nothing (owner: "looks very messy"). Called from inside its own group now, so a
-   * face is one heading with everything that belongs to it underneath.
-   *
-   * A function that is CALLED, not a component that is rendered — defining one inside
-   * render is what react-hooks/static-components forbids, and this returns JSX from a
-   * plain call.
-   */
-const artworkRow = (r: { side: string; art: FaceArt }) => {
-const here = r.side === sideName
-const unsaved = here ? artUnsaved : !savedFaces[r.side]
-return (
-  <div key={r.side} className="mb-1">
-    <FileRow
-      file={{
-        /*
-         * THE DESIGN NUMBER IS THE NAME — DSN-1042.
-         *
-         * This printed the filename the image arrived under, falling back to
-         * "Untitled artwork". Neither identifies anything: most artwork has no
-         * name at all, and "Screenshot 2026-08-24 at 10.14.42" names the
-         * moment somebody pressed a key. Two orders printing the SAME picture
-         * showed two unrelated strings.
-         *
-         * `designNo` already existed for exactly this — its own declaration
-         * says it is there "so a design can be referred to at all: most carry
-         * no name, and 'the octopus one' is not something you can type into a
-         * search box" — and it was rendered nowhere. The same number is on the
-         * board card and in the search index (designSearchTerms), so DSN-1042
-         * here and DSN-1042 there are the same picture.
-         *
-         * The filename is not lost: it moves to the note, where it is a useful
-         * hint and not the row's identity. Artwork with no number yet is
-         * unsaved, and the note already says so.
-         */
-        name: designLabel(here ? designNo : r.art.no)
-          || (here ? designName || fileNameFrom(designUrl) : r.art.name)
-          || "Untitled artwork",
-        size: here ? designSize : undefined,
-        thumb: r.art.data,
-        status: here && saving ? "uploading" : "done",
-        /* THE FACE IS NOT REPEATED HERE. It was the first thing on this note — right,
-           when every face's artwork was printed in one flat list — and the row now sits
-           under a heading that says it. "front" above "front" is the duplication that
-           made the panel read as messy. */
-        note: [
-          unsaved ? "Not saved yet" : null,
-          /* The human filename, once the number has taken the headline — a
-             hint about which file this was, not the thing that identifies it. */
-          designLabel(here ? designNo : r.art.no)
-            ? (here ? designName || fileNameFrom(designUrl) : r.art.name) || null
-            : null,
-        ].filter(Boolean).join(" · "),
-        onRemove: () => void removeArtwork(r.side),
-      }}
-    />
-  </div>
-)
-}
-
   const filesByFace = useMemo(() => {
     type Group = { key: string; kind: "face" | "stray" | "whole"; files: typeof lineFiles }
     const seen = new Set<string>()
@@ -2865,6 +2800,71 @@ return (
  setErr(e instanceof Error ? e.message : "Couldn't remove the artwork.")
     } finally { setRemoving(false) }
   }
+
+  /**
+   * ONE FACE'S ARTWORK ROW, as a function rather than a mapped list.
+   *
+   * The panel used to print every face's artwork above, then the file groups below —
+   * two stacked lists each naming the same faces, so a three-face garment said
+   * "front / back / left" twice and the group headings read as orphaned words over
+   * nothing (owner: "looks very messy"). Called from inside its own group now, so a
+   * face is one heading with everything that belongs to it underneath.
+   *
+   * A function that is CALLED, not a component that is rendered — defining one inside
+   * render is what react-hooks/static-components forbids, and this returns JSX from a
+   * plain call.
+   */
+const artworkRow = (r: { side: string; art: FaceArt }) => {
+const here = r.side === sideName
+const unsaved = here ? artUnsaved : !savedFaces[r.side]
+return (
+  <div key={r.side} className="mb-1">
+    <FileRow
+      file={{
+        /*
+         * THE DESIGN NUMBER IS THE NAME — DSN-1042.
+         *
+         * This printed the filename the image arrived under, falling back to
+         * "Untitled artwork". Neither identifies anything: most artwork has no
+         * name at all, and "Screenshot 2026-08-24 at 10.14.42" names the
+         * moment somebody pressed a key. Two orders printing the SAME picture
+         * showed two unrelated strings.
+         *
+         * `designNo` already existed for exactly this — its own declaration
+         * says it is there "so a design can be referred to at all: most carry
+         * no name, and 'the octopus one' is not something you can type into a
+         * search box" — and it was rendered nowhere. The same number is on the
+         * board card and in the search index (designSearchTerms), so DSN-1042
+         * here and DSN-1042 there are the same picture.
+         *
+         * The filename is not lost: it moves to the note, where it is a useful
+         * hint and not the row's identity. Artwork with no number yet is
+         * unsaved, and the note already says so.
+         */
+        name: designLabel(here ? designNo : r.art.no)
+          || (here ? designName || fileNameFrom(designUrl) : r.art.name)
+          || "Untitled artwork",
+        size: here ? designSize : undefined,
+        thumb: r.art.data,
+        status: here && saving ? "uploading" : "done",
+        /* THE FACE IS NOT REPEATED HERE. It was the first thing on this note — right,
+           when every face's artwork was printed in one flat list — and the row now sits
+           under a heading that says it. "front" above "front" is the duplication that
+           made the panel read as messy. */
+        note: [
+          unsaved ? "Not saved yet" : null,
+          /* The human filename, once the number has taken the headline — a
+             hint about which file this was, not the thing that identifies it. */
+          designLabel(here ? designNo : r.art.no)
+            ? (here ? designName || fileNameFrom(designUrl) : r.art.name) || null
+            : null,
+        ].filter(Boolean).join(" · "),
+        onRemove: () => void removeArtwork(r.side),
+      }}
+    />
+  </div>
+)
+}
 
   /**
    * COPY THIS FACE ONTO THE OTHERS.
