@@ -856,7 +856,7 @@ function CustomerFileThumb({ src }: { src: string }) {
 
 export function DesignCanvasDialog({
  open, onOpenChange, orderId, orderLabel, item, initialDesign, initialPos, onSaved, catalog,
- siblings, designs, onSendToDesigner, filesLocked, sideFee, sideFees,
+ siblings, designs, onSendToDesigner, filesLocked, sideFee, sideFees, faceCharges,
 }: {
  open: boolean
  onOpenChange: (v: boolean) => void
@@ -880,6 +880,14 @@ export function DesignCanvasDialog({
    *  before these existed. A map rather than a resolved number so the rail and the quote
    *  read the same figures from the same place. */
   sideFees?: Record<string, number> | null
+  /**
+   * WHAT EACH FACE IS ACTUALLY BILLED — its placement share plus the design work on it,
+   * read off the quote by faceChargesFor. `sideFees` above is the placement RATE TABLE,
+   * which is what a face would add if it were the one carrying the placement; since
+   * ba6dbe91 only ONE face per line ever is, so the table is the wrong answer for every
+   * face but the first and this is the right one wherever it exists.
+   */
+ faceCharges?: Record<string, number> | null
   /** Every design on the order, keyed as the server keys them (line first, sku as fallback).
    *  Only used to count how many lines "use on every line" would OVERWRITE before it does. */
  designs?: Record<string, { data?: string } | undefined> | null
@@ -3108,14 +3116,31 @@ export function DesignCanvasDialog({
                    quoted a price, add the artwork, and meet a different figure on the
                    summary. */
  const rate = (sideFees && Number(sideFees[k]) > 0 ? Number(sideFees[k]) : Number(sideFee)) || 0
- const charges = rate > 0 && (art ? costingFaces[k] : anyFaceHasArt)
+                /**
+                 * WHAT THIS FACE COSTS, which is two different questions depending on whether
+                 * anything is on it.
+                 *
+                 * PLACED: the quote knows — its placement share plus its design fee. That is
+                 * what the invoice says and it is what the tile now prints. It used to print
+                 * the placement RATE on every face after the first, which since ba6dbe91 is a
+                 * fee none of them carry: the rail said "+$3.00" on a Back the summary priced
+                 * at $0.00 and the ledger billed $2.00 of design work for.
+                 *
+                 * EMPTY: only the placement can be quoted, and only when no other face has
+                 * taken it — one placement per line. The design fee on an empty face is not
+                 * knowable, because it is priced from the artwork nobody has added yet, and
+                 * a guess here is the same defect one step earlier.
+                 */
+ const owed = art ? (faceCharges ? faceCharges[k] : undefined) : undefined
+ const shown = owed != null ? owed : art ? (costingFaces[k] ? rate : 0) : (anyFaceHasArt ? 0 : rate)
+ const charges = shown > 0.005
  return (
                   <FaceTile
  key={f.side} url={f.url} label={f.side || "front"}
                     /* One artwork per face is this window's model, so: a list of one. */
  layers={art ? [{ src: art.data, pos: art.pos }] : []}
  active={i === side} onSelect={() => goToSide(i)}
- extra={charges ? `+${rate.toLocaleString("en-US", { style: "currency", currency: "USD" })}` : null}
+ extra={charges ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}` : null}
                   />
                 )
               })}

@@ -73,7 +73,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf, sellerLabelOf, sideRatesFor, methodsLabelOf } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf, sellerLabelOf, sideRatesFor, faceChargesFor, methodsLabelOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
@@ -3143,6 +3143,7 @@ export function OrdersHub() {
                               // all a manual line has where a marketplace line has a listing
                               // sku.
  blankSku={stockSkuOf(it, catalog, stock) || undefined}
+ catalogReady={catalog.length > 0}
  className="sm:pr-[15rem]"
  /* AN ARRAY, NOT A FRAGMENT. As one fragment the stock reading and the thread
                                  chips rendered flush together — "Stock: 0 ●● 2 threads" — while every
@@ -3599,6 +3600,7 @@ export function OrdersHub() {
  orderId={editing.order.id}
  orderLabel={numOf(editing.order)}
               sideFees={sideRatesFor(editQuote, editing.item)}
+              faceCharges={faceChargesFor(editQuote, editing.item)}
  item={editingLive?.item ?? editing.item}
  initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
  initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}

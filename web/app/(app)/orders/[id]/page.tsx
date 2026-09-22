@@ -3,7 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import { Fragment, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
-import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, sideRatesFor, methodsLabelOf } from "@/lib/order-format"
+import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, sideRatesFor, faceChargesFor, methodsLabelOf } from "@/lib/order-format"
 import { CopyButton } from "@/components/app/copy-button"
 import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
@@ -2675,7 +2675,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                 printing "× N". An unpriced row renders no multiplication at
                                 all, so it keeps the count here — otherwise de-duplicating
                                 would have deleted it. */}
-                            <OrderedVariant item={it} blankSku={resolveProduct(it, catalog)?.sku ?? undefined} showQty={unit <= 0} />
+                            <OrderedVariant item={it} blankSku={resolveProduct(it, catalog)?.sku ?? undefined} catalogReady={catalog.length > 0} showQty={unit <= 0} />
                             {/* THE POSITIONS, directly under the codes — one column of facts
                                 about the line, all on the same left edge. It sat over the
                                 spec strip at the foot of the card, the width of the artwork
@@ -3734,6 +3734,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                  * lines of one order can be two different blanks.
                  */
                 sideFees={sideRatesFor(quote, customize)}
+                faceCharges={faceChargesFor(quote, customize)}
  catalog={catalog}
         />
       )}

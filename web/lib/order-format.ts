@@ -456,6 +456,64 @@ export const addressSourceLabel = (o: OrderRow): string => {
  * charge (sideRates in server/src/pricing.js), so the tile cannot quote a price the invoice
  * will not use.
  */
+/**
+ * WHAT EACH FACE OF ONE LINE ACTUALLY COSTS — the placement it carries plus the design work
+ * on it, per face.
+ *
+ * THE RAIL WAS QUOTING A FEE THAT NO LONGER EXISTS (owner, today: "it is showing $3 while
+ * charging $2"). `sideRatesFor` below is the PLACEMENT rate table, and it was the right
+ * answer under the 2026-09-18 rule that every face is charged. ba6dbe91 reversed that — one
+ * placement per LINE, every face after it paying only its own design fee — and the rate
+ * table never learned. So a beanie with artwork front and back showed "+$3.00" on Back while
+ * the summary beside it said `Back · Embroidery $0.00` and the ledger charged $2.00 of design
+ * work. Three surfaces, three numbers, one face.
+ *
+ * Read from the quote, never recomputed: `sideParts.parts` is the placement the charge
+ * actually used, and `perSide` is the server's own split of a design fee across the faces it
+ * covers. Deriving either on the client is how a breakdown and a charge come to disagree
+ * about one line (§5).
+ *
+ * A fee still under review has `amount: null` — it contributes nothing rather than a guess,
+ * and the caller can tell a face with no fee from one whose fee is not yet known.
+ */
+export function faceChargesFor(
+  quote: {
+    lines?: { line_id?: string | null; sku?: string | null
+              sideParts?: { parts?: { side?: string | null; amount?: number | null }[] } | null }[]
+    designFees?: { items?: { line_id?: string | null; sku?: string | null
+                             amount?: number | null; sides?: string[] | null
+                             perSide?: Record<string, number> | null }[] } | null
+  } | null | undefined,
+  item: { line_id?: string | null; sku?: string | null },
+): Record<string, number> {
+  const mine = (l: { line_id?: string | null; sku?: string | null }) =>
+    (l.line_id && l.line_id === (item.line_id ?? null))
+    || (!l.line_id && !!l.sku && l.sku === item.sku)
+  const out: Record<string, number> = {}
+  const add = (side: string | null | undefined, amount: number | null | undefined) => {
+    const k = String(side ?? "").trim().toLowerCase()
+    if (!k || amount == null || !isFinite(Number(amount))) return
+    out[k] = Math.round(((out[k] ?? 0) + Number(amount)) * 100) / 100
+  }
+  const line = (quote?.lines ?? []).find(mine)
+  for (const p of line?.sideParts?.parts ?? []) add(p.side, p.amount)
+  for (const f of (quote?.designFees?.items ?? []).filter(mine)) {
+    const sides = f.sides ?? []
+    if (!sides.length || f.amount == null) continue
+    for (const sd of sides) {
+      const own = f.perSide ? f.perSide[sd] : null
+      /* EVEN SHARES WITH THE LAST FACE ABSORBING THE ROUNDING — the server's own rule, and
+         the one the summary already falls back to when a quote predates `perSide`. */
+      if (own != null && isFinite(Number(own))) { add(sd, Number(own)); continue }
+      const each = Math.round((f.amount / sides.length) * 100) / 100
+      add(sd, sides.indexOf(sd) === sides.length - 1
+        ? Math.round((f.amount - each * (sides.length - 1)) * 100) / 100
+        : each)
+    }
+  }
+  return out
+}
+
 export function sideRatesFor(
   quote: { lines?: { line_id?: string | null; sku?: string | null; sideRates?: Record<string, number> }[] } | null | undefined,
   item: { line_id?: string | null; sku?: string | null },
