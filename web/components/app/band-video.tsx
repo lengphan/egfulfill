@@ -32,8 +32,26 @@ import { useEffect, useRef } from "react"
  *   bitrate     98 kbps  → 2.6 Mbps, 27× — the old figure was the whole "blurry" story
  *   motion      mean frame-to-frame 0.203 → 1.972, NINE times: the old clip barely moved,
  *               which is why it read as a still picture sliding rather than as cloth
- *   loop seam   1.48 (untrimmed 4.76) — `end_image` pinned to the start frame, then the
- *               116-frame window with the smallest first/last difference chosen
+ *   loop        motion continuity ACROSS the cut +0.29, against +0.41 mid-clip — see below
+ *
+ * THE LOOP IS CROSSFADED, AND THE REASON IS NOT THE ONE I FIRST MEASURED (owner, 2026-09-23:
+ * "theres a start and end ????").
+ *
+ * The first cut pinned `end_image` to the start frame and then chose the window with the
+ * smallest |last - first|. By that number it looked excellent — 1.21 against a typical
+ * frame-to-frame step of 2.17, so the cut was SMALLER than an ordinary step — and it was
+ * still visibly a loop. The measurement was answering the wrong question.
+ *
+ * POSITION IS NOT VELOCITY. Correlating each frame's motion with the next gives +0.42 through
+ * the middle of the clip: the fabric keeps flowing one way. Across the cut it was NEGATIVE,
+ * -0.17 and -0.19 — the cloth reached the starting pose and then flowed BACKWARDS out of it.
+ * That is what pinning an end frame asks for: the model decelerates and reverses to land on
+ * the pose it was given. The still matched and the motion did not, and the eye reads motion.
+ *
+ * So the last 24 frames are blended into the first 24 (out[i<N] = lerp(src[M+i], src[i],
+ * i/N), length M = L-N), which spreads the reversal across a second instead of landing it in
+ * one frame. Measured after: +0.29 and +0.25 — the same positive regime as ordinary motion —
+ * and |last - first| 2.46 against a typical step of 2.63.
  *   contrast    ink #171826 on the darkest 5% under the greeting, across ALL 116 frames,
  *               9.82:1 — measured per frame because a moving surface can darken under the
  *               name mid-loop and a figure from frame 0 would never see it

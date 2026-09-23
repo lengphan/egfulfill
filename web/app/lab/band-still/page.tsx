@@ -42,7 +42,7 @@ export default function BandStillLab() {
         <div className="flex items-baseline gap-3">
           <h2 className="text-sm font-medium">Fabric — the band, re-shot</h2>
           <span className="text-xs tabular-nums text-muted-foreground">
-            3808×528 · 2.6 Mbps · 4.8s loop · seam 1.48 · motion ×9.7 · ink 9.8:1
+            3808×528 · 3.1 Mbps · 3.8s loop · crossfaded · motion ×9.7 · ink 9.8:1
           </span>
         </div>
         <PageBand
