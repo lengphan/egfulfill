@@ -37,7 +37,7 @@ import { phashDistance, PHASH_NEAR } from '../fingerprint.js';
  * already digitised. An order already charged keeps its charge; nothing here reverses one,
  * the same rule the delete route records.
  */
-async function applyToWaitingLines(srcDesignId, artHash, user) {
+export async function applyToWaitingLines(srcDesignId, artHash, user) {
   if (!/^[0-9a-f]{64}$/.test(String(artHash || ''))) return [];
   const src = await q('select * from design_file_data where design_id=$1', [String(srcDesignId)])
     .then((r) => r.rows[0]);
@@ -94,6 +94,31 @@ async function applyToWaitingLines(srcDesignId, artHash, user) {
     } catch { /* one order failing must not stop the rest */ }
   }
   return done;
+}
+
+
+/**
+ * THE OTHER DIRECTION: artwork lands on a line, and we already hold its stitch file.
+ *
+ * applyToWaitingLines covers "the file arrived last". This covers "the ORDER arrived last" —
+ * a picture we have digitised before turning up on a new line — which is the commoner of the
+ * two and the one a library is for. Same rules: exact hash only, never a lookalike; only a
+ * line with no stitch file of its own; nothing overwritten.
+ *
+ * The newest library file wins when a picture has more than one. A second file is normally
+ * the corrected one, and the same choice the reuse panel already makes when it offers the
+ * first of several.
+ */
+export async function attachLibraryFileForArtwork(artHash, user) {
+  const h = String(artHash || '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(h)) return [];
+  const src = await q(
+    `select design_id from design_file_data
+      where art_hash = $1 and order_id is null and kind in ('pes','emb')
+      order by created_at desc nulls last
+      limit 1`, [h]).then((r) => r.rows[0]).catch(() => null);
+  if (!src) return [];
+  return applyToWaitingLines(src.design_id, h, user);
 }
 
 export function designFilesRoutes(app, requireAuth) {

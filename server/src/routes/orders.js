@@ -9,6 +9,7 @@ import { isStaff, isUserId, resolveSeller as _resolveSeller, canSurface, canSeeM
 import { COST_TYPES } from '../costs.js';
 import { refreshStaleTracking } from './dispatch.js';
 import { egBroadcast } from '../events.js';
+import { attachLibraryFileForArtwork } from './design_files.js';
 import { notify } from './notifications.js';
 import { aiComplete } from './support_ai.js';
 import { sendMail, mailConfigured } from '../mailer.js';
@@ -4183,6 +4184,22 @@ export function ordersRoutes(app, requireAuth) {
        same id on every other face declared that day. */
     const designNo = artHash ? await designNoFor(artHash, req.params.id) : null;
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null, design_no: designNo } });
+    /**
+     * DO WE ALREADY HOLD THE STITCH FILE FOR THIS PICTURE? Then put it on.
+     *
+     * The other half of the Design Lab library: filing a file attaches it to the orders
+     * already waiting, and this attaches a file we already hold to artwork that has just
+     * arrived. Exact hash only — a lookalike still only ever suggests (§6) — and only where
+     * the line has no stitch file of its own, so nothing is ever replaced.
+     *
+     * NOT AWAITED. The save is what the person is waiting for, and a library fan-out must
+     * not sit in front of it; the attach broadcasts `design-file` per order, which is what
+     * an open board already re-reads on. A method-only save carries no new artwork and is
+     * skipped — the picture it is about has already been through here.
+     */
+    if (artHash && !methodOnly) {
+      attachLibraryFileForArtwork(artHash, req.user).catch(() => {});
+    }
     /* WHAT THIS PLACEMENT COST, when it cost anything. The caller has just moved the seller's
        money and has to be able to say so on the spot — a debit discovered later on a statement
        is the one that becomes a support thread. Absent on every free save, which is all of
@@ -4856,7 +4873,32 @@ export function ordersRoutes(app, requireAuth) {
         lines: g.lines.map((l) => ({ line_id: l.line_id || null, sku: l.sku || null })),
       });
     }
-    return { items, total };
+    /**
+     * WHICH LINES ARE HAVING THEIR DIGITISING WAIVED BY A FILE THAT NEVER SAID WHERE IT GOES.
+     *
+     * `wholeLine = sides.has('')` above is deliberate and stays: every stitch file attached
+     * before sides existed has side '', and reading it as "this line" is what keeps those
+     * orders priced exactly as they were. But it means a file uploaded TODAY with no face
+     * silently marks every face `supplied` and waives the fee on all of them — and until
+     * 2026-09-23 two of the four upload paths could not send a face at all.
+     *
+     * So the rule is not changed — changing it would reprice settled orders, which is the one
+     * thing recorded history may not do — and the situation is REPORTED instead. The submit
+     * dialog names these lines so somebody decides on purpose, rather than the cheapest
+     * possible answer being chosen by omission.
+     *
+     * Only a line with MORE THAN ONE embroidered face qualifies: on a single-face line "the
+     * whole line" and "that face" are the same set, so there is nothing ambiguous to report.
+     */
+    const unplaced = [];
+    for (const r of rows) {
+      const emb = (Array.isArray(r.emb_sides) ? r.emb_sides : []).map((x) => String(x || '').toLowerCase());
+      if (emb.length < 2) continue;
+      const sides = machineSidesOf(r);
+      if (!sides.has('')) continue;
+      unplaced.push({ line_id: r.line_id ?? null, sku: r.sku ?? null, name: r.name ?? null, faces: emb });
+    }
+    return { items, total, unplaced };
   }
 
   /**
