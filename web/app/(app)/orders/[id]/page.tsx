@@ -1779,10 +1779,30 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                           hover: placement <= 0.005
                                             ? tl("order", "One placement is charged per item — this face adds nothing to the garment.")
                                             : tl("order", "The placement — hooping and aligning, charged once for the whole garment.") },
-                                        ...(run > 0.005
+                                        /**
+                                         * A FREE TECHNIQUE IS STILL THE TECHNIQUE.
+                                         *
+                                         * This drew the method row only when it cost something, so a
+                                         * DTG face on a platform where method_dtg is 0 showed its
+                                         * placement and nothing else — and an embroidered back beside
+                                         * it showed "Embroidery $5.00". A reader compared the two and
+                                         * concluded the front had no method recorded. It did; it was
+                                         * free. Reported twice, in those words.
+                                         *
+                                         * The technique cannot move onto the placement row or the
+                                         * heading — both carried it once and both had it removed as
+                                         * repetition (owner, 2026-09-21) — so it stays its own row and
+                                         * that row now appears whenever the face HAS a technique,
+                                         * printing "Free" at zero exactly as a free placement does.
+                                         * §4: a thing that cannot be read and a thing that does not
+                                         * exist must not look the same.
+                                         */
+                                        ...((r.method || lineMethod) || run > 0.005
                                           ? [{ key: `face-${j}-m`, face: r.face, method: r.method || lineMethod, amount: run,
                                                isMethod: true,
-                                               hover: tl("order", "A pass through the machine for this face.") }]
+                                               hover: run > 0.005
+                                                 ? tl("order", "A pass through the machine for this face.")
+                                                 : tl("order", "This technique adds nothing to this face.") }]
                                           : []),
                                       ]
                                     }),
