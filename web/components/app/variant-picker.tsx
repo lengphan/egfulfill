@@ -118,8 +118,13 @@ function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onP
         */}
       <PopoverTrigger
         disabled={disabled}
+        /* ONE TRACK, NOT TWO. col-span-2 was what pushed this onto a second row: three
+           fields fill columns 1–3 and a two-column item cannot fit in the one that is left,
+           so it wrapped — the strip read as three controls with something extra underneath.
+           The track it sits in is the widest of the four (see the grid above), which is the
+           point: this is the field with two techniques to print. */
         className={cn(
-          "col-span-2 flex w-full min-w-0 items-center gap-1.5 rounded-2xl border border-border bg-card px-2.5 text-left font-medium transition-colors",
+          "flex w-full min-w-0 items-center gap-1.5 rounded-2xl border border-border bg-card px-2.5 text-left font-medium transition-colors",
           "h-9 text-xs hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
           disabled && "cursor-not-allowed opacity-60",
         )}
@@ -161,6 +166,11 @@ function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onP
               emptyLabel={lineMethod ? `${lineMethod} (${tl("variantPicker", "from the line")})` : undefined}
               disabled={disabled}
               onChange={(v) => onPick(sd, v)}
+              /* BESIDE THE ROW, NOT OVER THE PANEL. A menu inside a popover flips upward when
+                 the space below runs out and then covers the list it was opened from —
+                 "drop down then drop up". To the right it can never hide its own parent. */
+              menuSide="right"
+              menuAlign="start"
               className="w-auto shrink-0 border-0 bg-transparent px-1 hover:bg-transparent"
             />
           </div>
@@ -181,6 +191,8 @@ function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onP
             placeholder={tl("variantPicker", "none")}
             disabled={disabled}
             onChange={(v) => onLine(v)}
+            menuSide="right"
+            menuAlign="end"
             className="w-auto shrink-0 border-0 bg-transparent px-1 hover:bg-transparent"
           />
         </div>
@@ -474,12 +486,22 @@ export function VariantPicker({
 
   return (
     <div className="mt-3">
-      {/* Uneven tracks, but the SAME tracks on every line item. Sized to the LONGEST value
-          each field actually holds: Blank carries full product names, Colour carries words
-          like "Heather Grey", while Size is "S"/"2XL" and Method is "DTG"/"EMB" — three or
-          four characters. Giving those two an equal share left them mostly empty and starved
-          the blank name, which is the one that gets truncated. */}
-      <div className={"grid grid-cols-2 gap-x-2 gap-y-2.5" + (dense ? "" : " sm:grid-cols-[1.7fr_1.25fr_0.7fr_0.85fr]")}>
+      {/**
+        * ALL FOUR ON ONE LINE, and the first three take only what they need.
+        *
+        * Four equal-ish tracks meant the Method field had no room and dropped to a second
+        * row — so a strip of four controls read as a strip of three with something extra
+        * underneath, which is the shape that made the per-face panel look like an appendix
+        * rather than part of the line.
+        *
+        * FIT-CONTENT, not fractions: a blank code is "EG-18002", a colour is "Crimson" and a
+        * size is "S". They are all SHORT, and every fraction of the row they were given was
+        * empty space taken from the one field that can actually use it. `minmax(0, …)` keeps
+        * them truncatable rather than pushing the row wide on a long product name, and
+        * Method takes whatever is left, which is the field that earns the space: it carries
+        * two techniques on a mixed garment.
+        */}
+      <div className={"grid grid-cols-2 gap-x-2 gap-y-2.5" + (dense ? "" : " sm:grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(0,1fr)]")}>
         {/* Blank — the load-bearing pick; nothing else can price without it, so it's the
             only field that flags itself when empty. */}
         {/* No custom placeholder: the field names itself now, and "Blank" beside the

@@ -3972,11 +3972,20 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
  item={customizeLive ?? customize}
  initialDesign={designSrc(designForLine(designs, customize)?.data)}
  initialPos={designForLine(designs, customize)?.pos}
-          // OPPOSITE SIDES OF THE SAME MOMENT. Before submit the order is the seller's
-          // draft and the factory has no business swapping their file; after it, the job is
-          // ours and the seller asks in chat instead. Whoever is locked sees the buttons
-          // disabled with the reason, not a "forbidden" after the click.
- filesLocked={isStaff ? preSubmit : !preSubmit}
+          /**
+           * OPPOSITE SIDES OF THE SAME MOMENT. Before submit the order is the seller's draft
+           * and the factory has no business swapping their file; after it, the job is ours
+           * and the seller asks in chat instead. Whoever is locked sees the buttons disabled
+           * with the reason, not a "forbidden" after the click.
+           *
+           * EXCEPT THERE IS NO SELLER ON A FACTORY ORDER, and 1,129 of them say so. An order
+           * the factory owns — every Etsy order synced into a factory account — sat at
+           * `new` and told staff "the files on this line are still the seller's", which is
+           * not a lock they can wait out: they ARE the owner, and there is nobody on the
+           * other side of it. The rule needs two parties to mean anything, so with one it
+           * does not apply.
+           */
+ filesLocked={isStaff ? (preSubmit && !order.factory_order) : !preSubmit}
  siblings={items.filter((it) => (it.line_id ?? it.sku) !== (customize.line_id ?? customize.sku))}
  designs={designs}
  onSaved={() => { reloadDesigns(); reloadOne(); setQuoteNonce((n) => n + 1) }}

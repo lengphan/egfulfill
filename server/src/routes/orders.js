@@ -4239,11 +4239,15 @@ export function ordersRoutes(app, requireAuth) {
     const side = b.side ? String(b.side).trim().toLowerCase().slice(0, 24) : null;
     if (!lineId && !sku) { reply.code(400); return { error: 'line id or sku required' }; }
 
-    const ord = (await q('select factory_status from orders where id=$1', [req.params.id])).rows[0];
+    const ord = (await q('select factory_status, factory_order from orders where id=$1', [req.params.id])).rows[0];
     const preSubmit = ['', 'new', 'draft'].includes(String((ord && ord.factory_status) || ''));
     const staff = isStaff(req.user);
     const admin = req.user && req.user.role === 'admin';
-    if (!admin && (staff ? preSubmit : !preSubmit)) {
+    /* NO SELLER, NO ZONE. "Still with the seller" needs two parties; on an order the factory
+       OWNS there is one, and refusing staff with a message about waiting for a seller is a
+       lock nobody can open. Same carve-out as the file route and the order page (§5). */
+    const ownedByFactory = !!(ord && ord.factory_order);
+    if (!admin && (staff ? (preSubmit && !ownedByFactory) : !preSubmit)) {
       reply.code(409);
       return { error: staff
         ? 'This order is still with the seller — artwork is theirs to change until it is submitted.'

@@ -73,6 +73,8 @@ export function VariantField({
  prefix,
  clearLabel,
  clearable = true,
+ menuSide,
+ menuAlign,
 }: {
  label: string
  value: string
@@ -146,6 +148,17 @@ export function VariantField({
    * worse failure.
    */
  clearable?: boolean
+  /**
+   * WHERE THE MENU OPENS, for a field that lives inside another panel.
+   *
+   * Left alone it opens below and flips above when the space runs out — correct for a field
+   * in a page, wrong for one inside a popover: the flipped menu covers the very list it was
+   * opened from, so the panel appeared to drop down and then drop up over itself. A row in
+   * a panel passes `menuSide="right"` and the choices appear beside it, which is what a
+   * submenu does and which can never hide its own parent.
+   */
+  menuSide?: "top" | "bottom" | "left" | "right"
+  menuAlign?: "start" | "center" | "end"
 }) {
   // A product that declares no options for this attribute is a free choice, not a bug —
   // the field says "Any" and there's nothing to open.
@@ -253,7 +266,7 @@ export function VariantField({
         * The Popup already sets the anchor width and the available height for every other
         * field in the app. This one only ever needed to stop overriding them.
         */}
-      <DropdownMenuContent align="start" className="min-w-44">
+      <DropdownMenuContent align={menuAlign ?? "start"} side={menuSide} sideOffset={menuSide ? 6 : undefined} className="min-w-44">
         {/* Clearing is a real choice — a line can legitimately go back to unset. Not for
  every field though: see `clearable`. */}
         {clearable && (

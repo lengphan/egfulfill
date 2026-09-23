@@ -989,9 +989,19 @@ export function designFilesRoutes(app, requireAuth) {
         const me = await effectiveSeller(req.user);
         if (!mine || !me || String(mine) !== String(me)) { reply.code(403); return { error: 'forbidden' }; }
       }
-      const ord = (await q('select factory_status from orders where id=$1', [row.order_id])).rows[0];
+      const ord = (await q('select factory_status, factory_order from orders where id=$1', [row.order_id])).rows[0];
       const preSubmit = ['', 'new', 'draft'].includes(String((ord && ord.factory_status) || ''));
-      if (staff ? preSubmit : !preSubmit) {
+      /**
+       * THERE IS NO SELLER ON A FACTORY ORDER, so the zone has only one side.
+       *
+       * "Still with the seller" needs two parties to mean anything. On an order the factory
+       * OWNS — every marketplace order synced into a factory account, 1,129 of them — staff
+       * are the owner, and refusing them with a message about waiting for a seller is a lock
+       * nobody can open. Mirrors the same carve-out on the order page's `filesLocked`; the
+       * two must agree or the button is enabled and the request 409s (§5).
+       */
+      const ownedByFactory = !!(ord && ord.factory_order);
+      if (staff ? (preSubmit && !ownedByFactory) : !preSubmit) {
         reply.code(409);
         return { error: staff
           ? 'This order is still with the seller — their files are theirs to change until it is submitted.'
