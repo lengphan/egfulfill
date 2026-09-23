@@ -12,7 +12,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Package, MapPin, Truck, Clock, PaperPlaneTilt, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash, ArrowUUpLeft } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
-import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard, type OrderDesignFee, type ReuseMatch } from "@/lib/api"
+import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard, type OrderDesignFee, type ReuseMatch, getProductTypes } from "@/lib/api"
 import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { deleteOrderItem } from "@/lib/api"
 import { refundOrder } from "@/lib/api"
@@ -35,7 +35,7 @@ import { OrderHistory } from "@/components/app/order-history"
 import { TabBar } from "@/components/app/tab-bar"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { ApproveOrderButton } from "@/components/app/approve-order-button"
-import { orderNeedsSetup } from "@/lib/variant-resolve"
+import { orderNeedsSetup, setTypeMockups } from "@/lib/variant-resolve"
 import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { Button } from "@/components/ui/button"
@@ -340,6 +340,16 @@ export default function OrderDetailPage() {
       .catch(() => alive && setOrders([]))
     // Catalog powers the variant picker's blank/colour/size/method options.
  getCatalogProducts().then((c) => alive && setCatalog(c ?? [])).catch(() => {})
+    /**
+     * THE CATEGORY SPECS, so `offeredSides` can answer at all.
+     *
+     * A product's faces are its own ticks, ELSE its configured type — and the type specs live
+     * in platform settings, which setTypeMockups holds in a module variable. Without this the
+     * fallback silently returns null on every blank that has not ticked its own faces, so the
+     * strip's per-face Method disclosure would appear on some products and not others with
+     * nothing on screen to say why. The mini designer already loads them for the same reason.
+     */
+ getProductTypes().then((rows) => alive && setTypeMockups(rows ?? [])).catch(() => {})
  if (id) {
  getOrderDesigns(id)
         .then((r) => {
@@ -3093,7 +3103,24 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                             control most likely to change the price. */}
                         {canEditVariants ? (
                           <VariantPicker orderId={String(id)} item={it} catalog={catalog}
-                            onSaved={() => { reloadOne(); setQuoteNonce((n) => n + 1) }} />
+                            /**
+                              * WHAT EACH FACE SAYS IT IS, from the designs this page already
+                              * holds. Giving the map is what turns the Method slot into the
+                              * per-face disclosure — a shirt can be embroidered on the front
+                              * and printed on the back, which is what the charge has priced
+                              * all along and what this strip asked once, for the garment.
+                              *
+                              * Only faces with a ROW appear here; the picker lists every face
+                              * the blank OFFERS and reads an absent one as inheriting, which
+                              * is what absent means (§4, the faces case).
+                              */
+                            faceMethods={Object.fromEntries(
+                              Object.entries(sidesForLine(designSides, it))
+                                .map(([sd, d]) => [sd.toLowerCase(), String(d?.method ?? "")]))}
+                            /* A face's method lands on order_designs, so the DESIGNS are what
+                               has to be refetched — reloadOne alone would leave the strip
+                               showing the value it had before the pick. */
+                            onSaved={() => { reloadOne(); reloadDesigns(); setQuoteNonce((n) => n + 1) }} />
                         ) : (
                           <VariantStrip blank={it.blank} color={it.color} size={it.size} method={methodsLabelOf(it)} marketplace={it.variant} locked />
                         )}

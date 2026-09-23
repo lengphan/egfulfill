@@ -1464,6 +1464,7 @@ const vi: Dict = {
   "order.Base cost": "Giá gốc",
   "order.Free": "Miễn phí",
   "canvas.Method": "Kỹ thuật in",
+  "variantPicker.from the line": "theo dòng hàng",
   "designCanvas.Free": "Miễn phí",
   "order.The placement — hooping and aligning, charged once for the whole garment.": "Phí đặt in — căng khung và canh chỉnh, tính một lần cho cả sản phẩm.",
   "order.A pass through the machine for this face.": "Một lượt chạy máy cho mặt này.",

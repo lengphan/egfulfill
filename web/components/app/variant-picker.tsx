@@ -2,12 +2,14 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useMemo, useState } from "react"
-import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
-import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel, bestMockup, blankCode } from "@/lib/variant-resolve"
+import { postItemSetup, postOrderDesign, type CatalogProduct, type OrderItem } from "@/lib/api"
+import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel, bestMockup, blankCode, offeredSides } from "@/lib/variant-resolve"
 import { thumbSrc } from "@/lib/order-image"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { getUser } from "@/lib/auth"
 import { VariantField } from "@/components/app/variant-field"
+import { CaretDown } from "@phosphor-icons/react"
+import { cn } from "@/lib/utils"
 
 // What the fields offer when the blank can't be resolved — see the note on colorList.
 // Sizes are the ladder every apparel blank in the catalogue draws from; methods are the
@@ -36,8 +38,88 @@ const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 /** The fields this control can write — the body of `postItemSetup` minus the line key. */
 export type ItemSetupPatch = Omit<Parameters<typeof postItemSetup>[1], "line_id" | "sku">
 
+
+/**
+ * EVERY FACE'S METHOD, UNDER ONE DISCLOSURE (owner, 2026-09-23: "however many faces it is,
+ * it can still be under one collapsible — that should be the cleanest").
+ *
+ * Colour and Size really are properties of the whole line. METHOD IS NOT: one shirt can be
+ * embroidered on the front and printed on the back, which sideDetail has priced per face for
+ * a while and the mini designer has asked per face since it grew its own field. The order row
+ * still asked once, for the garment, so the two screens disagreed about what a method even is.
+ *
+ * WHY A DISCLOSURE AND NOT N FIELDS. A six-face duffel would put six controls on a row that
+ * already carries the artwork, the price and the positions. The strip keeps FOUR fields at
+ * every face count; the trigger answers the common case without being opened.
+ *
+ * AND THE TRIGGER NAMES THE METHODS, not "Mixed". A word meaning "look inside" on the one
+ * screen where somebody is checking what was ordered hides exactly the answer they came for.
+ * "DTG · Embroidery" is the same width and is the answer.
+ *
+ * THE ROWS ARE THE DESIGNER'S OWN FIELD — same VariantField, same face prefix, same
+ * inherit-as-placeholder behaviour — so this is one pattern in two places rather than a third.
+ */
+function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onPick }: {
+  faces: string[]
+  /** Per face, as stored: "" / absent = INHERIT the line. Never "no method". */
+  value: Record<string, string>
+  lineMethod: string
+  options: string[]
+  disabled?: boolean
+  onPick: (side: string, v: string) => void
+}) {
+  const tl = useLabelT()
+  /* WHAT THE GARMENT IS ACTUALLY DECORATED WITH — each face resolved through the same rule
+     the charge uses (`methodOf.get(face) || lineMethod`), then deduped IN FACE ORDER so the
+     summary reads front-first rather than alphabetically. */
+  const resolved = faces.map((f) => (value[f] ?? "").trim() || lineMethod).filter(Boolean)
+  const distinct = [...new Set(resolved)]
+  const summary = distinct.join(" · ")
+  return (
+    <details className="group col-span-2 min-w-0">
+      {/* Same chrome as VariantField's trigger — this is a FIELD (§4: shape says kind), and a
+          strip whose fourth control is shaped differently reads as a mistake. */}
+      <summary
+        className={cn(
+          "flex w-full min-w-0 cursor-pointer list-none items-center gap-1.5 rounded-2xl border bg-card px-2.5 text-left font-medium transition-colors",
+          "h-9 text-xs hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+          disabled ? "cursor-not-allowed opacity-60" : "",
+          "border-border",
+        )}
+      >
+        <span className="min-w-0 truncate text-muted-foreground">
+          {tl("variantPicker", "Method")}<span className="text-muted-foreground/60"> · </span>
+        </span>
+        <span className={cn("min-w-0 flex-1 truncate", !summary && "text-muted-foreground")}>
+          {summary || tl("variantPicker", "none")}
+        </span>
+        <CaretDown size={11} className="shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-1.5 flex flex-col gap-1.5">
+        {faces.map((sd) => (
+          <VariantField
+            key={sd}
+            prefix={tl("sides", sd)}
+            label={`${tl("sides", sd)} · ${tl("variantPicker", "Method")}`}
+            value={value[sd] ?? ""}
+            options={options}
+            /* AN UNSET FACE SHOWS WHAT IT INHERITS, and when the line has nothing to inherit
+               it shows the field's own noun — a question, not an answer. Identical to the
+               designer's field; see the note there. */
+            placeholder={lineMethod || tl("variantPicker", "Method")}
+            clearable={false}
+            emptyLabel={lineMethod ? `${lineMethod} (${tl("variantPicker", "from the line")})` : undefined}
+            disabled={disabled}
+            onChange={(v) => onPick(sd, v)}
+          />
+        ))}
+      </div>
+    </details>
+  )
+}
+
 export function VariantPicker({
-  orderId, item, catalog, onSaved, dense, hideMethod,
+  orderId, item, catalog, onSaved, dense, hideMethod, faceMethods,
 }: {
   orderId: string
   item: OrderItem
@@ -74,6 +156,18 @@ export function VariantPicker({
    * DOES have one method and this is the only place to set it.
    */
   hideMethod?: boolean
+  /**
+   * PER-FACE METHODS, as stored — "" or absent on a face means it INHERITS the line.
+   *
+   * Given => the Method slot becomes one disclosure listing every face the blank offers
+   * (Option C, owner 2026-09-23). Omitted => the single line-level field, which is right
+   * for a caller that has no per-face UI and for a blank with one face.
+   *
+   * The caller owns the map because it owns the order_designs read: the order page already
+   * has one for its positions row, and a second fetch here would be a second answer to a
+   * question that is already on screen.
+   */
+  faceMethods?: Record<string, string> | null
 }) {
   const tl = useLabelT()
   const [busy, setBusy] = useState<string | null>(null)
@@ -158,6 +252,42 @@ export function VariantPicker({
    * fallbacks: those are free choices that don't decide how the thing gets made.
    */
   const methodList = keep(item.print_type || "", product ? methodOpts : FALLBACK_METHODS)
+  /**
+   * THE FACES THIS BLANK OFFERS — `offeredSides`, the one definition (CLAUDE.md §4).
+   *
+   * Its own ticks, else its configured TYPE, else NULL — and null is "we have not been told",
+   * not "front only", so an unanswered product falls back to the single line-level field
+   * rather than to a disclosure listing one face. A private array here would be the fifth
+   * opinion on this question; the faces case is exactly what that rule was written for.
+   */
+  const faces = useMemo(() => offeredSides(product) ?? [], [product])
+  /**
+   * DECLARE A FACE'S METHOD. "" clears it back to inheriting the line.
+   *
+   * The same call the mini designer makes: artwork is NOT sent, and the server treats a
+   * method-only save as a declaration — it leaves any picture already on the face exactly
+   * where it is, and charges nothing, because the fee gate is the FILE (`data is not null or
+   * storage_key is not null`) and never the method.
+   */
+  const saveFaceMethod = async (side: string, v: string) => {
+    setBusy("faceMethod"); setErr(null)
+    try {
+      await postOrderDesign(orderId, {
+        sku: item.sku || item.name || "",
+        line_id: item.line_id ?? undefined,
+        side,
+        method: v || null,
+      })
+      /* NO PATCH. `onSaved` carries an optimistic patch for order_items fields; a face's
+         method lives on order_designs and changes nothing on the item row itself — the
+         caller refetches the designs it already owns. */
+      onSaved?.()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't set the method.")
+    } finally {
+      setBusy(null)
+    }
+  }
   /**
    * BLANK IS AN OPTION, NOT AN ABSENCE (owner, 2026-09-18).
    *
@@ -314,7 +444,23 @@ export function VariantPicker({
             orders/new can afford: this field is a quarter of a four-column strip, so
             "Method · None on this blank" truncated to "Method · …" — which says less than
             nothing, since the reason was the part that got cut. "Method · none" fits. */}
-        {!hideMethod && (
+        {/**
+          * ONE DISCLOSURE, OR ONE FIELD. A blank with several faces gets every face under the
+          * Method slot; anything else keeps the field it always had. `faceMethods` being
+          * given is what says the caller can service it — the design canvas hides this
+          * control outright, because its own per-face rows follow the stage rail and are the
+          * better answer where the garment is on screen.
+          */}
+        {!hideMethod && faceMethods && faces.length > 1 ? (
+          <FaceMethodDisclosure
+            faces={faces}
+            value={faceMethods}
+            lineMethod={String(item.print_type || "").trim()}
+            options={methodList}
+            disabled={busy === "faceMethod"}
+            onPick={(side, v) => void saveFaceMethod(side, v)}
+          />
+        ) : !hideMethod && (
         <VariantField
           label={tl("variantPicker", "Method")}
           /* EMPTY IS "NOT DECIDED", and shows the placeholder like every other field here. A
