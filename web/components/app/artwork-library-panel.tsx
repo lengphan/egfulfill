@@ -1,14 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { PenNib, CircleNotch, UploadSimple, Check, MagnifyingGlass } from "@phosphor-icons/react"
+import { PenNib, CircleNotch, UploadSimple, DownloadSimple, MagnifyingGlass } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { SectionCard } from "@/components/app/section-card"
 import { EmptyState } from "@/components/app/empty-state"
 import { Thumb } from "@/components/app/thumb"
 import { Button } from "@/components/ui/button"
 import { useLightbox } from "@/components/app/image-lightbox"
-import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, type FactoryDesign } from "@/lib/api"
+import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, type FactoryDesign } from "@/lib/api"
 
 /**
  * THE FACTORY'S DESIGN LIBRARY — every picture that reached an order line, once each.
@@ -119,9 +119,37 @@ export function ArtworkLibraryPanel() {
         artHash: d.art_hash,
       })
       if (r?.error) throw new Error(r.error)
-      setRows((prev) => (prev ?? []).map((x) => (x.art_hash === d.art_hash ? { ...x, has_file: true } : x)))
+      /* NAME IT IMMEDIATELY. The upload knows the file it just sent, so the card can say
+         which file is on record without waiting for a reload to tell it — the id is the
+         one the server derives from the hash, which is what makes re-attaching a REPLACE
+         rather than a second file for one picture. */
+      setRows((prev) => (prev ?? []).map((x) => (x.art_hash === d.art_hash
+        ? { ...x, has_file: true, file_id: `ART-${d.art_hash.slice(0, 16)}`, file_name: file.name }
+        : x)))
     } catch (e) {
       setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't attach that file."))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /**
+   * FETCH IT AND HAND IT OVER. Same two steps the order panel's download does — the route
+   * answers with a data URL, an anchor saves it — because a stitch file is bytes a machine
+   * needs, and a name you cannot open is barely more use than a tick.
+   */
+  const download = async (d: FactoryDesign) => {
+    if (!d.file_id) return
+    setBusy(d.art_hash); setErr(null)
+    try {
+      const r = await downloadDesignFile(d.file_id)
+      if (!r?.data) throw new Error(tl("artwork", "That file has no data to download."))
+      const a = document.createElement("a")
+      a.href = r.data
+      a.download = r.name || d.file_name || "design"
+      a.click()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't download that file."))
     } finally {
       setBusy(null)
     }
@@ -276,9 +304,29 @@ export function ArtworkLibraryPanel() {
                     */}
                   <div className="mt-1.5">
                     {d.has_file ? (
-                      <span className="flex items-center gap-1.5 text-xs font-medium text-success">
-                        <Check size={14} weight="bold" /> {tl("artwork", "File on record")}
-                      </span>
+                      /**
+                       * THE FILE'S NAME, AND IT OPENS. "File on record" was a tick: it said
+                       * a stitch file existed and not WHICH, and there was no way to look at
+                       * the thing it was talking about — so the only way to check the right
+                       * file was filed was to find an order carrying the artwork.
+                       *
+                       * It is a value, not a caption (§4), so the name is at `text-sm` and
+                       * truncates rather than wrapping the card. A file we hold but cannot
+                       * name still says so, because the two links `has_file` reads are not
+                       * both able to produce a filename.
+                       */
+                      <button
+                        type="button"
+                        disabled={!d.file_id || busy === d.art_hash}
+                        onClick={() => void download(d)}
+                        title={d.file_id ? `${tl("artwork", "Download")} ${d.file_name || d.file_id}` : undefined}
+                        className="flex max-w-full items-center gap-1.5 text-sm font-medium text-success enabled:hover:underline disabled:cursor-default"
+                      >
+                        {busy === d.art_hash
+                          ? <CircleNotch size={14} className="shrink-0 animate-spin" />
+                          : <DownloadSimple size={14} weight="bold" className="shrink-0" />}
+                        <span className="truncate">{d.file_name || tl("artwork", "File on record")}</span>
+                      </button>
                     ) : (
                       <Button
                         variant="outline" size="sm"

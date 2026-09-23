@@ -2077,6 +2077,12 @@ export type FactoryDesign = {
    *  was uploaded against — so the library cannot say "no file" about artwork the reuse
    *  panel offers a file for. */
   has_file: boolean
+  /** WHICH file, so a card can name it and a press can fetch it — `has_file` alone could
+   *  say a stitch file was on record without saying which, and nothing could open it.
+   *  `file_id` is the design_id `downloadDesignFile` takes. */
+  file_id?: string | null
+  file_name?: string | null
+  file_kind?: string | null
   first_seen?: string | null
   last_seen?: string | null
 }
