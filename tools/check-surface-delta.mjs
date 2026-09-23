@@ -212,13 +212,19 @@ console.log('\nBUT A FACE THAT WILL BILL STOPS TO ASK')
 {
   /* L-dtf's print_type says Embroidery while its stamp was billed at DTF, method 0 — the
      drift EGF-002155 showed. A face with no method INHERITS that, which moves the line's
-     dearest technique and bills $4/unit. There the technique IS what is being charged for,
-     so a guess would be a wrong charge rather than a wrong label. */
+     dearest technique. There the technique IS what is being charged for, so a guess would be
+     a wrong charge rather than a wrong label.
+
+     THE QUOTED FIGURE IS THE WHOLE JUMP, NOT THE METHOD HALF (triaged 2026-09-23). It read
+     8 — the $4/unit method move across two units — which was the entire delta under the
+     21 Sep rule. The amendment gives the new face its own run as well, so the refusal now
+     quotes $8/unit: the method jump plus the run. It must match what accepting would
+     actually cost, and the assertion further down pins that same 16. */
   const before = await faceCount('L-dtf')
   const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-dtf', side: 'right', data: 'https://x/emb.png', name: 'emb' })
   check('refused with 400', r.status, 400)
   check('and says what is missing', r.body.needsMethod, true)
-  check('and names the figure it would charge', r.body.amount, 8)
+  check('and names the figure it would charge', r.body.amount, 16)
   check('nothing was written', await faceCount('L-dtf'), before)
   check('no money moved', (await feeRows()).length, 0)
 }
@@ -264,16 +270,20 @@ console.log('\nTHE METHOD STILL MOVES THE LINE, ACROSS BOTH UNITS')
   await db.query(`insert into wallet_ledger (account, delta, type, ref) values ($1, 200, 'topup-in','gate-refill')`, [SELLER])
   const r = await postDesign({ sku: 'EG-GATE', line_id: 'L-dtf', side: 'right', data: 'https://x/emb.png', name: 'emb', method: 'Embroidery' })
   check('saved', r.status, 200)
-  /* 15 blank + 4 embroidery (the product's own rate, not the platform's 5) + the two faces
-     already stamped at 3 each + the new face at 0 = 25, against a stamp of 21, x2 units.
-     The PLACEMENT adds nothing now; the technique still does — which is the half no per-face
-     rule could ever have reached. */
-  check('the method jump alone, x2 units', r.body.surcharge && r.body.surcharge.amount, 8)
+  /* A NEW FACE CARRIES ITS OWN RUN (amended after 2026-09-21; triaged 2026-09-23).
+     This block wanted the new face stamped at ZERO — right under the 21 Sep rule, where a
+     face after the first paid only its design fee. sideDetail was then amended: the PLACEMENT
+     is still paid once, but every face after the first buys its technique's run, because a
+     second embroidered face is a second pass through the machine.
+     So:  15 blank + 4 embroidery (the product's own rate, not the platform's 5)
+          + front 3 (the one placement) + the DTF face's own run 3 + the new EMB run 4  = 29,
+     against a stamp of 21 — a jump of 8 per unit, x2 units. */
+  check('the method jump alone, x2 units', r.body.surcharge && r.body.surcharge.amount, 16)
   const it = await itemOf('L-dtf')
-  check('unit_cost restamped 21 -> 25', Number(it.unit_cost), 25)
+  check('unit_cost restamped 21 -> 29', Number(it.unit_cost), 29)
   check('method rose 0 -> 4', it.cost_parts.method, 4)
   check('billed method follows the dearest face', it.cost_parts.billedMethod, 'Embroidery')
-  check('the new face is stamped at zero', it.cost_parts.sides.map((p) => p.amount), [3, 3, 0])
+  check('the new face is stamped at its own run', it.cost_parts.sides.map((p) => p.amount), [3, 3, 4])
   check('exactly one fee row', (await feeRows()).length, 1)
 }
 
