@@ -246,6 +246,28 @@ export function mockupFaces(p: CatalogProduct | null, color?: string | null): Mo
  */
 type TypeSpec = { sides: string[]; mockups: Record<string, string> }
 let TYPE_SPECS: Record<string, TypeSpec> = {}
+/**
+ * REACT CANNOT SEE A MODULE VARIABLE, and three surfaces were quietly wrong because of it.
+ *
+ * `offeredSides` answers from TYPE_SPECS, which is filled by a fetch AFTER first paint. The
+ * products page already knew — it keeps a `typesLoaded` flag and GATES its picker on it — but
+ * the order page called the loader and nothing re-rendered, and the order ROWS never called
+ * it at all. So on any blank that has not ticked its own faces (EG-2000B, measured), the
+ * per-face Method disclosure never appeared: `faces` was read once, before the specs landed,
+ * and no dependency ever changed to read it again.
+ *
+ * A version plus a subscription rather than another flag threaded through props: the value
+ * lives here, so the invalidation belongs here too, and one `useSyncExternalStore` in the
+ * picker covers every surface that renders it — including the two that had no loader.
+ */
+let SPECS_VERSION = 0
+const SPEC_LISTENERS = new Set<() => void>()
+export const typeSpecsVersion = () => SPECS_VERSION
+export const typeSpecsLoaded = () => Object.keys(TYPE_SPECS).length > 0
+export function subscribeTypeSpecs(fn: () => void) {
+  SPEC_LISTENERS.add(fn)
+  return () => { SPEC_LISTENERS.delete(fn) }
+}
 export function setTypeMockups(types: { name: string; sides?: string[]; mockups?: Record<string, string>; mockup?: string | null }[]) {
   const m: Record<string, TypeSpec> = {}
   for (const t of types ?? []) {
@@ -255,6 +277,8 @@ export function setTypeMockups(types: { name: string; sides?: string[]; mockups?
     m[t.name.toLowerCase()] = { sides: t.sides?.length ? t.sides : ["front"], mockups }
   }
   TYPE_SPECS = m
+  SPECS_VERSION += 1
+  for (const fn of SPEC_LISTENERS) fn()
 }
 const specFor = (p: CatalogProduct | null): TypeSpec | null =>
   TYPE_SPECS[String(p?.type ?? "").toLowerCase()] ?? null

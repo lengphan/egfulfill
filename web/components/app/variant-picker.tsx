@@ -1,9 +1,9 @@
 "use client"
 
 import { useLabelT } from "@/lib/i18n"
-import { useMemo, useState } from "react"
-import { postItemSetup, postOrderDesign, type CatalogProduct, type OrderItem } from "@/lib/api"
-import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel, bestMockup, blankCode, offeredSides } from "@/lib/variant-resolve"
+import { useMemo, useState, useSyncExternalStore } from "react"
+import { postItemSetup, postOrderDesign, getProductTypes, type CatalogProduct, type OrderItem } from "@/lib/api"
+import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel, bestMockup, blankCode, offeredSides, setTypeMockups, subscribeTypeSpecs, typeSpecsVersion, typeSpecsLoaded } from "@/lib/variant-resolve"
 import { thumbSrc } from "@/lib/order-image"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { getUser } from "@/lib/auth"
@@ -30,6 +30,18 @@ const FALLBACK_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "
 const BLANK_LABEL = "Blank Only"
 
 const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
+
+/** ONE REQUEST FOR THE WHOLE PAGE. A module promise, not a hook: forty rows mount at once
+ *  and each would otherwise fire its own fetch for the same settings object. */
+let SPECS_PROMISE: Promise<void> | null = null
+const ensureTypeSpecs = () => {
+  if (!SPECS_PROMISE) {
+    SPECS_PROMISE = getProductTypes()
+      .then((rows) => { setTypeMockups(rows ?? []) })
+      .catch(() => { SPECS_PROMISE = null })   // a failed load must be retryable, not permanent
+  }
+  return SPECS_PROMISE
+}
 
 // The per-line variant picker: Blank · Colour · Size · Method. Marketplace orders arrive
 // with these UNSET (nothing to price), so this is what makes them submittable — and a
@@ -349,7 +361,22 @@ export function VariantPicker({
    * rather than to a disclosure listing one face. A private array here would be the fifth
    * opinion on this question; the faces case is exactly what that rule was written for.
    */
-  const faces = useMemo(() => offeredSides(product) ?? [], [product])
+  /**
+   * THE CATEGORY SPECS, ONCE, WHEREVER THIS IS RENDERED.
+   *
+   * `offeredSides` falls back to the product's TYPE, and those specs arrive from platform
+   * settings after first paint. The order page loaded them and never re-rendered; the order
+   * ROWS never loaded them at all — so a blank that has not ticked its own faces showed no
+   * per-face Method disclosure on either, with nothing on screen to say why.
+   *
+   * Loading them HERE rather than in each page is the same argument the module makes for
+   * holding them at all: every caller needs the answer, so no caller should have to remember
+   * to ask. Guarded by `typeSpecsLoaded()` and a module-level promise, so a queue of forty
+   * rows makes one request between them.
+   */
+  const specsV = useSyncExternalStore(subscribeTypeSpecs, typeSpecsVersion, typeSpecsVersion)
+  if (!typeSpecsLoaded()) void ensureTypeSpecs()
+  const faces = useMemo(() => offeredSides(product) ?? [], [product, specsV])
   /**
    * DECLARE A FACE'S METHOD. "" clears it back to inheriting the line.
    *
