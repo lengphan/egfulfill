@@ -5181,7 +5181,6 @@ const vi: Dict = {
   "artwork.This design already has too many files.": "Thiết kế này đã có quá nhiều tệp.",
   "variantPicker.Method per face": "Kỹ thuật theo từng mặt",
   "variantPicker.Every other face": "Các mặt còn lại",
-  "variantPicker.more faces": "mặt nữa",
   "variantPicker.none": "chưa chọn",
   "artwork.this artwork is": "hình này là",
   "artwork.which takes": "nên chỉ nhận",
