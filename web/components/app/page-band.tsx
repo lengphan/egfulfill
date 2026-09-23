@@ -4,6 +4,7 @@ import { useRef, type ReactNode } from "react"
 import { motion } from "motion/react"
 import { BandChrome } from "@/components/app/band-chrome"
 import { BandVideo } from "@/components/app/band-video"
+import { BandStill } from "@/components/app/band-still"
 import { BandWeb } from "@/components/app/band-web"
 import { BandArray } from "@/components/app/band-array"
 import { BandLiquid } from "@/components/app/band-liquid"
@@ -93,6 +94,24 @@ export const SETS: Record<string, string[]> = {
 }
 
 export const DEFAULT_SET = "balloon"
+
+/**
+ * CANDIDATE MATERIALS for the band, as stills at 3024px. Not wired to any real page yet —
+ * `/lab/band-still` is where they are compared against the shipped clip. See band-still.tsx
+ * for why the band's 10.9:1 stripe is the constraint that produced these compositions.
+ */
+export const CLIPS: Record<string, { src: string; poster: string; masked?: boolean }> = {
+  "chrome-tubes": { src: "/ploy/obj/cand/chrome-loop.mp4", poster: "/ploy/obj/cand/chrome-loop.webp", masked: true },
+  /** The clip this replaced — kept addressable so the lab can show the two together. Nothing
+   *  in the app points at it; `BandVideo`'s own defaults are the new pair. */
+  before: { src: "/ploy/obj/peri-flow.mp4", poster: "/ploy/obj/peri-still.webp" },
+}
+
+export const STILLS: Record<string, string> = {
+  "chrome-tubes": "/ploy/obj/cand/chrome-tubes.webp",
+  balloons: "/ploy/obj/cand/balloons.webp",
+  crystal: "/ploy/obj/cand/crystal.webp",
+}
 
 /**
  * THE ARRANGEMENTS.
@@ -219,7 +238,7 @@ export const DEFAULT_MOTION = "swim"
  * distance between things. A field and a pool are each ONE body: one composition, one motion,
  * and the whole half of the band is used rather than dotted.
  */
-export const FIGURES = ["video", "web", "chromefield", "pool", "beads", "objects", "field", "aura"] as const
+export const FIGURES = ["video", "clip", "still", "web", "chromefield", "pool", "beads", "objects", "field", "aura"] as const
 export const DEFAULT_FIGURE = "video"
 
 /**
@@ -339,6 +358,8 @@ export function PageBand({
   motionStyle = DEFAULT_MOTION,
   figure = DEFAULT_FIGURE,
   webSrc,
+  stillSrc,
+  clip,
 }: {
   title: ReactNode
   sub?: ReactNode
@@ -355,6 +376,10 @@ export function PageBand({
   figure?: (typeof FIGURES)[number]
   /** Which chrome web render, when `figure` is "web". Only the lab passes this. */
   webSrc?: string
+  /** Which candidate material, when `figure` is "still". Only the lab passes this. */
+  stillSrc?: string
+  /** Which candidate clip, when `figure` is "clip". Only the lab passes this. */
+  clip?: keyof typeof CLIPS
 }) {
   const band = useRef<HTMLDivElement>(null)
   /*
@@ -378,7 +403,7 @@ export function PageBand({
         "relative isolate flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-xl px-5 py-5 " +
         /* The pale liquid-glass figure turns the band into a light surface, so the type has to
            invert with it — white on that material measures as invisible, not merely weak. */
-        (figure === "video" ? "bg-[#dfe3f2] text-[#171826] " : "bg-sidebar text-sidebar-foreground ") +
+        (figure === "video" || figure === "still" || figure === "clip" ? "bg-[#dfe3f2] text-[#171826] " : "bg-sidebar text-sidebar-foreground ") +
         /* THE BAND STAYS SHORT (owner's call, 2026-09-09) — the height is not the knob. The
            padding is: the cluster occupies the right of the band, so the type needs the other
            58% reserved or a long Vietnamese name runs into an object. Mobile hides the
@@ -388,11 +413,11 @@ export function PageBand({
     >
       <div className="min-w-0">
         <h1 className="font-title text-2xl font-semibold leading-tight tracking-tight">{title}</h1>
-        {sub && <p className={"text-sm " + (figure === "video" ? "text-[#171826]/70" : "text-sidebar-foreground/60")}>{sub}</p>}
+        {sub && <p className={"text-sm " + (figure === "video" || figure === "still" || figure === "clip" ? "text-[#171826]/70" : "text-sidebar-foreground/60")}>{sub}</p>}
       </div>
       {children}
 
-      {figure === "video" ? <BandVideo /> : figure === "web" ? <BandWeb src={webSrc} /> : figure === "chromefield" ? <BandChrome /> : figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "beads" ? <BandLiquid dense /> : figure === "aura" ? <BandAura /> : (
+      {figure === "video" ? <BandVideo /> : figure === "clip" ? <BandVideo masked={CLIPS[clip ?? "chrome-tubes"].masked} src={CLIPS[clip ?? "chrome-tubes"].src} poster={CLIPS[clip ?? "chrome-tubes"].poster} /> : figure === "still" ? <BandStill src={stillSrc ?? STILLS["chrome-tubes"]} /> : figure === "web" ? <BandWeb src={webSrc} /> : figure === "chromefield" ? <BandChrome /> : figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "beads" ? <BandLiquid dense /> : figure === "aura" ? <BandAura /> : (
       /*
         * THE LAYER IS THE WHOLE BAND, not the right 40%.
         *
