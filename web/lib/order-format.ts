@@ -522,6 +522,75 @@ export function faceChargesFor(
   return out
 }
 
+/**
+ * THE SURFACE MONEY ON EACH FACE, AND NOT A PENNY OF THE DESIGN MONEY.
+ *
+ * `faceChargesFor` above answers "what has this face cost" — placement or run, PLUS that
+ * face's share of any design fee — which is the right answer for the removal confirmation,
+ * where a person is about to throw artwork away and needs the whole figure.
+ *
+ * It is the wrong answer for the designer's face rail, and that is the owner's call
+ * (2026-09-23): "just plus the surface fees — then design fee will show later in the summary
+ * if design has been put there and save". The two charges behave nothing alike and the tile
+ * can only honestly carry one of them:
+ *
+ *   SURFACE  mechanical, and knowable before any artwork exists. The placement on the first
+ *            face, that technique's run on every face after it. A rate table decides it.
+ *   DESIGN   per DESIGN, not per face, and decided by a PERSON — a tier is picked, a complex
+ *            job is quoted and must be ACCEPTED before it is charged. One fee can cover
+ *            front and back at once, so it does not divide onto a tile in the first place.
+ *
+ * Summing them into one figure is what let the rail print "+ design fee" in the slot where a
+ * surface fee belongs: a charge nobody could quote, standing in for one that was always
+ * quotable. The design fee shows where it is decided — the order summary, after the artwork
+ * is saved and before submit.
+ */
+/**
+ * WHAT A FACE AFTER THE FIRST COSTS ON THIS LINE, by technique.
+ *
+ * The rail needs this for a face with no artwork, where there is no `sideParts` row to read:
+ * every face after the first buys its own technique's RUN, which is priced from the method
+ * and so is knowable before any file exists. Resolved server-side by the same function the
+ * charge uses (methodAddOnsFor in server/src/pricing.js), for the same reason `sideRatesFor`
+ * is — a tile must not quote a figure the invoice will not use.
+ *
+ * Matched by `line_id`, like every other reader here: two lines of one order can be two
+ * different blanks with two different rate tables, and `sku` is null on a manual line and
+ * shared by identical-SKU siblings (CLAUDE.md §5).
+ */
+export function faceAddOnsFor(
+  quote: { lines?: { line_id?: string | null; sku?: string | null; faceAddOns?: Record<string, number> }[] } | null | undefined,
+  item: { line_id?: string | null; sku?: string | null },
+): Record<string, number> | null {
+  const hit = (quote?.lines ?? []).find((l) =>
+    (l.line_id && l.line_id === (item.line_id ?? null))
+    || (!l.line_id && !!l.sku && l.sku === item.sku))
+  return hit?.faceAddOns ?? null
+}
+
+export function faceSurfacesFor(
+  quote: {
+    lines?: { line_id?: string | null; sku?: string | null
+              sideParts?: { parts?: { face?: string | null; side?: string | null; amount?: number | null }[] } | null }[]
+  } | null | undefined,
+  item: { line_id?: string | null; sku?: string | null },
+): Record<string, number> {
+  const line = (quote?.lines ?? []).find((l) =>
+    (l.line_id && l.line_id === (item.line_id ?? null))
+    || (!l.line_id && !!l.sku && l.sku === item.sku))
+  const out: Record<string, number> = {}
+  /* `face`, NOT `side` — sideDetail in server/src/pricing.js pushes `{ face, amount, method }`
+     and `side` is undefined on every part the server has ever sent. faceChargesFor shipped
+     with that exact bug and dropped every placement charge on the floor; `side` stays only as
+     the fallback it is there too. */
+  for (const p of line?.sideParts?.parts ?? []) {
+    const k = String(p.face ?? p.side ?? "").trim().toLowerCase()
+    if (!k || p.amount == null || !isFinite(Number(p.amount))) continue
+    out[k] = Math.round(((out[k] ?? 0) + Number(p.amount)) * 100) / 100
+  }
+  return out
+}
+
 export function sideRatesFor(
   quote: { lines?: { line_id?: string | null; sku?: string | null; sideRates?: Record<string, number> }[] } | null | undefined,
   item: { line_id?: string | null; sku?: string | null },

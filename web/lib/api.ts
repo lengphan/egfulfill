@@ -3180,6 +3180,21 @@ export type OrderQuote = {
      *  price before anyone commits to a face, and it has to be the price the charge will use.
      *  Resolved by the same three tiers as sideParts (sideRates in server/src/pricing.js). */
     sideRates?: Record<string, number>
+    /**
+     * WHAT A FACE AFTER THE FIRST COSTS, keyed by technique (`emb`, `dtg`, `dtf`…).
+     *
+     * `sideRates` above is the PLACEMENT table, and only ONE face per line carries a
+     * placement — so it answers for the first face and for no other. This is the other half:
+     * every face after the first buys its own technique's RUN, and that is priced from the
+     * method, never from the artwork, so it is knowable before a file exists.
+     *
+     * Keyed by method because a face may declare its own (`order_designs.method`) and differ
+     * from its line. Carries every technique the blank offers, not only the ones already on
+     * it, so a method just chosen on an empty face resolves immediately.
+     *
+     * Same resolver as the charge (methodAddOnsFor in server/src/pricing.js).
+     */
+    faceAddOns?: Record<string, number>
     supplierCost?: number | null }[]
   /** Lines with no price, and WHY — the reasons need different people to act.
    *  `no-blank`: nothing named, the seller picks one. `unknown-blank`: a blank IS named and

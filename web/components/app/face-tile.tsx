@@ -24,7 +24,7 @@ import type { Pos } from "@/components/app/design-canvas"
  * Same %-frame as the stage — square, `pos` in percentages — so what a 64px tile shows is
  * what the 500px stage shows.
  */
-export function FaceTile({ url, layers, label, active, extra, onSelect }: {
+export function FaceTile({ url, layers, label, active, extra, extraPending, onSelect }: {
   url: string
   layers: { src: string; pos: Pos }[]
   label: string
@@ -39,6 +39,18 @@ export function FaceTile({ url, layers, label, active, extra, onSelect }: {
    * loaded said nothing either. The caller answers for every face now.
    */
   extra?: string | null
+  /**
+   * THE FIGURE IS WHAT THIS FACE WILL COST, NOT WHAT IT HAS COST.
+   *
+   * A surface fee is priced from the TECHNIQUE, so it is knowable before any artwork exists
+   * — which is the whole reason the rail can show it up front instead of producing it once a
+   * file is dropped. But a face with no file is charged nothing until one lands, so printing
+   * the figure in the same ink as a billed face would claim money that is not owed.
+   *
+   * Muted ink, same size, same number. When the file lands the figure does not move; only
+   * its weight does.
+   */
+  extraPending?: boolean
   onSelect: () => void
 }) {
   const has = layers.length > 0
@@ -77,7 +89,8 @@ export function FaceTile({ url, layers, label, active, extra, onSelect }: {
       {extra && (
         <span className={"w-full text-center leading-tight "
           + (/\d/.test(extra)
-            ? "truncate text-xs font-medium tabular-nums text-foreground"
+            ? "truncate text-xs font-medium tabular-nums "
+              + (extraPending ? "text-muted-foreground" : "text-foreground")
             /* A WORD WRAPS, a figure does not. "+ design fee" truncated to "+ design…" in a
                72px tile, which is the half that says nothing — the whole value of the line
                is the word "fee". Two short lines cost the empty tiles a few pixels of

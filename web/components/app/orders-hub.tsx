@@ -73,7 +73,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf, sellerLabelOf, sideRatesFor, faceChargesFor, methodsLabelOf } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf, sellerLabelOf, sideRatesFor, faceChargesFor, faceSurfacesFor, faceAddOnsFor, methodsLabelOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
@@ -3601,6 +3601,8 @@ export function OrdersHub() {
  orderLabel={numOf(editing.order)}
               sideFees={sideRatesFor(editQuote, editing.item)}
               faceCharges={faceChargesFor(editQuote, editing.item)}
+                faceSurfaces={faceSurfacesFor(editQuote, editing.item)}
+                faceAddOns={faceAddOnsFor(editQuote, editing.item)}
  item={editingLive?.item ?? editing.item}
  initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
  initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}

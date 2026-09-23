@@ -1288,6 +1288,40 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                     the dearest face already on the garment is the wrong quote for an empty
                     one. */
                  sideRates: sideRates(fees, (srow && srow.data) || null, it.print_type),
+                 /**
+                  * WHAT A FACE AFTER THE FIRST COSTS, by technique — the OTHER half of the
+                  * rail's question, and the half it has never been sent.
+                  *
+                  * `sideRates` above is the PLACEMENT table, and since 2026-09-21 only one
+                  * face per line ever carries a placement. Every face after it buys its
+                  * technique's RUN instead, which is this. The rail was left quoting the
+                  * placement to faces that will never pay one — and when that was noticed it
+                  * printed the words "+ design fee" instead, which named a different charge
+                  * entirely: a design fee is per DESIGN, decided and quoted by a person.
+                  *
+                  * A MAP BY METHOD, NOT ONE FIGURE. A face may declare its own technique
+                  * (order_designs.method) and differ from its line — an embroidered front
+                  * with a DTG back — so one number would be wrong on exactly the face that
+                  * bothered to say what it was. The line's own method is included so a face
+                  * that says nothing can still be answered.
+                  *
+                  * KNOWABLE BEFORE ANY ARTWORK, which is the whole point: the run is priced
+                  * from the technique, not from the picture. A seller can be told what a
+                  * second face costs before committing to one, rather than after.
+                  *
+                  * Same resolver as the charge (methodAddOn, via methodAddOnsFor), so the
+                  * tile cannot quote a figure the invoice will not use.
+                  */
+                 faceAddOns: methodAddOnsFor(srow, fees, [
+                   it.print_type,
+                   ...withMethods.map((f) => f.method),
+                   /* AND EVERY TECHNIQUE THE BLANK OFFERS, not only the ones already on it.
+                      A seller declares a method on an EMPTY face — "the back is embroidered,
+                      artwork to follow" — and the tile has to price that the moment it is
+                      chosen, which is before any face carries it. Reading only what is on
+                      the garment would answer every method except the one just picked. */
+                   ...(Array.isArray(srow && srow.data && srow.data.methods) ? srow.data.methods : []),
+                 ]),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
   return { lines, unpriced };

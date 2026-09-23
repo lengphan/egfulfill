@@ -24,6 +24,7 @@ import { VariantField } from "@/components/app/variant-field"
 import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery, methodsOf, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
+import { normTech } from "@/lib/print-method"
 import { postItemSetup } from "@/lib/api"
 import { designLabel } from "@/lib/design-id"
 import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
@@ -857,6 +858,7 @@ function CustomerFileThumb({ src }: { src: string }) {
 export function DesignCanvasDialog({
  open, onOpenChange, orderId, orderLabel, item, initialDesign, initialPos, onSaved, catalog,
  siblings, designs, onSendToDesigner, filesLocked, sideFee, sideFees, faceCharges,
+ faceSurfaces, faceAddOns,
 }: {
  open: boolean
  onOpenChange: (v: boolean) => void
@@ -888,6 +890,26 @@ export function DesignCanvasDialog({
    * face but the first and this is the right one wherever it exists.
    */
  faceCharges?: Record<string, number> | null
+  /**
+   * THE SURFACE MONEY ALONE, per face — `faceSurfacesFor`, which reads `sideParts` and
+   * leaves the design fee where it is decided.
+   *
+   * `faceCharges` above adds each face's share of any design fee, and that is right for the
+   * removal confirmation, where somebody is about to discard artwork and needs the whole
+   * figure. It is wrong on the TILE: owner, 2026-09-23 — "just plus the surface fees, then
+   * design fee will show later in the summary if design has been put there and save".
+   */
+ faceSurfaces?: Record<string, number> | null
+  /**
+   * WHAT A FACE AFTER THE FIRST WOULD COST, by technique — the figure the rail never had.
+   *
+   * Only one face per line carries a placement, so `sideFees` answers for the first and for
+   * no other. Every face after it buys its own technique's RUN, which is priced from the
+   * METHOD and therefore knowable with no artwork at all. That is what replaces the words
+   * "+ design fee" — a charge nobody can quote, standing in the slot where a quotable one
+   * belongs. Keyed by technique (`emb`, `dtg`…) because a face may declare its own.
+   */
+ faceAddOns?: Record<string, number> | null
   /** Every design on the order, keyed as the server keys them (line first, sku as fallback).
    *  Only used to count how many lines "use on every line" would OVERWRITE before it does. */
  designs?: Record<string, { data?: string } | undefined> | null
@@ -1280,6 +1302,33 @@ export function DesignCanvasDialog({
     }
  return out
   }, [faces, facesWithArt])
+
+  /**
+   * WHAT A RUN COSTS ON A GIVEN FACE — the surface fee for every face after the first.
+   *
+   * THE FACE'S OWN TECHNIQUE, else the LINE'S. A face that says nothing is decorated the way
+   * the line is, which is the inheritance every other reader of `order_designs.method` uses —
+   * and getting it wrong here quotes embroidery on a face somebody has just set to DTG.
+   * Mirrors `methodOf.get(face) || lineMethod` in sideDetail (server/src/pricing.js).
+   *
+   * ZERO WHEN THE TABLE HAS NO ENTRY, never a guess — which is also what the charge does,
+   * since methodAddOn returns 0 for an unpriced key. A second DTG face genuinely is free.
+   */
+ const runFee = useCallback((face: string) => {
+ const m = (faceMethod[face] ?? "").trim() || String(liveItem.print_type ?? "").trim()
+ const key = m ? normTech(m)?.key : null
+ return key && faceAddOns ? Number(faceAddOns[key]) || 0 : 0
+  }, [faceMethod, liveItem.print_type, faceAddOns])
+
+  /**
+   * IS THE QUOTE ALREADY CHARGING A FACE ON THIS LINE?
+   *
+   * It always is in practice — quoteOrder prices a line with no artwork as ONE face, so the
+   * front carries its placement from the moment the line exists. But a window opened from a
+   * route with no quote has an empty map, and there the first face has not been taken: the
+   * PLACEMENT is the honest quote for it, exactly as it was before any of this.
+   */
+ const billedFaces = Object.keys(faceSurfaces ?? {}).length > 0
 
   /* Placed AFTER the memos above, not beside `sideName` where it reads more naturally.
      The React Compiler treats a value passed into a function it cannot see through as
@@ -3077,19 +3126,40 @@ return (
  box on the stage, so a drag lit up two competing dashed rectangles and a floating
  caption, and the window read as an error state. The stage box alone is the
  feedback now: one target, one highlight. */}
-        {/* pr-10 clears the close button, line-clamp-2 stops a marketplace title from
- becoming a three-line headline. Etsy names run 130+ characters, so unclamped
- this pushed the stage most of the way down the window and ran the last word
- underneath the ✕. */}
+        {/**
+          * THE BLANK YOU ARE PRINTING ON, AND ITS SKU. Two lines, and that is the whole header
+          * (owner, 2026-09-23: "product name on top, then our product SKU below, that should
+          * be enough — you seem to repeat a lot or don't change dynamically according to the
+          * product changes").
+          *
+          * IT NAMED THE LISTING, NOT THE GARMENT. The title was `item.name` — the marketplace
+          * title, which belongs to what the BUYER ordered and never moves. Swap the blank on
+          * the variant strip and a dad hat went on calling itself "Transfer Duffel. 108084",
+          * measured on EG-300. `product` is resolveProduct(liveItem, catalog), so it is the
+          * row the price and the mockups already come from and it follows the strip by
+          * construction — the name was the one thing in this window not reading it.
+          *
+          * AND THE SECOND LINE WAS THE FIRST ONE AGAIN. It printed `blank || sku` — already a
+          * "EG-300 - Bio-Washed Classic Dad Hat" pair — then colour, size and method, all of
+          * which are on the strip immediately behind this dialog and two of which this window
+          * cannot change. Our SKU alone is what the header still has to say: it is how the
+          * floor, a purchase order and the summary all refer to this garment.
+          *
+          * The line's own name survives as the FALLBACK, for a manual line whose blank
+          * resolves to nothing — a window with no name at all is worse than a stale one.
+          *
+          * pr-10 clears the close button; line-clamp-2 stops a 130-character Etsy name, which
+          * reaches this only through that fallback, from pushing the stage down the window.
+          */}
         <DialogHeader className="shrink-0 border-b border-border px-6 py-3">
-          <DialogTitle className="line-clamp-2 pr-10 leading-snug">{item.name || item.sku}</DialogTitle>
-          {/* THE VARIANT, READ-ONLY. What is being printed on is a thing this window has to
- state and does not need to own: the picker is on the order's item row, and two
- controls for one fact is how the two disagree. A line of text answers "what am
-              I placing this on" without being a second place to change it. */}
-          {[liveItem.color, liveItem.size, liveItem.print_type].some(Boolean) && (
-            <div className="mt-0.5 truncate text-xs text-muted-foreground">
-              {[liveItem.blank || liveItem.sku, liveItem.color, liveItem.size, liveItem.print_type].filter(Boolean).join(" · ")}
+          <DialogTitle className="line-clamp-2 pr-10 leading-snug">
+            {product?.name || item.name || liveItem.blank || item.sku}
+          </DialogTitle>
+          {/* A SKU IS A VALUE — something read off the screen and typed somewhere else — so it
+              is text-sm, never the 11px a mark gets (§4, "a value is not a caption"). */}
+          {(product?.sku || liveItem.sku) && (
+            <div className="mt-0.5 truncate text-sm tabular-nums text-muted-foreground">
+              {product?.sku || liveItem.sku}
             </div>
           )}
         </DialogHeader>
@@ -3294,60 +3364,49 @@ return (
                    summary. */
  const rate = (sideFees && Number(sideFees[k]) > 0 ? Number(sideFees[k]) : Number(sideFee)) || 0
                 /**
-                 * WHAT THIS FACE COSTS, which is two different questions depending on whether
-                 * anything is on it.
+                 * WHAT THIS FACE COSTS — ONE FIGURE, ALWAYS, AND THE SUMMARY'S OWN.
                  *
-                 * PLACED: the quote knows — its placement share plus its design fee. That is
-                 * what the invoice says and it is what the tile now prints. It used to print
-                 * the placement RATE on every face after the first, which since ba6dbe91 is a
-                 * fee none of them carry: the rail said "+$3.00" on a Back the summary priced
-                 * at $0.00 and the ledger billed $2.00 of design work for.
+                 * THE RAIL AND THE SUMMARY MUST NOT DISAGREE (owner, 2026-09-23: "the fees
+                 * shown per face on the designer should reflect truly on the summary — not
+                 * back +2 then show back +4 — which is actually what's happening right now,
+                 * very confusing"). Measured on EG-300: the tile said Front +$2.00 while the
+                 * summary billed Front · DTG $5.00, because the tile fell back to the flat
+                 * `method_side` whenever the per-line rate table did not reach it. `owed` is
+                 * now read from `sideParts` — the rows the summary itself prints — so a face
+                 * the invoice is charging shows the invoice's figure or nothing else.
                  *
-                 * EMPTY: only the placement can be quoted, and only when no other face has
-                 * taken it — one placement per line. The design fee on an empty face is not
-                 * knowable, because it is priced from the artwork nobody has added yet, and
-                 * a guess here is the same defect one step earlier.
+                 * SURFACE MONEY ONLY. `faceSurfaces`, not `faceCharges`: a design fee is per
+                 * DESIGN and decided by a person, and it appears in the summary once artwork
+                 * is saved. Adding its share here is what produced two different numbers for
+                 * one face.
+                 *
+                 * AND AN EMPTY FACE STILL ANSWERS. Every face after the first buys its own
+                 * technique's RUN, priced from the method, so it is knowable with no artwork
+                 * at all — which is what retires the words "+ design fee" from this rail. It
+                 * is drawn MUTED (`pending`), because nothing is charged for that face until
+                 * a file lands: same figure, lighter ink, and it does not move when it does.
                  */
-                /**
-                 * THE QUOTE'S FIGURE IS NOT GATED ON WHAT THIS WINDOW HAS OPEN.
-                 *
-                 * This read `art ? faceCharges[k] : undefined`, so a face the invoice is
-                 * ALREADY charging showed nothing whenever the editor held no artwork for
-                 * it — a design fee whose `sides` cover front and back printed on Front
-                 * alone, and the seller saw one number for two charged faces (owner: "if
-                 * it's there, must have design fees shown"). What a face costs is the
-                 * quote's business; whether this window has its picture loaded is not.
-                 */
- const owed = faceCharges ? faceCharges[k] : undefined
-                /**
-                 * EVERY FACE SAYS SOMETHING, and the three answers are different facts:
-                 *
-                 *  - a NUMBER — what this face is charged, from the quote where there is one.
-                 *  - "Included" — printed and costing nothing more: the placement the line
-                 *    price already carries.
-                 *  - "+ design fee" — EMPTY, and the line has already taken its placement.
-                 *    Since ba6dbe91 a further face pays only for the design work on it, and
-                 *    that is priced from artwork nobody has added yet. The placement RATE is
-                 *    the wrong number here and printing it is the bug that was just fixed on
-                 *    this rail; a word is the honest answer, not a guess.
-                 *
-                 * An empty face on a line with NO artwork at all still quotes the placement,
-                 * because that is exactly what the first printed face costs.
-                 */
+                /* THE QUOTE'S FIGURE IS NOT GATED ON WHAT THIS WINDOW HAS OPEN. This read
+                   `art ? … : undefined`, so a face the invoice was ALREADY charging showed
+                   nothing whenever the editor held no artwork for it. What a face costs is
+                   the quote's business; whether this window has its picture loaded is not. */
+ const owed = faceSurfaces ? faceSurfaces[k] : undefined
  const shown = owed != null ? owed
-                  : art ? (costingFaces[k] ? rate : 0)
-                  : (anyFaceHasArt ? null : rate)
+                  : art ? (costingFaces[k] ? runFee(k) : 0)
+                  : (billedFaces ? runFee(k) : rate)
+                /* MUTED WHENEVER THE QUOTE IS NOT ALREADY CHARGING THIS FACE. Same figure,
+                   lighter ink — see FaceTile's `extraPending`. */
+ const pending = owed == null
  return (
                   <FaceTile
  key={f.side} url={f.url} label={f.side || "front"}
                     /* One artwork per face is this window's model, so: a list of one. */
  layers={art ? [{ src: art.data, pos: art.pos }] : []}
  active={i === side} onSelect={() => goToSide(i)}
- extra={shown == null
-                      ? tl("designCanvas", "+ design fee")
- : shown > 0.005
-                        ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}`
-                        : tl("designCanvas", "Included")}
+ extra={shown > 0.005
+                      ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}`
+                      : tl("designCanvas", "Included")}
+ extraPending={pending}
                   />
                 )
               })}

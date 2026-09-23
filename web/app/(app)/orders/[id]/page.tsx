@@ -3,7 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import { Fragment, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
-import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, sideRatesFor, faceChargesFor, methodsLabelOf } from "@/lib/order-format"
+import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, sideRatesFor, faceChargesFor, faceSurfacesFor, faceAddOnsFor, methodsLabelOf } from "@/lib/order-format"
 import { CopyButton } from "@/components/app/copy-button"
 import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
@@ -3859,6 +3859,8 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                  */
                 sideFees={sideRatesFor(quote, customize)}
                 faceCharges={faceChargesFor(quote, customize)}
+                faceSurfaces={faceSurfacesFor(quote, customize)}
+                faceAddOns={faceAddOnsFor(quote, customize)}
  catalog={catalog}
         />
       )}

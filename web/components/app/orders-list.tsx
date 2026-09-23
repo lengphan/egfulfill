@@ -34,7 +34,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, sideRatesFor, faceChargesFor, methodsLabelOf } from "@/lib/order-format"
+import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, sideRatesFor, faceChargesFor, faceSurfacesFor, faceAddOnsFor, methodsLabelOf } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
@@ -713,6 +713,8 @@ export function OrdersList() {
  orderLabel={numOf(editing.order)}
               sideFees={sideRatesFor(editQuote, editing.item)}
               faceCharges={faceChargesFor(editQuote, editing.item)}
+                faceSurfaces={faceSurfacesFor(editQuote, editing.item)}
+                faceAddOns={faceAddOnsFor(editQuote, editing.item)}
  item={editingLive?.item ?? editing.item}
  initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
  initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}
