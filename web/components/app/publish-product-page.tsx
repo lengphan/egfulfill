@@ -1052,7 +1052,18 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
      * OVERWRITES, like every other field here: two applies of one template must give one
      * form. Appending would duplicate the size chart on the second press.
      */
- if (d.images?.length) { imgTouched.current = true; setImages(d.images.slice(0, MAX_IMAGES)) }
+    /* UNCONDITIONAL, INCLUDING THE EMPTY CASE (owner, 2026-09-23: "a tshirt should have its
+       own variants and listing images, while caps should be different as well").
+
+       This was guarded on `d.images?.length`, so applying a CAP template that carries no
+       boilerplate left the TEE's size chart sitting in the grid — and the seller would have
+       published a cap with a shirt's chart on it. A template describes a whole listing; "no
+       images" is one of the things it can say.
+
+       It also restores the invariant the overwrite rule is for: two applies of one template
+       give one form, whatever was applied in between. */
+ imgTouched.current = true
+ setImages((d.images ?? []).slice(0, MAX_IMAGES))
     /* The picks are handed to the reset effect rather than set here — see the ref's note. */
  tmplVariantsRef.current = { colors: [...(d.colors ?? [])], sizes: [...(d.sizes ?? [])] }
     /* THE BLANK BY SKU, THEN BY NAME — the same two-step the product picker uses, because a
@@ -1837,10 +1848,11 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
             {tl("publish", "Save new")}
           </Button>
           {/* REPLACE is offered only when one is picked, because "update" with nothing
-              selected has no referent and would have to guess which one. */}
+              selected has no referent and would have to guess which one — which is also why
+              the word "picked" came off it: the button does not exist unless one is. */}
           {tmplPick && (
             <Button size="sm" variant="outline" disabled={tmplBusy} onClick={() => void storeTemplate(true)}>
-              {tl("publish", "Replace picked")}
+              {tl("publish", "Replace")}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => setTmplOpen(false)}>{tl("publish", "Cancel")}</Button>

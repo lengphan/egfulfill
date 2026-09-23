@@ -254,6 +254,47 @@ const bobSees = await call('bob', '/api/listing_templates')
 check("bob cannot see alice's image template", (bobSees.body ?? []).length, 0)
 await call('alice', `/api/listing_templates/${IMGS.body?.id}`, { method: 'DELETE' })
 
+// ── two templates, two different listings ───────────────────────────────────────────────
+/**
+ * A TEMPLATE DESCRIBES ONE LISTING, NOT A SETTING (owner, 2026-09-23: "a tshirt should have
+ * its own variants and listing images, while caps should be different as well").
+ *
+ * Each row carries its own `data`, so this holds by construction — which is exactly the kind
+ * of thing that stops holding the day somebody hoists one field into a shared place. The tee
+ * keeps a size chart the cap has never heard of, and the cap keeps its own sizes and blank.
+ */
+const TEE = await call('alice', '/api/listing_templates', {
+  method: 'POST',
+  body: JSON.stringify({
+    name: 'Tee', data: { title: 'Tee', blank_sku: 'EG-5000', sizes: ['S', 'M', 'L'],
+                         images: ['https://cdn.example.com/tee-size-chart.png'] },
+  }),
+})
+const CAP = await call('alice', '/api/listing_templates', {
+  method: 'POST',
+  body: JSON.stringify({
+    name: 'Cap', data: { title: 'Cap', blank_sku: 'EG-600', sizes: ['Adjustable'],
+                         images: ['https://cdn.example.com/cap-fit-guide.png'] },
+  }),
+})
+check('the tee keeps its own chart', TEE.body?.data?.images, ['https://cdn.example.com/tee-size-chart.png'])
+check('the cap keeps its own guide', CAP.body?.data?.images, ['https://cdn.example.com/cap-fit-guide.png'])
+check('…and their sizes do not mix', [TEE.body?.data?.sizes, CAP.body?.data?.sizes],
+  [['S', 'M', 'L'], ['Adjustable']])
+/* SAVING THE CAP DID NOT TOUCH THE TEE — re-read rather than trusting the POST's echo, which
+   is the whole difference between "the response looked right" and "the row is right". */
+const after = await call('alice', '/api/listing_templates')
+const teeRow = (after.body ?? []).find((t) => t.id === TEE.body?.id)
+check('the tee is unchanged after the cap was saved', teeRow?.data?.images,
+  ['https://cdn.example.com/tee-size-chart.png'])
+/* A TEMPLATE MAY ALSO SAY "NO IMAGES", and the client must read that as a clear rather than
+   as "leave whatever is on screen" — otherwise a cap publishes with a tee's size chart. */
+const BARE = await call('alice', '/api/listing_templates', {
+  method: 'POST', body: JSON.stringify({ name: 'Bare', data: { title: 'Bare' } }),
+})
+check('a template with no images stores none', 'images' in (BARE.body?.data ?? {}), false)
+for (const t of [TEE, CAP, BARE]) await call('alice', `/api/listing_templates/${t.body?.id}`, { method: 'DELETE' })
+
 // ── delete, by the owner ────────────────────────────────────────────────────────────────
 const del = await call('alice', `/api/listing_templates/${ID}`, { method: 'DELETE' })
 check('alice can delete her own', del.status, 200)

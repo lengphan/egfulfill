@@ -2211,7 +2211,7 @@ const vi: Dict = {
   "publish.Save as template": "Lưu thành mẫu",
   "publish.Name this template": "Đặt tên cho mẫu này",
   "publish.Save new": "Lưu mẫu mới",
-  "publish.Replace picked": "Thay mẫu đang chọn",
+  "publish.Replace": "Thay thế",
   "publish.Delete this template": "Xoá mẫu này",
   "publish.Delete?": "Xoá?",
   "publish.Reupload": "Tải lên lại",
