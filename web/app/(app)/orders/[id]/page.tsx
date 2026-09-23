@@ -2833,9 +2833,37 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
+                            {/**
+                              * THE GARMENT, NOT THE LISTING (owner, 2026-09-23: "the product
+                              * name only changed on the designer window, should change here in
+                              * order detail page as well").
+                              *
+                              * This read `it.name` — the marketplace title, which belongs to
+                              * what the BUYER ordered and never moves. Swap the blank on the
+                              * strip below and a youth tee went on calling itself "Transfer
+                              * Duffel. 108084". resolveProduct is the row the price, the
+                              * mockups and the faces already come from, so the heading now
+                              * follows the strip the way everything else on the card does.
+                              *
+                              * THE BUYER'S TITLE IS NOT LOST. On an ORDER page it is how a
+                              * seller recognises the line on the marketplace, so it keeps a
+                              * line of its own — but only when it exists and actually differs,
+                              * which on a manual line or a matching title is never. A blank
+                              * that resolves to nothing falls back to it, exactly as the
+                              * designer does: a row with no name is worse than a stale one.
+                              */}
                             <div className="flex items-center gap-2">
-                              <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
+                              <div className="truncate font-medium">
+                                {resolveProduct(it, catalog)?.name || it.name || it.sku || "Item"}
+                              </div>
                             </div>
+                            {(() => {
+                              const pn = resolveProduct(it, catalog)?.name
+                              const listing = (it.name || "").trim()
+                              return pn && listing && listing.toLowerCase() !== pn.toLowerCase()
+                                ? <div className="truncate text-xs text-muted-foreground">{listing}</div>
+                                : null
+                            })()}
                             {/* Same line as the production queue: what the buyer chose, next
  to what we are choosing. */}
                             {/* The catalogue row is what turns a blank NAME into the sku

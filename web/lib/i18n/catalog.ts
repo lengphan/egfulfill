@@ -1463,6 +1463,7 @@ const vi: Dict = {
   "order.This order was charged when one placement came inside the blank's price. Every placement is charged now.": "Giá phôi đã gồm một mặt in; mỗi mặt thêm sẽ tính phí.",
   "order.Base cost": "Giá gốc",
   "order.Free": "Miễn phí",
+  "canvas.Method": "Kỹ thuật in",
   "designCanvas.Free": "Miễn phí",
   "order.The placement — hooping and aligning, charged once for the whole garment.": "Phí đặt in — căng khung và canh chỉnh, tính một lần cho cả sản phẩm.",
   "order.A pass through the machine for this face.": "Một lượt chạy máy cho mặt này.",

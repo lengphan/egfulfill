@@ -3504,6 +3504,43 @@ return (
             * already sets on itself, so nothing about the resting layout moves.
             */}
           <div className="relative w-full overflow-hidden">
+          {/**
+            * WHOSE PHOTO THE GARMENT IS, ON THE GARMENT (owner, 2026-09-23: "remove the card,
+            * maybe put an overlay button to replace the artwork on top of our blank image —
+            * no need for a separate card on top of the variant strip").
+            *
+            * It was a bordered card with a heading, a subtitle and a button — three rows to
+            * carry one action, above the strip, and the subtitle was the exact shape §4 calls
+            * a defect: prose explaining a control that is already on screen.
+            *
+            * THIS IS NOT THE RETURN OF THE STAGE-RAIL BUTTON. That one was removed because
+            * every other mark on the rail acts on the ARTWORK under the cursor, so a control
+            * changing the GARMENT was the one whose target was not what you were pointing at.
+            * This sits in the corner of the blank itself, which IS its target — you are
+            * pointing at the thing it changes.
+            *
+            * `pointer-events-none` on the tray and `auto` on the button: the stage owns the
+            * whole surface for dragging artwork and taking a drop, and a transparent overlay
+            * across it is the bug the z-20 note further down records being chased.
+            */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-start p-2">
+            <Button
+              type="button" size="sm" variant="outline"
+              className="pointer-events-auto border-border/70 bg-background/85 shadow-sm backdrop-blur-sm"
+              onClick={() => (ownMockups[sideKey] ? void clearOwnMockup() : mockupRef.current?.click())}
+              disabled={mockBusy || filesLocked}
+              /* THE REASON IS A `title`, NOT A LINE UNDER IT (§4). What this does and what it
+                 does NOT do — it is a backdrop, never the print file — is the one thing about
+                 this control that can be misread, so it stays; it just stops being a sentence
+                 printed on the page forever. */
+              title={filesLocked ? lockedWhy : ownMockups[sideKey]
+                ? tl("canvas", "Put our product photo back")
+                : tl("canvas", "Use your own product photo as the backdrop — the design file is still needed")}
+            >
+              {mockBusy ? <CircleNotch size={14} className="animate-spin" /> : <ImageSquare size={14} weight="bold" />}
+              {ownMockups[sideKey] ? tl("canvas", "Use ours") : tl("canvas", "Use mine")}
+            </Button>
+          </div>
           {/* The zoom wrapper. It scales this box, NOT the artwork's percentages — see
               lib/stage-zoom.ts. `origin-top` so zooming grows the garment downward from
               where the eye already is rather than pushing its collar off the top. */}
@@ -3864,41 +3901,9 @@ return (
             ]}
           />
           {ctxTab === "design" && (<>
-          {/**
-            * YOUR OWN PHOTO BEHIND THE ARTWORK — and it is a BACKDROP, which the label says
-            * in as many words because it is the one thing about this control that can be
-            * misread. Most sellers already have product photography; placing on our blank
-            * photo means the picture they list with and the picture the floor works from are
-            * two different images of one job.
-            *
-            * It does NOT replace the print file. The design is still what is placed, saved
-            * and printed, and a line with a photo and no design cannot ship — the gate reads
-            * order_designs, and this is stored somewhere else on purpose.
-            *
-            * OFF THE STAGE RAIL, WHERE IT DID NOT BELONG. That rail is the design tool: every
-            * other mark on it — rotate, lock, erase, delete — acts on the ARTWORK under the
-            * cursor, which is why it sits over the picture at all. This one changes the
-            * GARMENT behind the artwork, so it was the only button there whose target was not
-            * the thing you were pointing at, and it kept the left half of the window from
-            * being purely the product. It belongs with the blank's other facts.
-            */}
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
-            <div className="min-w-0">
-              <div className="text-sm font-medium">{ownMockups[sideKey] ? tl("canvas", "Your product photo") : tl("canvas", "Our product photo")}</div>
-              <div className="text-2xs text-muted-foreground">{tl("canvas", "The backdrop the artwork sits on")}</div>
-            </div>
-            <Button
-              type="button" size="sm" variant="outline"
-              onClick={() => (ownMockups[sideKey] ? void clearOwnMockup() : mockupRef.current?.click())}
-              disabled={mockBusy || filesLocked}
-              title={filesLocked ? lockedWhy : ownMockups[sideKey]
-                ? tl("canvas", "Put our product photo back")
-                : tl("canvas", "Use your own product photo as the backdrop — the design file is still needed")}
-            >
-              {mockBusy ? <CircleNotch size={14} className="animate-spin" /> : <ImageSquare size={14} weight="bold" />}
-              {ownMockups[sideKey] ? tl("canvas", "Use ours") : tl("canvas", "Use mine")}
-            </Button>
-          </div>
+          {/* The "whose photo is this" control is ON the garment now — see the stage's
+              bottom-left overlay. It was a card here with a heading and a subtitle above the
+              variant strip, which is three rows and a border for one button. */}
           {!filesLocked && catalog && catalog.length > 0 && (
             <VariantPicker
               orderId={orderId}
@@ -3958,10 +3963,27 @@ return (
                  The face's own word, the way every other surface in the app says it —
                  tl("sides", …), never a hand-capitalised string. */
               prefix={tl("sides", sd)}
-              label={`${tl("sides", sd)} · ${tl("canvas", "type")}`}
+              /* "METHOD", THE WORD THE STRIP ABOVE ALREADY USES (owner, 2026-09-23: "the
+                 method here should be method"). This field called itself `type` while
+                 VariantPicker called the identical question Method — two names for one thing,
+                 on two controls a seller reads in the same glance. */
+              label={`${tl("sides", sd)} · ${tl("canvas", "Method")}`}
               value={faceMethod[sd] ?? ""}
               options={faceMethodOptions}
-              placeholder={lineMethod || tl("canvas", "Same as the line")}
+              /**
+               * AN UNSET FACE SHOWS THE METHOD IT INHERITS — and when there is none to
+               * inherit, it says so as a FIELD, not as a sentence.
+               *
+               * The fallback read "Same as the line", which is only meaningful while the line
+               * HAS a method. On a line whose `print_type` is unset — every marketplace order
+               * arrives that way (§5: only the factory's own picks pre-fill) — all three faces
+               * read "Front · Same as the line" and named a value that does not exist. Same as
+               * WHAT? Nothing was decided anywhere.
+               *
+               * "Method" is what Colour and Size do when they are empty: the field's own noun,
+               * which reads as a question rather than as an answer.
+               */
+              placeholder={lineMethod || tl("canvas", "Method")}
               /* NO CLEAR ROW (owner, 2026-09-21). "Same as the line" was there so a placement
                  could go back to inheriting — a real state (order_designs.method null) and one
                  nobody was looking for in a list of techniques. Picking a technique is the only
