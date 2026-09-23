@@ -36,7 +36,7 @@ try { sh('pg_isready', []) } catch {
 }
 
 const DB = 'egfulfill_public_api_gate'
-const PORT = 4141
+const PORT = 4146   // unique across tools/check-*.mjs — run-gates.sh refuses a duplicate
 const URL_ = `postgres://localhost:5432/${DB}`
 const SECRET = 'public-api-gate-secret'
 
@@ -46,7 +46,13 @@ try { jwt = require('jsonwebtoken') } catch {
   process.exit(0)
 }
 
-try { sh('dropdb', ['--if-exists', DB]) } catch { /* nothing to drop */ }
+/* --force, because the previous gate's server may still hold a connection when these run
+   back to back: plain dropdb then fails with "database is being accessed by other users",
+   createdb fails after it, and the gate dies for a reason that has nothing to do with what
+   it tests. A flaky gate is one people learn to ignore. Fallback for a Postgres older than
+   13, where --force does not exist. */
+try { sh('dropdb', ['--if-exists', '--force', DB]) }
+catch { try { sh('dropdb', ['--if-exists', DB]) } catch { /* nothing to drop */ } }
 sh('createdb', [DB])
 sh('psql', ['-q', '-d', DB, '-f', join(ROOT, 'server/db/schema.sql')])
 const SELLER = sh('psql', ['-t', '-A', '-d', DB, '-c',
@@ -74,7 +80,7 @@ const check = (label, ok, detail = '') => {
 
 function teardown() {
   try { api.kill('SIGKILL') } catch { /* already gone */ }
-  try { sh('dropdb', ['--if-exists', DB]) } catch { /* the next run drops it */ }
+  try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* the next run drops it */ }
 }
 process.on('exit', teardown)
 

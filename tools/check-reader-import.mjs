@@ -51,10 +51,14 @@ try { jwt = require('jsonwebtoken'); pg = require('pg') } catch {
   process.exit(0)
 }
 
-/* A FRESH DATABASE EVERY RUN. A gate that inherits the last run's rows passes on state it
+/* --force added 2026-09-23: run back to back by tools/run-gates.sh, the previous gate's
+   server can still hold a connection, dropdb fails with "being accessed by other users",
+   and this gate dies for a reason that has nothing to do with what it tests.
+
+   A FRESH DATABASE EVERY RUN. A gate that inherits the last run's rows passes on state it
    did not create, which is the same failure mode as a stale process making a broken build
    look healthy (§2.1). */
-try { sh('dropdb', ['--if-exists', DB]) } catch { /* nothing to drop */ }
+try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* nothing to drop */ }
 sh('createdb', [DB])
 sh('psql', ['-q', '-d', DB, '-f', join(ROOT, 'server/db/schema.sql')])
 /* FIRST LINE ONLY. `psql -c "insert … returning id"` prints the id AND the command tag
@@ -99,7 +103,7 @@ async function waitForApi() {
 
 function teardown() {
   try { api.kill('SIGKILL') } catch { /* already gone */ }
-  try { sh('dropdb', ['--if-exists', DB]) } catch { /* leave it; the next run drops it */ }
+  try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* leave it; the next run drops it */ }
 }
 process.on('exit', teardown)
 
@@ -171,6 +175,36 @@ console.log('\nIMPORT — the order is created with its items')
      defaulting to DTG and the thread matcher never runs. */
   check('embroidery detected from the title', items[0].print_type, 'EMB')
   check('the plain line stays method-less', items[1].print_type, null)
+}
+
+/**
+ * WAIT FOR THE INDEXES THAT ARE THE CLAIM.
+ *
+ * `order_items_platform_line_uq` and `order_items_derived_line_uq` are created at ROUTE LOAD
+ * in orders.js (§6 — many tables and indexes are, not in schema.sql), chained behind several
+ * other statements. The second import below can beat them to it, and then `on conflict do
+ * nothing` has no constraint to conflict against: the lines duplicate, and this gate reports
+ * the duplication it exists to catch. Measured 2026-09-23 at 1 run in 3, standalone.
+ *
+ * It is a race in THIS FILE, not in production — a deployment that has run once already has
+ * both indexes. But it is worth naming what the flake exposed: duplicate protection lives in
+ * a `create unique index if not exists … .catch(() => {})` at route load, so if that creation
+ * ever failed on a fresh database, re-pressing Sync would duplicate lines silently and this
+ * gate is the only thing that would ever say so.
+ */
+const waitForIndex = async (name) => {
+  for (let i = 0; i < 60; i++) {
+    const r = await db.query('select to_regclass($1) as t', [name]).catch(() => ({ rows: [{ t: null }] }))
+    if (r.rows[0]?.t) return true
+    await new Promise((res) => setTimeout(res, 100))
+  }
+  return false
+}
+for (const idx of ['order_items_platform_line_uq', 'order_items_derived_line_uq']) {
+  if (!(await waitForIndex(idx))) {
+    console.error(`FAIL  ${idx} never appeared — it IS the no-duplicate guarantee, so the section below would pass or fail for the wrong reason.`)
+    process.exit(1)
+  }
 }
 
 console.log('\nPRESSING SYNC TWICE — the claim that nothing duplicates')

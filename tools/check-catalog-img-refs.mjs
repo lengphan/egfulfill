@@ -57,7 +57,7 @@ try { jwt = require('jsonwebtoken'); pg = require('pg') } catch {
 
 /* A FRESH DATABASE EVERY RUN — a gate that inherits the last run's rows passes on state it
    did not create, the same failure as a stale process making a broken build look healthy. */
-try { sh('dropdb', ['--if-exists', DB]) } catch { /* nothing to drop */ }
+try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* nothing to drop */ }
 sh('createdb', [DB])
 sh('psql', ['-q', '-d', DB, '-f', join(ROOT, 'server/db/schema.sql')])
 
@@ -103,7 +103,7 @@ async function waitForApi() {
 }
 function teardown() {
   try { api.kill('SIGKILL') } catch { /* already gone */ }
-  try { sh('dropdb', ['--if-exists', DB]) } catch { /* the next run drops it */ }
+  try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* the next run drops it */ }
 }
 process.on('exit', teardown)
 

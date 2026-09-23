@@ -47,7 +47,7 @@ try { jwt = require('jsonwebtoken'); pg = require('pg') } catch {
   process.exit(0)
 }
 
-try { sh('dropdb', ['--if-exists', DB]) } catch { /* nothing to drop */ }
+try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* nothing to drop */ }
 sh('createdb', [DB])
 sh('psql', ['-q', '-d', DB, '-f', join(ROOT, 'server/db/schema.sql')])
 
@@ -104,7 +104,7 @@ async function waitForTable(name) {
 
 function teardown() {
   try { api.kill('SIGKILL') } catch { /* already gone */ }
-  try { sh('dropdb', ['--if-exists', DB]) } catch { /* the next run drops it */ }
+  try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* the next run drops it */ }
 }
 process.on('exit', teardown)
 
@@ -120,15 +120,27 @@ if (!(await waitForTable('listing_templates'))) {
   process.exit(1)
 }
 
-/* Alice's team, so the member resolves to her as owner — the same shape the wallet uses. */
-await db.query(
-  `create table if not exists team_members (
-     owner_id uuid, user_id uuid, email text, status text, created_at timestamptz default now())`,
-).catch(() => {})
+/* Alice's team, so the member resolves to her as owner — the same shape the wallet uses.
+ *
+ * THE TABLE IS THE APP'S, AND WAITED FOR RATHER THAN DECLARED HERE. This used to create its
+ * own `team_members` and then insert with `.catch(() => {})`, racing team.js's own route-load
+ * CREATE — and when the insert lost that race the error was swallowed, the membership never
+ * existed, and the two team assertions failed. Intermittently: measured at 1 run in 3 on
+ * 2026-09-23, which is the worst possible frequency because it reads as a flaky suite rather
+ * than a bug. A second definition of a table the app already owns is the same mistake as a
+ * second copy of a rule; waitForTable is right there and was already used for the other one.
+ *
+ * The insert no longer swallows either. If the team fixture cannot be written, the two checks
+ * that depend on it are meaningless and this should say so rather than report a failure whose
+ * cause is three steps away. */
+if (!(await waitForTable('team_members'))) {
+  console.error('FAIL  team_members never appeared — team.js creates it at route load; nothing below about teams would mean anything.')
+  process.exit(1)
+}
 await db.query(
   `insert into team_members (owner_id, user_id, email, status) values ($1,$2,$3,'active')`,
   [ALICE, MATE, 'mate@test.local'],
-).catch(() => {})
+)
 
 console.log('LISTING TEMPLATES')
 

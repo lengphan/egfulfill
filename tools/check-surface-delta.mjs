@@ -53,12 +53,12 @@ try { jwt = require('jsonwebtoken'); pg = require('pg') } catch {
 }
 
 const DB = 'egfulfill_surface_gate'
-const PORT = 4139
+const PORT = 4144   // was 4139, which check-catalog-img-refs also claimed — see run-gates.sh
 const URL_ = `postgres://localhost:5432/${DB}`
 const SECRET = 'surface-gate-secret'
 const ORDER = 'FF-gate-surface-1'
 
-try { sh('dropdb', ['--if-exists', DB]) } catch { /* nothing to drop */ }
+try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* nothing to drop */ }
 sh('createdb', [DB])
 sh('psql', ['-q', '-d', DB, '-f', join(ROOT, 'server/db/schema.sql')])
 const SELLER = sh('psql', ['-t', '-A', '-d', DB, '-c',
@@ -90,7 +90,7 @@ const postDesign = async (body) => {
 }
 const teardown = () => {
   try { api.kill('SIGKILL') } catch { /* already gone */ }
-  try { sh('dropdb', ['--if-exists', DB]) } catch { /* the next run drops it */ }
+  try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* the next run drops it */ }
 }
 process.on('exit', teardown)
 

@@ -44,7 +44,13 @@ const PORT = 4142
 const URL_ = `postgres://localhost:5432/${DB}`
 const SECRET = 'leak-gate-secret'
 
-try { sh('dropdb', ['--if-exists', DB]) } catch { /* nothing to drop */ }
+/* --force, because the previous gate's server may still hold a connection when these run
+   back to back: plain dropdb then fails with "database is being accessed by other users",
+   createdb fails after it, and the gate dies for a reason that has nothing to do with what
+   it tests. A flaky gate is one people learn to ignore. Fallback for a Postgres older than
+   13, where --force does not exist. */
+try { sh('dropdb', ['--if-exists', '--force', DB]) }
+catch { try { sh('dropdb', ['--if-exists', DB]) } catch { /* nothing to drop */ } }
 sh('createdb', [DB])
 sh('psql', ['-q', '-d', DB, '-f', join(ROOT, 'server/db/schema.sql')])
 const psql = (sql) => sh('psql', ['-t', '-A', '-q', '-d', DB, '-c', sql]).trim()
@@ -72,7 +78,7 @@ const check = (label, ok, detail = '') => {
 }
 function teardown() {
   try { api.kill('SIGKILL') } catch { /* already gone */ }
-  try { sh('dropdb', ['--if-exists', DB]) } catch { /* the next run drops it */ }
+  try { sh('dropdb', ['--if-exists', '--force', DB]) } catch { /* the next run drops it */ }
 }
 process.on('exit', teardown)
 
