@@ -149,5 +149,40 @@ console.log('\nTHE PLACEMENT IS PAID ONCE, THE MACHINE RUN IS NOT')
     sideAddOn(faces(2), fees, null, 'Embroidery'), 3)
 }
 
-console.log(bad ? `\n${bad} failure(s).` : '\nOne placement per line, one machine run per face, and nothing else moved.')
+/**
+ * THE WORDS THE PRODUCT EDITOR PUTS ON SCREEN (2026-09-23).
+ *
+ * That editor shows four per-face price boxes and a set of method boxes, and for a year it
+ * labelled neither — so four fields reading "+ $2.00" implied four faces at $2.00 each when
+ * only ONE of them is ever charged. The headings now state the rule:
+ *
+ *   Placement  ·  charged once per garment
+ *   Method     ·  charged per printed face
+ *
+ * Both are literally true, and this is what keeps them that way. A label is a claim about
+ * behaviour; §4 has already been bitten by a measurement living in a comment while the code
+ * moved underneath it. If the rule changes again, this fails and the words get changed with
+ * it instead of quietly becoming a lie on a form people price products with.
+ */
+console.log('\nWHAT THE PRODUCT EDITOR CLAIMS ON ITS OWN HEADINGS')
+{
+  const fees = { method_emb: 6, method_side: 2, ship_garment: 0, ship_extra: 0 };
+  const d = { name: 'Tee', sku: 'X', basePrice: 10 };
+  for (let n = 1; n <= 5; n++) {
+    const faces = ['front', 'back', 'left', 'right', 'sleeve'].slice(0, n).map((side) => ({ side, method: 'Embroidery' }));
+    /* ONE placement, whatever N is — and the method exactly N times. `method` is charged by
+       costPartsOf and the runs by sideDetail, so the two halves are summed here the same way
+       unitCostOf sums them. */
+    const r = sideBreakdown(faces, fees, d, 'Embroidery');
+    const placements = r.parts.filter((p) => p.kind === 'placement');
+    const runs = r.parts.filter((p) => p.kind === 'run');
+    check(`${n} face${n > 1 ? 's' : ''} — "charged once per garment"`, placements.length, 1);
+    /* The line's own method charge is the FIRST face's run, billed by costPartsOf rather
+       than listed here — so the runs in `parts` are one short of the printed faces, and the
+       two together are exactly N. */
+    check(`${n} face${n > 1 ? 's' : ''} — "charged per printed face"`, runs.length + 1, n);
+  }
+}
+
+console.log(bad ? `\n${bad} failure(s).` : '\nOne placement per line, one machine run per face, and the editor says so.')
 process.exit(bad ? 1 : 0)

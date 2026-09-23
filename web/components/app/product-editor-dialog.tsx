@@ -2449,7 +2449,19 @@ export function ProductEditorDialog({
                     thing across three screens, and the tick for it lived in a separate list
                     from the tile it governed. One grid now: tick it to offer it, set its
                     picture, set what it costs. */}
-                <span className="text-sm font-medium">{tl("product", "Placement")}</span>
+                {/* AND WHAT THESE PRICES ARE, in the heading rather than as a sentence
+                    under four identical boxes (§4).
+                    Four fields reading "+ 2.00" implied four faces at $2.00 each. Only ONE of
+                    them is ever charged: since 2026-09-21 a line pays a single placement, on
+                    the first face it prints in PRICED_SIDES order, and every face after that
+                    buys its technique's RUN instead — which is the box below, not this one.
+                    So these set the rate for whichever face ends up carrying it. */}
+                <span className="text-sm font-medium">
+                  {tl("product", "Placement")}
+                  <span className="ml-2 font-normal text-xs text-muted-foreground">
+                    {tl("product", "charged once per garment")}
+                  </span>
+                </span>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-muted-foreground">from {type}</span>
                   {sides.length > 0 && (
@@ -2686,7 +2698,18 @@ export function ProductEditorDialog({
            */}
           <div className="space-y-2">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-medium">{tl("product", "Pricing overrides")}</span>
+              {/* "PER PRINTED FACE" IS LITERALLY TRUE, and it is the fact this section was
+                  missing. A method surcharge is charged once on the line (costPartsOf) and
+                  once more for every face after the first (sideDetail's run) — which for N
+                  faces of one technique is exactly N times. Whoever typed a figure here had
+                  no way to know that from a heading reading "Pricing overrides", while four
+                  placement boxes above implied the per-face money lived up there. */}
+              <span className="text-sm font-medium">
+                {tl("product", "Method")}
+                <span className="ml-2 font-normal text-xs text-muted-foreground">
+                  {tl("product", "charged per printed face")}
+                </span>
+              </span>
               <span className="text-xs text-muted-foreground">{tl("product", "blank follows Settings")}</span>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -2740,7 +2763,10 @@ export function ProductEditorDialog({
                   is charged now, so "additional" describes a rule that no longer exists — and
                   on a one-face product it read as a number that would never apply, when in fact
                   it is the only surface charge that line will ever carry. */}
-              <span className="shrink-0 text-xs text-muted-foreground">{tl("product", "Each placement")}</span>
+              {/* NOT "EACH PLACEMENT". One is charged per garment, so "each" described a rule
+                  that has not applied since 2026-09-21 — and it is the LAST rung of the
+                  ladder besides, reached only when the face above has no figure of its own. */}
+              <span className="shrink-0 text-xs text-muted-foreground">{tl("product", "Any placement")}</span>
               <Input
                 value={sideOv}
                 onChange={(e) => setSideOv(e.target.value.replace(/[^0-9.]/g, ""))}
