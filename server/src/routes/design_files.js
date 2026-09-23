@@ -49,7 +49,27 @@ export async function applyToWaitingLines(srcDesignId, artHash, user) {
   const waiting = await q(
     `select distinct d.order_id, d.line_id, d.sku
        from order_designs d
+       /* THE LINE IT WOULD LAND ON. Required, not optional: a design row whose sku matches
+          no item on the order has no line to be a file FOR, and attaching there produced a
+          stitch file floating on the order, attributed to nothing, which the fee engine
+          cannot see and a person cannot place. */
+       join order_items i on i.order_id = d.order_id
+        and ( (d.line_id is not null and i.line_id = d.line_id)
+           or (d.line_id is null and i.sku = d.sku) )
       where d.art_hash = $1
+        /**
+         * ONLY AN EMBROIDERED FACE TAKES A STITCH FILE.
+         *
+         * Without this it attached a .EMB to a DTG shirt and to an appliqué line, because the
+         * artwork is what matched and artwork has no method. The floor then finds a stitch
+         * file on a job no machine will hoop.
+         *
+         * THE SAME TEST designLines ALREADY USES, verbatim: a face with its own method is
+         * taken at its word, one that says nothing inherits the line. Two spellings of "is
+         * this embroidery" is how the fee engine and the file engine come to disagree about
+         * the same line (§5).
+         */
+        and (d.method ~* 'emb' or (coalesce(d.method, '') = '' and coalesce(i.print_type, '') ~* 'emb'))
         and not exists (
           select 1 from design_file_data f
            where f.order_id = d.order_id
