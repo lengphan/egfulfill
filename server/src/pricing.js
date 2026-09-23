@@ -656,8 +656,20 @@ function sideDetail(faces, fees, d, lineMethod = null) {
        nothing inherits, and the caller already knows the line's method; filling it in here
        would make an inherited face indistinguishable from one somebody chose. */
     const amount = charged ? money(methodAddOn(d, tech, fees)) : money(rate);
+    /**
+     * WHICH KIND OF MONEY THIS IS, said rather than inferred (owner, 2026-09-23: the summary
+     * should read "Front $2.00" with "DTG $3.00" under it, not one folded "Front · DTG $5.00").
+     *
+     * The two amounts above are different purchases that happen to be numbers in one list: the
+     * first face's is a PLACEMENT — the setup, one per line — and every other is a RUN, a pass
+     * through the machine for that face's technique. A client can only tell them apart by
+     * assuming parts[0] is the placement, and that assumption is WRONG exactly when the first
+     * face's rate is 0: `charged` does not flip, so the SECOND face is handed the placement
+     * instead. A breakdown that mislabels which charge is which is the §5 defect in its
+     * display form, so the producer names it.
+     */
+    parts.push({ face, amount, method: methodOf.get(face) || null, kind: charged ? 'run' : 'placement' });
     if (rate > 0) charged = true;
-    parts.push({ face, amount, method: methodOf.get(face) || null });
   }
   /* NO INCLUDED FACE ANY MORE, so none is named. `included` stays absent rather than null-ed
      out of habit: a CHARGED order's stamp still carries the face it had, and the summary reads

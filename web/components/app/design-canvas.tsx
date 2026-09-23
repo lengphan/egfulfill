@@ -3415,7 +3415,12 @@ return (
  extra={shown == null ? null
                       : shown > 0.005
                         ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}`
-                        : tl("designCanvas", "Included")}
+                        /* "FREE", THE SAME WORD THE SUMMARY USES. It said "Included", which
+                           described the retired rule that one face sat inside the blank's price;
+                           a face costs nothing now because the line's single placement is
+                           already charged elsewhere. One state must not have two names across
+                           two surfaces — that is how the two come to look like they disagree. */
+                        : tl("designCanvas", "Free")}
  extraPending={pending}
                   />
                 )

@@ -3164,7 +3164,21 @@ export type OrderQuote = {
       included: string | null
       /** The included face's own technique, when it has one. null = it inherits the line. */
       includedMethod?: string | null
-      parts: { face: string; amount: number; method?: string | null }[]
+      parts: {
+        face: string; amount: number; method?: string | null
+        /**
+         * WHICH PURCHASE THIS AMOUNT IS — `placement` (the setup: hooping and aligning, one
+         * per line) or `run` (a pass through the machine for this face). Two different things
+         * that happened to be numbers in one list, which is why the summary could fold them
+         * into a single figure without anyone noticing.
+         *
+         * SAID BY sideDetail, never inferred from position: parts[0] is the placement only
+         * while the first face's rate is above zero — when it is not, `charged` does not flip
+         * and the SECOND face is handed the placement instead. Absent on a stamp frozen before
+         * this existed, where index 0 is right because it is what that code did.
+         */
+        kind?: 'placement' | 'run'
+      }[]
     }
     /** WHICH METHOD THE SURCHARGE IS FOR. One method fee is charged per line, at the DEAREST
      *  face's technique (billingMethodOf in server/src/pricing.js) — so on a line printed

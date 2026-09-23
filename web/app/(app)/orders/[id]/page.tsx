@@ -1469,10 +1469,10 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    * A live quote sets no `included`, so the row simply stops
                                    * appearing on everything priced from here on.
                                    */
-                                  const faceRows: { face: string; method: string; amount: number }[] = [
+                                  const faceRows: { face: string; method: string; amount: number; kind?: string }[] = [
                                     ...(inc && !parts.some((pt) => pt.face === inc)
-                                      ? [{ face: inc, method: incMethod || lineMethod, amount: 0 }] : []),
-                                    ...parts.map((pt) => ({ face: pt.face, method: pt.method || lineMethod, amount: pt.amount })),
+                                      ? [{ face: inc, method: incMethod || lineMethod, amount: 0, kind: 'placement' }] : []),
+                                    ...parts.map((pt) => ({ face: pt.face, method: pt.method || lineMethod, amount: pt.amount, kind: pt.kind })),
                                   ]
                                   /* WHERE THE SURCHARGE LANDS. The first face whose technique IS
                                      the billed one; if nothing matches — an old line with no face
@@ -1481,6 +1481,13 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                   const at = billed
                                     ? faceRows.findIndex((r) => r.method.toLowerCase() === billed.toLowerCase())
                                     : -1
+                                  /* Would attaching the surcharge put a SECOND charge on that row?
+                                     True when the face it lands on already has a run of its own —
+                                     a mixed line — and true when no face matches it at all. */
+                                  const surchargeStandsAlone = method > 0.005 && (
+                                    at < 0
+                                    || (faceRows[at]?.kind ?? (at === 0 ? 'placement' : 'run')) === 'run'
+                                  )
 
                                   /**
                                    * FEES SIT UNDER THE SURFACE THEY BELONG TO (owner, 2026-09-17).
@@ -1662,22 +1669,83 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    * exact share of the order's — so the strikethroughs reconcile
                                    * to the total however many rows they are spread over.
                                    */
-                                  const goodsRows: { key: string; face: string | null; method: string; amount: number; surfaceFree?: boolean; methodFee?: number; hover?: string }[] = [
+                                  /**
+                                   * BREAK DOWN, DON'T COMPILE (owner, 2026-09-23: "whatever fees
+                                   * need break down, break down, don't compile — that would always
+                                   * be what we need").
+                                   *
+                                   * A face used to print ONE figure that was two purchases added
+                                   * together: `own + mf`, the surface plus the line's method
+                                   * surcharge, split only in a hover nobody hovers. On EG-300 that
+                                   * read `Front · DTG  $5.00` for a $2.00 placement and a $3.00 DTG
+                                   * run — and the designer's rail, which quotes the placement alone,
+                                   * then correctly said $2.00 and looked like it was lying.
+                                   *
+                                   * Each face is now its SURFACE and its METHOD, one under the other:
+                                   *
+                                   *     Front            $2.00      the placement — one per line
+                                   *       DTG            $3.00      the run for that face
+                                   *     Back              Free      no second placement
+                                   *       DTG            $3.00      its own run
+                                   *
+                                   * Same total, and now every figure on the card is a thing somebody
+                                   * can point at. A zero prints "Free" rather than $0.00 — already
+                                   * the rule in the amount cell below.
+                                   *
+                                   * WHICH KIND EACH AMOUNT IS COMES FROM THE SERVER (`kind`), never
+                                   * from its position. parts[0] is the placement only while the first
+                                   * face's rate is above zero; when it is not, sideDetail hands the
+                                   * placement to the SECOND face and an index-based guess mislabels
+                                   * both. A stamp written before `kind` existed has none, and there
+                                   * index 0 is right because it is exactly what that code did.
+                                   *
+                                   * THE METHOD ROW IS OMITTED WHEN IT IS ZERO. A second DTG face
+                                   * costs nothing, and "Back Free / DTG Free" is one fact written
+                                   * twice — the surface row already said it.
+                                   */
+                                  const goodsRows: { key: string; face: string | null; method: string; amount: number; surfaceFree?: boolean; isSurface?: boolean; isMethod?: boolean; hover?: string }[] = [
                                     { key: 'blank', face: null, method: '', amount: blank * qty },
-                                    ...faceRows.map((r, j) => {
-                                      const own = r.amount * qty
-                                      const mf = at === j ? method * qty : 0
-                                      return {
-                                        key: `face-${j}`, face: r.face, method: r.method, amount: own + mf,
-                                        /* IS THE SURFACE ITSELF FREE? One face is inside the
-                                           blank's price, and that is true whether or not the
-                                           line's technique carries a surcharge. */
-                                        surfaceFree: own <= 0.005,
-                                        methodFee: mf,
-                                        hover: mf > 0 && own > 0
-                                          ? `${usd(own)} ${tl("order", "extra placement")} + ${usd(mf)} ${r.method}`
-                                          : undefined,
-                                      }
+                                    /**
+                                     * THE LINE'S METHOD CHARGE, WHEN IT CANNOT RIDE A FACE.
+                                     *
+                                     * It is charged ONCE per line at the DEAREST technique, and on
+                                     * the single-method lines that are almost all of them it simply
+                                     * IS the first face's run — so it sits under that face, which is
+                                     * what makes "Front $2.00 / DTG $3.00" read as one purchase each.
+                                     *
+                                     * A MIXED LINE BREAKS THAT. Front DTG with an embroidered back
+                                     * bills at embroidery, so `at` lands on the back — which already
+                                     * carries its OWN run, and adding the two produced a single
+                                     * "Embroidery $12.00". Two charges, one figure, which is the
+                                     * thing this whole section exists to stop. It takes its own row
+                                     * here instead, beside the blank, where it belongs in the model:
+                                     * price = blank + method + Σ faces.
+                                     */
+                                    ...(surchargeStandsAlone
+                                      ? [{ key: 'method', face: null, method: billed, amount: method * qty,
+                                           hover: tl("order", "Charged once for the item, at the dearest technique on it.") }]
+                                      : []),
+                                    ...faceRows.flatMap((r, j) => {
+                                      const kind = r.kind ?? (j === 0 ? 'placement' : 'run')
+                                      const placement = (kind === 'placement' ? r.amount : 0) * qty
+                                      /* The line's single method surcharge IS the billed face's own
+                                         run on a single-method line — costPartsOf charges it once
+                                         rather than in `parts`, so it belongs on that face's method
+                                         row. Unless it would double up there; see above. */
+                                      const run = (kind === 'run' ? r.amount : 0) * qty
+                                        + (at === j && !surchargeStandsAlone ? method * qty : 0)
+                                      return [
+                                        { key: `face-${j}`, face: r.face, method: '', amount: placement,
+                                          surfaceFree: placement <= 0.005, isSurface: true,
+                                          hover: placement <= 0.005
+                                            ? tl("order", "One placement is charged per item — this face adds nothing to the garment.")
+                                            : tl("order", "The placement — hooping and aligning, charged once for the whole garment.") },
+                                        ...(run > 0.005
+                                          ? [{ key: `face-${j}-m`, face: r.face, method: r.method || lineMethod, amount: run,
+                                               isMethod: true,
+                                               hover: tl("order", "A pass through the machine for this face.") }]
+                                          : []),
+                                      ]
                                     }),
                                   ]
                                   /**
@@ -1714,7 +1782,8 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    * One charge stays the single line it always was.
                                    */
                                   const groupedFaces = new Set(
-                                    goodsRows.filter((r) => r.face && feesFor(r.face).length > 0).map((r) => r.face as string)
+                                    goodsRows.filter((r) => r.face && (r.isMethod || feesFor(r.face).length > 0))
+                                      .map((r) => r.face as string)
                                   )
                                   return (<>
                                     {goodsRows.map((r, j) => {
@@ -1731,20 +1800,24 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                               "in the blank" said something that had stopped being
                                               true of any unpaid order. */}
                                           <dt
-                                            className={`min-w-0 truncate text-muted-foreground ${r.face && groupedFaces.has(r.face) ? "pl-6" : "pl-3"}`}
+                                            className={`min-w-0 truncate text-muted-foreground ${r.face && groupedFaces.has(r.face) && !r.isSurface ? "pl-6" : "pl-3"}`}
                                             title={r.hover
                                               || (r.surfaceFree && r.face
                                                 ? tl("order", "One placement is charged per item — this face adds nothing to the garment.")
                                                 : undefined)}
                                           >
                                             {r.face
-                                              ? (groupedFaces.has(r.face)
+                                              ? (r.isSurface
+                                                  /* THE FACE, AND ONLY THE FACE. It used to carry
+                                                     "· DTG" as well, which named the technique on the
+                                                     row holding the PLACEMENT — the one charge that
+                                                     has nothing to do with the technique. The method
+                                                     has its own row underneath now. */
+                                                  ? <span className="capitalize">{tl("sides", r.face)}</span>
                                                   /* The heading above already said which face. This row
                                                      is what was DONE to it — the technique, or the bare
                                                      word when the line never recorded one. */
-                                                  ? <span>{r.method || tl("order", "Print")}</span>
-                                                  : (<><span className="capitalize">{tl("sides", r.face)}</span>
-                                                   {r.method && <span className="text-muted-foreground/70"> · {r.method}</span>}</>))
+                                                  : <span>{r.method || tl("order", "Print")}</span>)
                                               /**
                                                 * "BLANK" — and the collision that took this name
                                                 * away resolved itself.
@@ -1768,7 +1841,12 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                                 * the label is loose, and the same case the
                                                 * editor keeps its legacy column for.
                                                 */
-                                              : tl("order", "Blank")}
+                                              : r.method
+                                                /* A faceless row that names a technique is the line's
+                                                   single method charge — see goodsRows. Everything
+                                                   else with no face is the garment. */
+                                                ? <span>{r.method}</span>
+                                                : tl("order", "Blank")}
                                             {/* THE RATE IS NOT REPEATED HERE (owner, 2026-09-21: "this is
                                                 quite cluttered? 20% off each row"). It was printed on every
                                                 discounted row of every item — six times on a three-face
