@@ -1524,6 +1524,28 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                   const feesFor = (face: string) =>
                                     mine.filter((f) => (f.sides ?? []).some((sd) => sd.toLowerCase() === face.toLowerCase()))
                                   /**
+                                   * THE FEE ROWS FOR ONE FACE, in one place — they are now rendered
+                                   * from two branches (a face with one row, and a face with a
+                                   * placement and a run), and two copies would be two places for the
+                                   * pencil rule to drift.
+                                   */
+                                  const feeRowsFor = (f: string, fees: typeof mine, i: number, j: number) =>
+                                    fees.map((fe, k) => {
+                                      const sds = fe.sides ?? []
+                                      const split = sds.length > 1
+                                      /* The pencil goes on the fee's TOPMOST drawn face and nowhere
+                                         else, so one job shows one price to set. */
+                                      const first = topDrawn(fe)
+                                      return feeRow(fe, `fee-${i}-${j}-${k}`, false, "pl-6", {
+                                        amount: shareOf(fe, f),
+                                        editable: !first || first.toLowerCase() === f.toLowerCase(),
+                                        /* The JOB's own sentence, on the control that prices it —
+                                           the only place "3 designs · $6.00" is true. */
+                                        whole: split && fe.amount != null ? `${fe.label} · ${usd(fe.amount)}` : undefined,
+                                        label: split ? labelFor(fe, [f]) : undefined,
+                                      })
+                                    })
+                                  /**
                                    * ONE FEE, SPLIT ACROSS THE FACES IT NAMES (owner, 2026-09-21).
                                    *
                                    * A design fee is per DESIGN, so three pictures on three faces is a
@@ -1720,7 +1742,7 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                    * costs nothing, and "Back Free / DTG Free" is one fact written
                                    * twice — the surface row already said it.
                                    */
-                                  const goodsRows: { key: string; face: string | null; method: string; amount: number; surfaceFree?: boolean; isSurface?: boolean; isMethod?: boolean; hover?: string }[] = [
+                                  const goodsRowsAll: { key: string; face: string | null; method: string; amount: number; surfaceFree?: boolean; isSurface?: boolean; isMethod?: boolean; hover?: string }[] = [
                                     { key: 'blank', face: null, method: '', amount: blank * qty },
                                     /**
                                      * THE LINE'S METHOD CHARGE, WHEN IT CANNOT RIDE A FACE.
@@ -1765,6 +1787,25 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                       ]
                                     }),
                                   ]
+                                  /**
+                                   * A $0 PLACEMENT UNDER ITS OWN HEADING SAYS NOTHING TWICE.
+                                     *
+                                     * Every face emits a placement row, and on all but one face that
+                                     * row is 0 — the line's single placement is charged elsewhere. Read
+                                     * on its own that is worth saying ("this face adds nothing"), and
+                                     * it is kept for a face that has nothing else. But when the same
+                                     * face also has a machine run, the group already reads
+                                     *     Back            <- heading, with the face's subtotal
+                                     *     Back      Free  <- this row, naming the face a second time
+                                     *     Embroidery $5.00
+                                     * and the middle line is the face's own name repeated above a
+                                     * charge it does not carry. Dropping it removes a row and no money:
+                                     * the amount is zero, so every subtotal and the total are unchanged.
+                                     */
+                                  const goodsRows = goodsRowsAll.filter((r, _j, all) => !(
+                                    r.isSurface && r.amount <= 0.005
+                                    && all.some((x) => x.isMethod && x.face === r.face)
+                                  ))
                                   /**
                                    * ALL OF IT ON THE BLANK ROW (owner, 2026-09-21).
                                    *
@@ -1930,6 +1971,30 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                          A heading above one child is a row split into two rows. */
                                       if (!fees.length) return [row]
                                       /**
+                                       * A FACE IS A GROUP — ONCE. This ran per ROW, and a decorated
+                                       * face has TWO of them: the placement and the machine run. So
+                                       * every face with a technique printed its heading twice and its
+                                       * design fees twice, and a three-face line rendered as six
+                                       * headings, six fee lines and a "Free" row under half of them.
+                                       * Reported as "so many entries" on an order with two faces, and
+                                       * it got worse with every face added — which is exactly the
+                                       * shape of a per-row heading.
+                                       *
+                                       * The heading goes above the face's FIRST row and the fees below
+                                       * its LAST, so the face reads as one block: what it cost, what
+                                       * was done to it, then what the artwork cost.
+                                       */
+                                      /* NOT `mine` — that name is this item's FEES, two hundred lines
+                                         up, and feesFor closes over it. */
+                                      const faceRowIdx = goodsRows.reduce((acc, x, k) => {
+                                        if (x.face === f) acc.push(k)
+                                        return acc
+                                      }, [] as number[])
+                                      const isFirst = faceRowIdx[0] === j
+                                      const isLast = faceRowIdx[faceRowIdx.length - 1] === j
+                                      if (!isFirst && !isLast) return [row]
+                                      if (!isFirst) return [row, ...feeRowsFor(f, fees, i, j)]
+                                      /**
                                        * THE HEADING'S FIGURE IS WHAT THIS FACE COST — the charge
                                        * after its share of the discount, plus every fee under it.
                                        * A heading that does not add up to its children is worse
@@ -1982,21 +2047,10 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                           <dd aria-hidden className="shrink-0" />
                                         </div>,
                                         row,
-                                        ...fees.map((fe, k) => {
-                                          const sds = fe.sides ?? []
-                                          const split = sds.length > 1
-                                          /* The pencil goes on the fee's TOPMOST drawn face and nowhere
-                                             else, so one job shows one price to set. */
-                                          const first = topDrawn(fe)
-                                          return feeRow(fe, `fee-${i}-${j}-${k}`, false, "pl-6", {
-                                            amount: shareOf(fe, f),
-                                            editable: !first || first.toLowerCase() === f.toLowerCase(),
-                                            /* The JOB's own sentence, on the control that prices it —
-                                               the only place "3 designs · $6.00" is true. */
-                                            whole: split && fe.amount != null ? `${fe.label} · ${usd(fe.amount)}` : undefined,
-                                            label: split ? labelFor(fe, [f]) : undefined,
-                                          })
-                                        }),
+                                        /* Only when this row is ALSO the face's last — a face with a
+                                           placement and a run puts them under one heading and the fees
+                                           beneath both, not between them. */
+                                        ...(isLast ? feeRowsFor(f, fees, i, j) : []),
                                       ]
                                     })}
                                     {orphanFees.map((f, k) => feeRow(f, `fee-${i}-orphan-${k}`,

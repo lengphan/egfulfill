@@ -1775,7 +1775,34 @@ export function ordersRoutes(app, requireAuth) {
       if (paid > 0) { o.cost = paid; o.cost_estimated = false; continue; }
       const items = Array.isArray(o.items) ? o.items : [];
       if (!items.length) continue;
-      const { lines, unpriced } = priceLines(items, idx, fees);
+      /**
+       * THE FACES THIS LINE ACTUALLY PRINTS ON — the list priced every one as a bare FRONT.
+       *
+       * priceLines defaults `sidesOf` to `() => ['front']`, and this call passed nothing. So
+       * a line embroidered on the back was costed as though the back did not exist, and the
+       * row's estimate came out one machine run short of the summary on the same order:
+       * measured on order 2974 (front DTG, back Embroidery) the row said $25.34 and the
+       * order page said $30.34, which is the quote. A seller reading the queue and then
+       * opening the order saw two different prices for the same garment, and the cheaper one
+       * was the one they saw first.
+       *
+       * `face_methods` rides on each item from the dm lateral in the list query, so the faces
+       * are already here — no second query, and the same {side, method} pairs quoteOrder
+       * builds from order_designs. A line with no faces still prices as ONE face, which is
+       * what the default meant and must keep meaning: never none, never more.
+       */
+      const sidesOf = (it) => {
+        /* `priced_faces`, NOT `face_methods`: a face DECLARED with no file is drawn on the
+           strip and is not charged, and quoteOrder's own query says so in its where clause.
+           Using the declared set here made the row MORE expensive than the order page, which
+           is the same disagreement pointing the other way. */
+        const fm = it && it.priced_faces;
+        const names = fm && typeof fm === 'object' ? Object.keys(fm) : [];
+        return names.length
+          ? names.map((side) => ({ side, method: String(fm[side] || '').trim() }))
+          : ['front'];
+      };
+      const { lines, unpriced } = priceLines(items, idx, fees, sidesOf);
       // No priced line means no answer — NOT zero. The column prints nothing and the row
       // still says how many lines could not be priced, which is the actionable half.
       o.cost = lines.length ? computeTotals(lines, fees, 0).total : null;
@@ -2002,9 +2029,17 @@ export function ordersRoutes(app, requireAuth) {
         -- deterministically rather than letting the aggregate below depend on row order.
         select count(*)::int as faces,
                count(*) filter (where f.method = '')::int as no_method,
-               jsonb_object_agg(f.side, f.method) as methods
+               jsonb_object_agg(f.side, f.method) as methods,
+               -- THE FACES PRICING COUNTS, which is not the same set. quoteOrder reads
+               -- quoteOrder reads order_designs with "data is not null or
+               -- storage_key is not null" — a face DECLARED with no file is not a face
+               -- anyone is charged for yet, so the estimate must use this set or it
+               -- bills artwork that does not exist.
+               jsonb_object_agg(f.side, f.method) filter (where f.has_art) as priced
           from (
-            select lower(coalesce(d.side, 'front')) as side, max(coalesce(d.method, '')) as method
+            select lower(coalesce(d.side, 'front')) as side,
+                   max(coalesce(d.method, '')) as method,
+                   bool_or(d.data is not null or d.storage_key is not null) as has_art
               from order_designs d
              where d.order_id = i.order_id
                and (
@@ -2117,6 +2152,8 @@ export function ordersRoutes(app, requireAuth) {
           -- Empty string = that face declares nothing and inherits the line, which is what
           -- the picker already reads an absent face as.
           'face_methods', coalesce(dm.methods, '{}'::jsonb),
+          -- Only the faces that carry artwork — the set quoteOrder prices. See the lateral.
+          'priced_faces', coalesce(dm.priced, '{}'::jsonb),
           'design_tier', i.design_tier, 'design_quote_status', i.design_quote_status,
           'design_quote_make', i.design_quote_make, 'design_quote_download', i.design_quote_download,
           -- img / img_ref: see the note above the query.
