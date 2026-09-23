@@ -24,7 +24,7 @@ import { ACTION_CATEGORIES } from "@/components/app/activity-meta"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { BrandingPanel } from "@/components/app/branding-panel"
 import { AiPricingPanel } from "@/components/app/ai-pricing-panel"
-import { PanelPicker } from "@/components/app/panel-picker"
+import { TabBar } from "@/components/app/tab-bar"
 import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { VolumeBoard } from "@/components/app/volume-board"
@@ -1054,8 +1054,32 @@ function nodeText(node: React.ReactNode): string {
 const matches = (node: React.ReactNode, q: string) =>
   !q || nodeText(node).toLowerCase().includes(q)
 
+/**
+ * THE FOUR QUESTIONS THE SECTIONS ANSWER, in the order of the bar.
+ *
+ * Eleven sections was eleven names for four questions, and a picker was the only way to
+ * see them because eleven tabs wrap onto two rows — and a wrapped tab bar reads as a
+ * paragraph of links rather than a set. Grouped, they fit one row and the bar can go back
+ * to being what §4 says a bar is: a rule under the live word.
+ *
+ * PRICING is everything that changes an invoice. SHIPPING is everything that gets a parcel
+ * out — what postage costs, the two addresses printed on the label, and the card that buys
+ * it. PRODUCTION is what the floor can make and how much of it. ANNOUNCEMENT is the one
+ * outward-facing thing here, and it has nothing to sit with.
+ */
+const SETTING_GROUPS = ["Pricing", "Shipping", "Production", "Announcement"] as const
+type SettingGroup = (typeof SETTING_GROUPS)[number]
+
 type FoldProps = {
  title: string
+  /** Which tab it lives under. */
+ group: SettingGroup
+  /**
+   * Position within its tab, low first. An explicit number rather than JSX order, because
+   * these sections are written where their form state is and moving a 200-line block to
+   * reorder a heading is a diff nobody can read.
+   */
+ rank?: number
  hint?: string
   /**
    * The section's own state — "not set", "16 cones", "off". Shown beside the heading of
@@ -1081,26 +1105,40 @@ function Fold(props: FoldProps): React.ReactNode {
 }
 
 /**
- * One select, one panel — the same shape as Settings › Integrations.
+ * ONE BAR, ONE TAB'S WORTH OF SECTIONS.
  *
- * Nine collapsed folds meant nine clicks to find out whether the ship-from address was
- * filled in, which is the one setting on this page that blocks buying a label outright.
- * The state now rides in the option label.
+ * This was a native <select> of all eleven section names, which means the open list was
+ * drawn by the OPERATING SYSTEM — its typeface, its blue highlight, no room for a section's
+ * own state — and eleven names is more than a person reads out of a menu anyway.
  *
- * Search still works and still drives this: it narrows the OPTION LIST, and the panel
- * follows the first surviving match. That's derived from the query rather than pushed
- * into state by an effect, so there's no frame where the panel and the query disagree.
+ * The sections are grouped into the four questions they actually answer (SETTING_GROUPS),
+ * so the bar fits one row without wrapping and every section in the open tab is on screen
+ * at once rather than behind a click. A tab's sections stack under it, each keeping its own
+ * heading and status — nothing was renamed except the old "Shipping" section, which became
+ * "Postage": inside a Shipping tab you cannot have a section called Shipping, and Postage
+ * is the truer name for three price bands.
+ *
+ * ATTENTION RIDES ON THE TAB. The picker listed "needs attention" chips underneath; the bar
+ * carries the count on the tab itself, in the alert tint, so a ship-from address with no ZIP
+ * is visible from whichever tab you are on. That is the one thing the merge must not lose.
+ *
+ * Search still drives this: it narrows the SECTIONS, tabs with nothing left disappear, and
+ * the open tab follows the first surviving one. Derived from the query rather than pushed
+ * into state by an effect, so there is no frame where the bar and the query disagree.
  */
 function FoldGroup({ children }: { children: React.ReactNode }) {
   const tl = useLabelT()
  const q = useContext(SettingsSearch)
- const [picked, setPicked] = useState("")
+ const [picked, setPicked] = useState<SettingGroup | "">("")
 
  const folds = Children.toArray(children).filter(
     (c): c is React.ReactElement<FoldProps> => isValidElement(c)
   )
  const visible = folds.filter((f) => matches([f.props.title, f.props.children], q))
- const active = visible.find((f) => f.props.title === picked) ?? visible[0]
+  // A tab exists only while it still holds a section — under a search that leaves one
+  // match, one tab is the honest bar.
+ const present = SETTING_GROUPS.filter((g) => visible.some((f) => f.props.group === g))
+ const active = present.includes(picked as SettingGroup) ? (picked as SettingGroup) : present[0]
 
  if (!visible.length) {
  return (
@@ -1110,39 +1148,48 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
     )
   }
 
+ const items = present.map((g) => {
+    // ZERO IS NOT RENDERED (TabBar's own rule), so a tab with nothing wrong carries no
+    // figure — which is what makes the one that does carry one worth looking at.
+ const needs = visible.filter((f) => f.props.group === g && f.props.attention).length
+ return { id: g, label: tl("settings", g), count: needs || undefined, alert: needs > 0 }
+  })
+ const shown = visible
+    .filter((f) => f.props.group === active)
+    .sort((a, b) => (a.props.rank ?? 99) - (b.props.rank ?? 99))
+
  return (
     <>
-      <div className="border-t border-border px-5 py-3">
-        <PanelPicker
- value={active?.props.title ?? ""}
+      <div className="border-t border-border px-5">
+        <TabBar
+ items={items}
+ value={active}
  onChange={setPicked}
- label={tl("settings", "Choose a settings section")}
- options={visible.map((f) => ({
- value: f.props.title,
- label: f.props.title,
- status: f.props.status,
- attention: f.props.attention,
-          }))}
+ size="sm"
+ spacing="none"
+ ariaLabel={tl("settings", "Settings sections")}
         />
-        {!!q && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {visible.length} of {folds.length} sections match “{q}”.
-          </p>
-        )}
       </div>
-      {/* Keyed on the section so switching remounts rather than showing the previous
- section's scroll/edit state for a frame. */}
-      {active && (
-        <div key={active.props.title} className="border-t border-border px-5 py-5">
-          <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="font-semibold">{active.props.title}</span>
-            {active.props.status && (
-              <span className="rounded-md bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">{active.props.status}</span>
-            )}
-          </div>
-          {active.props.children}
-        </div>
+      {!!q && (
+        <p className="border-t border-border px-5 pt-3 text-xs text-muted-foreground">
+          {visible.length} of {folds.length} sections match “{q}”.
+        </p>
       )}
+      {/* Keyed on the tab so switching remounts rather than showing the previous tab's
+ scroll/edit state for a frame (§5 — reset by remounting, never by an effect). */}
+      <div key={active}>
+        {shown.map((f) => (
+          <section key={f.props.title} className="border-t border-border px-5 py-5">
+            <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="font-semibold">{f.props.title}</span>
+              {f.props.status && (
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">{f.props.status}</span>
+              )}
+            </div>
+            {f.props.children}
+          </section>
+        ))}
+      </div>
     </>
   )
 }
@@ -1500,18 +1547,12 @@ function PlatformPanel() {
         />
       </div>
       <FoldGroup>
-      <Fold title={tl("settings", "Dashboard announcement")}>
-        <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "Runs in the strip at the top of every dashboard, after each person's own figures.")}
-        </p>
+      <Fold title={tl("settings", "Dashboard announcement")} group="Announcement" rank={1}>
         <AnnouncementBody />
       </Fold>
       {!isOperator && (
-      <Fold title={tl("settings", "Warehouse ship-from address")} status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
+      <Fold title={tl("settings", "Ship-from address")} group="Shipping" rank={2} status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
 
-        <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "Where parcels are tendered from. Set once for the whole team. If returns come back somewhere else, set that separately below.")}
-        </p>
         {!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip) && (
           <div className="mb-3 flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
             <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
@@ -1542,12 +1583,13 @@ function PlatformPanel() {
           />
           <span className="text-xs">
             <span className="font-medium">{tl("settings", "Ship under each seller’s shop name")}</span>
+            {/* ONE LINE. This ran to four, and the three it lost were restating the switch:
+                that a buyer sees the shop, that two shops do not advertise a shared factory,
+                and what the label says when it is off — which is the name in the field
+                directly above. What survives is the only thing the switch does NOT say and
+                somebody might fear: that turning it on does not send returns elsewhere. */}
             <span className="block text-muted-foreground">
-              The sender name becomes the seller&rsquo;s own shop, at the address above — so a buyer
- sees the shop they bought from, and two parcels from two shops don&rsquo;t advertise a
- shared factory. Only the name changes; carriers route on the address, so returns
- still come here. Turn this off and every label reverts to
-              &ldquo;{shipFrom.name || tl("settings", "the name above")}&rdquo;.
+              {tl("settings", "Carriers route on the address, so returns still come here.")}
             </span>
           </span>
         </label>
@@ -1560,9 +1602,9 @@ function PlatformPanel() {
           (Shippo) / return_address (EasyPost). Left blank, the carrier falls back to the
  sender, which is what happened before this field existed. */}
       {!isOperator && (
-      <Fold title={tl("settings", "Return address")} status={returnAddr.street ? "set" : "using ship-from"}>
+      <Fold title={tl("settings", "Return address")} group="Shipping" rank={3} status={returnAddr.street ? "set" : "using ship-from"}>
         <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "Only needed if returns come back to a")} <b>{tl("settings", "different address")}</b> {tl("settings", "than the one you ship from. Leave it blank and returns follow the ship-from address above. The name here is yours — it is never replaced by the seller’s shop name.")}
+          {tl("settings", "This name is never replaced by the seller’s shop name.")}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <TextField label={tl("settings", "Name / company")} value={returnAddr.name ?? ""} onChange={(v) => setReturnField("name", v)} />
@@ -1587,7 +1629,7 @@ function PlatformPanel() {
       </Fold>
       )}
       {!isOperator && (
-      <Fold title={tl("settings", "Fees")}>
+      <Fold title={tl("settings", "Fees")} group="Pricing" rank={1}>
         {/* MONEY OUT first, then money in, and the direction is written into every hint.
             These sat together unlabelled when the payout was called "design fee", which is
  how a rate paid TO a designer read as a charge made to a seller. */}
@@ -1721,10 +1763,10 @@ function PlatformPanel() {
  category and every product in it inherits a blank for the Design Maker, instead
  of an upload per product. A product's own mockup still wins. */}
       {!isOperator && (
-      <Fold title={tl("settings", "Partner rates")} status={Number(expediteCost) > 0 || Number(designPartnerCost) > 0 ? "set" : "unset — nothing booked"}>
+      <Fold title={tl("settings", "Partner rates")} group="Pricing" rank={3} status={Number(expediteCost) > 0 || Number(designPartnerCost) > 0 ? "set" : "unset — nothing booked"}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "Neither partner can be billed through an API — byeastside and Pink Design both settle by invoice — so what they cost us is a fixed figure set here and booked against every job as it happens.")} <strong>{tl("settings", "A rate of 0 records nothing")}</strong>{tl("settings", ", so their statement on the Billing page will be empty until these are set.")}
+          <strong>{tl("settings", "A rate of 0 books nothing")}</strong>{tl("settings", " — the Billing statement stays empty until these are set.")}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <MoneyField
@@ -1746,7 +1788,7 @@ function PlatformPanel() {
         <div className="mt-4">
           <label className="mb-1 block text-sm font-medium">{tl("settings", "Default product type for Pink Design")}</label>
           <p className="mb-1.5 text-xs text-muted-foreground">
-            {tl("settings", "Applied to every design sent to Pink, so the card’s send form won’t ask for it. Choose")} <strong>{tl("settings", "No default")}</strong> {tl("settings", "to pick per card instead.")}
+            {tl("settings", "Applied to every design sent to Pink, so the card’s form won’t ask.")}
           </p>
           <select value={pinkProductType} onChange={(e) => setPinkProductType(e.target.value)}
  className="h-9 w-full max-w-sm min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
@@ -1765,7 +1807,7 @@ function PlatformPanel() {
       )}
 
       {!isOperator && (
-      <Fold title={tl("settings", "Peak-season capacity")} status={capacityMode ? "on" : "off"}>
+      <Fold title={tl("settings", "Peak-season capacity")} group="Production" rank={3} status={capacityMode ? "on" : "off"}>
         {/* Master switch — off = no header counters, no notice, limits ignored. */}
         <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <input type="checkbox" checked={capacityMode} onChange={(e) => setCapacityMode(e.target.checked)} className="size-4 accent-primary" />
@@ -1773,7 +1815,7 @@ function PlatformPanel() {
           <span className="text-xs text-muted-foreground">{tl("settings", "— turns on the order counters in the header (sellers see their own, staff see the factory total) and the delay notice.")}</span>
         </label>
         <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "When a seller crosses their daily order limit they see the notice below at submit — a heads-up, never a block. Set a limit on an individual seller from the Accounts list; this is the")} <strong>default</strong> {tl("settings", "for any seller without their own.")}
+          {tl("settings", "A heads-up at submit, never a block. One seller’s own limit is set on the Accounts list.")}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block space-y-1">
@@ -1815,10 +1857,10 @@ function PlatformPanel() {
  which meant setting a hex here, navigating back, and looking. They are not platform
  policy like a postage band. (components/app/lookbook-branding-dialog.tsx) */}
 
-      <Fold title={tl("settings", "Embroidery threads")} status={`${threads.length} cones`}>
+      <Fold title={tl("settings", "Embroidery threads")} group="Production" rank={2} status={`${threads.length} cones`}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "Thread matching picks the nearest cone")} <em>{tl("settings", "you stock")}</em>{tl("settings", ". The built-in starter list is 16 colours, which is why a light blue can come back as Grey — add your real chart here and matches get proportionally better. Leave it empty to keep the starter list.")}
+          {tl("settings", "Matching only picks cones")} <em>{tl("settings", "you stock")}</em>{tl("settings", ". Empty keeps the 16-colour starter list.")}
         </p>
 
         <div className="mb-3 overflow-hidden rounded-lg border border-border">
@@ -1914,11 +1956,11 @@ function PlatformPanel() {
         </div>
       </Fold>
 
-      <Fold title={tl("settings", "Placements")} status={`${types.length} types`}>
+      <Fold title={tl("settings", "Placements")} group="Production" rank={1} status={`${types.length} types`}>
         <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "Placements and outlines are set once per category and inherited by every product in it — define four placements on Headwear and fifty hats get them without fifty uploads. The outlines are positioning aids for the Design Maker only; they never appear as a product’s catalog image.")}
+          {tl("settings", "Set once per category and inherited by every product in it. The outlines guide the Design Maker only — they are never a catalog image.")}
         </p>
         <div className="space-y-2">
           {types.map((t, i) => {
@@ -2073,7 +2115,7 @@ function PlatformPanel() {
  which card is active and when it expires — the card itself is changed in Shippo's
  own dashboard, which is where card details belong. */}
       {!isOperator && (
-      <Fold title={tl("settings", "Postage card")}>
+      <Fold title={tl("settings", "Postage card")} group="Shipping" rank={4}>
         <ShippoBillingPanel />
       </Fold>
       )}
@@ -2085,11 +2127,11 @@ function PlatformPanel() {
  the bands as though it took precedence. It took nothing: pricing.js reaches the
  bands first and one of them always matches, so that field was edited and saved and
  changed no invoice. It is gone, and what remains is the two figures that bill. */}
-      <Fold title={tl("settings", "Shipping")}>
+      <Fold title={tl("settings", "Postage")} group="Shipping" rank={1}>
         <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          {tl("settings", "The first item is charged at its garment’s rate below; every other unit in the same parcel adds the extra-item fee. A product with its own shipping fee — set on the product card — overrides the rate for that product, and a per-size fee overrides both. When an order mixes garments, the DEAREST rate applies: a parcel with a hoodie in it costs hoodie postage whatever else is in the box.")}
+          {tl("settings", "A mixed parcel is charged the DEAREST rate in it. A product’s own shipping fee overrides its band; a per-size fee overrides both.")}
         </p>
         <div className="grid gap-4 sm:grid-cols-3">
           <MoneyField label={tl("settings", "Caps & hats")} value={bands.ship_cap ?? ""} onChange={(v) => setBand("ship_cap", v)} />
@@ -2109,14 +2151,14 @@ function PlatformPanel() {
  than for the one kind of surcharge that was in it first — the per-side charge
  belongs here too, and "Print method surcharge" would have read as the wrong home
  for it. */}
-      <Fold title={tl("settings", "Surcharge")}>
+      <Fold title={tl("settings", "Surcharge")} group="Pricing" rank={2}>
         {/* THE ONE CARD AN OPERATOR CAN BE GRANTED. Everything else on this page stays
             admin-or-warehouse whatever the switch says, and the SERVER is what enforces that
             — a granted operator's PUT is narrowed to these four keys in factory_settings.js.
             This only decides whether the fields are drawn live or as a disabled fieldset. */}
         <ReadOnlyFor on={isOperator && !isGrantOn(GRANT_OPERATOR_EDIT_SURCHARGES)}>
 
-        <p className="mb-3 text-xs text-muted-foreground">{tl("settings", "Added to the base cost per unit. A product can override this for its own methods.")}</p>
+        <p className="mb-3 text-xs text-muted-foreground">{tl("settings", "A product can override these for its own methods.")}</p>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <MoneyField label={tl("settings", "DTG")} value={bands.method_dtg ?? ""} onChange={(v) => setBand("method_dtg", v)} />
           <MoneyField label={tl("settings", "DTF")} value={bands.method_dtf ?? ""} onChange={(v) => setBand("method_dtf", v)} />
@@ -2144,7 +2186,7 @@ function PlatformPanel() {
             />
           </div>
           <p className="mb-2 mt-4 text-xs text-muted-foreground">
-            {tl("settings", "Every placement is charged. Set a placement to charge it its own rate instead of the figure above; leave it blank to use that figure.")}
+            {tl("settings", "Blank uses the figure above.")}
           </p>
           <div className="mb-2 eg-label text-muted-foreground">{tl("settings", "By face")}</div>
           <div className="grid gap-4 sm:grid-cols-4 lg:grid-cols-8">
