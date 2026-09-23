@@ -19,7 +19,13 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // WAREHOUSE IS NOT HERE. The floor's work starts at the print queue — same line the Board
   // above is drawn on — and this page names which sellers ordered a design, which is the
   // narrowest §6 surface in the app.
-  { label: "Artwork", href: "/artwork", icon: PenNib, roles: ["operator", "designer", "admin"] },
+  //
+  // IT IS A DESIGN LAB TAB NOW (/design?tab=files), not its own board — the same question
+  // the Machine files tab asks from the other end. The sidebar entry stays, with its roles
+  // unchanged, because a designer is NOT in Design Lab's own STAFF_TOOLS entry below and
+  // would otherwise lose the only link they had to it. The tab itself carries the same
+  // three roles, so warehouse still never sees it.
+  { label: "Artwork", href: "/design?tab=files", icon: PenNib, roles: ["operator", "designer", "admin"] },
   // Shipping = Dispatch (today's out-queue) + Shipments (parcel archive) as two tabs.
   // They stay distinct tabs, NOT one merged list: Dispatch is a short queue emptied by
   // evening, Shipments is an ever-growing archive — merging the lists would bury the queue.

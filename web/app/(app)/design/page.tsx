@@ -7,7 +7,8 @@ import { SectionCard } from "@/components/app/section-card"
 import { EmptyState } from "@/components/app/empty-state"
 import { TemplatesPanel } from "@/components/app/templates-panel"
 import { MachineFilesPanel } from "@/components/app/machine-files-panel"
-import { DesignLabTabs, useDesignLabTab } from "@/components/app/design-lab-tabs"
+import { DesignLabTabs, useDesignLabTab, canSeeDesignLabTab } from "@/components/app/design-lab-tabs"
+import { ArtworkLibraryPanel } from "@/components/app/artwork-library-panel"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 // DesignStudioDialog is no longer mounted here — "Place on a mockup" was its only
@@ -19,7 +20,7 @@ import { proxiedImageSrc } from "@/lib/order-image"
 import { useTrimmedSrc } from "@/lib/image-trim"
 import { Thumb } from "@/components/app/thumb"
 import { useLightbox } from "@/components/app/image-lightbox"
-import { getToken } from "@/lib/auth"
+import { getToken, getUser } from "@/lib/auth"
 
 /**
  * A LIBRARY THUMBNAIL, and what it does when the picture is not there.
@@ -90,6 +91,14 @@ function DesignLab() {
  const tab = useDesignLabTab()
  const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
  const [signedOut, setSignedOut] = useState(false)
+  /* Read after mount, like `signedOut` — getUser() touches storage the prerender has not
+     got. Null until then, which the Files gate reads as "not allowed", so the panel can
+     never flash for a role that may not see it. */
+ const [role, setRole] = useState<string | null>(null)
+ useEffect(() => {
+ const id = setTimeout(() => setRole(getUser()?.role ?? null), 0)
+ return () => clearTimeout(id)
+  }, [])
   /* The header's own picker. The zone still takes a drop; this is the click route, which is
      what "Import artwork" has to actually do to be telling the truth. */
  const pickRef = useRef<HTMLInputElement | null>(null)
@@ -322,6 +331,21 @@ function DesignLab() {
         </SectionCard>
       ) : tab === "machine" ? (
         <MachineFilesPanel />
+      ) : tab === "files" ? (
+        /* THE SAME QUESTION THE BAR ASKED. The toggle is hidden from a warehouse hand and
+           from a seller, but ?tab=files is a URL anyone can type — so the panel asks too,
+           and says WHICH it is rather than rendering an empty library (§4: a thing that
+           cannot be read and a thing that does not exist must never draw the same). The
+           real boundary is still the server's: /api/factory/designs refuses a seller. */
+        canSeeDesignLabTab("files", role) ? (
+          <ArtworkLibraryPanel />
+        ) : (
+          <EmptyState
+            icon={PenNib}
+            title={tl("design", "Files is for the factory's design staff")}
+            note={tl("design", "It names which shops ordered a design, so it is not shown here.")}
+          />
+        )
       ) : (
         <TemplatesPanel />
       )}

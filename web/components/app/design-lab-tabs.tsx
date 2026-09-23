@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
-import { getToken } from "@/lib/auth"
+import { getToken, getUser } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
 /**
@@ -47,10 +47,25 @@ const TABS = [
   // a machine file is the cut file, which has no placement to carry and no blank it belongs
   // to — the same .EMB runs on a cap and on a left chest. Two questions, two surfaces.
   { key: "machine", label: "Machine files", href: "/design?tab=machine" },
+  /**
+   * FILES — the factory's artwork library, which was its own board at /artwork.
+   *
+   * It is the SAME QUESTION Machine files asks, from the other end: that tab holds the
+   * stitch files we have, this one holds every picture an order asked for and says which
+   * of them we hold a file FOR. Two shelves in two places is how "have we digitised this
+   * before" gets answered by guessing.
+   *
+   * STAFF, AND NOT ALL STAFF. Every card names the shops that ordered a design, which is
+   * the narrowest §6 surface in the app — so this keeps exactly the roles its own nav item
+   * carried (operator · designer · admin) and warehouse does not see it, even though the
+   * rest of Design Lab is open to them. The server refuses a seller outright; this gate is
+   * the second lock, not the first.
+   */
+  { key: "files", label: "Files", href: "/design?tab=files", roles: ["operator", "designer", "admin"] },
   // "Design", not "Design maker". It sits beside two one-word toggles, and the bar reads as
   // a set of three — a two-word member of a three-word set is the one the eye stops on.
   { key: "maker", label: "Design", href: "/design/maker" },
-] as const
+] as const satisfies readonly { key: string; label: string; href: string; roles?: readonly string[] }[]
 
 export type DesignLabTab = (typeof TABS)[number]["key"]
 
@@ -62,7 +77,18 @@ export function useDesignLabTab(): DesignLabTab {
   const tab = search.get("tab")
   // An explicit list rather than a chain of ternaries: a fourth surface arriving is where a
   // chain quietly starts answering "library" for a tab that exists.
-  return tab === "templates" || tab === "machine" ? tab : "library"
+  return tab === "templates" || tab === "machine" || tab === "files" ? tab : "library"
+}
+
+/**
+ * MAY THIS ROLE SEE THIS TOGGLE? Exported so the PAGE asks the same question the BAR does —
+ * a tab hidden from the bar but still rendered by the panel underneath is a gate that only
+ * looks like one, and ?tab=files is a URL anyone can type.
+ */
+export function canSeeDesignLabTab(key: DesignLabTab, role?: string | null): boolean {
+  const t = TABS.find((x) => x.key === key)
+  const roles = (t as { roles?: readonly string[] } | undefined)?.roles
+  return !roles || (!!role && roles.includes(role))
 }
 
 export function DesignLabTabs({ className }: { className?: string }) {
@@ -71,14 +97,18 @@ export function DesignLabTabs({ className }: { className?: string }) {
   // Read after mount — getToken() touches localStorage, which the prerender doesn't have.
   // Deferred rather than set inline, matching how every other page here reads the session.
   const [signedOut, setSignedOut] = useState(false)
+  const [role, setRole] = useState<string | null>(null)
   useEffect(() => {
-    const id = setTimeout(() => setSignedOut(!getToken()), 0)
+    const id = setTimeout(() => {
+      setSignedOut(!getToken())
+      setRole(getUser()?.role ?? null)
+    }, 0)
     return () => clearTimeout(id)
   }, [])
 
   return (
     <nav aria-label={tl("designLab", "Design Lab sections")} className={cn(tabsListVariants(), "h-8", className)}>
-      {TABS.map(({ key, label, href }) => {
+      {TABS.filter(({ key }) => canSeeDesignLabTab(key, role)).map(({ key, label, href }) => {
         const on = key === active
         // The maker is the only surface that needs a session — it loads the catalog and
         // saves. Signed out it renders an empty stage with a Save that 401s, so it's

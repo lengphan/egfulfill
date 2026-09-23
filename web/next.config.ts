@@ -47,6 +47,10 @@ const nextConfig: NextConfig = {
       // weren't. Redirected rather than moved outright: the old URL is in bookmarks and in
       // notification links already sent.
       { source: "/operator", destination: "/production", permanent: false },
+      // The artwork library became Design Lab's Files tab — it and Machine files are two
+      // halves of "have we digitised this before", and they were on two different shelves.
+      // The old board is in bookmarks and in the staff sidebar's history.
+      { source: "/artwork", destination: "/design?tab=files", permanent: false },
     ]
   },
 }
