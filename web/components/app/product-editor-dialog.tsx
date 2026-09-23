@@ -611,16 +611,29 @@ export function ProductEditorDialog({
    * DOES ANY SIZE STILL NEED BASE COST?
    *
    * Only sizes actually on the product count — an unadded size has no tier and no opinion. A
-   * product where every size carries a Blank price never reads base cost again, so the column
-   * comes off the table rather than sitting there labelled "legacy": a field that cannot
-   * affect the price is not clarified by a caption, it is a box somebody has to decide to
-   * ignore on every visit.
+   * field that cannot affect the price is not clarified by a caption; it is a box somebody
+   * has to decide to ignore on every visit, so it comes off the table entirely.
    *
-   * It survives while ANY size still lacks a Blank price, because there it is the only
-   * statement of what the garment costs and dropping it would leave that size unpriceable.
+   * IT WAS SHOWN WHENEVER BLANK WAS EMPTY, and that is wrong on the one flow where it hurts
+   * most (owner, 2026-09-23: "remove this base cost column when I add products from the
+   * supplier page"). A supplier import arrives with Product cost on every size and Blank on
+   * none — so the column appeared, empty, on exactly the products that have never needed it.
+   *
+   * THE OLD REASON DOES NOT HOLD. It said dropping it would leave such a size unpriceable.
+   * costPartsOf's ladder says otherwise: blank, then base cost, then PRODUCT COST + markup,
+   * then the product-level figures. A supplier row sits on the third rung and prices fine.
+   *
+   * So it is shown where it is actually load-bearing, which is two cases and not one:
+   *
+   *   a size already HOLDS a base cost — legacy data, which you must be able to see and
+   *   clear, because it silently outranks Product cost on the ladder;
+   *
+   *   a size has neither Blank nor Product cost — there really is nothing else to price it
+   *   with, and hiding the field would make it unpriceable for real.
    */
  const showBaseCost = useMemo(
-    () => sizes.length === 0 || sizes.some((s) => !(Number(tiers[s]?.blank) > 0)),
+    () => sizes.some((s) => Number(tiers[s]?.price) > 0)
+       || sizes.some((s) => !(Number(tiers[s]?.blank) > 0) && !(Number(tiers[s]?.cost) > 0)),
     [sizes, tiers])
   // Bulk-fill the whole size table in one go. Base can be a flat $ or a % markup over each
   // size's own product cost (so a pricier 3XL still lands a proportional base); shipping is
@@ -1085,14 +1098,31 @@ export function ProductEditorDialog({
    * size — or the bar would promise a refusal that never comes, or stay silent before one
    * that does.
    */
+  /**
+   * A SIZE IS PRICED IF ANY RUNG OF THE LADDER ANSWERS FOR IT.
+   *
+   * This counted sizes with no BASE COST, which was the whole story when base cost was the
+   * price of a garment. It is one rung of five now — blank, base cost, product cost + markup,
+   * then the product-level pair — and reading only the second meant a product priced entirely
+   * on Blank showed a red alert on the Sizes tab for every size it had, beside a table where
+   * every row was filled in.
+   *
+   * Mirrors save()'s own test, and must: a bar that promises a refusal which never comes is
+   * as bad as one that stays silent before one that does.
+   */
  const unpricedCount = useMemo(() => {
-    // firstTierNum's fallback, inlined: it is declared below this line, so calling it here
-    // is a temporal-dead-zone crash on first render rather than a style question.
- const tv = (sizes.length ? tiers[sizes[0]]?.price : "")?.trim()
- const savedBase = Number(tv || basePrice.trim()) || 0
- if (savedBase > 0) return 0
- return sizes.filter((sz) => !(num(tiers[sz]?.price) > 0)).length
-  }, [sizes, tiers, basePrice])
+    /* Inlined rather than calling firstTierNum — that is declared below this line, so a call
+       here is a temporal-dead-zone crash on first render, not a style question (§7). */
+ const first = sizes.length ? tiers[sizes[0]] : undefined
+ const productLevel = Number(first?.price?.trim() || basePrice.trim()) > 0
+      || Number(first?.blank?.trim() || "") > 0
+      || Number(productCost) > 0
+ if (productLevel) return 0
+ return sizes.filter((sz) => {
+ const t = tiers[sz]
+ return !(num(t?.blank) > 0) && !(num(t?.price) > 0) && !(num(t?.cost) > 0)
+    }).length
+  }, [sizes, tiers, basePrice, productCost])
 
  const TABS: readonly TabBarItem<EditorTab>[] = useMemo(() => [
     { id: "details", label: tl("product", "Details") },
@@ -1209,9 +1239,13 @@ export function ProductEditorDialog({
      * margin order arrived at by hand rather than by an empty field — the refusal names the
      * size and both numbers rather than saying "invalid".
      */
- const savedBase = Number(firstTierNum("price", basePrice) ?? 0) || 0
+    /* THE LADDER, NOT ONE RUNG. `price` is the legacy base cost; a product priced on Blank,
+       or one carrying only a product cost the markup runs on, is priced — and refusing to
+       save it would be a refusal the invoice does not agree with. */
+ const savedBase = Number(firstTierNum("blank", "") ?? 0) || Number(firstTierNum("price", basePrice) ?? 0)
+      || (Number(productCost) > 0 ? Number(productCost) + markup : 0) || 0
  if (sizes.length === 0) {
- if (!(savedBase > 0)) { fail("pricing", "Set a base cost before saving — it is what the seller is charged. Without one the order prices itself at what we pay the supplier plus the markup setting, which can be no margin at all."); return }
+ if (!(savedBase > 0)) { fail("pricing", "Set a price before saving — it is what the seller is charged. Without one the order prices itself at what we pay the supplier plus the markup setting, which can be no margin at all."); return }
     } else {
       /**
        * A BLANK PRICE IS A PRICE, and this did not know it.
@@ -2066,21 +2100,39 @@ export function ProductEditorDialog({
  className="h-8 text-xs" inputMode="numeric" aria-label={`Stock for size ${s}`}
                         />
                       )}
-                      {/* Margin for THIS size = its Base cost − its Product cost (what we
- charge the seller minus what the blank costs us). Base is this
- row's if typed, else the derived product-cost + markup, else the
- product-level base; product cost is this row's, else the product
- level. A 3XL that costs more to buy shows a thinner margin here. */}
+                      {/**
+                        * MARGIN = WHAT THE SELLER IS CHARGED − WHAT THE BLANK COSTS US, and
+                        * the first half has to walk the ladder the CHARGE walks.
+                        *
+                        * It read Base cost and never Blank. Since 2026-09-18 `blank` is the
+                        * base of every order and Base cost is the legacy rung below it — so
+                        * on a supplier import priced with the Bulk bar (Blank 19.61, product
+                        * cost 14.61, Base cost never typed) this reported −$14.61 in red for
+                        * a size earning $5.00. Three rows above, a note already said this
+                        * column "will look healthy while it is wrong"; it was the other way
+                        * round here, and a red figure on a healthy price is the same defect
+                        * pointed the other way.
+                        *
+                        * SAME ORDER AS costPartsOf: blank, then base cost, then product cost
+                        * + markup, then the product-level base, then the product-level cost
+                        * + markup. Anything else and this column disagrees with the invoice.
+                        */}
                       {(() => {
- const baseN = t?.price?.trim() ? Number(t.price)
+ const priceN = Number(t?.price)
+ const baseN = isFinite(blankN) && blankN > 0 ? blankN
+ : t?.price?.trim() && isFinite(priceN) && priceN > 0 ? priceN
  : derived ? Number(derived)
- : Number(basePrice)
- const costRow = t?.cost?.trim() ? Number(t.cost) : Number(productCost)
+ : Number(basePrice) > 0 ? Number(basePrice)
+ : Number(productCost) > 0 ? Number(productCost) + markup
+ : NaN
+                        /* `rowCost` already is "this row's, else the product's" — the same
+                           fallback the placeholder and the save refusal use. */
+ const costRow = rowCost
  const m = baseN - costRow
  return (
                           <span
  className={"text-right text-xs font-semibold tabular-nums " + (!isFinite(m) ? "text-muted-foreground" : m >= 0 ? "text-success" : "text-destructive")}
- title={isFinite(m) ? `Base ${baseN.toFixed(2)} − product cost ${costRow.toFixed(2)}` : tl("product", "Enter a product cost and a base cost")}
+ title={isFinite(m) ? `${baseN.toFixed(2)} charged − ${costRow.toFixed(2)} product cost` : tl("product", "Enter a product cost and a price")}
                           >
                             {isFinite(m) ? `$${m.toFixed(2)}` : "—"}
                           </span>
