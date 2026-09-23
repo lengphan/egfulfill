@@ -823,22 +823,47 @@ Screenshots go in `screenshots/` (gitignored, and `@hidden` in Caddy).
 
 State these plainly rather than implying otherwise:
 
-- **Supplier ordering — NOTHING PLACES A REAL ORDER TODAY.** Re-checked 2026-09-14 against
-  the code and the live `.env`; the three are at different stages and it matters which:
+- **Supplier ordering — S&S REACHES S&S; Otto and SanMar do not leave the building.**
+  Re-checked 2026-09-23 against the code, the live `.env` AND `app_secrets` on the VPS. The
+  three are at different stages and it matters which:
 
   | | server route | UI wired | `*_ORDER_LIVE` on the VPS | creds |
   |---|---|---|---|---|
-  | **S&S** | full payload — PO number, ship-to, shipping method, saved payment profile, per-line warehouse | **yes**, 2 call sites in `purchase-view.tsx`, sending all of it | not set → dry run | set |
-  | **Otto** | exists, gated | **no** — `NO_AUTO_ORDER` holds it back on purpose and `ottoOrder()` has 0 callers | not set → dry run | missing |
-  | **SanMar** | exists, gated | **no** — `sanmarOrder()` exists in `lib/api.ts` with 0 callers | not set → dry run | missing |
+  | **S&S** | full payload — PO number, ship-to, shipping method, saved payment profile, per-line warehouse | **yes**, 2 call sites in `purchase-view.tsx`, sending all of it | **`SS_ORDER_LIVE=1` — SENT to S&S** | `.env` |
+  | **Otto** | exists, gated | **no** — `NO_AUTO_ORDER` holds it back on purpose and `ottoOrder()` has 0 callers | not set → dry run | `app_secrets` |
+  | **SanMar** | exists, gated | **no** — `sanmarOrder()` exists in `lib/api.ts` with 0 callers | not set → dry run | `app_secrets` |
 
-  So S&S is the only one that would send anything if its gate were flipped — and its payload
-  has still never been validated against a live account, which is the reason the gate exists.
-  Otto is refused by the UI *and* missing credentials; SanMar has no UI path at all.
+  **THE PREVIOUS VERSION OF THIS BLOCK WAS WRONG IN BOTH DIRECTIONS, AND SAID SO CONFIDENTLY**
+  — it was headed "NOTHING PLACES A REAL ORDER TODAY", listed S&S's gate as "not set → dry
+  run", and called Otto's and SanMar's credentials "missing". All three had moved. That is
+  the expensive kind of stale: a reader believes nothing can reach a supplier and stops
+  checking. Corrected 2026-09-23 after a seller-visible 502 sent someone to read it.
 
-  The old wording here said "the UI sends only `{sku, qty}` (no address, PO number, shipping
+  **S&S is live, and the safety is now a SECOND flag, not the gate.** `SS_ORDER_LIVE=1`, so
+  the route genuinely posts to S&S. What keeps it harmless is the payload's
+  `testOrder: !wantLive`, and `ssOrder(lines, extra, live = false)` in `lib/api.ts` defaults
+  that third argument to `false` — both call sites pass two arguments, so every order the UI
+  places today goes to S&S as a **Test order**: accepted, echoed back, nothing picked, nothing
+  billed. **Passing `live: true` from any new call site is what makes it real money**, and the
+  payload has still never been validated against a live account. Read that as: the dry-run
+  gate you would look for is already open, and the thing standing between the Place button and
+  a real purchase order is one default argument.
+
+  Otto and SanMar are refused by the UI *and* dry-run at the server, so they are two gates
+  from sending anything — but their credentials DO exist now (Otto's five and SanMar's three
+  are in Settings › Integrations, hence inside the nightly dump). Only the flags are missing.
+
+  **`node tools/check-supplier-order-gates.mjs` is the gate**, and it exists because a doc
+  cannot fail a build. It boots the API with all three flags unset and CALLS each order route
+  — supplying every field each supplier validates first, so the dry-run branch is actually
+  reached rather than passing on a 400 — then asserts `ssOrder`'s third argument still
+  defaults to `false`, that no call site passes it, that Otto and SanMar still have none, and
+  that this block does not go back to claiming nothing can reach a supplier. The one thing it
+  cannot see is which flags are set on the VPS; it prints the command that answers that.
+
+  The wording before that said "the UI sends only `{sku, qty}` (no address, PO number, shipping
   or payment method)". That stopped being true for S&S and was left behind — the doc, not the
-  code, was the stale half.
+  code, was the stale half. Twice now.
 - **Design library `.pes` bytes** — `eg_design_files` is localStorage-only in the legacy app. Order-attached files *are* persisted via `POST /api/design_files`; the library upload path isn't wired to it.
 - **Thread palette** — `DEFAULT_THREAD_PALETTE` ships 16 colours. Matching is now perceptually correct (OKLab, lightness weighted 0.5 because hue is a thread's identity and lightness is a shade choice), but 16 cones can't represent real artwork; a light blue still resolves to Grey. The stock list is the bottleneck, not the matcher.
 - **Not yet built** — revert-from-Activity with correct wallet response; announcements; per-team peak-season order limits; subscription discounts; A4 multi-up label sheets.
