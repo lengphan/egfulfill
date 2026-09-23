@@ -9,7 +9,7 @@ import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { TabBar } from "@/components/app/tab-bar"
 import { SearchField } from "@/components/app/search-field"
-import { StatCard, StatGrid } from "@/components/app/stat-card"
+
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { BrandSplitDialog } from "@/components/app/brand-split-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -317,28 +317,20 @@ export function ProductsCatalog() {
     // Active IS "on the marketing site" now — one flag, so this tile and the public route
     // cannot drift apart. What can still differ is a product Active with no price: the public
     // route drops it, so counting Active alone would again report items the site isn't showing.
- const active = list.filter((p) => (p.status ?? "Active") === "Active").length
+    /* ACTIVE BUT PRICELESS — the one figure still drawn, and the only one that was ever a
+       job rather than a tally. The public catalogue drops a product with no price, so these
+       are Active and invisible, and nothing else on the page would say so. */
  const stranded = list.filter((p) => (p.status ?? "Active") === "Active" && publicPriceOf(p) === null).length
- const internal = list.filter((p) => {
- const s = (p.status ?? "Active").trim().toLowerCase()
- return s === "sellers only" || s === "staff only"
-    }).length
- return {
- total: list.length,
- cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size),
- active, live: active - stranded, stranded, internal,
-    }
+    /* ONLY `stranded` IS READ NOW — the banner's. The other five fed the stat tiles above
+       and went with them; a memo computing figures nothing renders is the dead export this
+       codebase has been bitten by before (a value nothing draws cannot look wrong). */
+ return { stranded }
   }, [products])
 
   // ── loading skeleton ──
  if (products === null) {
  return (
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-[92px] animate-pulse rounded-xl bg-muted" />
-          ))}
-        </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-[280px] animate-pulse rounded-2xl bg-muted" />
@@ -350,22 +342,34 @@ export function ProductsCatalog() {
 
  return (
     <div className="space-y-5">
-      <StatGrid>
-        <StatCard label={tl("products", "Products")} value={String(stats.total)} sub={tl("products", "in your catalog")} />
-        <StatCard label={tl("products", "Categories")} value={String(stats.cats)} sub={tl("products", "product types")} />
-        <StatCard label={tl("products", "Internal")} value={String(stats.internal)} sub={tl("products", "sellers or staff only")} />
-        {/* Counts what the site actually SHOWS, not how many are Active. The two differ only
- when a product has no price, and when they do this tile says so rather than
- quietly reporting the larger, friendlier number. */}
-        <StatCard
- label={tl("products", "On the public site")}
- value={String(stats.live)}
- sub={stats.stranded > 0
-            ? `${stats.stranded} Active but held back`
- : stats.live === stats.total ? tl("products", "all products") : `of ${stats.total} products`}
- tone={stats.stranded > 0 ? "neg" : stats.live ? "pos" : undefined}
-        />
-      </StatGrid>
+      {/**
+        * NO STAT ROW (owner, 2026-09-23: "I don't think we need those cards at all").
+        *
+        * Four tiles — Products · Categories · Internal · On the public site — and three of
+        * them misled:
+        *
+        *   CATEGORIES counted product TYPES while its neighbours counted products, drawn
+        *   identically, so a row reading 34 · 4 · 4 · 30 invited all four to be read as one
+        *   unit. It also collided with Internal at 4, the same figure twice meaning different
+        *   things.
+        *
+        *   INTERNAL used the word this file already rules incorrect a few hundred lines down
+        *   — "a Sellers-only product is not internal, sellers are customers" — and it is
+        *   worse on the SELLER's own copy: the server strips Staff-only, so what they saw
+        *   counted was their own orderable catalogue, called factory-internal to their face.
+        *
+        *   ON THE PUBLIC SITE read as a prepositional phrase in a row of nouns, and 4 + 30 =
+        *   34 made the row look like a partition of the catalogue. It is not one: Draft,
+        *   Archived and Active-but-unpriced fall into neither tile. It adds up today by
+        *   coincidence, which is worse than not adding up.
+        *
+        * And the captions that used to carry the unit have not rendered since StatCard
+        * dropped `sub`, so every label had been standing alone with nothing to qualify it.
+        *
+        * WHAT SURVIVES IS THE ONE ACTIONABLE THING: the banner below, which names the Active
+        * products the site is not showing and filters the grid to exactly them. A count
+        * nobody can act on is a number read once; that sentence is a job.
+        */}
 
       {/* The shipping-band table used to sit here, between the stats and the grid. It is
  still on the product DETAIL page, where you are looking at one garment and its band
