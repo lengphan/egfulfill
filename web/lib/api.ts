@@ -2068,7 +2068,7 @@ export function uploadDesignFile(body: { designId: string; orderId?: string; sku
      * to check. 0 is the honest answer that nothing was waiting on this picture.
      */
     attached?: number
-    orders?: { order_id: string; line_id: string | null; design_id: string }[] }>(
+    orders?: { order_id: string; line_id: string | null; side: string | null; design_id: string }[] }>(
     `/api/design_files`, { method: "POST", body: JSON.stringify(body) })
 }
 

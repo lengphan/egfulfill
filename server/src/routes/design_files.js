@@ -47,7 +47,11 @@ export async function applyToWaitingLines(srcDesignId, artHash, user) {
   if (!src || !['pes', 'emb'].includes(String(src.kind))) return [];
 
   const waiting = await q(
-    `select distinct d.order_id, d.line_id, d.sku
+    `select distinct d.order_id, d.line_id, d.sku,
+            /* THE FACE, and null when the design row has none. A row written before sides
+               existed has no face to land on, and null is what every reader already means
+               by "this whole line" — so old data keeps behaving exactly as it did. */
+            nullif(lower(trim(coalesce(d.side, ''))), '') as side
        from order_designs d
        /* THE LINE IT WOULD LAND ON. Required, not optional: a design row whose sku matches
           no item on the order has no line to be a file FOR, and attaching there produced a
@@ -70,16 +74,29 @@ export async function applyToWaitingLines(srcDesignId, artHash, user) {
          * the same line (§5).
          */
         and (d.method ~* 'emb' or (coalesce(d.method, '') = '' and coalesce(i.print_type, '') ~* 'emb'))
+        /**
+         * IS THIS FACE ALREADY ANSWERED? — per FACE, not per line.
+         *
+         * It used to ask whether the LINE had any stitch file, so a cap with a file on the
+         * front and nothing on the back was "done" and the back never got one. A face is
+         * answered by a file ON that face, or by a file with no face at all — which is what
+         * every reader here already means by "covers the whole line" (designLines keeps a
+         * sideless file as '' and reads it exactly that way).
+         */
         and not exists (
           select 1 from design_file_data f
            where f.order_id = d.order_id
              and f.kind in ('pes','emb')
              and (
                /* the same line, the same sku-scoped file, or a file that covers the whole
-                  order — any of the three means this line is already answered */
+                  order — any of the three reaches this line */
                (d.line_id is not null and f.line_id = d.line_id)
                or (d.line_id is null and f.sku is not null and f.sku = d.sku)
                or (f.line_id is null and f.sku is null)
+             )
+             and (
+               coalesce(f.side, '') = ''
+               or lower(f.side) = lower(coalesce(d.side, ''))
              )
         )`, [String(artHash)]).then((r) => r.rows).catch(() => []);
 
@@ -98,11 +115,17 @@ export async function applyToWaitingLines(srcDesignId, artHash, user) {
            NO `side`: the file answers the line, which is what a file attached before sides
            existed has always meant, and it is the reading that keeps those orders priced
            exactly as they were. */
-        `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, art_hash, source, created_at, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'factory', now(), now())`,
+        `insert into design_file_data (design_id, order_id, sku, line_id, side, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, art_hash, source, created_at, updated_at)
+         values ($1,$2,$3,$4,$15,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'factory', now(), now())`,
         [newId, w.order_id, w.sku || null, w.line_id || null, seller || null, src.file_name, src.mime,
          src.data, src.url, src.storage_key || null, src.content_hash, Number(src.price) || 0, src.kind,
-         String(artHash)]);
+         String(artHash),
+         /* THE FACE THE ARTWORK SITS ON (owner: "should always land on exact face"). A
+            sideless file is read as covering the whole line, which on a cap embroidered
+            front and back marks BOTH faces supplied off one file — so the digitising for
+            the second is never billed and the floor is told a face is ready that is not.
+            Null only when the design row itself has no face. */
+         w.side || null]);
       audit({ user }, 'design_file.auto_attached', {
         entityType: 'order', entityId: String(w.order_id),
         after: { from: String(srcDesignId), to: newId, line_id: w.line_id || null, sku: w.sku || null, art_hash: String(artHash) },
@@ -110,7 +133,7 @@ export async function applyToWaitingLines(srcDesignId, artHash, user) {
       /* The boards re-read on this ping, so an order open on somebody's screen picks the
          file up without a reload — the same broadcast an ordinary upload sends. */
       egBroadcast({ type: 'design-file', orderId: String(w.order_id), sku: w.sku || null, kind: src.kind });
-      done.push({ order_id: w.order_id, line_id: w.line_id || null, design_id: newId });
+      done.push({ order_id: w.order_id, line_id: w.line_id || null, side: w.side || null, design_id: newId });
     } catch { /* one order failing must not stop the rest */ }
   }
   return done;
