@@ -15,6 +15,7 @@ import { swatchChipStyle } from "@/lib/color-swatch"
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
 import { framingStyle } from "@/lib/product-framing"
+import { thumbSrc } from "@/lib/order-image"
 
 /**
  * One published product, in public shape.
@@ -292,7 +293,12 @@ export function BoldProduct({ product, shipping }: {
                           (colorIdx === i ? "border-[var(--mk-ink)]" : "border-[var(--mk-hairline)] hover:border-[var(--mk-ink)]")
                         }
                       >
-                        <Image src={c.image} alt="" fill unoptimized sizes="80px" className="object-cover" />
+                        {/* AT 80px, NOT AT 900. These are colour swatches and there can be a
+                            dozen of them, each pulling the product's full picture — the server
+                            caps at 900 when nothing is asked for, which is right for the hero
+                            above and eleven times the pixels a swatch draws. `unoptimized` is
+                            set here, so next/image is not going to shrink it for us. */}
+                        <Image src={thumbSrc(c.image, 80)} alt="" fill unoptimized sizes="80px" className="object-cover" />
                       </button>
                     ) : null
                   )}

@@ -61,8 +61,42 @@ export function proxiedImageSrc(url?: string | null): string {
  * designer and the print path keep the full-resolution one, which is exactly why this is not
  * done at sync: the big image is still the right image, just not for a 96px square.
  */
+/**
+ * OUR OWN IMAGE ROUTES ARE WIDTH-AWARE TOO, since 2026-09-23.
+ *
+ * `/api/public/products/:slug/img`, `/api/order_items/:id/img`, `/api/ss/img` and
+ * `/api/catalog/img/:hash` all re-encode on the way out and take a `w` — see
+ * server/src/image.js. The cap is 900 when nothing is asked for, which is right for a
+ * product card and three times too much for a 96px row tile.
+ *
+ * MIRRORS `WIDTHS` in server/src/image.js — an unlisted value is ignored there and falls
+ * back to the default, so a drift here costs bytes rather than a broken picture, but it is
+ * still one list in two places and both move together.
+ */
+const OURS = /^\/api\/(public\/products\/[^/]+\/img|order_items\/[^/]+\/img|ss\/img|catalog\/img\/[^/]+)(\?|$)/
+const SERVER_WIDTHS = [320, 640, 900, 1400]
+
+/**
+ * THREE DEVICE PIXELS PER CSS PIXEL, the same assumption the Etsy steps below are chosen on.
+ * A 96px tile therefore wants 288 and takes the 320 step; a 300px card wants 900 and takes
+ * the default it would have had anyway, so this never makes anything larger.
+ */
+function ourWidth(px: number): number {
+  const want = px * 3
+  return SERVER_WIDTHS.find((w) => w >= want) ?? SERVER_WIDTHS[SERVER_WIDTHS.length - 1]
+}
+
 export function thumbSrc(url?: string | null, px = 96): string {
-  if (!url || !/^https?:\/\/i\.etsystatic\.com\//i.test(url)) return url || ""
+  if (!url) return ""
+  /* Ask OUR proxy for the size actually being drawn. Appended rather than replaced: the
+     public product route already takes `?c=<colour>` and dropping it would show the wrong
+     colourway. */
+  if (OURS.test(url)) {
+    const w = ourWidth(px)
+    if (w >= 900) return url   // the default — no point minting a second cache entry for it
+    return url + (url.includes("?") ? "&" : "?") + `w=${w}`
+  }
+  if (!/^https?:\/\/i\.etsystatic\.com\//i.test(url)) return url || ""
   /**
    * ONLY THE `xN` WIDTHS, BECAUSE THE FIXED ONES CROP.
    *
