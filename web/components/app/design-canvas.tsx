@@ -4256,8 +4256,44 @@ return (
               </div>
               {art && artworkRow(art)}
               {g.files.map((f) => (
-                <Fragment key={f.designId}>
                 <FileRow
+                  key={f.designId}
+                  /**
+                   * THE PLACEMENT PICKER RIDES THE ROW IT GOVERNS (owner, 2026-09-23).
+                   *
+                   * It used to render under the row, indented — and on a list already grouped
+                   * under face headings, a control floating between two rows belongs visibly
+                   * to neither. The heading says which face the GROUP is; this says which
+                   * face the FILE is, which is the thing you change when the grouping is
+                   * wrong.
+                   *
+                   * MACHINE FILES ONLY, and still deliberately: a picture's face is decided
+                   * by where it was PLACED on the canvas, so a dropdown beside it would be a
+                   * second way to set one fact, and the two would disagree the moment
+                   * somebody used the one that is not the canvas. A stitch file has no
+                   * placement to read, which is why it needs the field at all.
+                   */
+                  trailing={(f.kind === "emb" || f.kind === "pes") && faces.length > 1 ? (
+                    <select
+                    /* CAPPED, because it now shares a row with the filename. `w-auto` so it
+                       is only as wide as the face it holds, and a max so a long placement
+                       name cannot squeeze the name it sits beside — that name is what the row
+                       is for. `.eg-control` because it is a FIELD, something you set, not an
+                       action (§4: shape says kind). */
+                    className="eg-control h-6 w-auto max-w-[8.5rem] px-1.5 text-2xs"
+                    value={f.side ?? ""}
+                    disabled={filesLocked || scoping === f.designId}
+                    title={filesLocked ? lockedWhy : tl("canvas", "Which placement this stitch file is for")}
+                    onChange={(e) => void setFileSide(f, e.target.value || null)}
+                    >
+                    <option value="">{tl("canvas", "No placement set")}</option>
+                    {faces.map((x) => (
+                    <option key={x.side} value={(x.side || "front").toLowerCase()}>
+                    {tl("sides", (x.side || "front").toLowerCase())}
+                    </option>
+                    ))}
+                    </select>
+                  ) : undefined}
                   file={{
                     name: f.name || "Untitled file",
                     /* The format, or what is happening to the row — the sub-line carries
@@ -4314,46 +4350,6 @@ return (
                     onRemove: !filesLocked || isAdmin ? () => void removeLineFile(f) : undefined,
                   }}
                 />
-                {/**
-                  * AND A WAY TO PUT IT RIGHT (owner, today: "nowhere to assign to a
-                  * surface").
-                  *
-                  * Grouping shows the gap; this closes it. A panel that displays a problem
-                  * and then sends you somewhere else to fix it is half a feature — and there
-                  * was nowhere else: the Files panel's scope picker chooses a LINE and stops.
-                  *
-                  * The server has taken this since per-side artwork existed — scope reads
-                  * `side`, and clears it when a file is widened to the whole order, because a
-                  * file on every line cannot belong to one surface. So this is a control over
-                  * a route, not a new capability.
-                  *
-                  * MACHINE FILES ONLY, and only on a garment with more than one face. A
-                  * picture's face is decided by where it was PLACED, which is the canvas, not
-                  * a dropdown; and on a one-sided line there is no choice to offer.
-                  *
-                  * `.eg-control` because it is a FIELD — something you set, not an action
-                  * (§4: shape says kind). Locked with everything else: a submitted order's
-                  * files are the factory's.
-                  */}
-                {(f.kind === "emb" || f.kind === "pes") && faces.length > 1 && (
-                  <select
-                    /* ON THE ROW'S OWN INDENT AND ONLY AS WIDE AS IT NEEDS. Full-width under
-                       the file, it read as a second row rather than as that row's field. */
-                    className="eg-control ms-9 h-6 w-auto max-w-[11rem] px-1.5 text-2xs"
-                    value={f.side ?? ""}
-                    disabled={filesLocked || scoping === f.designId}
-                    title={filesLocked ? lockedWhy : tl("canvas", "Which placement this stitch file is for")}
-                    onChange={(e) => void setFileSide(f, e.target.value || null)}
-                  >
-                    <option value="">{tl("canvas", "No placement set")}</option>
-                    {faces.map((x) => (
-                      <option key={x.side} value={(x.side || "front").toLowerCase()}>
-                        {tl("sides", (x.side || "front").toLowerCase())}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                </Fragment>
               ))}
             </div>
             )})}

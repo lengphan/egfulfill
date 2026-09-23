@@ -1,7 +1,7 @@
 "use client"
 
 import { useLabelT } from "@/lib/i18n"
-import { useRef, useState } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { CheckCircle, CircleNotch, DownloadSimple, UploadSimple, WarningCircle, X, type Icon } from "@phosphor-icons/react"
 import { RegionMark, REGION_LINE, REGION_NOTE } from "@/components/app/region"
 import { cn } from "@/lib/utils"
@@ -130,7 +130,25 @@ export function fileRoleLabel(kind?: string | null): string {
  * (the designer's stage, where the "zone" is the garment itself) prints the same row rather
  * than inventing a ninth one.
  */
-export function FileRow({ file, className }: { file: DroppedFile; className?: string }) {
+export function FileRow({ file, className, trailing }: {
+  file: DroppedFile
+  className?: string
+  /**
+   * A CONTROL THAT BELONGS TO THIS FILE, on this file's row.
+   *
+   * The designer's placement picker used to render UNDER the row it governed, indented —
+   * and on a list where files are already grouped under face headings, a second control
+   * floating between two rows reads as belonging to neither (owner, 2026-09-23: "the
+   * dropdown face pills should be for each file, and on the same row, not like this —
+   * floating somewhere in the middle looks very odd").
+   *
+   * A SLOT, not a `side` prop. This row is shared by seven surfaces and knows nothing about
+   * placements; teaching it one caller's field would be the ninth row-shape this component
+   * exists to prevent. It sits before the download button, so the row still ends with its
+   * actions wherever it is used.
+   */
+  trailing?: ReactNode
+}) {
   const tl = useLabelT()
   const size = formatBytes(file.size)
   const state = file.status ?? "done"
@@ -162,6 +180,7 @@ export function FileRow({ file, className }: { file: DroppedFile; className?: st
           </span>
         )}
       </span>
+      {trailing && <span className="shrink-0">{trailing}</span>}
       {file.onDownload && (
         <button
           type="button"
