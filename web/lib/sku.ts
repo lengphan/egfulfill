@@ -37,9 +37,63 @@ export function nextEgSku(products: CatalogProduct[]): string {
   let top = FIRST - 1
   for (const p of products ?? []) {
     const m = EG_SKU.exec(String(p?.sku ?? "").trim())
-    if (m) top = Math.max(top, Number(m[1]) || 0)
+    if (!m) continue
+    /* A STYLE-DERIVED SKU DOES NOT ADVANCE THE SEQUENCE (2026-09-23).
+       `egSkuFromStyle` mints EG-19000 from Gildan 19000, and those numbers land wherever the
+       supplier's catalogue happens to sit — five digits up from anything we have handed out.
+       Counting them would push the next SEQUENTIAL product to EG-19001, which then looks like
+       a style number it is not, and collides the day somebody adds style 19001. A product
+       whose sku is exactly its own supplier style is recognisable, so it is skipped. */
+    if (skuMatchesStyle(p)) continue
+    top = Math.max(top, Number(m[1]) || 0)
   }
   return `EG-${top + 1}`
+}
+
+/** Is this product's sku the one `egSkuFromStyle` would have minted for it? */
+function skuMatchesStyle(p: CatalogProduct): boolean {
+  const style = styleDigits((p as { supplierSku?: string | null }).supplierSku)
+  if (!style) return false
+  const own = String(p?.sku ?? "").trim().toUpperCase()
+  return own === `EG-${style}`
+}
+
+const styleDigits = (v: unknown) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "")
+
+/**
+ * OUR SKU, BUILT FROM THE SUPPLIER'S STYLE NUMBER (owner, 2026-09-23: "Gildan code is 19000
+ * and our suggestion is 18712 — it should stay close, so EG-19000").
+ *
+ * THE COST OF THIS IS KNOWN AND WAS ACCEPTED. The note at the top of this file is still true:
+ * our sku is what publish writes onto the seller's listing, so EG-19000 tells any buyer which
+ * blank the garment is and where else to buy it. That is the §2.9 harm, chosen deliberately
+ * for the recognisability — it is not an oversight, and it should not be "fixed" back without
+ * asking.
+ *
+ * THE STYLE, NOT THE SUPPLIER'S ROW ID. Callers pass `styleNo`, which for S&S is `styleName`
+ * — 16 is S&S's internal id for what everyone else calls 5000, and minting EG-16 would be
+ * both wrong and meaningless (CLAUDE.md §5).
+ *
+ * A TAKEN NUMBER IS NOT A COLLISION TO PAPER OVER (owner, 2026-09-23). EG-19000 already
+ * existing almost always means the SAME GARMENT is already in the catalogue — Gildan 19000
+ * is Gildan 19000 whether S&S or SanMar ships it — so an `EG-19000-2` would mint a duplicate
+ * product and split its stock and its history in half. The sequence is offered instead: the
+ * operator sees a number that is plainly not the style and knows to look before adding.
+ *
+ * Ordering is S&S first in practice, so this is rare by construction. A product that really
+ * should carry two sources needs a sourcing list on the row, which is a different change and
+ * is not pretended at here.
+ */
+export function egSkuFromStyle(
+  styleNo: string | null | undefined,
+  taken: readonly string[] | undefined,
+  products: CatalogProduct[],
+): string {
+  const style = styleDigits(styleNo)
+  if (!style) return nextEgSku(products)
+  const used = new Set((taken ?? []).map((x) => String(x ?? "").trim().toUpperCase()).filter(Boolean))
+  const base = `EG-${style}`
+  return used.has(base) ? nextEgSku(products) : base
 }
 
 /** Tidy what someone typed into a SKU without arguing with them: upper-cased, spaces

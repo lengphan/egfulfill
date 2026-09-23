@@ -25,7 +25,7 @@ import {
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { driveImg, prettyColor, driveMap, ssCatalogProduct, ssStockByColor, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
-import { nextEgSku, cleanSku } from "@/lib/sku"
+import { nextEgSku, egSkuFromStyle, cleanSku } from "@/lib/sku"
 import { ourSku } from "@/lib/our-sku"
 import { EmptyState } from "@/components/app/empty-state"
 
@@ -333,8 +333,19 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       // the product would save with no sku at all. confirmAdd assigns one regardless; this
       // is so the operator SEES which one before agreeing to it.
  getCatalogProducts().then((ps) => {
- setPreviewNextSku(nextEgSku(ps))
- setPreviewTaken(ps.map((p) => String(p.sku ?? "")).filter(Boolean))
+ const taken = ps.map((p) => String(p.sku ?? "")).filter(Boolean)
+        /**
+         * OUR SKU FROM THEIR STYLE NUMBER (owner, 2026-09-23: "Gildan code is 19000 and our
+         * suggestion is 18712 — it should stay close, so EG-19000").
+         *
+         * `styleNo` on the card view model, which for S&S is `styleName` — its `styleID` is
+         * an internal row id (16 for what everyone calls 5000) and would mint EG-16 (§5).
+         *
+         * The §2.9 cost was put to the owner and accepted: this number is published on the
+         * seller's listing, so it names the blank. Do not quietly revert it.
+         */
+ setPreviewNextSku(egSkuFromStyle(cardData(it).styleNo, taken, ps))
+ setPreviewTaken(taken)
       }).catch(() => {})
       // Stock for the review step, so a style can be trimmed to what the supplier can
       // actually fill BEFORE it becomes a product. S&S only — the other two would cost a
