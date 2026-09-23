@@ -3,7 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import { Fragment, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
-import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, sideRatesFor, faceChargesFor, faceSurfacesFor, faceAddOnsFor, methodsLabelOf } from "@/lib/order-format"
+import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, faceChargesFor, faceSurfacesFor, faceAddOnsFor, methodsLabelOf } from "@/lib/order-format"
 import { CopyButton } from "@/components/app/copy-button"
 import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
@@ -3992,7 +3992,6 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
           /* What a SECOND printed face adds per unit, so the side pills can say so before
  anyone commits to one. From the quote, which is the same settings the charge
  reads — a number typed here would be a second opinion about the price. */
- sideFee={quote?.fees?.method_side ?? null}
                 /*
                  * THE RATES FOR *THIS LINE'S* BLANK, resolved server-side.
                  *
@@ -4008,7 +4007,6 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                  * on the tile is the number on the invoice. Matched by line_id, because two
                  * lines of one order can be two different blanks.
                  */
-                sideFees={sideRatesFor(quote, customize)}
                 faceCharges={faceChargesFor(quote, customize)}
                 faceSurfaces={faceSurfacesFor(quote, customize)}
                 faceAddOns={faceAddOnsFor(quote, customize)}

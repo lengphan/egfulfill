@@ -590,13 +590,12 @@ export function faceSurfacesFor(
   }
   return out
 }
+/* `sideRatesFor` IS GONE (2026-09-23). It resolved the PLACEMENT rate table for a line, and
+   the designer's face rail was the only thing that ever read it. That rail prints what the
+   TECHNIQUE costs on a face now: a placement on one tile and a machine run on the next, in
+   one unlabelled column, read as the front being cheaper than the back. A placement is
+   charged once per garment and the summary gives it a row of its own, under the face that
+   carries it.
 
-export function sideRatesFor(
-  quote: { lines?: { line_id?: string | null; sku?: string | null; sideRates?: Record<string, number> }[] } | null | undefined,
-  item: { line_id?: string | null; sku?: string | null },
-): Record<string, number> {
-  const hit = (quote?.lines ?? []).find((l) =>
-    (l.line_id && l.line_id === (item.line_id ?? null))
-    || (!l.line_id && !!l.sku && l.sku === item.sku))
-  return hit?.sideRates ?? {}
-}
+   The server still SENDS `sideRates` on the quote line, and should — it is the rate table
+   the charge itself resolves through. Nothing on the client needs to re-read it. */

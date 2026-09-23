@@ -857,7 +857,7 @@ function CustomerFileThumb({ src }: { src: string }) {
 
 export function DesignCanvasDialog({
  open, onOpenChange, orderId, orderLabel, item, initialDesign, initialPos, onSaved, catalog,
- siblings, designs, onSendToDesigner, filesLocked, sideFee, sideFees, faceCharges,
+ siblings, designs, onSendToDesigner, filesLocked, faceCharges,
  faceSurfaces, faceAddOns,
 }: {
  open: boolean
@@ -873,22 +873,12 @@ export function DesignCanvasDialog({
   /** The order's OTHER lines, for "use on every line". Absent → the control isn't offered,
    * which is right for a surface that only ever holds one line. */
  siblings?: OrderItem[]
-  /** What each ADDITIONAL printed face adds per unit (settings: method_side). Shown on the
-   * side pills so the cost is known BEFORE a second face is committed to, not discovered on
-   * the Summary afterwards. null/0 ⇒ extra sides are free and nothing is said. */
- sideFee?: number | null
-  /** Per-FACE rates, when the platform prices them apart — `side_<face>` from settings. A
-   *  face with no entry costs `sideFee`, the flat rate, which is what every face cost
-   *  before these existed. A map rather than a resolved number so the rail and the quote
-   *  read the same figures from the same place. */
-  sideFees?: Record<string, number> | null
-  /**
-   * WHAT EACH FACE IS ACTUALLY BILLED — its placement share plus the design work on it,
-   * read off the quote by faceChargesFor. `sideFees` above is the placement RATE TABLE,
-   * which is what a face would add if it were the one carrying the placement; since
-   * ba6dbe91 only ONE face per line ever is, so the table is the wrong answer for every
-   * face but the first and this is the right one wherever it exists.
-   */
+  /* `sideFee` / `sideFees` ARE GONE (2026-09-23). They resolved what a PLACEMENT costs, and
+     this window stopped printing placements: a tile prints what the TECHNIQUE costs on its
+     face, because the two in one unlabelled column read as the front being cheaper than the
+     back. The placement is charged once per garment and the summary gives it its own row,
+     under the face that carries it. Removed rather than left unread — a prop three callers
+     still fill in is a prop the next reader assumes is doing something. */
  faceCharges?: Record<string, number> | null
   /**
    * THE SURFACE MONEY ALONE, per face — `faceSurfacesFor`, which reads `sideParts` and
@@ -1287,26 +1277,10 @@ export function DesignCanvasDialog({
  return out
   }, [faceArt, sideName, designUrl])
  const anyFaceHasArt = Object.values(facesWithArt).some(Boolean)
-  /**
-   * WHICH PRINTED FACES PAY A RUN — every one except the first.
-   *
-   * Ordered by the garment's own face list, so the answer is stable: "the first" is front on
-   * anything that has one, not whichever row the server happened to return first.
-   *
-   * THE FIRST ONE IS NOT FREE, it is the face carrying the line's single PLACEMENT — see the
-   * tile below. This memo only says which faces are past it; what each side of that line
-   * costs is the caller's question, and reading `false` here as "no charge" is what printed
-   * Free on a front that was about to be billed.
-   */
- const costingFaces = useMemo(() => {
- const out: Record<string, boolean> = {}
- let seen = 0
- for (const f of faces) {
- const k = (f.side || "front").toLowerCase()
- if (facesWithArt[k]) { seen += 1; out[k] = seen > 1 }
-    }
- return out
-  }, [faces, facesWithArt])
+  /* `costingFaces` is gone. It marked every printed face except the first, and the tile
+     used it to decide placement-vs-run — a question the tile no longer asks now that it
+     prints the METHOD fee for every face. What separates the first face from the rest is a
+     placement, and that is the summary's row to print. */
 
   /**
    * WHAT A RUN COSTS ON A GIVEN FACE — the surface fee for every face after the first.
@@ -1330,19 +1304,16 @@ export function DesignCanvasDialog({
  const m = (faceMethod[face] ?? "").trim() || String(liveItem.print_type ?? "").trim()
  const key = m ? normTech(m)?.key : null
     /* A key the table has no entry for IS zero — methodAddOn returns 0 for an unpriced
-       technique, so a second DTG face genuinely costs nothing. That is an answer, not a gap. */
- return key ? Number(faceAddOns[key]) || 0 : 0
+       technique, so a second DTG face genuinely costs nothing. That is an answer, not a gap.
+
+       NO TECHNIQUE NAMED IS NOT ZERO. Neither the face nor the line has said how this is
+       decorated, so there is no fee to quote and the tile prints nothing — "+$0.00" there
+       would be a statement about a charge nobody has decided. */
+ return key ? Number(faceAddOns[key]) || 0 : null
   }, [faceMethod, liveItem.print_type, faceAddOns])
 
-  /**
-   * IS THE QUOTE ALREADY CHARGING A FACE ON THIS LINE?
-   *
-   * It always is in practice — quoteOrder prices a line with no artwork as ONE face, so the
-   * front carries its placement from the moment the line exists. But a window opened from a
-   * route with no quote has an empty map, and there the first face has not been taken: the
-   * PLACEMENT is the honest quote for it, exactly as it was before any of this.
-   */
- const billedFaces = Object.keys(faceSurfaces ?? {}).length > 0
+  /* `billedFaces` is gone with it: the tile asked it only to choose between a placement
+     and a run, and it chooses neither now. */
 
   /* Placed AFTER the memos above, not beside `sideName` where it reads more naturally.
      The React Compiler treats a value passed into a function it cannot see through as
@@ -3369,14 +3340,11 @@ return (
  const art = k === sideName
                   ? (designUrl ? { data: designUrl, pos } : null)
                   : ((faceArt ?? {})[k] ?? null)
-                /* The surcharge is per ADDITIONAL face: shown on one that already costs, and
-                   on an empty one that WOULD — which is only true once something else is
-                   printed. Nothing at all when the rate is 0. */
-                /* THIS face's rate, not the flat one. Telling a seller "+$2.00" on a sleeve
-                   that actually adds $5.00 is worse than telling them nothing: they are
-                   quoted a price, add the artwork, and meet a different figure on the
-                   summary. */
- const rate = (sideFees && Number(sideFees[k]) > 0 ? Number(sideFees[k]) : Number(sideFee)) || 0
+                /* NO PLACEMENT RATE HERE ANY MORE. `sideFees` / `sideFee` resolve what a
+                   placement costs, and the tile stopped printing placements — it prints what
+                   the TECHNIQUE costs on this face. The props stay on the component: three
+                   call sites pass them, and the rail's own note about quoting the right rate
+                   is still the reason they exist. */
                 /**
                  * WHAT THIS FACE COSTS — ONE FIGURE, ALWAYS, AND THE SUMMARY'S OWN.
                  *
@@ -3405,23 +3373,33 @@ return (
                    nothing whenever the editor held no artwork for it. What a face costs is
                    the quote's business; whether this window has its picture loaded is not. */
  const owed = faceSurfaces ? faceSurfaces[k] : undefined
- const shown: number | null = owed != null ? owed
-                  /* THE FIRST PRINTED FACE IS NOT FREE (owner, 2026-09-23: "whichever face
-                     has design still needs to show price even if it's free").
-
-                     This printed 0 — "Free" — on the first face carrying artwork, which was
-                     right under the rule that one placement came inside the blank's price.
-                     That rule went on 2026-09-18: the first face pays the PLACEMENT and every
-                     face after it pays its own run. So a front with artwork on it read Free
-                     beside a back the summary was billing $2.00 for, which is the same figure
-                     the front is about to be charged the moment it is saved.
-
-                     Free is still printed, and still means it — a second DTG face whose run
-                     is 0 genuinely adds nothing. */
-                  : art ? (costingFaces[k] ? runFee(k) : rate)
-                  : (billedFaces ? runFee(k) : rate)
-                /* MUTED WHENEVER THE QUOTE IS NOT ALREADY CHARGING THIS FACE. Same figure,
-                   lighter ink — see FaceTile's `extraPending`. */
+                /**
+                 * THE METHOD FEE, AND ONLY WHEN A METHOD IS CHOSEN (owner, 2026-09-23: "I
+                 * need just the method fees when a method is chosen — if not chosen, don't
+                 * show the +fee… it's very misleading in terms of what fees are charged
+                 * there").
+                 *
+                 * The tile printed the quote's SURFACE money, which on the first printed face
+                 * is the placement and nothing else. So Front read +$1.00 beside a Back at
+                 * +$5.00 — two numbers measuring two different things, in one column,
+                 * unlabelled, reading as though printing the front were the cheap one.
+                 *
+                 * One question per tile now: what does this technique cost on this face. Same
+                 * figure across a single-method garment, which is what makes the rail
+                 * readable at a glance, and still per-face — a DTG back on an embroidered
+                 * shirt says its own price.
+                 *
+                 * NO METHOD, NO FIGURE. `runFee` answers null when neither the face nor the
+                 * line has named a technique, and the tile then says nothing at all. A "+$0"
+                 * or a "Free" there would be a claim about a charge nobody has decided yet,
+                 * which is the misleading half — quoting a price for an undecided face is the
+                 * same defect as quoting the wrong one.
+                 *
+                 * THE PLACEMENT IS NOT LOST, it is not HERE. The summary prints it as its own
+                 * row under the face it belongs to, which is where a charge that happens once
+                 * per garment can be read as happening once.
+                 */
+ const shown: number | null = runFee(k)
  const pending = owed == null
  return (
                   <FaceTile
