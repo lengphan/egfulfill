@@ -31,6 +31,9 @@ import { ImageLightbox } from "@/components/app/image-lightbox"
  */
 const squash = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "")
 const ALL = "__all"
+/** The staged face picker's "covers the whole garment" option — an ANSWER, held apart from
+ *  the unanswered state, which is the one the attach gate refuses. See `needsFace`. */
+const EVERY = "__every"
 function matchLine(fileName: string, items: OrderItem[]): string {
  const base = squash(fileName.replace(/\.[a-z0-9]+$/i, ""))
  if (!base) return ALL
@@ -439,6 +442,36 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
  /* One computation, two readers — the list and the empty state. Two calls is how they
      come to disagree about whether anything is there. */
  const placedLines = placedRows(placedMap ?? undefined, item ? [item] : [], false)
+ /**
+  * THE FACES THIS LINE HAS ARTWORK ON — the set a stitch file can be pinned to.
+  *
+  * Same rule and same reasoning as the order page's copy of this panel: computeDesignFees
+  * only ever compares a file's side against faces that CARRY A PICTURE, so this is the set
+  * that changes a price, and deriving "which faces does the blank offer" here would be the
+  * second opinion §4's faces rule forbids.
+  */
+ const lineFaces = [...new Set(placedLines.map((r) => r.side).filter(Boolean))] as string[]
+ /**
+  * MOVE A STITCH FILE ONTO A FACE — the control the BOARD never had.
+  *
+  * The designer board mounts this panel, and this is where a designer actually works. It
+  * could upload a .EMB and never say which surface it was for, while computeDesignFees
+  * reads a file with no side as covering the WHOLE line (`wholeLine = sides.has('')`) and
+  * waives the digitising on every face of it. So the one window a designer lives in was the
+  * one that could not answer the question that decides the charge — and the same file
+  * dropped in the design window priced correctly.
+  */
+ const setFileSide = async (f: DesignFileRow, side: string | null) => {
+ if ((f.side ?? null) === side) return
+ setBusy(f.designId); setErr(null)
+ try {
+ const r = await scopeDesignFile(f.designId, f.lineId ?? null, side)
+ if (r?.error) throw new Error(r.error)
+ load()
+    } catch (e) {
+ setErr(e instanceof Error ? e.message : "Could not set the placement for that file.")
+    } finally { setBusy(null) }
+  }
  return (
     <div className="space-y-2">
       <Dropzone
@@ -489,7 +522,19 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                     <span className="truncate text-xs font-medium">{f.name}</span>
                     {f.isLatest && <span className="shrink-0 rounded bg-shipped/12 px-1 py-0.5 text-2xs font-bold text-shipped" title={tl("designFiles", "Most recent machine file for this item — the current fixed version")}>LATEST</span>}
                   </div>
-                  <div className="truncate text-2xs text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
+                  {/* THE FACE, FIRST — it is what the row is being read for on a board, and
+                      for a stitch file it is the input to the digitising charge. "No
+                      placement set" is drawn as the open question it is, not as a blank. */}
+                  <div className="truncate text-2xs text-muted-foreground">
+                    {(f.kind === "emb" || f.kind === "pes") && (
+                      f.side
+                        ? <span className="font-medium uppercase">{tl("sides", f.side)} · </span>
+                        : lineFaces.length > 1
+                          ? <span className="font-medium text-hold">{tl("designFiles", "No placement set")} · </span>
+                          : null
+                    )}
+                    {scopeLabel(f)}{k.hint}
+                  </div>
                 </div>
 
                 {/* Only .pes is sold, so only .pes gets a price — and only admin/warehouse
@@ -511,6 +556,22 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                   )
                 )}
 
+                {/* `.eg-control` because it is a FIELD — something you set (§4: shape says
+                    kind). Stitch files only, and only when there is a choice to make. */}
+                {(f.kind === "emb" || f.kind === "pes") && lineFaces.length > 1 && (
+                  <select
+ className="eg-control h-7 w-auto max-w-[8rem] shrink-0 px-1.5 text-xs"
+ value={f.side ?? ""}
+ disabled={busy === f.designId}
+ title={tl("designFiles", "Which placement this stitch file is for")}
+ onChange={(e) => void setFileSide(f, e.target.value || null)}
+                  >
+                    <option value="">{tl("designFiles", "No placement set")}</option>
+                    {lineFaces.map((x) => (
+                      <option key={x} value={x}>{tl("sides", x)}</option>
+                    ))}
+                  </select>
+                )}
                 <Button size="sm" variant="ghost" className="shrink-0" disabled={busy === f.designId} onClick={() => get(f)} title={tl("designFiles", "Download")}>
                   {busy === f.designId ? <CircleNotch size={12} className="animate-spin" /> : <FileArrowDown size={13} weight="bold" />}
                 </Button>
@@ -657,7 +718,17 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   /** `preview` is an object URL and only images have one — a .pes has no picture to show,
    * and inventing a placeholder that looks like artwork is worse than the glyph. It must
    * be revoked when the row goes; see the effect below. */
- type Staged = { file: File; name: string; target: string; image: boolean; preview?: string }
+ type Staged = { file: File; name: string; target: string; image: boolean; preview?: string
+  /**
+   * WHICH FACE, CHOSEN AT DROP RATHER THAN CORRECTED AFTER.
+   *
+   * A stitch file filed with no face is read by computeDesignFees as covering the WHOLE
+   * line, so it waives the digitising on every face of it — which on a multi-face garment
+   * is the most expensive state a file can be in, and it used to be the only state this
+   * panel could produce. Undefined means nobody has said yet; the Attach below refuses to
+   * send that for a line where there is genuinely a choice to make.
+   */
+  side?: string | null }
  const [staged, setStaged] = useState<Staged[]>([])
 
   /**
@@ -781,6 +852,14 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  const r = await uploadDesignFile({
  designId: idFor(orderId, scope, s.name), orderId, sku: it.sku ?? undefined,
  lineId: it.line_id ?? undefined, name: s.name, mime: s.file.type || undefined, data,
+              /**
+               * ONLY WHEN A FACE WAS ACTUALLY CHOSEN, and never for an "every item" drop.
+               *
+               * Same narrow rule design-canvas states: a single-face line stores null exactly
+               * as it always did, so nothing about a one-sided order changes, and a file
+               * widened across lines cannot belong to one surface of one garment.
+               */
+ side: s.target === ALL ? null : s.side ?? null,
             })
  if (r?.error) throw new Error(r.error)
           }
@@ -918,6 +997,38 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * both"); the staging list never got the same treatment, so the two lists of files on
    * one order still did not look like the same kind of thing. Now they do.
    */
+ /**
+  * THE FACES A TARGET LINE HAS ARTWORK ON — the set a stitch file can be pinned to, and the
+  * only set that changes a price. Same rule as the file rows below and the board panel
+  * above: §4 forbids a screen deciding for itself which faces a BLANK offers (`offeredSides`
+  * owns that), but this is a different question — computeDesignFees only ever compares a
+  * file's side against faces that carry a picture.
+  *
+  * Declared here rather than beside `placed` further down because the staging queue reads it
+  * and renders first; a const used above its own declaration is the TDZ shape check-tdz
+  * exists to catch.
+  */
+ const facesForTarget = (targetKey: string): string[] => {
+ if (targetKey === ALL) return []
+ const it = items.find((x) => (x.line_id || x.sku) === targetKey)
+ if (!it) return []
+ const m = sidesForLine(designs, { line_id: it.line_id, sku: it.sku })
+ return Object.keys(m).filter((k) => !!m[k]?.data)
+  }
+  /** A stitch file, on a line with a real choice of face, that nobody has placed yet. */
+ /**
+  * UNANSWERED ≠ EVERY PLACEMENT, and the whole gate rests on the difference.
+  *
+  * `undefined` is nobody has said; `null` is somebody chose "every placement" and meant it.
+  * Both store null on the row — the database cannot tell them apart and does not need to —
+  * but only the second may be attached, because the cost of the first is a digitising fee
+  * silently waived on every face of the garment. This is the same distinction CLAUDE.md
+  * keeps making about blank data: "we have not been told" is not an answer, and a surface
+  * that treats it as one is where the money goes.
+  */
+ const needsFace = (x: Staged) => !x.image && x.side === undefined && facesForTarget(x.target).length > 1
+ const unplaced = staged.filter(needsFace)
+
  const queue = staged.length > 0 && (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -975,6 +1086,31 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
                 {tl("designFiles", "No embroidery item on this order")}
               </span>
             ))}
+            {/* AND WHICH FACE OF IT. A machine file only — a picture's face is decided by
+                where it is PLACED on the canvas, never by a dropdown — and only when the
+                target line has artwork on more than one. `.eg-control` because it is a FIELD
+                (§4: shape says kind), and it is marked when unanswered because leaving it is
+                what waives the fee. */}
+            {!s.image && facesForTarget(s.target).length > 1 && (
+              <select
+ className={"eg-control h-8 w-auto max-w-[9rem] shrink-0 px-1.5 text-xs "
+                  + (s.side ? "" : "border-hold text-hold")}
+ value={s.side === undefined ? "" : s.side === null ? EVERY : s.side}
+ title={tl("designFiles", "Which placement this stitch file is for")}
+ onChange={(e) => setStaged((prev) => prev.map((x) => (x.name === s.name
+                    ? { ...x, side: e.target.value === "" ? undefined : e.target.value === EVERY ? null : e.target.value }
+                    : x)))}
+              >
+                <option value="">{tl("designFiles", "Which placement?")}</option>
+                {facesForTarget(s.target).map((k) => (
+                  <option key={k} value={k}>{tl("sides", k)}</option>
+                ))}
+                {/* SAYING "all of them" IS AN ANSWER — it is the unanswered state that is
+                    refused, not the intent. Without this the gate would block a file that
+                    genuinely does cover the line, which is how a legitimate job gets stuck. */}
+                <option value={EVERY}>{tl("designFiles", "Every placement")}</option>
+              </select>
+            )}
             <button
  onClick={() => setStaged((prev) => prev.filter((x) => x.name !== s.name))}
  title={tl("designFiles", "Take this one out")} aria-label={`Take ${s.name} out`}
@@ -986,7 +1122,16 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
         ))}
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" onClick={() => void attach()} disabled={!!busy}>
+        {/* THE REASON, NOT A DISABLED BUTTON ON ITS OWN. A control that refuses without
+            saying why is the thing §4 calls a broken feature; this names the files. */}
+        {unplaced.length > 0 && (
+          <span className="min-w-0 flex-1 text-xs text-hold">
+            {unplaced.length === 1
+              ? `${unplaced[0].name} — say which placement it is for`
+              : `${unplaced.length} stitch files need a placement`}
+          </span>
+        )}
+        <Button size="sm" onClick={() => void attach()} disabled={!!busy || unplaced.length > 0}>
           {busy ? <><CircleNotch size={13} className="animate-spin" /> Sending {busy}…</> : `Attach ${staged.length} file${staged.length === 1 ? "" : "s"}`}
         </Button>
       </div>
@@ -1012,6 +1157,38 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * downstream reads it as a line. Orders backfill line_id on read (orders.js), so the
    * fallback is the honest failure, not the normal path.
    */
+ /**
+  * WHICH FACE A STITCH FILE IS FOR — the half of the scope route this panel never called.
+  *
+  * `scopeDesignFile` has taken a `side` since per-side artwork existed, and design-canvas
+  * has had this picker since the Files tab was grouped by face. This panel — which is what
+  * the DESIGNER BOARD and the order page mount — called it with the line alone, and the
+  * comment in design-canvas says so out loud: "the Files panel's scope picker chooses a
+  * LINE and stops."
+  *
+  * THAT GAP IS MONEY, NOT LAYOUT. computeDesignFees reads `machine_sides` and treats a file
+  * with no side as covering the WHOLE line — `wholeLine = sides.has('')` — so it marks every
+  * face `supplied` and waives the digitising on all of them. A designer uploading one .EMB
+  * for the front from a board card therefore waived the back and the sleeve too, while the
+  * same file dropped in the design window priced correctly. One file, two prices, decided by
+  * which window it was dropped in.
+  *
+  * Optimistic then reconciled from the server's answer, exactly as design-canvas does it:
+  * widening a file to the whole ORDER clears its face, so a list that kept drawing the old
+  * one would be arguing with the database.
+  */
+ const setFileSide = async (f: DesignFileRow, side: string | null) => {
+ if ((f.side ?? null) === side) return
+ setBusy(f.designId); setErr(null)
+ try {
+ const r = await scopeDesignFile(f.designId, f.lineId ?? null, side)
+ if (r?.error) throw new Error(r.error)
+ load()
+    } catch (e) {
+ setErr(e instanceof Error ? e.message : "Could not set the placement for that file.")
+    } finally { setBusy(null) }
+  }
+
  const rescope = async (f: DesignFileRow, key: string) => {
  const it = key === ALL ? null : items.find((x) => (x.line_id || x.sku) === key)
  if (it && !it.line_id) { setErr(`${it.name || it.sku || "That item"} has no line id yet, so a file can't be filed against it on its own.`); return }
@@ -1127,10 +1304,14 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
            worse, it invites a second file onto a line that needs one. */
  const own = rows.some((f) => f.kind === "emb" || f.kind === "pes")
  const key = it ? (it.line_id ? `L:${it.line_id}` : it.sku ? `S:${it.sku}` : "") : ""
+ const mine = placed.filter((r) => r.no === no)
  return {
  no, it,
- placed: placed.filter((r) => r.no === no),
+ placed: mine,
  rows,
+ /* The faces this item actually has artwork on — the set a stitch file can be pinned
+    to, and the only set that changes a price. See the picker on the file row. */
+ faces: [...new Set(mine.map((r) => r.side).filter(Boolean))] as string[],
  hits: !isSeller && !own && key ? reuse[key] ?? null : null,
         }
       })
@@ -1207,6 +1388,26 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
               {f.isLatest && <span className="shrink-0 rounded bg-shipped/12 px-1 py-0.5 text-2xs font-bold text-shipped" title={tl("designFiles", "Most recent machine file for this item — the current fixed version")}>LATEST</span>}
             </div>
             <div className="text-xs text-muted-foreground">
+              {/**
+                * THE FACE, SAID ON THE ROW (owner, 2026-09-23: "there shouldn't be drift or
+                * anything missing with the files and summary pricing").
+                *
+                * This row printed the item, the sender and the price and never the surface,
+                * while the artwork rows above it have printed theirs all along — so the two
+                * lists on one panel disagreed about whether a face was a thing a file had.
+                * It is also the input to a charge: a stitch file with no face waives the
+                * digitising on EVERY face of the line, so "no placement set" is not a
+                * cosmetic blank, it is the most expensive state a file can be in and it has
+                * to look like an open question rather than a settled row.
+                */}
+              {(f.kind === "emb" || f.kind === "pes") && (
+                f.side
+                  ? <span className="font-medium uppercase">{tl("sides", f.side)}</span>
+                  : g.faces.length > 1
+                    ? <span className="font-medium text-hold">{tl("designFiles", "No placement set")}</span>
+                    : null
+              )}
+              {(f.kind === "emb" || f.kind === "pes") && (f.side || g.faces.length > 1) ? " · " : ""}
               {f.sku ? `Item ${f.sku} · ` : ""}
               {/* WHO SENT IT, from the reader's side. "You sent this" is true for the seller
  and false for every operator, warehouse hand and admin looking at the same
@@ -1244,6 +1445,33 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  options={optionsFor(f.kind === "image")}
  onChange={(v) => void rescope(f, keyAt(f.kind === "image", v))}
             />
+          )}
+          {/**
+            * AND WHICH FACE OF IT — see `setFileSide`. A stitch file only, and only on a line
+            * that has artwork on more than one face.
+            *
+            * THE OPTIONS ARE THE FACES THIS LINE HAS ARTWORK ON, and that is deliberate
+            * rather than convenient. §4's faces rule forbids a screen deriving its own answer
+            * to "which faces does this blank offer" — `offeredSides` owns that, and it needs
+            * the catalog product, which this panel does not have. But that is not the question
+            * here: computeDesignFees only ever compares a file's side against faces that
+            * CARRY A PICTURE (`imageKeysOf` / `facePairsOf`), so a stitch file pinned to a
+            * face with no artwork changes no price at all. The set that matters is exactly
+            * the set the group above already drew.
+            */}
+          {(f.kind === "emb" || f.kind === "pes") && g.faces.length > 1 && (
+            <select
+ className="eg-control h-7 w-auto max-w-[9rem] shrink-0 px-1.5 text-xs"
+ value={f.side ?? ""}
+ disabled={busy === f.designId}
+ title={tl("designFiles", "Which placement this stitch file is for")}
+ onChange={(e) => void setFileSide(f, e.target.value || null)}
+            >
+              <option value="">{tl("designFiles", "No placement set")}</option>
+              {g.faces.map((k) => (
+                <option key={k} value={k}>{tl("sides", k)}</option>
+              ))}
+            </select>
           )}
           {/**
             * WHAT THE SELLER PAYS, set by the people whose job that is.

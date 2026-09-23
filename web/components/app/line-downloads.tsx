@@ -11,6 +11,34 @@ import { designSrc } from "@/lib/order-image"
 const SIDE_ORDER = ["front", "back", "left", "right", "sleeve", "pocket"]
 
 /**
+ * THE FACE COMES FIRST, IN THE ROW AND IN THE SAVED FILENAME (owner, 2026-09-23).
+ *
+ * This menu printed "Artwork · PNG" for a one-artwork line and the bare filename for a
+ * stitch file, so the one fact you open it to establish — WHICH SURFACE this file is for —
+ * was the one fact it withheld. The face was already on the artwork rows, but only
+ * `arts.length > 1`, which is the wrong test: a line with one picture today gets a second
+ * tomorrow, and the file you saved this morning is already on disk called `artwork.png`.
+ *
+ * It was never on a machine file at all, though `DesignFileRow.side` has carried it since
+ * per-side artwork existed. That is the row where it matters most: a stitch file's face is
+ * what computeDesignFees reads to decide whether a digitising fee is owed, so a row that
+ * will not say its face is hiding the input to a charge.
+ *
+ * SAID THE SAME WAY IN BOTH PLACES. What you read on screen and what lands in ~/Downloads
+ * are the same string — "FRONT bunny.png" — because the menu's whole job is handing files
+ * to somebody who will open them later, and a name that only exists on screen is no help
+ * at the point the file is used. The stored side key is what goes in the filename (stable,
+ * and it is what the floor and the fee rows already say); the localized label is what is
+ * drawn.
+ */
+const faceFile = (side: string | null | undefined, name: string) =>
+  side ? `${side.toUpperCase()} ${name}` : name
+
+/** The name with its extension present — "bunny" saved from a PNG is still bunny.png. */
+const withExt = (name: string, ext: string) =>
+  name && !new RegExp(`\\.${ext}$`, "i").test(name) ? `${name}.${ext.toLowerCase()}` : name
+
+/**
  * THE FILES THIS LINE IS MADE FROM, downloadable from the line itself.
  *
  * The artwork and the stitch file were reachable only by opening the design window and
@@ -71,7 +99,8 @@ export function LineDownloads({ design, files, item, sides }: {
       if (!href) return
       const a = document.createElement("a")
       a.href = href
-      a.download = f.name || `${stem}.emb`
+      /* The same string the row draws — see `faceFile`. */
+      a.download = faceFile(f.side, f.name || `${stem}.emb`)
       document.body.appendChild(a); a.click(); a.remove()
     } catch { /* the row stays; a failed fetch must not remove the way to retry */ }
     finally { setBusy(null) }
@@ -117,22 +146,23 @@ export function LineDownloads({ design, files, item, sides }: {
         {arts.map((a) => {
           const name = String(a.design?.name ?? "").trim()
           const ext = extOf(name, a.src)
-          /* NAMED BY ITS SIDE when there is more than one — two rows both reading
-             "artwork.png" tell nobody which is the back. */
-          const sideLabel = a.side && arts.length > 1 ? tl("sides", a.side) : ""
+          /* ALWAYS, not only when there are several. See `faceFile` above. */
+          const fileName = withExt(name || tl("lineDownloads", "Artwork"), ext)
           return (
             <a
               key={a.side || "art"}
               href={a.src}
-              download={name || `${stem}${a.side ? `-${a.side}` : ""}.${ext.toLowerCase()}`}
+              download={faceFile(a.side, name ? withExt(name, ext) : `${stem}.${ext.toLowerCase()}`)}
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
+              title={faceFile(a.side, fileName)}
             >
               <DownloadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate" title={name || undefined}>
-                {sideLabel && <span className="capitalize">{sideLabel}</span>}
-                {sideLabel && (name ? " · " : "")}
-                {name || (!sideLabel ? tl("lineDownloads", "Artwork") : "")}
-              </span>
+              {a.side && (
+                <span className="shrink-0 text-2xs font-bold uppercase tracking-wide text-muted-foreground">
+                  {tl("sides", a.side)}
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate">{fileName}</span>
               <span className="shrink-0 text-2xs text-muted-foreground">{ext}</span>
             </a>
           )
@@ -148,7 +178,14 @@ export function LineDownloads({ design, files, item, sides }: {
             {busy === f.designId
               ? <CircleNotch size={14} className="shrink-0 animate-spin" />
               : <DownloadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />}
-            <span className="min-w-0 flex-1 truncate" title={f.name || undefined}>{f.name || tl("lineDownloads", "Machine file")}</span>
+            {f.side && (
+              <span className="shrink-0 text-2xs font-bold uppercase tracking-wide text-muted-foreground">
+                {tl("sides", f.side)}
+              </span>
+            )}
+            <span className="min-w-0 flex-1 truncate" title={faceFile(f.side, f.name || tl("lineDownloads", "Machine file"))}>
+              {f.name || tl("lineDownloads", "Machine file")}
+            </span>
             {/* The KIND, not the id. The slug this used to print is unreadable and
                 unactionable; "EMB" is the fact somebody is looking for. */}
             <span className="shrink-0 text-2xs text-muted-foreground">{fileRoleLabel(f.kind)}</span>

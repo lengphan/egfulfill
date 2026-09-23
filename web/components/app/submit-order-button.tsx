@@ -193,6 +193,33 @@ export function SubmitOrderButton({
             </p>
           ) : null}
 
+          {/**
+            * A STITCH FILE THAT NEVER SAID WHERE IT GOES, ON A GARMENT WITH SEVERAL FACES.
+            *
+            * computeDesignFees reads such a file as covering the WHOLE line, so it waives the
+            * digitising on every face of it. That rule is deliberate for the rows written
+            * before sides existed and is not being changed here — repricing settled orders is
+            * the one thing recorded history may not do. But it means the CHEAPEST possible
+            * answer can be reached by nobody saying anything, and the figure above is the one
+            * that gets charged.
+            *
+            * SO IT WARNS AND DOES NOT STOP, exactly like the peak-season notice below it. A
+            * file that genuinely covers the whole garment is a real thing, and blocking here
+            * would strand that job at the last step. The place it IS refused is where the
+            * ambiguity is created — the Files panel will not attach a stitch file to a
+            * multi-face line until somebody picks a placement or says "every placement" —
+            * which leaves this as the net for files that arrived before that gate existed.
+            */}
+          {(q?.designFees?.unplaced?.length ?? 0) > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-sm text-hold">
+              <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
+              <span>
+                {tl("submitOrder", "A stitch file with no placement is covering every face, so no digitising is being charged on:")}{" "}
+                {(q?.designFees?.unplaced ?? []).map((u) => u.name || u.sku || "a line").join(", ")}
+              </span>
+            </div>
+          )}
+
           {/* Peak-season heads-up — shown only when this seller is over their limit. It warns,
  it doesn't stop: they can still submit. */}
           {limitNotice && (

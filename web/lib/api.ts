@@ -3279,7 +3279,17 @@ export type OrderQuote = {
   charged: number
   balance: number
   /** Design/check fees per line — visible in the Summary; complex ones are TBD until accepted. */
-  designFees?: { items: OrderDesignFee[]; total: number }
+  designFees?: { items: OrderDesignFee[]; total: number
+    /**
+     * LINES WHOSE DIGITISING IS BEING WAIVED BY A STITCH FILE THAT NEVER SAID WHERE IT GOES.
+     *
+     * computeDesignFees reads a file with no side as covering the WHOLE line, so it marks
+     * every face `supplied`. That is deliberate for the rows written before sides existed
+     * and must not change — repricing settled orders is the one thing recorded history may
+     * not do — so the server reports the situation instead and the submit dialog says it out
+     * loud. Absent from a server too old to send it, which reads as "nothing to say".
+     */
+    unplaced?: { line_id: string | null; sku: string | null; name: string | null; faces: string[] }[] }
   /** Σ(supplier cost × qty) over the lines we know a blank cost for. Null = we know none,
    *  which is not the same as zero and must never be subtracted as if it were. STAFF ONLY. */
   supplierTotal?: number | null
