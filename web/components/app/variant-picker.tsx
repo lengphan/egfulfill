@@ -147,7 +147,13 @@ function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onP
           <div key={sd} className="flex items-center gap-2 rounded-lg px-2 py-0.5 hover:bg-accent">
             {/* THE FACE READS AS SET OR INHERITED, in weight and colour rather than in a
                 word — the value beside it already says "from the line" when it inherits. */}
-            <span className={cn("min-w-0 flex-1 truncate text-sm capitalize",
+            {/* A FACE NAME IS A LABEL; THE METHOD BESIDE IT IS THE VALUE — and they were the
+                wrong way round. "Front" sat at text-sm (14px) while the technique it names
+                sat at text-2xs (11px), which §4 reserves for a MARK: something recognised,
+                never read. The reader's eye landed on the word it already knew and had to
+                squint at the answer. text-xs for the label, and VariantField's compact size
+                below is the value's half of the same swap. */}
+            <span className={cn("min-w-0 flex-1 truncate text-xs capitalize",
               decided(sd) ? "font-medium text-foreground" : "text-muted-foreground")}>
               {tl("sides", sd)}
             </span>
@@ -501,7 +507,15 @@ export function VariantPicker({
         * Method takes whatever is left, which is the field that earns the space: it carries
         * two techniques on a mixed garment.
         */}
-      <div className={"grid grid-cols-2 gap-x-2 gap-y-2.5" + (dense ? "" : " sm:grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(0,1fr)]")}>
+      {/* METHOD IS A FIELD, NOT A GUTTER.
+          It held `minmax(0,1fr)` on the reasoning that it "earns the space" by carrying two
+          techniques on a mixed garment. A fraction does not mean "room for two techniques",
+          it means EVERY spare pixel on the row — so on a wide board the strip read as three
+          small pills and one field stretched across half the screen, empty, while a long
+          blank name was truncating three tracks to its left.
+          Four content tracks: each control is as wide as what it has to say, and the slack
+          stays slack. The row is a strip of pills, not a table — nothing is owed the width. */}
+      <div className={"grid grid-cols-2 gap-x-2 gap-y-2.5" + (dense ? "" : " sm:grid-cols-[repeat(4,minmax(0,max-content))] sm:justify-start")}>
         {/* Blank — the load-bearing pick; nothing else can price without it, so it's the
             only field that flags itself when empty. */}
         {/* No custom placeholder: the field names itself now, and "Blank" beside the

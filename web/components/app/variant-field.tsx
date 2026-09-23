@@ -210,7 +210,11 @@ export function VariantField({
         "flex w-full min-w-0 items-center gap-1.5 rounded-2xl border bg-card text-left font-medium transition-colors",
         "hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border",
- compact ? "h-7 px-2 text-2xs" : "h-9 px-2.5 text-xs",
+ /* COMPACT IS DENSE, NOT ILLEGIBLE. text-2xs is 11px, which §4 gives to a count badge and
+           explicitly withholds from anything read — and the only thing this size renders is the
+           per-face METHOD, the value the panel exists to set. h-8 so 14px type has somewhere to
+           sit. The face name beside it moved the other way, to text-xs. */
+        compact ? "h-8 px-2 text-sm" : "h-9 px-2.5 text-xs",
         // Only the required-but-empty field draws attention; the rest stay quiet.
         // --primary, NOT amber. Amber is a RESERVED floor status (warning / on hold), and
         // borrowing it for form validation put "this field is blank" in the same colour as

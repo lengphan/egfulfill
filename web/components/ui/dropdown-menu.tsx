@@ -38,6 +38,20 @@ function DropdownMenuContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
+        /**
+         * DOWNWARD, AND SHORTER — never flipped upside down.
+         *
+         * Base UI's default is `side: 'flip'`: when the popup's full height does not fit
+         * below, it puts the whole thing ABOVE the trigger. So a 20-item blank list opened
+         * upward while a 4-row panel on the same strip opened downward, and a menu's
+         * direction became a function of how many options it happened to have.
+         *
+         * `shift` keeps the requested side and moves the popup to fit. The popup already
+         * carries `max-h-(--available-height)` and `overflow-y-auto`, so the space below is
+         * what it is given and a long list scrolls inside it — which is the behaviour the
+         * clamp was written for and could never take effect while flipping won first.
+         */
+        collisionAvoidance={{ side: 'shift' }}
       >
         {/**
           * IT COMES OUT OF THE THING YOU PRESSED.
