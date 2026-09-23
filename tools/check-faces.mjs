@@ -175,6 +175,10 @@ const ALLOWED = new Map([
    'SIDE_ORDER sorts the files already attached to a line — it never decides what may be attached'],
   ['web/components/app/line-downloads.tsx',
    'same: an ordering for downloads that exist, not a list of surfaces on offer'],
+  ['web/lib/product-price.ts',
+   'PRICED_SIDES is the order faces are CHARGED in, mirroring server/src/routes/factory_settings.js — '
+   + 'it decides which of the faces it was HANDED carries the line\'s one placement, and never which '
+   + 'faces a product has. The caller passes those in, from offeredSides. Same shape as SIDE_ORDER above.'],
 ])
 /** A surface deciding for itself which faces a product has. */
 const SMELLS = [

@@ -1585,8 +1585,17 @@ export type PublicProduct = {
   sides?: string[]
   /** What each ADDITIONAL printed face adds per unit. The first print is inside the base
    *  price; faces 2, 3, 4 each add this — the same arithmetic sideAddOn() bills the order
-   *  by (server/src/pricing.js). 0 means extra faces are free, which is the default. */
+   *  by (server/src/pricing.js). 0 means extra faces are free, which is the default.
+   *
+   *  THAT DESCRIPTION IS HISTORY AND THE FIELD IS NOT. `sideFee` is the FLAT rate — the last
+   *  rung of faceRate() — never "what each additional face adds". One placement is charged
+   *  per line since 2026-09-21 and every face after it pays its own technique's RUN, which
+   *  is `methodPrices`. Price this through lib/product-price.ts, never by hand. */
   sideFee?: number
+  /** `side_<face>` — the rung above the flat rate. Absent key = unset, not zero. */
+  sideFees?: Record<string, number>
+  /** `side_<method>` — the rung between the two. */
+  sideMethodFees?: Record<string, number>
   /** How the photo is framed — the crop set in the product editor, so the public site shows
    *  the same composition the app does. Null when nobody has framed it. See
    *  lib/product-framing.ts; the server clamps both to the editor's own bounds. */
@@ -3894,7 +3903,11 @@ export function getFactorySettings() {
  *  billed nothing while every product page printed it. `shipExtra` is each additional unit
  *  in the same parcel. */
 export type ShipBands = { cap: number; heavy: number; garment: number }
-export type DesignFees = { standard: number; complex: number; check: number; shipBands?: ShipBands; shipExtra?: number; /** Platform per-unit surcharge by method key (emb, dtf…) — the fallback when a product sets none. */ methods?: Record<string, number>; /** Per ADDITIONAL printed face (settings `method_side`). The first print is inside the blank's base cost — see sideAddOn in server/src/pricing.js, which is what the order is billed on. 0 keeps extra faces free. */ sideFee?: number }
+export type DesignFees = { standard: number; complex: number; check: number; shipBands?: ShipBands; shipExtra?: number; /** Platform per-unit surcharge by method key (emb, dtf…) — the fallback when a product sets none. */ methods?: Record<string, number>; /** THE FLAT PLACEMENT RATE (settings `method_side`) — the LAST rung of faceRate() in server/src/pricing.js, reached only when nothing more specific answers. It is NOT "what each additional face adds": since 2026-09-21 one placement is charged per line and every face after it pays its own technique's RUN, which is `methods` above. */ sideFee?: number
+  /** `side_<face>` — a sleeve is awkward whatever is put on it. Beats `sideFee`, loses to the product's own `sidePrice`. Absent keys are unset, not zero. */
+  sideFees?: Record<string, number>
+  /** `side_<method>` — every DTG placement. The rung between the per-face rates and the flat one. */
+  sideMethodFees?: Record<string, number> }
 export function getDesignFees() {
   return api<DesignFees>(`/api/design_fees`)
 }

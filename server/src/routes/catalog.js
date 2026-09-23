@@ -10,7 +10,7 @@ import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { variantSku, variantLabel, variantPairs, productSizes, productColors } from '../variant-sku.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
-import { readAll as readSettings, readProductTypes, ALL_SIDES } from './factory_settings.js';
+import { readAll as readSettings, readProductTypes, ALL_SIDES, PRICED_SIDES, METHOD_KEYS } from './factory_settings.js';
 import { methodAddOnsFor } from '../pricing.js';
 
 // Roles that OWN pricing. A change by anyone else is legitimate — operators build
@@ -537,15 +537,26 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         return spec && spec.sides && spec.sides.length ? spec.sides : ['front'];
       })(),
       /**
-       * WHAT A SECOND PRINT COSTS, per unit.
+       * THE PLACEMENT LADDER, so a public page can price front-and-back at all.
        *
-       * The page can price front-and-back only if it knows this, and the alternative — a
-       * public page quoting one print for a garment someone means to decorate on two sides
-       * — is the same under-quoting the method surcharge was added to fix. sideAddOn() in
-       * pricing.js is what bills it; this is the same number, so the quote and the invoice
-       * agree. 0 means extra faces are free, which is the shipped default.
+       * `sideFee` is the FLAT rate and the LAST rung of faceRate() in pricing.js, not "what
+       * each additional face adds" — the note that used to sit here said the latter, and the
+       * page built on it quoted `sideFee × (N − 1)` against an invoice that since 2026-09-21
+       * charges ONE placement per line and then each further face its own machine RUN.
+       * Measured: an embroidered hoodie on three faces read $30.00 here and billed $39.00.
+       *
+       * The two more specific rungs go with it, because a ladder missing its top is a
+       * different ladder. An absent key is UNSET, not zero — `> 0` is what every rung tests.
+       *
+       * ALLOW-LIST, NOT REDACTION (§2.9): these are three price fields added deliberately.
+       * They are surcharges a BUYER pays, never what a blank costs us, and they appear on
+       * every invoice already — no supplier, sku or blank is implied by any of them.
        */
       sideFee: fees ? money(Number(fees.method_side) || 0) : 0,
+      sideFees: fees ? Object.fromEntries(
+        PRICED_SIDES.map((f) => [f, money(Number(fees[`side_${f}`]) || 0)]).filter(([, v]) => v > 0)) : {},
+      sideMethodFees: fees ? Object.fromEntries(
+        METHOD_KEYS.map((k) => [k, money(Number(fees[`side_${k}`]) || 0)]).filter(([, v]) => v > 0)) : {},
     };
   };
 

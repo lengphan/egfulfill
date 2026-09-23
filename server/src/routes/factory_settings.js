@@ -576,6 +576,25 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       // pricing.js is what actually bills it; this is the seller-facing read of the same
       // number, so the page and the invoice cannot quote different figures.
       sideFee: Number(nums.method_side) || 0,
+      /**
+       * AND THE TWO RUNGS ABOVE THE FLAT RATE, which never left the server.
+       *
+       * faceRate() resolves a placement through five rungs and the client could only see the
+       * last two — the product's own map, then `method_side`. So a `side_sleeve` or a
+       * `side_dtg` typed into Settings priced the invoice and was INVISIBLE on the product
+       * page, which is the one screen whose whole job is quoting a configured variant.
+       * Measured as part of the 2026-09-23 drift audit.
+       *
+       * Seller-safe for exactly the reason the method surcharges above are: a placement rate
+       * is what a SELLER pays extra, never what the blank costs us (§2.9), and it is already
+       * on every invoice they receive.
+       */
+      sideFees: Object.fromEntries(
+        PRICED_SIDES.map((f) => [f, Number(nums[`side_${f}`]) || 0]).filter(([, v]) => v > 0)
+      ),
+      sideMethodFees: Object.fromEntries(
+        METHOD_KEYS.map((k) => [k, Number(nums[`side_${k}`]) || 0]).filter(([, v]) => v > 0)
+      ),
     };
   });
 

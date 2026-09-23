@@ -11,6 +11,7 @@ import { getCatalogProducts, getDesignFees, getProductTypes, type CatalogProduct
 import { ShippingFees } from "@/components/shipping-fees"
 import { shipFirstFee } from "@/lib/ship-band"
 import { sizesOf, methodsOf, sidesOf, setTypeMockups } from "@/lib/variant-resolve"
+import { productUnitPrice } from "@/lib/product-price"
 import { PRODUCT_METHODS, normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
 import { framingStyle } from "@/lib/product-framing"
@@ -244,46 +245,35 @@ export default function ProductDetailPage() {
  const selMethod = pickMethod === BLANK_KEY ? null
     : (techs.find((t) => t.key === pickMethod) ?? techs[0] ?? null)
  const isBlank = blankTiers && pickMethod === BLANK_KEY
-  /** The method's add-on — the product's own figure, else the platform's, else nothing.
-   *  Mirrors methodAddOn in server/src/pricing.js: product override first, then fees. */
- const methodFee = (key: string | null | undefined, label?: string) => {
- if (!key) return 0
- const own = product.methodPrices?.[key.toUpperCase()] ?? (label ? product.methodPrices?.[label.split(" ")[0]] : undefined)
- if (typeof own === "number" && own > 0) return own
- const plat = fees?.methods?.[key.toLowerCase()]
- return typeof plat === "number" && plat > 0 ? plat : 0
+  /**
+   * THE PRICE COMES FROM ONE MODULE NOW — lib/product-price.ts, which the gate
+   * tools/check-product-price.mjs EXECUTES against the real priceLines over 321 cases.
+   *
+   * This page carried its own copy of the ladder and it was a rule generation behind. It
+   * read `sidesAdd = Σ sideRateFor(face)` — EVERY selected face charged its placement, the
+   * 2026-09-18 rule — while the invoice has charged ONE placement per line since 09-21, and
+   * each face after it that face's machine RUN. Measured by executing pricing.js against it:
+   * an embroidered hoodie printed front, back and sleeve quoted $33.00 here against an
+   * invoice of $39.00. It drifted the other way too, over-quoting a second DTG face by a
+   * placement the charge gives away.
+   *
+   * And `sideRateFor` never read the PLATFORM's per-face keys at all — only the product's
+   * own map, then the flat rate — so a `side_sleeve` set in Settings was invisible on the
+   * one page whose whole job is quoting a configured variant.
+   */
+  const pricing = { sidePrice: (product as { sidePrice?: unknown }).sidePrice, methodPrices: product.methodPrices }
+  const platform = {
+    sideFee: fees?.sideFee, sideFees: fees?.sideFees,
+    sideMethodFees: fees?.sideMethodFees, methods: fees?.methods,
   }
   /** The faces this blank can be printed on, and the ones being priced. */
- const sides = sidesOf(product)
- const selSides = (pickSides ?? []).filter((s) => sides.includes(s))
- const pricedSides = selSides.length ? selSides : sides.slice(0, 1)
-  /** What each ADDITIONAL face adds. Mirrors sideAddOn in server/src/pricing.js — the first
-   *  print is inside the base cost, so only faces 2, 3, 4 are charged. */
- const sideFee = Number(fees?.sideFee ?? 0) || 0
-  /**
-   * EVERY PLACEMENT IS CHARGED, AT THIS PRODUCT'S OWN RATE.
-   *
-   * Two faults, one after the other. It was `sideFee * (length - 1)` — the first-placement-free
-   * formula — which survived the rule change that removed inclusion because single-select
-   * placement made it always zero, and a dead expression cannot be seen to be stale.
-   *
-   * And `sideFee` is the PLATFORM's flat rate. A product carrying its own per-face prices —
-   * `sidePrice: {front: 1}` on this cap — was quoted the platform $3.00 here while the order
-   * charged $1.00, so the page and the invoice disagreed by the exact amount somebody had
-   * deliberately typed into the editor.
-   *
-   * Mirrors faceRate in server/src/pricing.js: the product's own figure for THIS face, then its
-   * flat override, then the platform's.
-   */
- const sideRateFor = (face: string) => {
- const own = (product as { sidePrice?: unknown }).sidePrice
- const map = own && typeof own === "object" ? (own as Record<string, unknown>) : null
- const perFace = map ? Number(map[face]) || 0 : 0
- if (perFace > 0) return perFace
- const ownFlat = typeof own === "number" ? own : Number(own) || 0
-    return ownFlat > 0 ? ownFlat : sideFee
-  }
- const sidesAdd = pricedSides.reduce((n, f) => n + sideRateFor(f), 0)
+  const sides = sidesOf(product)
+  const selSides = (pickSides ?? []).filter((s) => sides.includes(s))
+  const pricedSides = selSides.length ? selSides : sides.slice(0, 1)
+  /* NO PER-FACE BREAKDOWN HERE. `facePartsFor` would give this page the same split the
+     order summary prints, and the owner removed a sum line from this card on 2026-09-21 —
+     "it read as an invoice for something nobody had bought yet". The module still exposes
+     the split for the order surfaces and for the gate; this page quotes one figure. */
   /* A BLANK IS THE GARMENT AND NOTHING ELSE: no method surcharge, and no surface — there is
      no printed face to charge for. Falls back to the base cost only if this size has no blank
      price of its own, which `blankTiers` has already made unreachable from the chip. */
@@ -294,7 +284,8 @@ export default function ProductDetailPage() {
      and no method surcharge. Everything else adds both. */
  const unitList = isBlank
     ? garmentPrice
-    : garmentPrice + methodFee(selMethod?.key, selMethod?.label) + sidesAdd
+    : productUnitPrice({ blank: garmentPrice, printType: selMethod?.label ?? null,
+                         faces: pricedSides, product: pricing, fees: platform })
 
  return (
     <div className="space-y-5">

@@ -5,7 +5,8 @@ import Image from "next/image"
 import Link from "next/link"
 import { TShirt, ArrowLeft, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise, INK_ON_ACID } from "@/components/marketing/bold-kit"
-import { normTech } from "@/lib/print-method"
+
+import { productUnitPrice, methodRate } from "@/lib/product-price"
 // ONE VOCABULARY FOR A FACE. `left` is "Left sleeve" everywhere in the product — on the
 // import sheet, on the boards and here — and a second spelling on the public page is how
 // two words for one placement start (CLAUDE.md §5).
@@ -141,11 +142,9 @@ export function BoldProduct({ product, shipping }: {
    * ZERO WHEN UNKNOWN, never a guess. A method the table has no entry for adds nothing —
    * which is what the charge does too, since methodAddOn returns 0 for an unpriced key.
    */
-  const addOnFor = (m: string | null) => {
-    if (!m) return 0
-    const key = normTech(m)?.key
-    return (key && product.methodPrices?.[key]) || 0
-  }
+  /* `addOnFor` is gone: productUnitPrice resolves the technique through the same ladder
+     the charge uses (methodRate), so a second copy here would be the drift this file just
+     stopped having. */
   /**
    * WHAT THE EXTRA FACES ADD.
    *
@@ -158,9 +157,34 @@ export function BoldProduct({ product, shipping }: {
   /** The faces this blank prints on, in the server's order. Empty for a product published
    *  before the field existed, which simply means no placement picker. */
   const placements = product.sides ?? []
-  const sideFee = Number(product.sideFee ?? 0) || 0
-  const sidesAdd = sideFee > 0 ? sideFee * Math.max(0, sides.length - 1) : 0
-  const shown = priceOfSize(size) + addOnFor(method) + sidesAdd
+  /**
+   * ONE MODULE, THE SAME ONE THE APP'S PRODUCT PAGE USES — lib/product-price.ts, executed
+   * against the real priceLines by tools/check-product-price.mjs.
+   *
+   * This carried the OLDEST of the three rules: `sideFee × (N − 1)`, which assumed the first
+   * printed face was inside the blank's price, charged every face after it the flat platform
+   * rate, and ignored the technique entirely. All three halves stopped being true — on
+   * 2026-09-18 when every face began carrying a placement, and again on 09-21 when the
+   * placement became one per LINE and each further face started paying its own machine RUN.
+   *
+   * Measured by executing pricing.js against it: one embroidered hoodie printed front, back
+   * and sleeve was quoted $30.00 HERE, on the public web, against an invoice of $39.00. That
+   * is a price a stranger can read before they have an account, which makes it the worst
+   * place of the three to be wrong.
+   */
+  /** What a face after the first adds — its technique's run, the same figure the rail and
+   *  the summary print. Zero when the method has no surcharge, and then nothing is said. */
+  const extraFace = methodRate(method, { methodPrices: product.methodPrices },
+    { sideFee: product.sideFee, sideFees: product.sideFees, sideMethodFees: product.sideMethodFees })
+  const shown = productUnitPrice({
+    blank: priceOfSize(size) ?? 0,
+    printType: method,
+    faces: sides,
+    /* The published shape carries the product's own overrides under these names; a key it
+       does not publish is simply unset, which every rung treats as "no answer". */
+    product: { sidePrice: (product as { sidePrice?: unknown }).sidePrice, methodPrices: product.methodPrices },
+    fees: { sideFee: product.sideFee, sideFees: product.sideFees, sideMethodFees: product.sideMethodFees },
+  })
   const chosen = colorIdx == null ? null : product.colors[colorIdx] ?? null
   const hero = chosen?.image ?? product.image
   /*
@@ -357,7 +381,16 @@ export function BoldProduct({ product, shipping }: {
                     the extra faces sit on top of it either way, exactly as the order charge
                     stacks them. */}
                 <span className="text-4xl font-semibold tracking-tight tabular-nums">
-                  {usd(size ? shown : (product.priceFrom ?? product.price) + addOnFor(method) + sidesAdd)}
+                  {usd(size ? shown : productUnitPrice({
+                    /* THE "FROM" PRICE — the cheapest size — decorated the same way the
+                       chosen one would be. It had its own copy of the stale arithmetic, so
+                       the headline and the sized price disagreed the moment a size was
+                       picked. One function answers both. */
+                    blank: product.priceFrom ?? product.price ?? 0,
+                    printType: method, faces: sides,
+                    product: { sidePrice: (product as { sidePrice?: unknown }).sidePrice, methodPrices: product.methodPrices },
+                    fees: { sideFee: product.sideFee, sideFees: product.sideFees, sideMethodFees: product.sideMethodFees },
+                  }))}
                 </span>
                 {size && <span className="text-sm font-semibold text-[var(--mk-ink)]/60">for {size}</span>}
               </div>
@@ -537,9 +570,17 @@ export function BoldProduct({ product, shipping }: {
                   <div className="mt-6">
                     <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--mk-ink)]/50">
                       <span>Placement <span className="text-[var(--mk-ink)]/35">· {placements.length}</span></span>
-                      {sideFee > 0 && (
+                      {/* WHAT AN EXTRA FACE ACTUALLY COSTS, which is not a placement.
+                          This read "{sideFee} per extra placement" — the flat rate, under the
+                          rule where every face after the first paid one. Since 2026-09-21 the
+                          placement is charged ONCE for the garment and a further face buys its
+                          technique's RUN instead, so both the figure and the words were wrong.
+                          A method the table prices at nothing says nothing: a second DTG face
+                          genuinely is free, and inventing a caption for it would be the
+                          over-quote this page already had in the other direction. */}
+                      {extraFace > 0 && (
                         <span className="normal-case tracking-normal text-[var(--mk-ink)]/45">
-                          {usd(sideFee)} per extra placement
+                          {usd(extraFace)} per extra {method || "print"}
                         </span>
                       )}
                     </div>
