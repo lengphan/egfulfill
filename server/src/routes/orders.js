@@ -5355,7 +5355,28 @@ export function ordersRoutes(app, requireAuth) {
          seller-specific — it names one of OUR placement recipes, so it travels to whoever
          can already see the order. Null for artwork somebody simply dropped, which is most
          of it. */
-      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, method: row.method ?? null, name: row.name, pos: row.pos, data: url || row.data, url, design_id: designId, template_id: row.template_id || null };
+      /**
+       * design_no WAS SELECTED AND NEVER RETURNED.
+       *
+       * The query joins design_ids and the note above it says the number comes with the row
+       * — "so the face you had open names itself" — and then this projection lists every
+       * column by hand and leaves that one out. So every consumer of this route saw
+       * `design_no: undefined`: the download menu prints DSN-#### only when it is non-null,
+       * so it printed nothing, and the Files tab had no number to match an order against.
+       * Verified against the live API before the fix: four design rows, design_no undefined
+       * on all four, while design_ids held 1398/1399 for those exact hashes.
+       *
+       * A NUMBER, NOT A STRING. design_no is a bigint and node-pg hands those back as
+       * strings (§5) — design-id.js coerces in both of its own readers for exactly this
+       * reason, and the client type says `number | null`. Returned raw it renders fine and
+       * compares wrong, which is the quiet half of that rule.
+       *
+       * NOT the same thing as `design_id` beside it. That is D-<first 8 of the art hash>, a
+       * content address; this is the DSN-#### a person says out loud. Both are here because
+       * both are used, and the names are one letter apart, which is most of how this was
+       * missed.
+       */
+      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, method: row.method ?? null, name: row.name, pos: row.pos, data: url || row.data, url, design_id: designId, design_no: row.design_no == null ? null : Number(row.design_no), template_id: row.template_id || null };
     });
   });
 
