@@ -491,7 +491,37 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       // A browser-ish User-Agent + Referer: their CDN 403s anything that looks like a bot,
       // which a bare 'egfulfill/1.0' does.
       const UA = 'Mozilla/5.0 (compatible; egfulfill/1.0)';
-      const get = (url) => fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': UA, Accept: 'image/*', Referer: 'https://www.ssactivewear.com/' } });
+      const one = (url) => fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': UA, Accept: 'image/*', Referer: 'https://www.ssactivewear.com/' } });
+      /**
+       * A DROPPED CONNECTION IS NOT A MISSING PICTURE, AND IT WAS BEING TREATED AS ONE.
+       *
+       * The self-heal below only ever ran on `!r.ok` — a 404 from a size variant that does
+       * not exist, or the wrong host. A fetch that THREW went straight to the catch and
+       * answered 502, and the editor's tile is a plain `<img>` that never asks again, so one
+       * reset socket left a permanently broken square in a grid of thirty.
+       *
+       * That is what was happening: the log shows `fetch error … fetch failed` — thirteen in
+       * a week, never a 404 — and every one of those URLs fetches from this box in ~50ms, and
+       * twenty-nine uncached ones in a single burst all returned 200. The address was always
+       * right. The connection was not, occasionally, because opening thirty sockets to one
+       * CDN at once is what drawing this page does.
+       *
+       * So: two more goes with a short backoff, and ONLY on a throw. A 404 is an answer and
+       * is not retried — retrying a real miss is how one broken tile becomes three requests
+       * for nothing. The 8s abort still covers the whole attempt, so this cannot hang longer
+       * than before; it just stops spending that budget on one unlucky socket.
+       */
+      const get = async (url) => {
+        let last;
+        for (let i = 0; i < 3; i++) {
+          try { return await one(url); } catch (e) {
+            last = e;
+            if (ctrl.signal.aborted) throw e;     // the deadline, not the socket — give up
+            await new Promise((res) => setTimeout(res, 120 * (i + 1)));
+          }
+        }
+        throw last;
+      };
       let r = await get(u);
       // Self-heal: a missing size variant or the wrong host shouldn't mean no picture.
       if (!r.ok) {

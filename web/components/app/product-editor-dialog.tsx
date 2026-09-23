@@ -186,6 +186,45 @@ const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", 
 const DEFAULT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"]
 const SUGGESTED_COLORS = ["Black", "White", "Navy", "Sand", "Heather Grey", "Red", "Royal", "Forest", "Maroon", "Charcoal"]
 
+/**
+ * A GALLERY TILE THAT ASKS TWICE BEFORE GIVING UP.
+ *
+ * These are supplier photos coming through our own proxy, and the proxy fetches them from
+ * the supplier's CDN when it has not cached one yet. Opening this tab asks for thirty at
+ * once, and a CDN drops a connection now and then — the log records `fetch failed`, never a
+ * 404, and the same URL fetched by hand is fine. A plain <img> never asks again, so one
+ * unlucky socket left a permanently torn square that read as "this image is missing".
+ *
+ * So: one retry, cache-busted so the browser does not hand back the failure it already has.
+ * After that it is a PLACEHOLDER SAYING IT COULD NOT LOAD, not the browser's broken glyph —
+ * §4 forbids drawing "we could not read it" and "it is not there" the same way, and the
+ * broken glyph is what made every session read this as missing data.
+ */
+function GalleryTile({ src }: { src: string }) {
+  const [tries, setTries] = useState(0)
+  const [dead, setDead] = useState(false)
+  // No reset effect: the call site keys this on the url, so a different picture is a
+  // different component and a failure recorded about the old one cannot outlive it (§5 —
+  // reset by remounting, never by an effect that renders stale state for a frame).
+  if (dead) {
+    return (
+      <span className="grid size-full place-items-center bg-muted text-muted-foreground" title={src}>
+        <ImageIcon size={20} weight="duotone" />
+      </span>
+    )
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={tries ? `${src}${src.includes("?") ? "&" : "?"}r=${tries}` : src}
+      alt=""
+      className="size-full object-cover"
+      draggable={false}
+      onError={() => { if (tries < 1) setTries((n) => n + 1); else setDead(true) }}
+    />
+  )
+}
+
 const imageOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
 const genId = (seed: number) => "PROD-" + seed.toString(36).toUpperCase()
 const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v))
@@ -2299,8 +2338,7 @@ export function ProductEditorDialog({
                   <div className={"relative size-28 overflow-hidden rounded-lg border-2 transition-colors " + (u === img ? "border-primary" : "border-border") + (dragIdx === i ? " opacity-40" : "")}>
                     {/* Click the photo to make it the MAIN image (first = hero). */}
                     <button type="button" onClick={() => setImg(u)} title={u === img ? tl("product", "Main image") : tl("product", "Make this the main image")} className="block size-full">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={u} alt="" className="size-full object-cover" draggable={false} />
+                      <GalleryTile key={u} src={u} />
                     </button>
                     {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-2xs font-semibold text-primary-foreground shadow">{tl("product", "Main")}</span>}
                     {assigned && matchConf[assigned] === "high" && <Check size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-success" aria-label={tl("product", "Confident match")} />}
