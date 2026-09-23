@@ -44,8 +44,8 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   "mode": "test",
   "count": 2,
   "data": [
-    { "id": "SS-16468", "sku": "16468", "name": "Heavy Cotton Tee",
-      "type": "Apparel", "method": "DTG", "base_price": 8.50 }
+    { "sku": "16468", "name": "Heavy Cotton Tee", "type": "Apparel", "method": "DTG",
+      "price": 14.50, "base_price": 8.50, "sizes": ["S", "M", "L", "XL"] }
   ]
 }`,
     method: "GET",

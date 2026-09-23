@@ -182,7 +182,7 @@ export function ApiPlayground() {
           <div className="grid gap-4 p-5 sm:grid-cols-3">
             {[
               { n: "1", h: tl("apiPlayground", "Get a key"), b: tl("apiPlayground", "Generate a key (egk_test_…) in Settings → API keys, then paste it below. Send it on every request as the X-API-Key header.") },
-              { n: "2", h: tl("apiPlayground", "Build in the sandbox"), b: tl("apiPlayground", "Every call hits /api/test/* — it validates auth and returns realistic responses but creates NO real orders, labels, or charges. Try the endpoints below.") },
+              { n: "2", h: tl("apiPlayground", "Build in the sandbox"), b: tl("apiPlayground", "A test key runs the same /api/v1/* routes live does — same validation, same prices — but creates NO real order and moves no money. Try the endpoints below.") },
               { n: "3", h: tl("apiPlayground", "Go live"), b: tl("apiPlayground", "Once your integration works, live access (a production key + real order endpoints) is enabled per-account — reach out and we'll turn it on.") },
             ].map((s) => (
               <div key={s.n} className="rounded-xl border border-border p-4">
@@ -276,7 +276,7 @@ export function ApiPlayground() {
               <Key size={14} weight="bold" /> {tl("apiPlayground", "Manage keys")}
             </a>
           </div>
-          <p className="text-xs text-muted-foreground">Keys are created &amp; managed in <a href="/settings?tab=keys" className="font-medium text-foreground underline underline-offset-2">{tl("apiPlayground", "Settings → API keys")}</a> — generate one there and paste it above. {env === "live" ? tl("apiPlayground", "A live key makes calls create real records.") : tl("apiPlayground", "A sandbox key hits /api/test/* — no real orders, labels or charges.")}</p>
+          <p className="text-xs text-muted-foreground">Keys are created &amp; managed in <a href="/settings?tab=keys" className="font-medium text-foreground underline underline-offset-2">{tl("apiPlayground", "Settings → API keys")}</a> — generate one there and paste it above. {env === "live" ? tl("apiPlayground", "A live key makes calls create real records.") : tl("apiPlayground", "A test key runs the same routes as live, but creates nothing and charges nothing.")}</p>
         </div>
       </SectionCard>
 
