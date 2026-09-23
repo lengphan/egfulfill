@@ -400,16 +400,29 @@ export function ArtworkLibraryPanel() {
                       * none. Nothing is drawn when nobody has said yet — an empty pill is
                       * not an answer.
                       */}
-                    {normalizeMethods(d.methods ?? []).map((m) => (
-                      <span
-                        key={m.key}
-                        className={"shrink-0 rounded-md px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide "
-                          + (m.key === "emb" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}
-                        title={m.label}
-                      >
-                        {m.key}
-                      </span>
-                    ))}
+                    {(() => {
+                      const ms = normalizeMethods(d.methods ?? [])
+                      /* WHAT THE PILL IS A FACT ABOUT. Two of them beside a DSN read as
+                         "this design IS both", which is a property of the picture and not
+                         what this says. It says the picture has been ORDERED both ways — on
+                         DSN-1131, a cotton shirt printed DTG on one order and an apron
+                         embroidered on another. Same artwork, two jobs, and it needs a file
+                         of each kind. The title says so in words; one method needs no
+                         explaining and gets the short form. */
+                      const why = ms.length > 1
+                        ? `${tl("artwork", "Ordered as")} ${ms.map((m) => m.label).join(" + ")}`
+                        : ms[0]?.label
+                      return ms.map((m) => (
+                        <span
+                          key={m.key}
+                          className={"shrink-0 rounded-md px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide "
+                            + (m.key === "emb" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}
+                          title={why}
+                        >
+                          {m.key}
+                        </span>
+                      ))
+                    })()}
                     {d.name && <span className="min-w-0 truncate text-sm text-muted-foreground">{d.name}</span>}
                   </div>
                   {/**
