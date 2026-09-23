@@ -68,7 +68,23 @@ export const ORDER_COLS: Record<OrderColId, OrderColDef> = {
   // comes off `items`, the only flexible column — which is what the note above says every
   // pixel here costs, and the trade is a listing title losing two characters it was
   // truncating anyway against an order number becoming readable at all.
-  order: { px: 104, id: "order", label: "Order", width: "w-[104px]", locked: true },
+  //
+  // A FLOOR AND A CEILING, for the same reason as the factory board's track: 104px was
+  // measured against an ETSY number, and Etsy is the SHORTEST of the three. Counted on the
+  // live table — Etsy 10 digits, Shopify 13, TikTok 18 — an 18-digit number is ~164px of
+  // text, so a TikTok row truncated the one cell the seller quotes to a buyer. MEASURED in
+  // Chrome at Inter 600 14px tabular-nums, which also reproduced this file's own 100px figure
+  // for "#4153521234" (99.61): Etsy 90.59 · Shopify 117.77 · TikTok 163.06 · manual FF- 217.52.
+  //
+  // `w-` fixes the column at 104 and the cell carries `truncate`, so the clip happened even
+  // with visible room to the right. `min-w-`/`max-w-` keeps the same 104px floor the px
+  // budget below is balanced against, and lets the column take slack up to 192px (168 text +
+  // the 24 of TableCell padding this file's own rule adds). Past that it truncates as before,
+  // which only a manual FF- id reaches.
+  //
+  // `px` stays 104: it is the number the budget arithmetic uses, and the FLOOR is what that
+  // arithmetic is about — the same reading minPxFor() takes of a minmax track.
+  order: { px: 104, id: "order", label: "Order", width: "min-w-[104px] max-w-[192px]", locked: true },
   store: { px: 88, id: "store", label: "Store", width: "w-[88px]", drop: "xl" },
   customer: { px: 136, id: "customer", label: "Customer", width: "w-[136px]", drop: "xl" },
   /**
@@ -246,7 +262,22 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // because the row minimum once exceeded the container and every board opened mid-scroll
   // with its primary action off-screen. A wider column paid for out of a narrower one keeps
   // that sum exactly where it was.
-  order:    { id: "order",    label: "Order",    grid: "6.5rem" },
+  //
+  // 6.5rem WAS MEASURED AGAINST AN ETSY RECEIPT, AND ETSY IS NOT THE LONGEST. Counted on the
+  // live table: Etsy 10 digits (1,129 orders), Shopify 13, TIKTOK 18 (20 orders). At the
+  // 9.09px per character this cell's own note establishes, 18 digits is ~164px against a
+  // 104px track — so a TikTok row truncated the one thing the column exists to say, on a row
+  // with visible empty space to its right. That is the complaint, and it is correct.
+  //
+  // minmax, not a bigger fixed track. minPxFor() counts a minmax as its FLOOR, so the row
+  // MINIMUM is unchanged at 6.5rem — the invariant the note above guards, and the reason
+  // DEFAULT_HIDDEN_FACTORY_COLS exists at all. The column simply takes slack when the board
+  // has it, which is exactly where the missing digits were going.
+  //
+  // The 10.5rem ceiling is deliberate: it clears 18 digits (~164px) and stops there, so a
+  // manual FF- id at 26 characters cannot drag the track to 240px and squeeze Items and
+  // Customer on every row for one order shape that has EGF-00xxxx on the line beneath it.
+  order:    { id: "order",    label: "Order",    grid: "minmax(6.5rem, 10.5rem)" },
   // Wide enough for a FULL tracking number rather than an ellipsis. A truncated tracking
   // number cannot be read to a buyer on the phone, which is the only reason it is on the
   // row at all — so it is sized to the longest carrier format, not to the space left over.
