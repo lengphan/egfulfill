@@ -3151,7 +3151,17 @@ export function OrdersHub() {
                                  now, so both pick up the row's separator and spacing; an entry that
                                  renders nothing takes its dot with it. */
  after={[
-                                  <LineStock key="stock" item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} onTrack={isStaff ? setTrackSku : undefined} />,
+                                  /* NO STOCK READING ON THE ROW (owner, 2026-09-23: "remove this
+                                     small stock section down here"). "Stock: 0" sat under every
+                                     line of every order — on a board that is about what to MAKE,
+                                     answering a question about what is on the SHELF, and reading
+                                     0 on the many blanks nobody tracks counts for. Where it is
+                                     actually a decision it is already said louder: Inventory
+                                     shows the count, the purchase cart shows the shortage, and a
+                                     line that cannot be filled is stopped at submit rather than
+                                     annotated here. LineStock stays — it is imported by nothing
+                                     else yet, and deleting a component to remove a call site is
+                                     a bigger change than the one that was asked for. */
                                   (() => {
                                     /**
                                      * THREADS ONLY ONCE A BLANK IS CHOSEN.

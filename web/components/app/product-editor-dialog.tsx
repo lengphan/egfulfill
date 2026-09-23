@@ -651,7 +651,7 @@ export function ProductEditorDialog({
    *
    * Three levers instead of two prefixes: WHAT to change, WHICH WAY, and BY HOW MUCH.
    */
- const [bulkField, setBulkField] = useState<"blank" | "shipping" | "cost">("blank")
+ const [bulkField, setBulkField] = useState<"blank" | "shipping" | "cost" | "stock">("blank")
  const [bulkDown, setBulkDown] = useState(false)
   /**
    * THE SHELF, PER VARIANT — variantSku -> units, as TEXT.
@@ -1024,6 +1024,9 @@ export function ProductEditorDialog({
    * editor's placeholder already does.
    */
  const applyBulk = () => {
+    /* Stock never reaches here — the bar routes it to applyBulkStock — and refusing is what
+       keeps the narrowing below from quietly writing Blank if that ever changes. */
+ if (bulkField === "stock") return
  const b = bulkBase.trim()
  if (b === "") return
  const amt = Number(b) || 0
@@ -1045,13 +1048,16 @@ export function ProductEditorDialog({
          */
  const rowCost = num(cur.cost)
  const ownCost = !isNaN(rowCost) ? rowCost : (num(productCost) || 0)
- const current = num(cur[bulkField])
- const start = !isNaN(current) ? current : (bulkField === "blank" ? ownCost : 0)
+        /* `bulkField` is already narrowed to the three money columns by the guard at the top
+           — Stock is a count held per VARIANT and routes to applyBulkStock instead. */
+ const field = bulkField
+ const current = num(cur[field])
+ const start = !isNaN(current) ? current : (field === "blank" ? ownCost : 0)
  const raw = bulkPct ? start * (1 + (sign * amt) / 100) : start + sign * amt
         /* NEVER BELOW ZERO. A minus that overshoots is a typo, and a negative price would be
            saved and then billed — clamping is the only outcome that cannot cost money. */
  const next = Math.max(0, Math.round(raw * 100) / 100)
- nextT[s] = { ...cur, [bulkField]: String(next) }
+ nextT[s] = { ...cur, [field]: String(next) }
       }
  return nextT
     })
@@ -1871,14 +1877,28 @@ export function ProductEditorDialog({
                         the control — "Blank price" over "product cost +" — which is §4's case:
                         a control that needs a sentence has the wrong label. The controls now
                         SAY it: [Blank] [+] [%] [12] reads as one line left to right. */}
-                    <span className="text-xs font-medium text-foreground">{tl("product", "Bulk price")}</span>
+                    {/* "BULK EDIT", not "Bulk price" — it sets Stock too now, and a bar
+                        labelled `price` would be the wrong word on the one column that is a
+                        COUNT (owner, 2026-09-23). */}
+                    <span className="text-xs font-medium text-foreground">{tl("product", "Bulk edit")}</span>
                     <select value={bulkField} onChange={(e) => setBulkField(e.target.value as typeof bulkField)}
                       className="eg-select eg-control h-8 pr-7 text-sm"
                       aria-label={tl("product", "Which price to change")}>
                       <option value="blank">{tl("product", "Blank")}</option>
                       <option value="shipping">{tl("product", "Shipping")}</option>
                       <option value="cost">{tl("product", "Product cost")}</option>
+                      {/* STOCK IS A COUNT, AND IT IS PER VARIANT. The other three are money
+                          held per SIZE; stock is held per size x colour, because that is how
+                          the shelf is keyed and what an order line names. That difference is
+                          why it was split out of this bar once — but two bars for one gesture
+                          is worse than one bar that routes, so the granularity lives in the
+                          handler and the button says which it is about to touch. */}
+                      <option value="stock">{tl("product", "Stock")}</option>
                     </select>
+                    {/* NOT FOR STOCK. A count is set, never nudged by a percentage — and a
+                        "-" against it would be an adjustment this box cannot express anyway,
+                        since the field strips everything but digits. */}
+                    {bulkField !== "stock" && (<>
                     {/* WHICH WAY. Two buttons rather than a typed minus: the amount box strips
                         everything but digits (it has to — a stray character silently became
                         NaN and wrote 0 across every size), so a minus could never be typed
@@ -1901,10 +1921,24 @@ export function ProductEditorDialog({
                         </button>
                       ))}
                     </span>
+                    </>)}
+                    {bulkField === "stock" ? (
+                      <>
+                        <Input value={bulkStock} onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
+                          className="h-8 w-20 text-sm tabular-nums" inputMode="numeric"
+                          aria-label={tl("product", "Units to set on every variant")} />
+                        {/* IT SAYS VARIANTS, because that is what it writes — every colourway of
+                            every size. "Apply to all sizes" would promise one number per size
+                            and leave a count no order line can draw from. */}
+                        <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulkStock}
+                          disabled={!bulkStock.trim() || !ourSku}>{tl("product", "Apply to all variants")}</Button>
+                      </>
+                    ) : (<>
                     <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
  className="h-8 w-20 text-sm tabular-nums" inputMode="decimal" aria-label={tl("product", "Amount to add or take off every size")} />
                     <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk}
  disabled={!bulkBase.trim()}>{tl("product", "Apply to all sizes")}</Button>
+                    </>)}
                   </div>
                 )}
                 {/* STOCK IS A COLUMN HERE. It was a size × colour grid of its own below —
