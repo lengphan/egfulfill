@@ -357,6 +357,15 @@ export function designFilesRoutes(app, requireAuth) {
                 min(d.updated_at) as first_seen,
                 max(d.updated_at) as last_seen,
                 count(distinct d.order_id) as orders,
+                /* WHICH ORDERS, not just how many. "3 orders" is the fact; the numbers are
+                   what a person acts on — they are what you type into the order search to
+                   go and look. node-pg hands a jsonb array straight back as JS, and the
+                   client needs ref_no/seq/id to print the same EGF-###### every other
+                   surface does (numOf), so the whole shape travels rather than a string
+                   built here. Capped in the mapper below, not the aggregate: the count has
+                   to stay the TRUE count even when the list is trimmed. */
+                jsonb_agg(distinct jsonb_build_object(
+                  'id', o.id, 'ref_no', o.ref_no, 'seq', o.seq)) as order_refs,
                 count(distinct o.seller_id) as sellers,
                 array_agg(distinct coalesce(u.store_name, u.name, u.email, '—')) as seller_names,
                 max(d.name) as name
@@ -431,6 +440,12 @@ export function designFilesRoutes(app, requireAuth) {
         orders: Number(r.orders) || 0,
         sellers: Number(r.sellers) || 0,
         seller_names: (r.seller_names || []).filter(Boolean),
+        /* Newest first and capped: a picture on sixty orders is a scroll nobody reads, and
+           the count beside it already says there are more. */
+        order_refs: (r.order_refs || [])
+          .filter((x) => x && x.id)
+          .sort((a, b) => Number(b.ref_no || 0) - Number(a.ref_no || 0))
+          .slice(0, 24),
         has_file: !!r.has_file,
         /* Named so a card can print it and a press can fetch it. `file_id` is the
            design_id the download route takes — ART-<hash16> for one filed against the

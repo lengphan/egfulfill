@@ -22,6 +22,26 @@ import { cn } from "@/lib/utils"
 // of each turns it into a row of competing marks, and none of them tell you anything the
 // word doesn't already say.
 const TABS = [
+  /**
+   * FILES LEADS, for the people who see it at all.
+   *
+   * It is the factory's artwork library — every picture an order asked for, and whether we
+   * already hold the stitch file for it — and it was its own board at /artwork. It is the
+   * SAME QUESTION Machine files asks from the other end: that tab holds the files we have,
+   * this one holds the artwork waiting on one. Two shelves in two places is how "have we
+   * digitised this before" gets answered by guessing.
+   *
+   * FIRST because it is where the work starts. A seller's own three tabs are a library they
+   * browse; this is a queue with a count of orders waiting on each row, and a queue that
+   * opens fourth is one somebody has to remember to go to.
+   *
+   * STAFF, AND NOT ALL STAFF. Every card names the shops that ordered a design, which is the
+   * narrowest §6 surface in the app — so it keeps exactly the roles its old nav item carried
+   * (operator · designer · admin), and warehouse does not see it even though the rest of
+   * Design Lab is open to them. A seller's bar therefore still opens on Artwork, unchanged.
+   * The server refuses a seller outright; this gate is the second lock, not the first.
+   */
+  { key: "files", label: "Files", href: "/design?tab=files", roles: ["operator", "designer", "admin"] },
   // ?tab=library rather than a bare /design: navigating from ?tab=templates to a URL with
   // NO search params left useSearchParams() holding the old value, so the hook kept
   // reporting "templates" and clicking Library re-rendered the Templates panel. Both hrefs
@@ -47,21 +67,6 @@ const TABS = [
   // a machine file is the cut file, which has no placement to carry and no blank it belongs
   // to — the same .EMB runs on a cap and on a left chest. Two questions, two surfaces.
   { key: "machine", label: "Machine files", href: "/design?tab=machine" },
-  /**
-   * FILES — the factory's artwork library, which was its own board at /artwork.
-   *
-   * It is the SAME QUESTION Machine files asks, from the other end: that tab holds the
-   * stitch files we have, this one holds every picture an order asked for and says which
-   * of them we hold a file FOR. Two shelves in two places is how "have we digitised this
-   * before" gets answered by guessing.
-   *
-   * STAFF, AND NOT ALL STAFF. Every card names the shops that ordered a design, which is
-   * the narrowest §6 surface in the app — so this keeps exactly the roles its own nav item
-   * carried (operator · designer · admin) and warehouse does not see it, even though the
-   * rest of Design Lab is open to them. The server refuses a seller outright; this gate is
-   * the second lock, not the first.
-   */
-  { key: "files", label: "Files", href: "/design?tab=files", roles: ["operator", "designer", "admin"] },
   // "Design", not "Design maker". It sits beside two one-word toggles, and the bar reads as
   // a set of three — a two-word member of a three-word set is the one the eye stops on.
   { key: "maker", label: "Design", href: "/design/maker" },

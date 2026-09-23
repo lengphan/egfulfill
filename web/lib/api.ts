@@ -2083,6 +2083,10 @@ export type FactoryDesign = {
   file_id?: string | null
   file_name?: string | null
   file_kind?: string | null
+  /** WHICH orders carried it — newest first, capped at 24 while `orders` stays the true
+   *  count. Carries what numOf needs so the library prints the same EGF-###### the order
+   *  page does, rather than inventing a second way to name an order. */
+  order_refs?: { id: string; ref_no?: number | string | null; seq?: number | null }[]
   first_seen?: string | null
   last_seen?: string | null
 }
