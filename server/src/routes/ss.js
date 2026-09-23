@@ -2075,7 +2075,22 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       });
       const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch (e) { data = txt; }
       if (!r.ok) {
-        reply.code(502);
+        /**
+         * THEIR STATUS, NOT A BLANKET 502 — this route was the only S&S route that hardcoded
+         * one, and it cost a real afternoon.
+         *
+         * S&S answer 400 with a reason a buyer can act on: "Identifier B11378500 (Adams
+         * Headwear, GC102, Black, One Size) - Out Of Stock (Ordered: 1, Available: 0)".
+         * Returning 502 for that says "the upstream did not answer" when it answered
+         * perfectly well and said no — so lib/api.ts used its 5xx floor, "The server didn't
+         * respond (HTTP 502). It may be restarting", and the operator retried a cap that was
+         * never going to be in stock. A refusal carries its reason (§4); a status code is
+         * half of that reason.
+         *
+         * 502 is kept for the catch below, which is the case it actually describes: we could
+         * not reach them at all.
+         */
+        reply.code(r.status >= 400 && r.status < 500 ? r.status : 502);
         // THEIR reason, in the message. "S&S rejected the order" is our sentence and says
         // nothing actionable — the useful text is whatever they sent back, and putting it
         // only in `detail` meant the client threw it away and showed the generic line.
