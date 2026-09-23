@@ -3716,7 +3716,11 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                       * whose whole job is telling you where to send a parcel, and
                       * addressSourceLabel already answered it for the boards.
                       */}
-                    <div className="mt-1.5 text-2xs text-muted-foreground">{addressSourceLabel(order)}</div>
+                    {/* Empty for a typed address — see STATIC_SOURCE_LABEL.manual. An empty
+                        div would still draw its margin, so the row goes with the words. */}
+                    {addressSourceLabel(order)
+                      ? <div className="mt-1.5 text-2xs text-muted-foreground">{addressSourceLabel(order)}</div>
+                      : null}
                   </div>
                   {/* Top-aligned, not centred. `-my-1` on a control beside a four-line
                       block put Edit level with the middle of the address, which is why it

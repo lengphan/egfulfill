@@ -405,7 +405,20 @@ const STATIC_SOURCE_LABEL: Record<Exclude<AddressSource, "sync">, string> = {
   email: "from sale email",
   label: "from the label",
   shippo: "from Shippo",
-  manual: "entered by hand",
+  /**
+   * NOTHING, FOR A TYPED ADDRESS (owner, 2026-09-23: "remove the enter by hand in the
+   * address field").
+   *
+   * The other five labels answer "which of these do I trust" — a synced address, one Shippo
+   * filled in, one that came off a label. "Entered by hand" answers nothing: it is what a
+   * manual order's address always is, printed under every one of them, and §4 calls a
+   * sentence that states what the control already says a defect rather than a help.
+   *
+   * An EMPTY STRING rather than removing the case: `manual` is still a real AddressSource —
+   * the sync branch falls back to it for a hand-typed line on a marketplace order — and the
+   * caller renders nothing when the label is empty.
+   */
+  manual: "",
   none: "no address yet",
 }
 
