@@ -22,6 +22,19 @@ let WANTED = []          // receipt ids OUR server says are missing an address
 let ROWS = []            // addresses the current page can supply for orders we already have
 let NEW_ORDERS = []      // whole orders the page describes that we do not have at all
 let OPEN_PEEK = false    // is the "what will be sent" list open? Dies with the popup.
+/**
+ * WHICH ONES GO, BY RECEIPT ID.
+ *
+ * Sync used to send the whole page, so a seller who wanted one order had to sync twelve.
+ * The two piles are disjoint by construction (`known` decides), so an order_id is a
+ * sufficient key — no receipt can be in both.
+ *
+ * EVERYTHING STARTS TICKED, because sending the page is still the common case and an empty
+ * list with a dead button would be a worse default than the behaviour this replaces. The
+ * set is rebuilt on every scan and dies with the popup; nothing about a choice is stored.
+ */
+let PICK = new Set()
+let VIEW = { line: '' }  // the last thing painted, so a tick can redraw without re-scanning
 
 /**
  * THE MARKETPLACE THIS BUILD CAN READ.
@@ -58,9 +71,15 @@ async function connect() {
   let tab
   const open = await chrome.tabs.query({ url: `${APP}/*` })
   if (open.length) {
+    /* AN APP TAB THE SELLER ALREADY HAS BEATS A NEW ONE — it is the one holding a session,
+       and it is usually already signed in. */
     tab = open[0]
   } else {
-    tab = await chrome.tabs.create({ url: APP, active: true })
+    /* STRAIGHT TO THE SIGN-IN PAGE. The button says "Connect to egful" and this landed on
+       the marketing homepage, so the one thing it exists to make possible — signing in —
+       was another click away, past a page about the product. Anyone already signed in is
+       bounced onward by the app itself, so this costs the signed-in case nothing. */
+    tab = await chrome.tabs.create({ url: `${APP}/login`, active: true })
     // Give the app a moment to boot and restore its session before reading storage.
     await new Promise((r) => setTimeout(r, 2500))
   }
@@ -137,14 +156,12 @@ async function api(path, init) {
  * tells you where to look. That is the one reading a broken selector shares with an empty
  * page — and the hover, which says `0 found`, is where that gets diagnosed.
  */
-function statsLine(s, toSend) {
-  const found = s.foundOnPage || 0
-  const bad = found - (s.usable || 0)
+function statsLine(s, toSend, stranded) {
   const ver = `v${chrome.runtime.getManifest().version}`
   /* Short enough to sit on one line beside Disconnect. "3 of 12 couldn\u2019t be read" was a
      sentence where a count would do \u2014 and it described the reading rather than the
      consequence, which is that those orders are not coming in. */
-  if (found && bad > 0) return `${bad} can\u2019t sync \u00b7 ${ver}`
+  if (stranded > 0) return `${stranded} can\u2019t sync \u00b7 ${ver}`
   return ver
 }
 
@@ -170,11 +187,11 @@ const SOURCE_WORDS = {
    from inside this codebase; the person hovering runs a shop. Every line says what happened
    to their orders, and the one that matters is the count we could not read \u2014 that is the
    real answer to "why didn't it pick up that order". */
-function statsTitle(s, toSend) {
+function statsTitle(s, toSend, stranded, alreadyIn) {
   const found = s.foundOnPage || 0
   const bits = [`${found} ${found === 1 ? 'order' : 'orders'}`, `${toSend} to send`]
-  const bad = found - (s.usable || 0)
-  if (bad > 0) bits.push(`${bad} can\u2019t sync`)
+  if (alreadyIn > 0) bits.push(`${alreadyIn} already in`)
+  if (stranded > 0) bits.push(`${stranded} can\u2019t sync`)
   if (s.how) bits.push(SOURCE_WORDS[s.how] || 'from the page')
   return bits.join(' \u00b7 ')
 }
@@ -190,21 +207,34 @@ function statsTitle(s, toSend) {
  * `button` names which of the two is shown, or none. A disabled button invites a press,
  * and this panel spends most of its life with nothing to press.
  */
-function paint({ line, note = '', button = null, peek = 0 }) {
+function paint(view) {
+  VIEW = view
+  const { line, note = '', button = null, peek = 0 } = view
   $('count').textContent = line
   $('note').textContent = note
   show($('note'), !!note)
-  show($('sync'), button === 'sync')
+  /* THE BUTTON COUNTS WHAT IS TICKED, and disappears when nothing is. Untick everything and
+     there is genuinely nothing to press — a `Sync 0` button is the disabled button this
+     panel has always refused to draw, wearing a number. */
+  const picked = PICK.size
+  if (button === 'sync') $('sync').textContent = `Sync ${picked} to egful`
+  show($('sync'), button === 'sync' && picked > 0)
   show($('open'), button === 'open')
   show($('peek'), peek > 0)
   if (peek > 0) {
-    $('peek').textContent = OPEN_PEEK ? 'Hide' : `Show ${peek}`
+    /* "Choose" rather than "Show": the list is where you pick what goes, and a label that
+       only offers to reveal it is why the picker went unfound. */
+    $('peek').textContent = OPEN_PEEK ? 'Hide' : `Choose ${peek}`
     show($('rows'), OPEN_PEEK)
   } else {
     OPEN_PEEK = false
     show($('rows'), false)
   }
 }
+
+/* Redraw from the last painted state — what a tick changes is the button, never the
+   reading of the page, so this must not re-scan. */
+const repaint = () => paint(VIEW)
 
 /**
  * WHAT IS ABOUT TO BE SENT, ON REQUEST — and never written anywhere.
@@ -226,8 +256,21 @@ function drawRows() {
    * gets read digit by digit, so it carries the 14px step and tabular figures, while the name
    * beside it is a label and stays at 12.
    */
-  const add = (id, who, detail) => {
+  const add = (id, who, detail, tag) => {
     const li = document.createElement('li')
+    /* THE WHOLE ROW IS THE CONTROL. A 13px checkbox is a hard target beside a 14px number,
+       and a label wrapping both means the order number, the buyer and the address are all
+       places you can press to include or leave out that order. */
+    const label = document.createElement('label')
+    const box = document.createElement('input')
+    box.type = 'checkbox'
+    box.checked = PICK.has(String(id))
+    box.addEventListener('change', () => {
+      if (box.checked) PICK.add(String(id)); else PICK.delete(String(id))
+      repaint()
+    })
+    const body = document.createElement('div')
+    body.className = 'body'
     const head = document.createElement('div')
     const num = document.createElement('span')
     num.className = 'id'
@@ -239,11 +282,23 @@ function drawRows() {
       nm.textContent = who
       head.appendChild(nm)
     }
+    /* SAY THAT WE ALREADY HAVE IT. An address row is an order that is IN egful and missing
+       a street, so without this the list reads as "about to import an order you synced
+       yesterday" — which is what it was reported as. The tag is on the row rather than in a
+       sentence underneath, because it is a fact about that one line. */
+    if (tag) {
+      const tg = document.createElement('span')
+      tg.className = 'tag'
+      tg.textContent = tag
+      head.appendChild(tg)
+    }
     const ad = document.createElement('div')
     ad.className = 'ad'
     ad.textContent = detail
     ad.title = detail                     // the full thing for the one that is truncated
-    li.append(head, ad)
+    body.append(head, ad)
+    label.append(box, body)
+    li.appendChild(label)
     ul.appendChild(li)
   }
   /* NEW ORDERS FIRST — they are the larger claim. "We are about to create this" deserves to
@@ -268,7 +323,8 @@ function drawRows() {
   }
   for (const r of ROWS) {
     add(r.order_id, r.name,
-      [r.street, r.street2, [r.city, r.state].filter(Boolean).join(' '), r.zip].filter(Boolean).join(', '))
+      [r.street, r.street2, [r.city, r.state].filter(Boolean).join(' '), r.zip].filter(Boolean).join(', '),
+      'already in')
   }
 }
 
@@ -350,8 +406,8 @@ async function scan() {
        sentences saying which of the two had happened; `12 Orders Can\u2019t Sync` says it AND
        says how many are stranded, which is the number the seller actually needs. */
     paint({ line: `0 orders found` })
-    $('stats').textContent = statsLine(s, 0)
-    $('stats').title = statsTitle(s, 0)
+    $('stats').textContent = statsLine(s, 0, 0)
+    $('stats').title = statsTitle(s, 0, 0, 0)
     return
   }
 
@@ -407,6 +463,9 @@ async function scan() {
   const stranded = ids.filter((id) => !known.has(String(id)) && !canDescribe.has(String(id)))
 
   WANTED = [...blankAddress]
+  /* A FRESH READING IS A FRESH CHOICE. Carrying ticks across a Rescan would let a receipt
+     that has since changed pile keep a decision taken about the other one. */
+  PICK = new Set([...NEW_ORDERS, ...ROWS].map((r) => String(r.order_id)))
   drawRows()
 
   /*
@@ -423,7 +482,45 @@ async function scan() {
    * it is the same press either way, and the result list says which happened afterwards.
    */
   const peek = NEW_ORDERS.length + ROWS.length
-  const found = `${peek} ${peek === 1 ? 'order' : 'orders'} found`
+  /*
+   * TWO JOBS, AND ONE COUNT HID ONE OF THEM.
+   *
+   * `2 orders found` was reported as "the extension found orders that have been synced
+   * already", and the reading was fair: one of those two was EGF-002247, already in egful
+   * and only missing the street Etsy withheld. Adding an order and filling in its address
+   * are the same press but they are NOT the same claim, and the larger one — "we are about
+   * to create this" — is the one a seller checks.
+   *
+   * So the line names whichever jobs are actually on the page, count plus the consequence.
+   * It is still one line and still at most one button; what it no longer does is let an
+   * order we already hold read as an order about to be created.
+   */
+  const bits = []
+  if (NEW_ORDERS.length) bits.push(`${NEW_ORDERS.length} ${NEW_ORDERS.length === 1 ? 'order' : 'orders'} to add`)
+  if (ROWS.length) bits.push(`${ROWS.length} ${ROWS.length === 1 ? 'address' : 'addresses'} to fill`)
+
+  /*
+   * NOTHING TO DO IS THREE DIFFERENT FACTS, AND THEY READ THE SAME.
+   *
+   * A page of eleven orders that are all in egful already printed `0 orders found` over
+   * `11 can\u2019t sync`, which is wrong twice over. It is not zero — eleven were read — and
+   * nothing about them failed: they are DONE. The `11` came from subtracting the ADDRESS
+   * reader\u2019s usable count from the RECEIPT reader\u2019s found count, two different
+   * denominators, so a list page with no address panel on it reported every healthy order
+   * as broken.
+   *
+   * `stranded` is the honest figure and it was already computed here and never used: on the
+   * page, not in egful, and not describable — the only orders that are genuinely stuck.
+   */
+  const alreadyIn = known.size
+  const strandedN = stranded.length
+  const found = bits.length
+    ? bits.join(' \u00b7 ')
+    : strandedN
+      ? `${strandedN} ${strandedN === 1 ? 'order' : 'orders'} can\u2019t sync`
+      : alreadyIn
+        ? `${alreadyIn} ${alreadyIn === 1 ? 'order' : 'orders'} already synced`
+        : '0 orders found'
 
   /* Zero is still "0 orders found" and not "Nothing new": the same sentence whatever the
      number, so the panel never changes shape on you. What could NOT be read is reported by
@@ -433,8 +530,10 @@ async function scan() {
   /* SAY WHAT WAS SEEN, not just what survived. "20 on page, 0 usable" is a bug report that
      can be acted on; a bare 0 is indistinguishable from an empty page, which is how a
      broken selector hides for weeks. */
-  $('stats').textContent = statsLine(s, peek)
-  $('stats').title = statsTitle(s, peek)
+  /* The footer repeats the stranded count only when the line above is busy saying what is
+     about to happen. Printing it twice is how the panel started narrating itself. */
+  $('stats').textContent = statsLine(s, peek, bits.length ? strandedN : 0)
+  $('stats').title = statsTitle(s, peek, strandedN, alreadyIn)
 }
 
 async function start() {
@@ -453,16 +552,21 @@ async function start() {
  * half-success from reading as a total failure and sending someone to press it again.
  */
 async function sync() {
-  if (!ROWS.length && !NEW_ORDERS.length) return
+  /* ONLY WHAT IS TICKED. The piles stay whole — what was left out is still on the panel
+     afterwards, so "sync these two now and the rest later" does not need a Rescan. */
+  const picked = (list) => list.filter((r) => PICK.has(String(r.order_id)))
+  const newPicked = picked(NEW_ORDERS)
+  const rowsPicked = picked(ROWS)
+  if (!newPicked.length && !rowsPicked.length) return
   $('sync').disabled = true
   $('sync').textContent = 'Syncing…'
   const said = []
   let trouble = ''
   try {
-    if (NEW_ORDERS.length) {
+    if (newPicked.length) {
       /* Send only what the route reads. `_how` is a diagnostic this side and has no business
          in a request body. */
-      const orders = NEW_ORDERS.map(({ order_id, buyer, buyer_email, total, ship_by, created_at, address, items }) =>
+      const orders = newPicked.map(({ order_id, buyer, buyer_email, total, ship_by, created_at, address, items }) =>
         ({ order_id, buyer, buyer_email, total, ship_by, created_at, address, items }))
       try {
         const res = await api(`/api/reader/${PLATFORM}/import`, { method: 'POST', body: JSON.stringify({ rows: orders }) })
@@ -474,27 +578,42 @@ async function sync() {
         if (res.existed) said.push(`${res.existed} already in`)
         if (res.skipped) said.push(`${res.skipped} can\u2019t sync`)
         if (res.notYours) said.push(`${res.notYours} other shop`)
-        NEW_ORDERS = []
+        /* Drop the ones that went, keep the ones that did not. A second press cannot
+           re-send what was just created, and an untidied pile cannot pretend it did. */
+        const sent = new Set(orders.map((o) => String(o.order_id)))
+        NEW_ORDERS = NEW_ORDERS.filter((r) => !sent.has(String(r.order_id)))
       } catch (e) { trouble = e.message }
     }
 
-    if (ROWS.length) {
-      const rows = ROWS.map(({ order_id, name, street, street2, city, state, zip, country }) =>
+    if (rowsPicked.length) {
+      const rows = rowsPicked.map(({ order_id, name, street, street2, city, state, zip, country }) =>
         ({ order_id, name, street, street2, city, state, zip, country }))
       try {
         const res = await api('/api/etsy/import-addresses', { method: 'POST', body: JSON.stringify({ rows }) })
         // What was just filled is no longer wanted, so a second press cannot double-send.
         WANTED = WANTED.filter((id) => !rows.some((r) => r.order_id === id))
-        ROWS = []
+        const sent = new Set(rows.map((r) => String(r.order_id)))
+        ROWS = ROWS.filter((r) => !sent.has(String(r.order_id)))
         if (res.updated) said.push(`${res.updated} ${res.updated === 1 ? 'address' : 'addresses'} filled`)
         if (res.alreadyHad) said.push(`${res.alreadyHad} already had`)
       } catch (e) { trouble = trouble || e.message }
     }
 
     if (trouble) fail(trouble)
-    paint({ line: said.length ? said[0] : 'Nothing changed', note: said.slice(1).join(' · ') })
+    /* WHAT IS LEFT IS STILL OFFERED. Anything left unticked is still readable on this page
+       and still not in egful, so the panel keeps its list and its button — ending on a
+       result line with no way to send the rest is what forces a Rescan for no reason. */
+    const left = NEW_ORDERS.length + ROWS.length
+    PICK = new Set([...PICK].filter((id) =>
+      [...NEW_ORDERS, ...ROWS].some((r) => String(r.order_id) === id)))
+    drawRows()
+    paint({
+      line: said.length ? said[0] : 'Nothing changed',
+      note: said.slice(1).join(' · '),
+      button: left ? 'sync' : null,
+      peek: left,
+    })
   } finally {
-    $('sync').textContent = 'Sync'
     $('sync').disabled = false
   }
 }
@@ -522,7 +641,7 @@ $('open').addEventListener('click', async () => {
 })
 $('peek').addEventListener('click', () => {
   OPEN_PEEK = !OPEN_PEEK
-  paint({ line: $('count').textContent, note: $('note').textContent, button: 'sync', peek: NEW_ORDERS.length + ROWS.length })
+  repaint()
 })
 $('forget').addEventListener('click', async () => {
   await chrome.storage.local.remove(['token', 'who'])
