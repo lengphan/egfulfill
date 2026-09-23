@@ -720,6 +720,34 @@ hole. Team members resolve to `owner_id` via `effectiveSeller`.
     garment remade with somebody else's name on it. A blank a human fills is cheaper than a
     confident invention.
 
+### The public API (`/api/v1/*`) — one surface, two modes (2026-09-23)
+
+Partner-facing, `X-API-Key`-authed, scoped per key (`API_SCOPES` in `sandbox.js`). **A test
+key and a live key take the SAME path**: `egk_test_…` prices from the real catalogue,
+refuses an unknown sku exactly as live does, fires `order.received` marked `test:true`, and
+writes nothing. That is the whole promise — build against test, change one key.
+
+**`/api/test/*` IS GONE, and must not come back.** It was the first sandbox and had become
+the argument against itself: four demo products you could not order in live, a
+caller-supplied `unit_price`, a hardcoded `4.63` of postage, and label routes returning
+invented tracking codes (`EGTEST…`) under a `sandbox.egfulfill.com` that never existed. A
+partner who integrated cleanly there collected 400s in production, which is the one failure
+a sandbox exists to prevent. The three v1 shipping routes stay at **501** for the same
+reason — a fake tracking number reaches a buyer who watches a number that will never move.
+
+**THE DOCS ARE A LIST, NOT PROSE.** `web/lib/api-endpoints.ts` drives BOTH the in-app
+playground and the public `/docs` page, so an entry there is a promise the route works.
+Nothing that 404s or 501s belongs in it — `GET /api/v1/statement` was documented with a
+full sample payload for two weeks after the route was deleted, and prose cannot fail a
+build.
+
+**`node tools/check-public-api.mjs` is the gate**, and it needs a local Postgres (skips
+cleanly without one). It boots the real Fastify app against a throwaway database, mints a
+key through the real `POST /api/keys`, then proves a test key still simulates every
+documented endpoint *and* that `orders` stays empty, EXECUTES every path in
+`api-endpoints.ts`, and asserts the retired surfaces stay retired. Run it after touching any
+`/api/v1/*` route or that array.
+
 ### Auth
 Sign-in accepts an **email or a username**. Usernames exclude `@`, which is what keeps
 the namespaces from overlapping — the identifier's shape decides which column is matched,
