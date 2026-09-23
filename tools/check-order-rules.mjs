@@ -104,13 +104,26 @@ const spec = require(specPath)
  * real app; here we do the same job with a resolve hook, so the compiled mobile module loads
  * the SAME shared file the app would load rather than a stand-in written for the test.
  */
-/* EVERY shared module mobile pulls in, not just the one under test: orders.ts imports
-   @shared/order-address too (added 2026-08-24), and a missing entry here is not a warning —
-   the require throws and the whole guard stops running. Compile-and-map each. */
-const ALIAS = {
-  '@shared/order-rules': specPath,
-  '@shared/order-address': compile('web/shared/order-address.ts'),
-}
+/* EVERY shared module mobile pulls in, not just the one under test: a missing entry here is
+   not a warning — the require throws and the whole guard stops running.
+ *
+ * BUILT FROM THE DIRECTORY, not typed out. The hand-written version listed order-rules and
+ * order-address, then web/shared/order-status.ts arrived (mobile/lib/orders.ts imports
+ * `sellerStatus` and `matchesFilter` from it) and this file crashed on load — so the stage
+ * gate that CLAUDE.md calls a three-surface mirror was silently checking nothing at all,
+ * while its own comment two lines up warned that exactly this would happen. A list of files
+ * that must match a directory should be read from the directory.
+ *
+ * Compiling every shared module rather than only the imported ones costs a second and means
+ * the next one is covered before anyone imports it. */
+const ALIAS = Object.fromEntries(
+  readdirSync(path.join(ROOT, 'web/shared'))
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'))
+    .map((f) => {
+      const name = `@shared/${f.replace(/\.ts$/, '')}`
+      return [name, name === '@shared/order-rules' ? specPath : compile(`web/shared/${f}`)]
+    }),
+)
 const resolve = Module._resolveFilename
 Module._resolveFilename = function (request, ...rest) {
   return ALIAS[request] ?? resolve.call(this, request, ...rest)

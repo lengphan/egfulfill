@@ -1419,7 +1419,17 @@ td[align="right"] {
  * runs on, and cannot show you one colour and then apply another. Run the gate after
  * touching any of this: `node tools/check-pop-presets.mjs`. */
 [data-pop="rose"] { --pop: oklch(0.74 0.200 335); --pop-foreground: oklch(0.175 0 0); }
-.dark[data-pop="rose"], .dark [data-pop="rose"] { --pop: oklch(0.74 0.235 335); --pop-foreground: oklch(0.145 0 0); }
+/* DARK ROSE IS DEEPER THAN LIGHT ROSE, and that is the measurement, not a preference.
+   `--status-working` in dark is oklch(0.760 0.130 340) — the working status IS a rose, five
+   degrees away, so the accent and a "working" chip sat 0.108 apart in OKLab against a 0.154
+   floor: an accent that reads as a status is a false signal on a factory floor (§4).
+   Hue cannot fix it — sweeping 336→348 moved ΔE by 0.003, because at one hue the distance is
+   carried by L and C. Dropping L to 0.64 and lifting C to 0.26 clears it at 0.178 with ink
+   still 5.12:1.
+   NOT C=0.30 AT L=0.74, which also "passes" at 0.172: that value is outside sRGB, the browser
+   clips it to the same pink, and the extra chroma the number claims never reaches a screen.
+   A gate measuring the specified colour cannot see that — check gamut before believing a fix. */
+.dark[data-pop="rose"], .dark [data-pop="rose"] { --pop: oklch(0.64 0.26 335); --pop-foreground: oklch(0.145 0 0); }
 
 /* THE MARKETING LIME, EXACTLY — #D4F897, the acid the skins already paint the hero plate
    with. It was oklch(0.89 0.195 112) = #DFE610, a highlighter yellow that shares only a

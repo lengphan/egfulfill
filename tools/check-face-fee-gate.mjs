@@ -10,13 +10,42 @@
  * Reading the SQL cannot settle that. This drives quoteOrder's real face query against real
  * rows, adding and removing artwork and a type in every order they can happen.
  *
- *   createdb egtest
- *   FEE_GATE_DATABASE_URL=postgres://you@127.0.0.1:5432/egtest node tools/check-face-fee-gate.mjs
+ *   node tools/check-face-fee-gate.mjs                       (makes its own throwaway database)
+ *   FEE_GATE_DATABASE_URL=postgres://you@host/egtest node …   (or point it at one)
  *
  * It creates and drops its own tables, so it refuses any database not named for testing.
  */
-const url = process.env.FEE_GATE_DATABASE_URL;
-if (!url) { console.error('Set FEE_GATE_DATABASE_URL to a THROWAWAY database.'); process.exit(2); }
+/**
+ * SELF-PROVISIONING, so this runs in the suite instead of being permanently amber.
+ *
+ * It used to exit 2 unless someone had exported FEE_GATE_DATABASE_URL by hand, which meant
+ * tools/run-gates.sh and CI carried it as "known-red — needs an env var" while the thing it
+ * guards is money: a seller billed for a print nobody made, or a print nobody paid for. A
+ * gate that only runs when a human remembers a variable is a gate for the days nothing is
+ * wrong. It now creates its own throwaway database the way every other database-backed gate
+ * here does, and still honours the variable when it is set.
+ *
+ * THE NAME GUARD BELOW IS UNCHANGED AND IS THE POINT — this file DROPS TABLES, so it refuses
+ * any database not named for testing. The name it makes for itself ends in `_test` so it
+ * passes its own check rather than being waved through as a special case.
+ */
+import { execFileSync as _exec } from 'node:child_process';
+const _sh = (cmd, args) => _exec(cmd, args, { encoding: 'utf8', stdio: 'pipe' });
+const OWN_DB = 'egfulfill_face_fee_test';
+let url = process.env.FEE_GATE_DATABASE_URL;
+if (!url) {
+  try { _sh('pg_isready', []); } catch {
+    console.log('SKIP  no local Postgres accepting connections — start one to run this gate.');
+    process.exit(0);
+  }
+  try { _sh('dropdb', ['--if-exists', '--force', OWN_DB]); }
+  catch { try { _sh('dropdb', ['--if-exists', OWN_DB]); } catch { /* nothing to drop */ } }
+  _sh('createdb', [OWN_DB]);
+  url = `postgres://localhost:5432/${OWN_DB}`;
+  process.on('exit', () => {
+    try { _sh('dropdb', ['--if-exists', '--force', OWN_DB]); } catch { /* the next run drops it */ }
+  });
+}
 const dbName = decodeURIComponent(new URL(url).pathname.slice(1));
 if (!/(^|[_-])test$|^egtest$/.test(dbName)) {
   console.error(`Refusing to run against "${dbName}" — name it egtest or *_test.`);

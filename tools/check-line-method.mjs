@@ -77,7 +77,6 @@ const ALLOWED = new Map(Object.entries({
   'web/components/app/push-to-partner-dialog.tsx': 'Sends to the partner, who takes one method.',
   'web/components/app/send-to-board-dialog.tsx': 'Board card label.',
   'web/components/app/item-design-actions.tsx': 'Row actions gated on the line being stitched at all.',
-  'web/components/app/orders-hub.tsx': 'Staff list rows; the strip goes through methodsLabelOf.',
   'web/components/app/spydeck-view.tsx': 'Competitor listings.',
   'web/app/(app)/orders/[id]/page.tsx': 'The order page; its strip goes through methodsLabelOf and its summary through billedMethod.',
   // ── caught by this gate on its first run, and each one looked at ──
@@ -87,11 +86,27 @@ const ALLOWED = new Map(Object.entries({
   'web/components/app/design-files-panel.tsx': 'The ORDER page\'s file panel: it picks which LINES a stitch file may attach to. Per-line is the right grain there — the per-FACE question is asked inside the dialog.',
   'web/components/app/designer-board.tsx': 'Reads the CARD\'s own method (card.type), which the card was stamped with when it was sent.',
   'web/lib/order-readiness.ts': '"Is this order ready" counts DECORATED lines — a line with any method at all. A face cannot make a line undecorated.',
+
+  // ── added 2026-09-23, each judged rather than blessed ──
+  'server/src/routes/design_files.js': 'THE FALLBACK ITSELF, in SQL: a design row with no method of its own inherits the line\'s (coalesce(d.method,\'\') = \'\' and i.print_type ~* \'emb\'). That is the rule this file tests, written as a query.',
+  'web/lib/product-price.ts': 'productUnitPrice/priceMethodKey take a method as an ARGUMENT and never read a line — the same standing as print-route.js above.',
+  'web/app/(app)/products/[id]/page.tsx': 'A catalogue PRODUCT\'s selected method, passed to the pricer. A product has no faces to disagree with.',
+  'web/components/marketing/bold-product.tsx': 'Same as the product page — a marketing product view pricing one chosen method.',
+  'web/lib/design-board.ts': 'Stamps a designer card with the line\'s method as the card is created, which is the same line-level snapshot designer-board.tsx reads back. A card is per LINE, and "does this job touch embroidery" is a routing question about the whole job.',
 }));
 
 const SCAN = ['server/src', 'web/lib', 'web/components', 'web/app', 'web/shared'];
 const SKIP = new Set(['node_modules', '.next', '.git', 'dist', 'build']);
 const RE = /\bprint_type\b|\bprintType\b/;
+/* A MENTION IN PROSE IS NOT A READ. web/lib/print-method.ts was reported as an unlisted
+   reader on the strength of the words "a line stores `print_type = Blank`" inside a comment
+   explaining the vocabulary. Allow-listing a file for something it does not do is how a list
+   of deliberate exceptions fills with noise and stops being read. Comments are stripped
+   before matching — crudely, but a false positive here costs more than a missed string in an
+   edge case the next line of real code would catch anyway. */
+const codeOnly = (src) => src
+  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  .replace(/(^|[^:])\/\/.*$/gm, '$1');
 const found = new Set();
 const walk = (dir) => {
   for (const e of readdirSync(dir)) {
@@ -99,7 +114,7 @@ const walk = (dir) => {
     const full = join(dir, e);
     if (statSync(full).isDirectory()) { walk(full); continue; }
     if (!/\.(ts|tsx|js|jsx|mjs)$/.test(e)) continue;
-    if (RE.test(readFileSync(full, 'utf8'))) found.add(relative(ROOT, full));
+    if (RE.test(codeOnly(readFileSync(full, 'utf8')))) found.add(relative(ROOT, full));
   }
 };
 for (const d of SCAN) { try { walk(join(ROOT, d)); } catch { /* not in this checkout */ } }

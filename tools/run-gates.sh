@@ -21,10 +21,7 @@ cd "$(dirname "$0")/.."
 
 # Each entry is `name: why it is red`. Fix one → delete its line. That is the whole process.
 ALLOW_FAIL_REASONS=$(cat <<'REASONS'
-check-line-method: 4 pass / 2 fail — pre-existing, in the line-method area, not investigated here
-check-order-rules: crashes on load — pre-existing, needs its own fix before it can gate anything
-check-pop-presets: 1 of 2 presets misses the ink contrast floor — a palette decision, not a regression
-check-face-fee-gate: needs FEE_GATE_DATABASE_URL pointed at a THROWAWAY database; exits 2 without it
+check-face-fee-gate: RUNS now and is genuinely red — 10 pass / 9 fail. Its expectations predate the 2026-09-21 pricing change (one placement per LINE, one technique run per FACE); the first failure is a single-face DTG line wanting $18.00 where the pricer charges $21.00, which is exactly the flat placement now billed once per line. The numbers need restating by whoever owns that change. NOT fixed by making the test agree with the code: this one guards a seller being billed for a print nobody made.
 REASONS
 )
 allowed() { echo "$ALLOW_FAIL_REASONS" | grep -q "^$1:"; }
