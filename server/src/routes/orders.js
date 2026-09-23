@@ -7,6 +7,7 @@ import { orderLabel, orderLabelOf } from '../order-label.js';
 import { hashOf, hashBytes, isPhash } from '../fingerprint.js';
 import { isStaff, isUserId, resolveSeller as _resolveSeller, canSurface, canSeeMoney } from '../auth.js';
 import { COST_TYPES } from '../costs.js';
+import { sendImage } from '../image.js';
 import { refreshStaleTracking } from './dispatch.js';
 import { egBroadcast } from '../events.js';
 import { attachLibraryFileForArtwork } from './design_files.js';
@@ -1929,10 +1930,11 @@ export function ordersRoutes(app, requireAuth) {
     // is only reachable if the value changed under us. Redirect rather than 404: the caller
     // wants the image, and that URL is the image.
     if (!m) { reply.redirect(String(row.img)); return; }
-    reply
-      .header('Content-Type', m[1])
-      .header('Cache-Control', 'public, max-age=31536000, immutable')
-      .send(Buffer.from(m[2], 'base64'));
+    /* Shrunk on the way out, keeping this route's own year-long freshness — see sendImage.
+       A queue draws one of these per line, so it is the single most repeated image request
+       in the app, and they are stored as whatever was uploaded. Display only: the artwork a
+       seller can actually download comes from /api/design_files/:id, which is untouched. */
+    return sendImage(req, reply, Buffer.from(m[2], 'base64'), m[1], { maxAge: 31536000 });
   });
 
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {

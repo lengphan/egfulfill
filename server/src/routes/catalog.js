@@ -10,6 +10,7 @@ import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { variantSku, variantLabel, variantPairs, productSizes, productColors } from '../variant-sku.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
+import { sendImage } from '../image.js';
 import { readAll as readSettings, readProductTypes, ALL_SIDES, PRICED_SIDES, METHOD_KEYS } from './factory_settings.js';
 import { methodAddOnsFor } from '../pricing.js';
 
@@ -730,9 +731,11 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     if (/^data:image\//i.test(raw)) {
       const m = /^data:([^;]+);base64,(.*)$/i.exec(raw);
       if (!m) { reply.code(404); return { error: 'Not found' }; }
-      reply.header('Content-Type', m[1]);
-      reply.header('Cache-Control', 'public, max-age=604800, immutable');
-      return Buffer.from(m[2], 'base64');
+      /* THE FAT ROWS ARE HERE. A data: URI in catalog_products is whatever somebody
+         uploaded, at whatever size, in whatever format — measured, the worst was a 684x684
+         RGBA PNG of 1,060 KB drawn in a ~300px card. `sendImage` re-encodes on the way out
+         and falls back to these exact bytes if it cannot. */
+      return sendImage(req, reply, Buffer.from(m[2], 'base64'), m[1]);
     }
     // ASK FOR THE LARGE ONE. S&S serve three sizes behind a filename suffix — _fs small,
     // _fm medium, _fl large — and the sync stores whatever their feed returned, which is
@@ -743,9 +746,14 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const res = await app.inject({ method: 'GET', url: upsizeSupplierImg(raw) });
     reply.code(res.statusCode);
     const ct = res.headers['content-type'];
-    if (ct) reply.header('Content-Type', ct);
-    reply.header('Cache-Control', 'public, max-age=604800, immutable');
-    return res.rawPayload;
+    /* A failure from the inner route is a JSON error body, not a picture — re-encoding it
+       would be nonsense, and `forDelivery` would hand it back untouched anyway. Sent as-is
+       so the status and the message survive. */
+    if (res.statusCode >= 400) {
+      if (ct) reply.header('Content-Type', ct);
+      return res.rawPayload;
+    }
+    return sendImage(req, reply, res.rawPayload, ct);
   });
 
   /**
@@ -790,9 +798,10 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     if (/^data:image\//i.test(raw)) {
       const m = /^data:([^;]+);base64,(.*)$/i.exec(raw);
       if (!m) { reply.code(404); return { error: 'Not found' }; }
-      reply.header('Content-Type', m[1]);
-      reply.header('Cache-Control', 'public, max-age=604800, immutable');
-      return Buffer.from(m[2], 'base64');
+      /* Negotiated, which is what makes this safe on a route whose consumer is a SPREADSHEET
+         rather than a browser: Sheets' own fetcher does not ask for WebP, so it keeps getting
+         exactly the bytes it gets today. A partner opening the workbook in a browser does. */
+      return sendImage(req, reply, Buffer.from(m[2], 'base64'), m[1]);
     }
 
     // A supplier address is re-dispatched INTERNALLY. Redirecting would put their host in the
@@ -810,9 +819,11 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const res = await app.inject({ method: 'GET', url: proxied });
       reply.code(res.statusCode);
       const ct = res.headers['content-type'];
-      if (ct) reply.header('Content-Type', ct);
-      reply.header('Cache-Control', 'public, max-age=604800, immutable');
-      return res.rawPayload;
+      if (res.statusCode >= 400) {
+        if (ct) reply.header('Content-Type', ct);
+        return res.rawPayload;
+      }
+      return sendImage(req, reply, res.rawPayload, ct);
     }
     if (/^https?:\/\//i.test(raw)) { reply.redirect(raw); return; }
     reply.code(404);

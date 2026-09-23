@@ -13,6 +13,7 @@
 // BOUNDED — it requires a brand or a set of styleIds; it never pulls everything.
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
+import { forDelivery, widthFrom, wantsWebp } from '../image.js';
 
 const SS_ACCOUNT = (process.env.SS_ACCOUNT_NUMBER || '').trim();
 const SS_KEY     = (process.env.SS_API_KEY || '').trim();
@@ -471,16 +472,51 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     const { storageEnabled, putObject, getObject } = await import('../storage.js');
     const { createHash } = await import('crypto');
     const ext = (u.split('?')[0].match(/\.[a-z0-9]{2,5}$/i) || ['.jpg'])[0];
-    const key = `supplier-img/${createHash('sha256').update(u).digest('hex').slice(0, 32)}${ext}`;
+    const sha = createHash('sha256').update(u).digest('hex').slice(0, 32);
+    const key = `supplier-img/${sha}${ext}`;
+    /**
+     * THE SHRUNK COPY GETS ITS OWN KEY, and that is the whole reason this is three lookups
+     * rather than one re-encode.
+     *
+     * Re-encoding on every cache hit would move the cost from the supplier's network to our
+     * CPU and pay it forever — a megabyte PNG is ~80ms of libvips per request. Storing the
+     * result means the work happens once per (image, width) and every later request is a
+     * bucket read, exactly as it is today.
+     *
+     * THE ORIGINAL KEY IS UNTOUCHED ON PURPOSE. Changing it would invalidate every object
+     * already in the bucket and send the whole catalogue back to S&S and Otto at once, which
+     * is a lot of traffic aimed at somebody else's CDN to save ourselves some bytes. The
+     * original stays the source of truth; the variant is derived from it.
+     */
+    const wantW = widthFrom(req.query);
+    const webp = wantsWebp(req.headers);
+    const vkey = `supplier-img/${sha}-w${wantW}.webp`;
 
-    // Served from our bucket if we already have it.
+    // Served from our bucket if we already have it — the shrunk copy first.
     if (storageEnabled()) {
+      if (webp) {
+        try {
+          const small = await getObject(vkey);
+          if (small && small.body && small.body.length) {
+            reply.header('Content-Type', 'image/webp');
+            reply.header('Cache-Control', 'public, max-age=604800, immutable');
+            reply.header('Vary', 'Accept');
+            return reply.send(small.body);
+          }
+        } catch { /* no variant yet — fall through and make one */ }
+      }
       try {
         const hit = await getObject(key);
         if (hit && hit.body && hit.body.length) {
-          reply.header('Content-Type', hit.contentType || 'image/jpeg');
+          const type = hit.contentType || 'image/jpeg';
+          const r = await forDelivery(hit.body, type, { width: wantW, webp });
+          /* Keep it, so the next reader pays a bucket read instead of libvips. Best-effort:
+             a storage failure must never cost the picture we are holding. */
+          if (r.optimised) putObject(vkey, r.buf, 'image/webp', 'private').catch(() => {});
+          reply.header('Content-Type', r.type || type);
           reply.header('Cache-Control', 'public, max-age=604800, immutable');
-          return reply.send(hit.body);
+          reply.header('Vary', 'Accept');
+          return reply.send(r.buf);
         }
       } catch { /* not cached yet — fetch below */ }
     }
@@ -549,10 +585,14 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         reply.code(502); return { error: 'image too large to proxy', bytes: buf.length };
       }
       // Best-effort store: a caching failure must never cost the picture we just fetched.
+      // The ORIGINAL, so the supplier is asked once however many widths we later serve.
       if (storageEnabled()) putObject(key, buf, type, 'private').catch(() => {});
-      reply.header('Content-Type', type);
+      const small = await forDelivery(buf, type, { width: wantW, webp });
+      if (storageEnabled() && small.optimised) putObject(vkey, small.buf, 'image/webp', 'private').catch(() => {});
+      reply.header('Content-Type', small.type || type);
       reply.header('Cache-Control', 'public, max-age=604800, immutable');
-      return reply.send(buf);
+      reply.header('Vary', 'Accept');
+      return reply.send(small.buf);
     } catch (e) {
       console.error(`[ss/img] fetch error for ${u}: ${e.message}`);
       reply.code(502); return { error: 'image fetch failed: ' + e.message };
