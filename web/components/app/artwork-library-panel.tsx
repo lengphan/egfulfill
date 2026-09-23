@@ -88,6 +88,8 @@ export function ArtworkLibraryPanel() {
   /** Which card has its orders open. ONE at a time: the point of the grid is that every
    *  card is the same object, and three cards open at three heights is a ragged wall. */
   const [openOrders, setOpenOrders] = useState<string | null>(null)
+  /** Which card a file is being dragged over. One at a time — a drag has one target. */
+  const [over, setOver] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   /** What just happened, when it is worth saying. Not a caption — it appears only after a
    *  press and names its result. */
@@ -151,50 +153,82 @@ export function ArtworkLibraryPanel() {
    * or the first file was wrong and you want both until you have checked. The first keeps the
    * bare id (nothing existing changes name); every one after takes a suffix.
    */
-  const nextFileId = (d: FactoryDesign) => {
+  const nextFileId = (d: FactoryDesign, taken: Set<string>) => {
     const base = `ART-${d.art_hash.slice(0, 16)}`
-    const taken = new Set((d.files ?? []).map((f) => f.design_id))
     if (!taken.has(base)) return base
-    for (let n = 2; n < 50; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`
-    return `${base}-${Date.now()}`
+    /* 50 suffixes is far past any real number of files for one picture, and a ceiling that
+       cannot be hit is still a ceiling — the alternative was a clock reading, which the
+       React Compiler refuses in a component body and which would make the id unstable
+       across a re-render anyway. */
+    for (let n = 2; n < 200; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`
+    return null
   }
 
-  const attach = async (d: FactoryDesign, file: File) => {
+  /**
+   * ATTACH WHAT WAS DROPPED — several at once, because that is how they arrive.
+   *
+   * A picture routinely needs more than one file: a front and a back, a stitch file and the
+   * print file for the same artwork ordered two ways. Taking one and ignoring the rest of a
+   * drop is the kind of silent half-success that reads as the feature being broken.
+   */
+  const attachFiles = async (d: FactoryDesign, list: FileList | File[]) => {
+    const picked = Array.from(list)
+    if (!picked.length) return
     /* THE PICKER FILTERS, THIS REFUSES. `accept` is a hint the OS dialog can be talked out
-       of, and a wrong file here is a stitch file on a printed job — the failure this whole
-       pairing exists to stop. It names the kind that was expected rather than just saying
-       no, because "wrong file" without the reason is the message people ignore. */
+       of — and nothing filters a DRAG at all — so a wrong file here is a stitch file on a
+       printed job, the failure this whole pairing exists to stop. It names the kind that was
+       expected rather than just saying no, because "wrong file" without the reason is the
+       message people ignore. */
     const ok = acceptFor(d.methods)
-    if (ok.length && !ok.includes(extOf(file.name))) {
-      setErr(`${file.name} — ${tl("artwork", "this artwork is")} ${(d.methods ?? []).join(" · ") || "—"}, ${tl("artwork", "which takes")} ${ok.join(" ")}`)
-      return
-    }
-    setBusy(d.art_hash); setErr(null); setNote(null)
+    const bad = ok.length ? picked.filter((f) => !ok.includes(extOf(f.name))) : []
+    const good = picked.filter((f) => !bad.includes(f))
+    /* THE REFUSAL SURVIVES THE SUCCESS. Drop three files where one is wrong and the two that
+       landed must not bury the one that did not — it is the only half a person has to act on. */
+    const refusal = bad.length
+      ? `${bad.map((f) => f.name).join(", ")} — ${tl("artwork", "this artwork is")} ${(d.methods ?? []).join(" · ") || "—"}, ${tl("artwork", "which takes")} ${ok.join(" ")}`
+      : null
+    if (!good.length) { setErr(refusal); return }
+
+    setBusy(d.art_hash); setErr(refusal); setNote(null)
+    /* IDS ARE MINTED AGAINST A SET THIS LOOP KEEPS ITSELF. `nextFileId` reads the row in
+       state, which does not change between iterations, so three files in one drop would all
+       have claimed the same id and overwritten each other. */
+    const taken = new Set((d.files ?? []).map((f) => f.design_id))
+    const added: { design_id: string; file_name: string; kind: string; own: boolean }[] = []
+    let reached = 0
     try {
-      const data = await new Promise<string>((res, rej) => {
-        const fr = new FileReader()
-        fr.onload = () => res(String(fr.result || ""))
-        fr.onerror = () => rej(new Error(tl("artwork", "Couldn't read that file")))
-        fr.readAsDataURL(file)
-      })
-      const designId = nextFileId(d)
-      const r = await uploadDesignFile({ designId, name: file.name, data, artHash: d.art_hash })
-      if (r?.error) throw new Error(r.error)
-      /* WHERE IT WENT, SAID ONCE. The upload puts the file on every order line carrying
-         this exact artwork and waiting for a stitch file, and that is a bigger thing than
-         "uploaded" — it is the answer to the question this tab exists to ask. It sits on
-         the card's own notice line and is replaced by the next thing that happens; 0 gets
-         no line, because nothing waiting is the ordinary case and not news. */
-      if (r?.attached) {
-        setNote(`${r.attached} ${r.attached === 1 ? tl("artwork", "order now has it") : tl("artwork", "orders now have it")}`)
+      for (const file of good) {
+        const data = await new Promise<string>((res, rej) => {
+          const fr = new FileReader()
+          fr.onload = () => res(String(fr.result || ""))
+          fr.onerror = () => rej(new Error(tl("artwork", "Couldn't read that file")))
+          fr.readAsDataURL(file)
+        })
+        const designId = nextFileId(d, taken)
+        /* Two hundred files for one picture is not a case to design for; it is a case to
+           refuse out loud rather than overwrite something. */
+        if (!designId) throw new Error(tl("artwork", "This design already has too many files."))
+        taken.add(designId)
+        const r = await uploadDesignFile({ designId, name: file.name, data, artHash: d.art_hash })
+        if (r?.error) throw new Error(r.error)
+        reached += r?.attached ?? 0
+        added.push({ design_id: designId, file_name: file.name, kind: "emb", own: true })
       }
-      /* NAME IT IMMEDIATELY. The upload knows the file it just sent, so the card can say
-         which file is on record without waiting for a reload to tell it. Newest first,
-         which is the order the listing returns them in. */
-      setRows((prev) => (prev ?? []).map((x) => (x.art_hash === d.art_hash
-        ? { ...x, has_file: true,
-            files: [{ design_id: designId, file_name: file.name, kind: "emb", own: true }, ...(x.files ?? [])] }
-        : x)))
+      /* WHERE THEY WENT, SAID ONCE. The upload puts each file on every order line carrying
+         this exact artwork and waiting for one, and that is a bigger thing than "uploaded" —
+         it is the answer to the question this tab exists to ask. 0 gets no line: nothing
+         waiting is the ordinary case and not news. */
+      if (reached) {
+        setNote(`${reached} ${reached === 1 ? tl("artwork", "order now has it") : tl("artwork", "orders now have it")}`)
+      }
+      /* NAME THEM IMMEDIATELY. The upload knows what it just sent, so the card can say what
+         is on record without waiting for a reload. Newest first, which is the order the
+         listing returns them in. */
+      if (added.length) {
+        setRows((prev) => (prev ?? []).map((x) => (x.art_hash === d.art_hash
+          ? { ...x, has_file: true, files: [...added.reverse(), ...(x.files ?? [])] }
+          : x)))
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't attach that file."))
     } finally {
@@ -368,7 +402,44 @@ export function ArtworkLibraryPanel() {
               return (
               /* items-start once a card can grow: centred, the thumbnail drifts down the
                  card as the order list opens under the text beside it. */
-              <li key={d.art_hash} className="flex items-start gap-3 rounded-xl border border-border bg-card p-2.5">
+              /**
+                * THE WHOLE CARD TAKES THE DROP.
+                *
+                * Not `components/app/dropzone.tsx`, and the rule says to check: that
+                * primitive DRAWS a zone — its own box, label, hint and receipt — and what is
+                * wanted here is for an existing object to accept a drop, the way a column
+                * accepts a card. Wrapping every row in a second bordered box to get four
+                * event handlers would be the ring-inside-a-ring this card already fixed once.
+                *
+                * A stitch file arrives in an email and leaves the browser again as a drag, so
+                * dragging IS the gesture — a button is the fallback, not the route. The
+                * button stays because a drop target with no click route cannot be reached
+                * from a keyboard.
+                */
+              <li
+                key={d.art_hash}
+                onDragOver={(e) => {
+                  /* Only a FILE drag. Without this a dragged link or a selected word lights
+                     up every card it crosses and the page looks like it is malfunctioning. */
+                  if (!e.dataTransfer.types.includes("Files")) return
+                  e.preventDefault()
+                  if (over !== d.art_hash) setOver(d.art_hash)
+                }}
+                /* relatedTarget is where the pointer WENT. Crossing onto a child fires
+                   dragleave on the parent, so without this test the highlight flickers off
+                   the moment the pointer reaches the thumbnail. */
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(null)
+                }}
+                onDrop={(e) => {
+                  if (!e.dataTransfer.types.includes("Files")) return
+                  e.preventDefault()
+                  setOver(null)
+                  void attachFiles(d, e.dataTransfer.files)
+                }}
+                className={"flex items-start gap-3 rounded-xl border bg-card p-2.5 transition-colors "
+                  + (over === d.art_hash ? "border-primary bg-accent" : "border-border")}
+              >
                 {/* The picture is the identification; everything beside it is confirmation.
                     A press opens it full size rather than navigating away — judging artwork
                     is why anyone is on this tab. */}
@@ -615,15 +686,17 @@ export function ArtworkLibraryPanel() {
       <input
         ref={fileRef}
         type="file"
+        multiple
         /* The union, narrowed on every press to what the pressed card's method can run. */
         accept={[...STITCH, ...PRINT].join(",")}
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0]
+          const list = e.target.files
           const d = pending.current
+          const picked = list ? Array.from(list) : []
           e.target.value = ""
           pending.current = null
-          if (f && d) void attach(d, f)
+          if (picked.length && d) void attachFiles(d, picked)
         }}
       />
     </SectionCard>

@@ -8,6 +8,9 @@ import { thumbSrc } from "@/lib/order-image"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { getUser } from "@/lib/auth"
 import { VariantField } from "@/components/app/variant-field"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CaretDown } from "@phosphor-icons/react"
+import { cn } from "@/lib/utils"
 
 // What the fields offer when the blank can't be resolved — see the note on colorList.
 // Sizes are the ladder every apparel blank in the catalogue draws from; methods are the
@@ -76,7 +79,6 @@ function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onP
   onLine: (v: string) => void
 }) {
   const tl = useLabelT()
-  const [open, setOpen] = useState(false)
   /* WHAT THE GARMENT IS ACTUALLY DECORATED WITH — each face resolved through the same rule
      the charge uses (`methodOf.get(face) || lineMethod`), then deduped IN FACE ORDER so the
      summary reads front-first rather than alphabetically. */
@@ -95,61 +97,95 @@ function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onP
    * back to the first face.
    */
   const used = Object.keys(value).map((k) => k.toLowerCase())
-  const interesting = faces.filter((f) => used.includes(f.toLowerCase()) || ((value[f] ?? "").trim() && value[f] !== lineMethod))
-  const shown = open ? faces : (interesting.length ? interesting : faces.slice(0, 1))
-  const hidden = faces.length - shown.length
+  /** A face somebody has actually decided about: it carries artwork, or its method has been
+   *  set away from the line's. Those read dark; the rest read as what they inherit. */
+  const decided = (f: string) => used.includes(f.toLowerCase()) || !!(value[f] ?? "").trim()
+
   return (
-    <div className="col-span-2 flex min-w-0 flex-col gap-1.5">
-      {/* THE FIELD IS A FIELD AGAIN. It was a <details> whose summary carried the same chrome
-          — so the one control in the strip that opened something looked identical to three
-          that do not, and the press that opened it felt like a box unfolding rather than a
-          menu. The line's own method is picked here like any other value; the faces sit
-          under it as marks, not as rows. */}
-      <VariantField
-        /* THE NOUN STAYS ON THIS ONE. Blank, Colour and Size are recognisable from their
-           values; "DTG" alone in a wide field is not, and the faces below it are all
-           prefixed — an unlabelled parent over labelled children reads as a fourth face. */
-        prefix={tl("variantPicker", "Method")}
-        label={tl("variantPicker", "Method")}
-        value={lineMethod}
-        options={options}
-        placeholder={summary || tl("variantPicker", "none")}
+    <Popover>
+      {/**
+        * THE TRIGGER IS A FIELD, and only a field.
+        *
+        * It was a <details> whose summary wore this same chrome — so the one control in the
+        * strip that opened something looked exactly like the three that do not, and pressing
+        * it unfolded a box that pushed the rest of the line down. A popover leaves the strip
+        * where it is and puts the faces over it, which is what a menu does everywhere else
+        * in this app.
+        *
+        * It names the STATE, not the category: "DTG · EMB" for a garment decorated two ways,
+        * the line's own method when every face agrees, "none" when nothing is chosen. Same
+        * rule the filter menus follow.
+        */}
+      <PopoverTrigger
         disabled={disabled}
-        onChange={(v) => onLine(v)}
-      />
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        {shown.map((sd) => (
-          <VariantField
-            key={sd}
-            compact
-            prefix={tl("sides", sd)}
-            label={`${tl("sides", sd)} · ${tl("variantPicker", "Method")}`}
-            value={value[sd] ?? ""}
-            options={options}
-            /* AN UNSET FACE SHOWS WHAT IT INHERITS, and when the line has nothing to inherit
-               it shows the field's own noun — a question, not an answer. Identical to the
-               designer's field; see the note there. */
-            placeholder={lineMethod || tl("variantPicker", "Method")}
-            clearable={false}
-            emptyLabel={lineMethod ? `${lineMethod} (${tl("variantPicker", "from the line")})` : undefined}
-            disabled={disabled}
-            onChange={(v) => onPick(sd, v)}
-            className="w-auto shrink-0"
-          />
-        ))}
-        {/* THE WAY TO THE REST, and it says how many rather than "more". A count is the fact
-            that decides whether it is worth pressing. */}
-        {hidden > 0 && (
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="eg-tap shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            +{hidden} {tl("variantPicker", "more faces")}
-          </button>
+        className={cn(
+          "col-span-2 flex w-full min-w-0 items-center gap-1.5 rounded-2xl border border-border bg-card px-2.5 text-left font-medium transition-colors",
+          "h-9 text-xs hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+          disabled && "cursor-not-allowed opacity-60",
         )}
-      </div>
-    </div>
+      >
+        <span className="min-w-0 truncate text-muted-foreground">
+          {tl("variantPicker", "Method")}<span className="text-muted-foreground/60"> · </span>
+        </span>
+        <span className={cn("min-w-0 flex-1 truncate", !summary && "text-muted-foreground")}>
+          {summary || tl("variantPicker", "none")}
+        </span>
+        <CaretDown size={11} className="shrink-0 text-muted-foreground" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-1.5">
+        {/* A HEADING, because this panel is a list of one kind of thing and the trigger it
+            came from said a different word. Not prose — three words naming the table. */}
+        <div className="px-2 pb-1.5 pt-1 eg-label text-muted-foreground">
+          {tl("variantPicker", "Method per face")}
+        </div>
+        {faces.map((sd) => (
+          <div key={sd} className="flex items-center gap-2 rounded-lg px-2 py-0.5 hover:bg-accent">
+            {/* THE FACE READS AS SET OR INHERITED, in weight and colour rather than in a
+                word — the value beside it already says "from the line" when it inherits. */}
+            <span className={cn("min-w-0 flex-1 truncate text-sm capitalize",
+              decided(sd) ? "font-medium text-foreground" : "text-muted-foreground")}>
+              {tl("sides", sd)}
+            </span>
+            <VariantField
+              compact
+              label={`${tl("sides", sd)} · ${tl("variantPicker", "Method")}`}
+              value={value[sd] ?? ""}
+              options={options}
+              /* AN UNSET FACE SHOWS WHAT IT INHERITS, and when the line has nothing to
+                 inherit it shows the field's own noun — a question, not an answer. */
+              /* AN INHERITED FACE SAYS SO. Muted type alone is a difference a reader has to
+                 notice by comparison; the words are the fact, and they are what stops the
+                 panel reading as six faces all set to DTG. */
+              placeholder={lineMethod ? `${lineMethod} ${tl("variantPicker", "from the line")}` : tl("variantPicker", "Method")}
+              clearable={false}
+              emptyLabel={lineMethod ? `${lineMethod} (${tl("variantPicker", "from the line")})` : undefined}
+              disabled={disabled}
+              onChange={(v) => onPick(sd, v)}
+              className="w-auto shrink-0 border-0 bg-transparent px-1 hover:bg-transparent"
+            />
+          </div>
+        ))}
+        {/* THE LINE'S OWN METHOD, under a rule, because it is not a face — it is what every
+            face above inherits when it says nothing. Without it the disclosure swallowed the
+            only control that could set it: the single Method field only renders for a blank
+            with ONE face. */}
+        <div className="mt-1.5 flex items-center gap-2 border-t border-border px-2 pb-0.5 pt-2">
+          <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+            {tl("variantPicker", "Every other face")}
+          </span>
+          <VariantField
+            compact
+            label={tl("variantPicker", "Method")}
+            value={lineMethod}
+            options={options}
+            placeholder={tl("variantPicker", "none")}
+            disabled={disabled}
+            onChange={(v) => onLine(v)}
+            className="w-auto shrink-0 border-0 bg-transparent px-1 hover:bg-transparent"
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
