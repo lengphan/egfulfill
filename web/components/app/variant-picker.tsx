@@ -507,15 +507,19 @@ export function VariantPicker({
         * Method takes whatever is left, which is the field that earns the space: it carries
         * two techniques on a mixed garment.
         */}
-      {/* METHOD IS A FIELD, NOT A GUTTER.
-          It held `minmax(0,1fr)` on the reasoning that it "earns the space" by carrying two
-          techniques on a mixed garment. A fraction does not mean "room for two techniques",
-          it means EVERY spare pixel on the row — so on a wide board the strip read as three
-          small pills and one field stretched across half the screen, empty, while a long
-          blank name was truncating three tracks to its left.
-          Four content tracks: each control is as wide as what it has to say, and the slack
-          stays slack. The row is a strip of pills, not a table — nothing is owed the width. */}
-      <div className={"grid grid-cols-2 gap-x-2 gap-y-2.5" + (dense ? "" : " sm:grid-cols-[repeat(4,minmax(0,max-content))] sm:justify-start")}>
+      {/* THE STRIP FILLS THE CARD, AND THE SLACK IS SHARED.
+          Two wrong shapes were tried before this one, and both are worth recording.
+          `minmax(0,1fr)` on Method alone gave that ONE field every spare pixel: three small
+          pills and a field stretched across half the card, empty, while a long blank name
+          truncated the three tracks to its left.
+          Four `max-content` tracks fixed the hogging and introduced the opposite problem —
+          the pills huddled at the left of a wide card with the rest of the row blank, which
+          reads as a layout that gave up rather than one that fits.
+          So: four FRACTIONS, weighted by what each field actually has to say. The blank is
+          widest because it carries a code and a swatch; size is narrowest because it holds
+          "S" or "2XL". Every track keeps a `minmax(0, …)` floor so a long product name
+          truncates instead of pushing the row wide. */}
+      <div className={"grid grid-cols-2 gap-x-2 gap-y-2.5" + (dense ? "" : " sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,1.2fr)]")}>
         {/* Blank — the load-bearing pick; nothing else can price without it, so it's the
             only field that flags itself when empty. */}
         {/* No custom placeholder: the field names itself now, and "Blank" beside the
