@@ -2,7 +2,7 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react"
-import { Plus, Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
+import { Plus, Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -3537,8 +3537,11 @@ return (
                 ? tl("canvas", "Put our product photo back")
                 : tl("canvas", "Use your own product photo as the backdrop — the design file is still needed")}
             >
-              {mockBusy ? <CircleNotch size={14} className="animate-spin" /> : <ImageSquare size={14} weight="bold" />}
-              {ownMockups[sideKey] ? tl("canvas", "Use ours") : tl("canvas", "Use mine")}
+              {/* NO MARK. "Use mine" needed one to say what kind of thing it was; "Upload
+                  Mockup" says it in the label, and a picture glyph beside the word picture
+                  is the same fact twice. The spinner stays — that is state, not decoration. */}
+              {mockBusy && <CircleNotch size={14} className="animate-spin" />}
+              {ownMockups[sideKey] ? tl("canvas", "Use ours") : tl("canvas", "Upload Mockup")}
             </Button>
           </div>
           {/* The zoom wrapper. It scales this box, NOT the artwork's percentages — see

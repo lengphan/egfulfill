@@ -62,6 +62,9 @@ export function ArtworkLibraryPanel() {
    *  card is the same object, and three cards open at three heights is a ragged wall. */
   const [openOrders, setOpenOrders] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  /** What just happened, when it is worth saying. Not a caption — it appears only after a
+   *  press and names its result. */
+  const [note, setNote] = useState<string | null>(null)
   const lightbox = useLightbox()
   const confirm = useConfirm()
 
@@ -130,7 +133,7 @@ export function ArtworkLibraryPanel() {
   }
 
   const attach = async (d: FactoryDesign, file: File) => {
-    setBusy(d.art_hash); setErr(null)
+    setBusy(d.art_hash); setErr(null); setNote(null)
     try {
       const data = await new Promise<string>((res, rej) => {
         const fr = new FileReader()
@@ -141,6 +144,14 @@ export function ArtworkLibraryPanel() {
       const designId = nextFileId(d)
       const r = await uploadDesignFile({ designId, name: file.name, data, artHash: d.art_hash })
       if (r?.error) throw new Error(r.error)
+      /* WHERE IT WENT, SAID ONCE. The upload puts the file on every order line carrying
+         this exact artwork and waiting for a stitch file, and that is a bigger thing than
+         "uploaded" — it is the answer to the question this tab exists to ask. It sits on
+         the card's own notice line and is replaced by the next thing that happens; 0 gets
+         no line, because nothing waiting is the ordinary case and not news. */
+      if (r?.attached) {
+        setNote(`${r.attached} ${r.attached === 1 ? tl("artwork", "order now has it") : tl("artwork", "orders now have it")}`)
+      }
       /* NAME IT IMMEDIATELY. The upload knows the file it just sent, so the card can say
          which file is on record without waiting for a reload to tell it. Newest first,
          which is the order the listing returns them in. */
@@ -265,6 +276,7 @@ export function ArtworkLibraryPanel() {
       )}
 
       {err && <p className="text-sm text-destructive">{err}</p>}
+      {note && !err && <p className="text-sm font-medium text-success">{note}</p>}
 
       {state === "loading" && !rows?.length ? (
         <div className="flex items-center justify-center py-14 text-muted-foreground">

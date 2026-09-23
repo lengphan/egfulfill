@@ -12,6 +12,90 @@ import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
 import { phashDistance, PHASH_NEAR } from '../fingerprint.js';
 
+
+/**
+ * A FILE FILED AGAINST ARTWORK GOES ONTO THE ORDERS WAITING FOR IT — no press, no prompt.
+ *
+ * THIS IS A DELIBERATE REVERSAL, and it needs stating because the rule it changes is in
+ * CLAUDE.md. §6 says an artwork match SUGGESTS and a human confirms. That rule was written
+ * about the PERCEPTUAL match — a lookalike, where being wrong puts somebody else's design on
+ * a garment — and it still holds for those: `similar` hits are still only ever offered.
+ *
+ * An EXACT hit is not a lookalike. `art_hash` is a hash of the artwork bytes, so a match is
+ * the same picture, and asking a person to confirm that two identical pictures are identical
+ * is a click that can only be answered one way. Owner, 2026-09-23: "dont suggest - attach the
+ * files to download button + the files tab" — the suggestion lived in one tab of one card,
+ * and a stitch file we already own is no use to the floor if nobody presses the button.
+ *
+ * IT FILLS GAPS AND NEVER OVERWRITES (§2.6). A line that already carries a stitch file is
+ * left exactly as it is, whoever put it there and whatever it is; so is a line covered by an
+ * order-wide file. Nothing is replaced, nothing is deleted, and no stage or status moves.
+ *
+ * WHAT IT DOES TO MONEY, SAID OUT LOUD. computeDesignFees bills digitising for a face with no
+ * stitch file and a check fee for one that has it, so attaching here can change what an
+ * UNSUBMITTED order costs — downward, and correctly: we are not digitising a picture we have
+ * already digitised. An order already charged keeps its charge; nothing here reverses one,
+ * the same rule the delete route records.
+ */
+async function applyToWaitingLines(srcDesignId, artHash, user) {
+  if (!/^[0-9a-f]{64}$/.test(String(artHash || ''))) return [];
+  const src = await q('select * from design_file_data where design_id=$1', [String(srcDesignId)])
+    .then((r) => r.rows[0]);
+  /* ONLY A STITCH FILE. A design IMAGE filed against artwork is a picture of the artwork,
+     and putting one on an order as though it were the thing the machine runs is the exact
+     confusion the two kinds exist to prevent. */
+  if (!src || !['pes', 'emb'].includes(String(src.kind))) return [];
+
+  const waiting = await q(
+    `select distinct d.order_id, d.line_id, d.sku
+       from order_designs d
+      where d.art_hash = $1
+        and not exists (
+          select 1 from design_file_data f
+           where f.order_id = d.order_id
+             and f.kind in ('pes','emb')
+             and (
+               /* the same line, the same sku-scoped file, or a file that covers the whole
+                  order — any of the three means this line is already answered */
+               (d.line_id is not null and f.line_id = d.line_id)
+               or (d.line_id is null and f.sku is not null and f.sku = d.sku)
+               or (f.line_id is null and f.sku is null)
+             )
+        )`, [String(artHash)]).then((r) => r.rows).catch(() => []);
+
+  const done = [];
+  for (const w of waiting) {
+    /* The order's own seller, read here rather than through the routes' ownerOfOrder —
+       that one is scoped inside designFilesRoutes and this helper is not. Same query. */
+    const seller = await q('select seller_id from orders where id=$1', [w.order_id])
+      .then((r) => (r.rows[0] && r.rows[0].seller_id) || null).catch(() => null);
+    const newId = `${src.kind === 'pes' ? 'DL' : 'EMB'}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    try {
+      await q(
+        /* The same insert the manual reuse route writes, storage_key included — without it
+           the copy points at the object through a URL the download route cannot read, so a
+           reused file downloads as nothing while the original works.
+           NO `side`: the file answers the line, which is what a file attached before sides
+           existed has always meant, and it is the reading that keeps those orders priced
+           exactly as they were. */
+        `insert into design_file_data (design_id, order_id, sku, line_id, seller_id, file_name, mime, data, url, storage_key, content_hash, price, kind, art_hash, source, created_at, updated_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'factory', now(), now())`,
+        [newId, w.order_id, w.sku || null, w.line_id || null, seller || null, src.file_name, src.mime,
+         src.data, src.url, src.storage_key || null, src.content_hash, Number(src.price) || 0, src.kind,
+         String(artHash)]);
+      audit({ user }, 'design_file.auto_attached', {
+        entityType: 'order', entityId: String(w.order_id),
+        after: { from: String(srcDesignId), to: newId, line_id: w.line_id || null, sku: w.sku || null, art_hash: String(artHash) },
+      });
+      /* The boards re-read on this ping, so an order open on somebody's screen picks the
+         file up without a reload — the same broadcast an ordinary upload sends. */
+      egBroadcast({ type: 'design-file', orderId: String(w.order_id), sku: w.sku || null, kind: src.kind });
+      done.push({ order_id: w.order_id, line_id: w.line_id || null, design_id: newId });
+    } catch { /* one order failing must not stop the rest */ }
+  }
+  return done;
+}
+
 export function designFilesRoutes(app, requireAuth) {
   q(`create table if not exists design_file_data (
        design_id    text primary key,
@@ -704,6 +788,22 @@ export function designFilesRoutes(app, requireAuth) {
       egBroadcast({ type: 'design-file', orderId: String(b.orderId), sku: b.sku || null, kind: savedKind });
     }
     /**
+     * FILED AGAINST ARTWORK WITH NO ORDER BEHIND IT — the Design Lab › Files upload. It goes
+     * straight onto every order line carrying that exact artwork and waiting for a stitch
+     * file. See applyToWaitingLines for why an exact hash attaches where a lookalike only
+     * ever suggests, and for what it refuses to touch.
+     *
+     * Only when there is no `orderId`: an upload made ON an order is already where it
+     * belongs, and fanning it out from there would put one line's file onto every other
+     * order that happens to share the picture, which is a much larger claim than the person
+     * dropping a file on one line was making.
+     */
+    let attached = [];
+    if (!b.orderId && b.artHash) {
+      attached = await applyToWaitingLines(String(b.designId), String(b.artHash).toLowerCase(), req.user)
+        .catch(() => []);
+    }
+    /**
      * A SELLER'S OWN MACHINE FILE enters the verification queue.
      *
      * Seller-supplied stitch files are the ones that cause problems — wrong size, wrong
@@ -748,7 +848,10 @@ export function designFilesRoutes(app, requireAuth) {
         href: `/orders/${b.orderId}`, entityId: String(b.designId),
       });
     }
-    return { ok: true, stored: url ? 'object-storage' : 'inline' };
+    /* SAY WHERE IT WENT. The card that uploaded it can then report "on 3 orders" rather
+       than leaving a person to go and check — and a zero here is the honest answer that
+       nothing was waiting on this picture, which is different from nothing happening. */
+    return { ok: true, stored: url ? 'object-storage' : 'inline', attached: attached.length, orders: attached };
   });
 
   // Remove a file from an order. Staff-only: a machine file is a factory artefact, and a

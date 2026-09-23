@@ -88,17 +88,19 @@ function useFmtDate() {
 function DesignLab() {
   const fmtDate = useFmtDate()
   const tl = useLabelT()
- const tab = useDesignLabTab()
- const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
- const [signedOut, setSignedOut] = useState(false)
   /* Read after mount, like `signedOut` — getUser() touches storage the prerender has not
-     got. Null until then, which the Files gate reads as "not allowed", so the panel can
-     never flash for a role that may not see it. */
+     got. THREE STATES: null = not read yet, "" = read and nobody is signed in, a role
+     otherwise. The Files gate reads anything but an allowed role as "not allowed", so the
+     panel can never flash for someone who may not see it, and useDesignLabTab waits on
+     null rather than defaulting to Artwork for a frame. */
  const [role, setRole] = useState<string | null>(null)
  useEffect(() => {
- const id = setTimeout(() => setRole(getUser()?.role ?? null), 0)
+ const id = setTimeout(() => setRole(getUser()?.role ?? ""), 0)
  return () => clearTimeout(id)
   }, [])
+ const tab = useDesignLabTab(role)
+ const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
+ const [signedOut, setSignedOut] = useState(false)
   /* The header's own picker. The zone still takes a drop; this is the click route, which is
      what "Import artwork" has to actually do to be telling the truth. */
  const pickRef = useRef<HTMLInputElement | null>(null)
@@ -192,7 +194,16 @@ function DesignLab() {
         * meant — the design work on an order — which is the pair people actually need to
         * tell apart.
         */}
-      {tab === "library" ? (
+      {tab === null ? (
+        /* WE DO NOT KNOW WHICH TAB YET — the session is still being read, and the default
+           depends on it. The same eight-card skeleton the Suspense fallback draws, so the
+           page does not collapse to a sliver and pop back. */
+        <Card className="gap-0 overflow-hidden p-0">
+          <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-52 animate-pulse rounded-xl bg-muted" />)}
+          </div>
+        </Card>
+      ) : tab === "library" ? (
         <SectionCard
  title={tl("design", "Your artwork")}
  actions={

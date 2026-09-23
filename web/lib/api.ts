@@ -2060,7 +2060,16 @@ export function uploadDesignFile(body: { designId: string; orderId?: string; sku
    * which keeps resolving through the order's own line exactly as before.
    */
   artHash?: string | null }) {
-  return api<{ ok?: boolean; stored?: string; error?: string }>(`/api/design_files`, { method: "POST", body: JSON.stringify(body) })
+  return api<{ ok?: boolean; stored?: string; error?: string
+    /**
+     * HOW MANY ORDERS IT LANDED ON. A file filed against artwork with no order behind it
+     * goes straight onto every line carrying that exact artwork and waiting for a stitch
+     * file — so the card that uploaded it can say where it went rather than leaving somebody
+     * to check. 0 is the honest answer that nothing was waiting on this picture.
+     */
+    attached?: number
+    orders?: { order_id: string; line_id: string | null; design_id: string }[] }>(
+    `/api/design_files`, { method: "POST", body: JSON.stringify(body) })
 }
 
 /**

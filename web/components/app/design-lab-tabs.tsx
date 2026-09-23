@@ -74,15 +74,33 @@ const TABS = [
 
 export type DesignLabTab = (typeof TABS)[number]["key"]
 
-/** Which toggle the current URL is on. Kept here so the page and the bar can't disagree. */
-export function useDesignLabTab(): DesignLabTab {
+/**
+ * Which toggle the current URL is on. Kept here so the page and the bar can't disagree.
+ *
+ * A BARE `/design` IS NOT A TAB, IT IS A DEFAULT — and the default is the first toggle this
+ * role can see. It was hard-coded to Artwork, so pressing Design Lab in the sidebar landed
+ * on the second tab and read as the bar jumping off Files by itself.
+ *
+ * `role` IS THREE STATES, not two, and that is what stops the flash. `null` means nobody has
+ * read the session yet (it lives in storage, which a prerender has not got), and answering
+ * "library" then would paint Artwork for a frame and swap — the same jump, one tick shorter.
+ * So it answers NOTHING until the role is known and the page draws its skeleton. `""` is the
+ * answer "read it, nobody is signed in", which is not staff and lands on Artwork like any
+ * seller. A caller that passes nothing is not role-aware and keeps the old behaviour.
+ *
+ * An explicit URL always wins and never waits: only the default consults the role.
+ */
+export function useDesignLabTab(role?: string | null): DesignLabTab | null {
   const pathname = usePathname()
   const search = useSearchParams()
   if (pathname?.startsWith("/design/maker")) return "maker"
   const tab = search.get("tab")
-  // An explicit list rather than a chain of ternaries: a fourth surface arriving is where a
+  // An explicit list rather than a chain of ternaries: a fifth surface arriving is where a
   // chain quietly starts answering "library" for a tab that exists.
-  return tab === "templates" || tab === "machine" || tab === "files" ? tab : "library"
+  if (tab === "templates" || tab === "machine" || tab === "files" || tab === "library") return tab
+  if (role === undefined) return "library"
+  if (role === null) return null
+  return canSeeDesignLabTab("files", role) ? "files" : "library"
 }
 
 /**
@@ -98,18 +116,21 @@ export function canSeeDesignLabTab(key: DesignLabTab, role?: string | null): boo
 
 export function DesignLabTabs({ className }: { className?: string }) {
   const tl = useLabelT()
-  const active = useDesignLabTab()
   // Read after mount — getToken() touches localStorage, which the prerender doesn't have.
   // Deferred rather than set inline, matching how every other page here reads the session.
   const [signedOut, setSignedOut] = useState(false)
+  // null = not read yet · "" = read, nobody signed in. See useDesignLabTab.
   const [role, setRole] = useState<string | null>(null)
   useEffect(() => {
     const id = setTimeout(() => {
       setSignedOut(!getToken())
-      setRole(getUser()?.role ?? null)
+      setRole(getUser()?.role ?? "")
     }, 0)
     return () => clearTimeout(id)
   }, [])
+  /* DECLARED AFTER `role`, and that is not style: read above it this is TS2448 and the
+     React Compiler drops the component — the trap §7 records, in the file that names it. */
+  const active = useDesignLabTab(role)
 
   return (
     <nav aria-label={tl("designLab", "Design Lab sections")} className={cn(tabsListVariants(), "h-8", className)}>
