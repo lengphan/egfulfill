@@ -2511,6 +2511,14 @@ export type OrderItem = {
    *  Both ride on the list so a board can be searched by design, not only by order. */
   design_name?: string | null
   design_no?: number | null
+  /** HOW MANY FACES THIS LINE HAS, AND HOW MANY OF THEM SAY NOTHING ABOUT THEIR METHOD.
+   *  Counted by the list query (the dm lateral in orders.js) so a board can tell a finished
+   *  line from an unfinished one WITHOUT fetching its designs. Read by itemNeedsSetup: a line
+   *  whose faces all declare a method needs none of its own, which is the rule the pricer has
+   *  always followed. Absent from an older server, and the reader treats absent as "every face
+   *  is silent" — the behaviour that was there before. */
+  face_count?: number
+  faces_without_method?: number
   personalization?: string
   unit_price?: number | string
   /** FROZEN AT SUBMIT — what this line costs the seller to produce, stored on the line so a

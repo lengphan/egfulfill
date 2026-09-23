@@ -468,7 +468,26 @@ export function itemNeedsSetup(item: OrderItem, catalog: CatalogProduct[]): bool
   if (!p) return !isSet(item.blank)   // nothing to produce on
   if (colorsOf(p).length && !isSet(item.color)) return true
   if (sizesOf(p).length && !isSet(item.size)) return true
-  if (methodsOf(p).length && !isSet(item.print_type)) return true
+  /**
+   * THE LINE, OR THE FACES — because the pricer already accepts either.
+   *
+   * This asked `item.print_type` alone, and a line whose faces each declare their own method
+   * has no need of one: §4's rule is that a silent face inherits the line and a SPEAKING face
+   * overrides it. Measured on a live order — four faces all saying Embroidery, print_type
+   * empty — sideDetail charged the full $11 while this function reported the line unfinished,
+   * so Approve was a dead button on an order the invoice considered complete. One question
+   * answered two ways is the faces defect §4 documents, and this was the fourth place.
+   *
+   * `faces_without_method` and `face_count` come from the list query itself (the dm lateral in
+   * orders.js), so the LIST can answer this without fetching designs. Absent on an older
+   * server, and `undefined > 0` is false — which lands exactly on the previous behaviour
+   * rather than on a silently permissive one.
+   */
+  if (methodsOf(p).length && !isSet(item.print_type)) {
+    const faces = item.face_count ?? 0
+    const silent = item.faces_without_method ?? faces   // no answer => treat every face as silent
+    if (!(faces > 0 && silent === 0)) return true
+  }
   return false
 }
 

@@ -1951,6 +1951,20 @@ export function ordersRoutes(app, requireAuth) {
      * one id shape for both line_id and sku, so an unprefixed coalesce matches across the
      * two namespaces and attaches the wrong artwork.
      */
+    /**
+     * THE LINE'S METHOD IS NOT THE ONLY PLACE A METHOD LIVES.
+     *
+     * itemNeedsSetup() on the client blocks Approve on `!isSet(item.print_type)` — it asks the
+     * LINE. The PRICER asks the FACES: sideDetail resolves each face's own method, and it
+     * charged $11 on a line whose print_type was empty because all four faces said Embroidery.
+     * So one surface refused to approve an order the other was already pricing in full, and
+     * the refusal was a dead button whose reason lives in a tooltip nobody hovers.
+     *
+     * That is §4's faces rule seen from the other side — a silent face inherits the line, a
+     * SPEAKING one overrides it — so a line whose faces all speak needs no method of its own.
+     * It has to be answered HERE because the list has no designs to look at, and the Approve
+     * button is on the list.
+     */
     const join = `left join order_items i on i.order_id = o.id
       left join lateral (
         select d.name, d.art_hash, di.design_no
@@ -1977,7 +1991,21 @@ export function ordersRoutes(app, requireAuth) {
                   (coalesce(d.side,'front') = 'front') desc,
                   d.updated_at desc nulls last
          limit 1
-      ) dz on true`;
+      ) dz on true
+      -- DOES EVERY FACE ON THIS LINE DECLARE A METHOD? See the note above this query.
+      -- Both halves are counted rather than a verdict being sent: a client deciding
+      -- "set up" from two integers can change its mind without a server deploy, and
+      -- faces = 0 is an honest "no faces yet", which is not "every face is fine".
+      left join lateral (
+        select count(*)::int as faces,
+               count(*) filter (where coalesce(d.method, '') = '')::int as no_method
+          from order_designs d
+         where d.order_id = i.order_id
+           and (
+             (d.line_id is not null and d.line_id = i.line_id)
+             or (d.line_id is null and (d.sku = i.sku or d.sku = i.line_id))
+           )
+      ) dm on true`;
     // ORDER BY i.id keeps line-item order stable across every board, so the per-line
     // design "slot" (1st vs 2nd same-SKU item) resolves to the same artwork everywhere.
     // IMAGE BYTES DO NOT TRAVEL IN THE LIST. Measured on a real board: 703 orders came to
@@ -2073,6 +2101,9 @@ export function ordersRoutes(app, requireAuth) {
           -- Both travel on the LIST because searching by design is the point: a name that
           -- only arrives when a row is expanded can't be typed into a filter box.
           'design_name', dz.name, 'design_no', dz.design_no,
+          -- See the dm lateral: how many faces this line has, and how many of them declare
+          -- no method of their own. The client reads the pair, not a verdict.
+          'face_count', coalesce(dm.faces, 0), 'faces_without_method', coalesce(dm.no_method, 0),
           'design_tier', i.design_tier, 'design_quote_status', i.design_quote_status,
           'design_quote_make', i.design_quote_make, 'design_quote_download', i.design_quote_download,
           -- img / img_ref: see the note above the query.
