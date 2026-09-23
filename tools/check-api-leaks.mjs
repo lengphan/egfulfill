@@ -54,6 +54,9 @@ const mkSeller = (email) => psql(
 ).split('\n')[0].trim()
 const A = mkSeller('seller-a@test.local')
 const B = mkSeller('seller-b@test.local')
+const STAFF = psql(
+  `insert into users (email, password_hash, role, name) values ('staff@test.local','x','admin','Gate Staff') returning id`
+).split('\n')[0].trim()
 
 const api = spawn(process.execPath, [join(ROOT, 'server/src/index.js')], {
   env: { ...process.env, DATABASE_URL: URL_, JWT_SECRET: SECRET, PORT: String(PORT), NODE_ENV: 'test' },
@@ -116,8 +119,10 @@ if (!(hasColumn('catalog_products', 'data') && hasColumn('inventory', 'visibilit
 psql(`insert into catalog_products (id, name, sku, type, method, base_price, price, data)
       values ('SANMAR-108085','Gate Tee','GATETEE','Apparel','DTG',8.50,14.50,
         '{"productCost": 3.11, "supplier": "SanMar", "supplierSku": "103-713-031753A",
-          "img": "https://cdn.ssactivewear.com/Images/Style/29M_f.jpg",
-          "spec_sheet": "https://www.sanmar.com/specs/108085.pdf",
+          "img": "/api/ss/img?u=https%3A%2F%2Fcdn.ssactivewear.com%2FImages%2FStyle%2F29M_f.jpg",
+          "specSheet": "https://www.sanmar.com/specs/108085.pdf",
+          "sizeChart": "https://cdn.ssactivewear.com/charts/16468.jpg",
+          "brand": "SanMar",
           "sizes": ["S","M","L"]}'::jsonb)`)
 psql(`insert into inventory (sku, name, variant, in_stock, reserved, category, visibility)
       values ('GATETEE','Gate Tee','Black / L',40,5,'Apparel','seller')`)
@@ -298,7 +303,111 @@ const boom = await call(keyA, 'GET', '/api/v1/orders/' + 'x'.repeat(300))
 check('an internal failure never returns a database message',
   boom.status !== 500 || (boom.body.code === 'internal_error' && !!boom.body.ref), boom.text.slice(0, 140))
 
+/* ─── 4 · the SELLER's own session ─────────────────────────────────────────────────── */
+/**
+ * THE BIGGER SURFACE, AND THE ONE THAT ACTUALLY LEAKED.
+ *
+ * A key reaches 11 routes. A seller's JWT reaches 243, and two of them were publishing
+ * exactly what §2.9 withholds — found on 2026-09-23 by running this rather than reading it:
+ *
+ *   /api/wallet        computed `bySupplier` from `where account = 'factory'`, ignoring the
+ *                      account being viewed, so every seller checking their balance received
+ *                      our purchasing by supplier NAME and AMOUNT.
+ *   /api/pricing/spec  returned `matched.id` — the catalogue id, which carries the import's
+ *                      provenance prefix (SANMAR-…, SS-…, OTTO-…).
+ *
+ * Both looked correct while reading: the wallet route gates the account carefully two lines
+ * above the query that ignores it, and pricing/spec is one line long. Both are invisible on
+ * a laptop with an empty factory ledger, which is what `bySupplier: []` looks like when it
+ * is working. So the fixture below SEEDS THE FACTORY'S SPEND — that is the condition under
+ * which the leak exists at all.
+ */
+console.log('\nTHE SELLER SURFACE — a seller session must never reach cost, supplier or another seller')
+psql(`insert into wallet_ledger (account, type, ref, delta, note, partner) values ('factory','blanks-cost','po-1',-4102,'PO','SanMar')`)
+psql(`insert into wallet_ledger (account, type, ref, delta, note, partner) values ('factory','blanks-cost','po-2',-9880,'PO','S&S Activewear')`)
+psql(`insert into wallet_ledger (account, type, ref, delta, note) values ('${A}','topup','own-1',500,'own money')`)
+
+const asUser = async (who, path, method = 'GET', body) => {
+  const r = await fetch(API + path, {
+    method,
+    headers: { Authorization: 'Bearer ' + who, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+  let text = ''
+  try { text = await r.text() } catch { /* no body */ }
+  return { status: r.status, text }
+}
+const SELLER = tokenFor(A, 'seller-a@test.local')
+const ADMIN = jwt.sign({ sub: STAFF, role: 'admin', email: 'staff@test.local' }, SECRET, { expiresIn: '1h' })
+
+const wallet = await asUser(SELLER, '/api/wallet')
+const spend = ['SanMar', 'S&S Activewear', '4102', '9880', 'bySupplier'].filter((k) => wallet.text.includes(k))
+check("a seller's wallet carries none of the factory's supplier spend", spend.length === 0, `leaked ${spend.join(', ')}`)
+check('…and their own balance still reads', wallet.status === 200 && wallet.text.includes('"balance":500'), wallet.text.slice(0, 120))
+const staffWallet = await asUser(ADMIN, '/api/wallet?account=factory')
+check('…while staff still get the supplier breakdown', staffWallet.text.includes('bySupplier') && staffWallet.text.includes('SanMar'),
+  'the fix took the report away from the people it is for')
+
+const spec = await asUser(SELLER, '/api/pricing/spec?sku=GATETEE')
+check('a price quote does not carry the supplier-prefixed catalogue id', !spec.text.includes('SANMAR-108085'), spec.text.slice(0, 160))
+check('…and still answers a price', spec.text.includes('unitCost'), spec.text.slice(0, 160))
+const staffSpec = await asUser(ADMIN, '/api/pricing/spec?sku=GATETEE')
+check('…while staff keep the id, which is how a staff surface finds the row', staffSpec.text.includes('SANMAR-108085'))
+
+/* The catalogue a seller reads is the third place this row leaves the building. */
+const cat = await asUser(SELLER, '/api/catalog_products')
+const catLeak = FORBIDDEN.filter(([tok]) => cat.text.includes(tok))
+check('the seller catalogue carries no cost and no supplier', catLeak.length === 0, catLeak.map((x) => x[0]).join(', '))
+/**
+ * THE THREE THAT ARE NOT FIELDS ABOUT SUPPLIERS.
+ *
+ * §2.9 covers URLs, and this row is why: the image was `/api/ss/img?u=https%3A%2F%2Fcdn.
+ * ssactivewear.com…` — our own proxy path with their domain inside it, printed in the src
+ * of every product card. The spec sheet and size chart are PDFs on a supplier domain. And
+ * `brand` holds the supplier's own name whenever the import's `brand || 'SanMar'` fallback
+ * fires, which is exactly on the rows with nothing else to say.
+ */
+const row = (() => { try { return JSON.parse(cat.text)[0] || {} } catch { return {} } })()
+check('a product image is an opaque same-origin address', typeof row.img === 'string' && row.img.startsWith('/api/catalog/img/'), `img is ${JSON.stringify(row.img)}`)
+check('…and the picture it points at still serves', (await asUser(SELLER, String(row.img || '/api/catalog/img/x'))).status !== 404, 'the seller sees a blank card')
+check('no spec sheet or size chart on a supplier domain', !row.specSheet && !row.sizeChart, JSON.stringify({ specSheet: row.specSheet, sizeChart: row.sizeChart }))
+check('no brand that is really the supplier', row.brand === undefined, `brand is ${JSON.stringify(row.brand)}`)
+const staffCat = await asUser(ADMIN, '/api/catalog_products')
+check('…while staff still read the real row', staffCat.text.includes('productCost') && staffCat.text.includes('ssactivewear'),
+  'the fix blinded the people who choose the blanks')
+
+/* The staff surfaces, named individually: a 403 list is only reassuring if it is the list
+   of things that would actually hurt. */
+for (const path of [
+  '/api/inventory',                 // the shelf, with supplier columns
+  '/api/catalog/rows',              // the unstripped catalogue row
+  '/api/catalog/supplier-styles',   // supplier catalogues by name
+  '/api/catalog/export',            // the catalogue as a file
+  '/api/wallet/partners',           // who we pay
+  '/api/wallet/export',
+  '/api/reports/pnl',               // margin
+  '/api/shipping/billing',          // our carrier account
+  '/api/admin/secrets',             // integration keys
+  '/api/audit',
+  '/api/users',
+  '/api/sellers',                   // everyone else's identity
+  '/api/design_files/library',      // other sellers' artwork
+  '/api/vietqr/transactions',
+]) {
+  const r = await asUser(SELLER, path)
+  check(`a seller cannot reach ${path}`, r.status === 403 || r.status === 404, `answered ${r.status}`)
+}
+
+/* Money, which is the other thing a session could take rather than read. */
+const selfCredit = await asUser(SELLER, '/api/wallet/ledger', 'POST', { account: A, type: 'topup', ref: 'hack', delta: 9999, note: 'self credit' })
+const after = psql(`select coalesce(sum(delta),0)::int from wallet_ledger where account='${A}'`).split('\n')[0].trim()
+check('a seller cannot credit their own wallet', selfCredit.status === 403 && after === '500', `${selfCredit.status}, balance now ${after}`)
+
+/* And one seller's session against another's order — the JWT half of section 2. */
+const peekJwt = await asUser(SELLER, `/api/orders/${orderB.body.id}`)
+check("a seller session cannot open another seller's order", peekJwt.status === 403 || peekJwt.status === 404, `answered ${peekJwt.status}`)
+
 console.log(bad === 0
-  ? '\nPASS  nothing named a supplier, no key crossed a seller boundary, and the credential held.'
+  ? '\nPASS  nothing named a supplier, nothing crossed a seller boundary, and the credential held.'
   : `\nFAIL  ${bad} problem${bad === 1 ? '' : 's'} — do not hand out a key until these are zero.`)
 process.exit(bad === 0 ? 0 : 1)

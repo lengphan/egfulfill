@@ -54,9 +54,27 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
 
   // What one unit of a spec costs us to make + ship. Powers the margin readout in the
   // publish dialog, using the SAME pricing path that bills an order.
+  /**
+   * THE ID IS NOT PUBLISHED TO A SELLER, BECAUSE IT NAMES OUR SUPPLIER — §2.9.
+   *
+   * This route handed back `quoteSpec`'s answer verbatim, and its `matched.id` is
+   * catalog_products.id — the import's provenance prefix: `SS-9182`, `SANMAR-108085`,
+   * `OTTO-…`. Measured on the live catalogue, 21 of 28 rows name a supplier outright. The
+   * partner API stripped this field for exactly this reason; the route every seller-facing
+   * pricing panel calls still shipped it, which is the same leak one authentication level
+   * lower — and a seller is a likelier reader of it than a partner is.
+   *
+   * sellerSafe below is why this is worth stating twice: it exists because the raw catalogue
+   * blob leaked productCost and `supplier` on the list route, and this is the third place
+   * the same row leaves the building. Nothing in the app reads `matched` at all, so dropping
+   * the id costs nothing; staff keep it, since the id is how a staff surface finds the row.
+   */
   app.get('/api/pricing/spec', { preHandler: requireAuth }, async (req) => {
     const qy = req.query || {};
-    return quoteSpec({ blank: qy.blank, sku: qy.sku, size: qy.size, printType: qy.printType });
+    const spec = await quoteSpec({ blank: qy.blank, sku: qy.sku, size: qy.size, printType: qy.printType });
+    if (isStaff(req.user) || !spec || !spec.matched) return spec;
+    const { id, ...matched } = spec.matched;
+    return { ...spec, matched };
   });
 
   // What a SELLER may not see: what the blank costs US. `productCost` and each size
@@ -80,6 +98,30 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     // called `supplier` is the obvious one nobody checked. Staff are unaffected — the list
     // route hands staff the unstripped row and only maps sellers through here.
     const { productCost, product_cost, supplierSku, supplier_sku, supplier, ...rest } = data;
+    /**
+     * A DOCUMENT ON THEIR DOMAIN NAMES THEM AS SURELY AS A FIELD DOES — §2.9 says so in as
+     * many words: "Spec sheets and size charts are supplier-branded PDFs on supplier
+     * domains. Proxy them or don't ship them." We do not proxy them, so they are not
+     * shipped: specSheet came back `https://www.sanmar.com/specs/108085.pdf` and sizeChart
+     * `https://cdn.ssactivewear.com/charts/…`, both on the list every seller page reads.
+     * A same-origin path is kept — that one is ours.
+     */
+    for (const key of ['specSheet', 'spec_sheet', 'sizeChart', 'size_chart']) {
+      const v = rest[key];
+      if (typeof v === 'string' && /^https?:\/\//i.test(v)) delete rest[key];
+    }
+    /**
+     * BRAND, BUT ONLY WHEN IT IS A BRAND.
+     *
+     * §2.9: the SanMar import writes `brand || 'SanMar'`, so the field holds our SUPPLIER'S
+     * NAME exactly when the real brand is missing — publishing it blind prints the supplier
+     * on precisely the rows that had nothing else to say. Gildan and Bella+Canvas are
+     * brands a buyer can read off a garment; these three are who we buy from.
+     */
+    if (typeof rest.brand === 'string'
+        && /^(s\s*&\s*s(\s+activewear)?|sanmar|otto\s*cap|ottocap|otto)$/i.test(rest.brand.trim())) {
+      delete rest.brand;
+    }
     if (Array.isArray(rest.sizePrices)) {
       rest.sizePrices = rest.sizePrices.map((t) => {
         if (!t || typeof t !== 'object') return t;
@@ -787,8 +829,27 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * governed by §2.9 and not what this is for.
    */
   const imgRefs = new Map();   // hash → url, so a repeat request re-hashes but never re-writes
-  async function byAddress(v) {
-    if (typeof v !== 'string' || !/^data:image\//i.test(v)) return v;
+  /**
+   * TWO REASONS TO REPLACE AN ADDRESS, and they are different questions.
+   *
+   * `data:` URLs are replaced because of SIZE — the bytes were riding inside the JSON.
+   * A SUPPLIER address is replaced because of §2.9: `/api/ss/img?u=https%3A%2F%2Fcdn.
+   * ssactivewear.com%2F…` prints who makes our blanks in the `src` of every product card,
+   * and the rule covers URLs, not just fields. That is the exact example §2.9 gives, and
+   * it was arriving on /api/catalog_products — which the orders hub, the products page,
+   * the publish page and the design surfaces all call — for every signed-in seller.
+   *
+   * `hideSupplier` rather than always: staff READ these addresses, and the picker that
+   * chooses a blank is built on them. Sellers get the same opaque `/api/catalog/img/<hash>`
+   * the partner workbook has used since it was written, for the same reason and through the
+   * same table — the hash is one-way, so the mapping exists only on this side.
+   */
+  async function byAddress(v, hideSupplier = false) {
+    if (typeof v !== 'string') return v;
+    const isData = /^data:image\//i.test(v);
+    const namesSupplier = hideSupplier
+      && (SUPPLIER_HOST.test(v) || SUPPLIER_IMG_PREFIXES.some((p) => v.startsWith(p)));
+    if (!isData && !namesSupplier) return v;
     const hash = imgHash(v);
     if (!imgRefs.has(hash)) {
       // Idempotent by hash — identical bytes resolve to the same row, so the table cannot
@@ -798,16 +859,20 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const ok = await q('insert into catalog_img_refs (hash, url) values ($1,$2) on conflict (hash) do nothing', [hash, v])
         .then(() => true).catch(() => false);
       if (ok) imgRefs.set(hash, true);
-      else return v;   // keep the data: URL this time rather than point at a row that isn't there
+      // A failed insert must not hand back the original when the original is the thing we
+      // are hiding: for a supplier address, no picture is the correct answer and a leaked
+      // one is not. A data: URL is only heavy, so that one still falls back.
+      else return namesSupplier ? null : v;
     }
     return `/api/catalog/img/${hash}`;
   }
-  async function slimImages(p) {
+  async function slimImages(p, hideSupplier = false) {
     const out = { ...p };
-    if (out.img) out.img = await byAddress(out.img);
-    if (Array.isArray(out.images)) out.images = await Promise.all(out.images.map(byAddress));
+    const at = (v) => byAddress(v, hideSupplier);
+    if (out.img) out.img = await at(out.img);
+    if (Array.isArray(out.images)) out.images = await Promise.all(out.images.map(at));
     if (out.colorImages && typeof out.colorImages === 'object') {
-      const e = await Promise.all(Object.entries(out.colorImages).map(async ([k, v]) => [k, await byAddress(v)]));
+      const e = await Promise.all(Object.entries(out.colorImages).map(async ([k, v]) => [k, await at(v)]));
       out.colorImages = Object.fromEntries(e);
     }
     // colorGallery holds the SAME kind of value as colorImages — a colourway's extra angles —
@@ -816,7 +881,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     // stop, just through a newer field.
     if (out.colorGallery && typeof out.colorGallery === 'object') {
       const e = await Promise.all(Object.entries(out.colorGallery).map(async ([k, v]) =>
-        [k, Array.isArray(v) ? await Promise.all(v.map(byAddress)) : v]));
+        [k, Array.isArray(v) ? await Promise.all(v.map(at)) : v]));
       out.colorGallery = Object.fromEntries(e);
     }
     // side_mockups is the THIRD field to arrive after this function was written, and it
@@ -834,7 +899,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     for (const key of ['side_mockups', 'sideMockups']) {
       const m = out[key];
       if (!m || typeof m !== 'object' || Array.isArray(m)) continue;
-      const e = await Promise.all(Object.entries(m).map(async ([k, v]) => [k, await byAddress(v)]));
+      const e = await Promise.all(Object.entries(m).map(async ([k, v]) => [k, await at(v)]));
       out[key] = Object.fromEntries(e);
     }
     return out;
@@ -854,7 +919,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       // The catalogue fields ride on the product rather than in a parallel list, so a
       // consumer can't hold a product and miss whether it's published.
       .map((row) => ({ ...row.data, inCatalog: !!row.in_catalog, catalogPrice: row.catalog_price == null ? null : Number(row.catalog_price) }));
-    const light = await Promise.all(rows.map(slimImages));
+    const light = await Promise.all(rows.map((row) => slimImages(row, !staff)));
     return staff ? light : light.map(sellerSafe);
   });
 
@@ -2100,7 +2165,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const rows = top
       .filter((row) => row.data && (staff || sellerVisible(row.status ?? row.data.status)))
       .map((row) => row.data);
-    const light = await Promise.all(rows.map(slimImages));
+    const light = await Promise.all(rows.map((row) => slimImages(row, !staff)));
     return (staff ? light : light.map(sellerSafe)).map((p) => ({
       id: p.id, name: p.name, img: p.img ?? null, type: p.type ?? null,
     }));

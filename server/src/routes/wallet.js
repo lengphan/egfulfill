@@ -506,7 +506,27 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
      * to be first. A total that quietly excludes the past is how a report becomes wrong in
      * a way nobody can see; a line named "unattributed" is one anybody can.
      */
-    const supplierRows = await q(
+    /**
+     * STAFF ONLY, AND IT WAS NOT.
+     *
+     * Read the WHERE clause below: `account = 'factory'`. This block never looked at the
+     * account being viewed — it always reported the FACTORY's supplier spend, and the route
+     * is requireAuth, so every seller opening their own wallet received our purchasing
+     * broken down BY SUPPLIER NAME: "SanMar $4,102", "S&S $9,880". That is §2.9 in its most
+     * complete form — not just who supplies us but what we spend with each of them, which is
+     * the one number a supplier would most like a competitor to have, and it was arriving on
+     * the page a seller opens to check their balance.
+     *
+     * It survived because `canAccess` above scopes the ACCOUNT, and everything else in this
+     * handler honours that — so the route reads as correctly gated right up to the one query
+     * that ignores its own caller. A seller's wallet on a laptop with no factory rows shows
+     * `bySupplier: []`, which is exactly what it looks like when it is working.
+     *
+     * The key is omitted entirely rather than emptied: [] says "we spend with nobody", and
+     * absent says "this is not your question".
+     */
+    const canSeeSupplierSpend = isStaff(req.user);
+    const supplierRows = !canSeeSupplierSpend ? { rows: [] } : await q(
       `select coalesce(nullif(partner,''), 'unattributed') as partner,
               sum(delta)::float as net,
               sum(case when delta < 0 then -delta else 0 end)::float as spend,
@@ -536,7 +556,8 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
       } catch { lowBelow = null; }
     }
     return {
-      account, balance: bal, ledger: led.rows, summary, bySupplier,
+      account, balance: bal, ledger: led.rows, summary,
+      ...(canSeeSupplierSpend ? { bySupplier } : {}),
       byType: byTypeDetail,
       // Named separately so a client does not have to know the rule to warn about it.
       unaccounted,
