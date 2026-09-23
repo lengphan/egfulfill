@@ -3245,7 +3245,13 @@ export function OrdersHub() {
                               * strip was the same number printed twice on one line.
                               */}
                             {mayEditVariants(role, stage, { editAfterApproval }) ? (
-                              <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
+                              <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load}
+                                        /* THE SAME QUESTION THE ORDER PAGE ASKS. Without this the row
+                                           showed one Method field for the whole garment while the detail
+                                           page showed one per face — two shapes for one line, and the
+                                           row's was the vaguer of the two. The map rides on the list item
+                                           (the dm lateral in orders.js), so the row needs no extra fetch. */
+                                        faceMethods={it.face_methods} />
                             ) : (
                               // Locked, not chipped: the same four fields the editable strip
                               // shows, greyed. A row that changes shape by role reads as two

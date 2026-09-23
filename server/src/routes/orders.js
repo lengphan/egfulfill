@@ -1997,14 +1997,22 @@ export function ordersRoutes(app, requireAuth) {
       -- "set up" from two integers can change its mind without a server deploy, and
       -- faces = 0 is an honest "no faces yet", which is not "every face is fine".
       left join lateral (
+        -- One row per FACE first: a face can hold more than one design row (a picture and the
+        -- stitch file made from it), and they carry the same method — max() picks one
+        -- deterministically rather than letting the aggregate below depend on row order.
         select count(*)::int as faces,
-               count(*) filter (where coalesce(d.method, '') = '')::int as no_method
-          from order_designs d
-         where d.order_id = i.order_id
-           and (
-             (d.line_id is not null and d.line_id = i.line_id)
-             or (d.line_id is null and (d.sku = i.sku or d.sku = i.line_id))
-           )
+               count(*) filter (where f.method = '')::int as no_method,
+               jsonb_object_agg(f.side, f.method) as methods
+          from (
+            select lower(coalesce(d.side, 'front')) as side, max(coalesce(d.method, '')) as method
+              from order_designs d
+             where d.order_id = i.order_id
+               and (
+                 (d.line_id is not null and d.line_id = i.line_id)
+                 or (d.line_id is null and (d.sku = i.sku or d.sku = i.line_id))
+               )
+             group by 1
+          ) f
       ) dm on true`;
     // ORDER BY i.id keeps line-item order stable across every board, so the per-line
     // design "slot" (1st vs 2nd same-SKU item) resolves to the same artwork everywhere.
@@ -2104,6 +2112,11 @@ export function ordersRoutes(app, requireAuth) {
           -- See the dm lateral: how many faces this line has, and how many of them declare
           -- no method of their own. The client reads the pair, not a verdict.
           'face_count', coalesce(dm.faces, 0), 'faces_without_method', coalesce(dm.no_method, 0),
+          -- The per-face methods themselves, so the ROW's variant strip can show the same
+          -- per-face disclosure the order page does instead of one field for the garment.
+          -- Empty string = that face declares nothing and inherits the line, which is what
+          -- the picker already reads an absent face as.
+          'face_methods', coalesce(dm.methods, '{}'::jsonb),
           'design_tier', i.design_tier, 'design_quote_status', i.design_quote_status,
           'design_quote_make', i.design_quote_make, 'design_quote_download', i.design_quote_download,
           -- img / img_ref: see the note above the query.

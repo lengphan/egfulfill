@@ -633,7 +633,13 @@ export function OrdersList() {
  catalogReady={catalog.length > 0}
                                       />
                                       {mayEditVariants(role, o.factory_status, { editAfterApproval }) ? (
-                                        <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
+                                        <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load}
+                                        /* THE SAME QUESTION THE ORDER PAGE ASKS. Without this the row
+                                           showed one Method field for the whole garment while the detail
+                                           page showed one per face — two shapes for one line, and the
+                                           row's was the vaguer of the two. The map rides on the list item
+                                           (the dm lateral in orders.js), so the row needs no extra fetch. */
+                                        faceMethods={it.face_methods} />
                                       ) : (
                                         <VariantStrip color={it.color} size={it.size} method={methodsLabelOf(it)} marketplace={it.variant} locked className="mt-1.5" />
                                       )}

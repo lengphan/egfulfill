@@ -2519,6 +2519,11 @@ export type OrderItem = {
    *  is silent" — the behaviour that was there before. */
   face_count?: number
   faces_without_method?: number
+  /** `{ front: "Embroidery", back: "" }` — what each FACE of this line says its method is,
+   *  lower-cased keys, empty string for a face that declares nothing and inherits the line.
+   *  Sent so the ROW's strip can show the same per-face disclosure the order page does; the
+   *  picker reads an absent face as inheriting, which is what absent means (§4, faces). */
+  face_methods?: Record<string, string>
   personalization?: string
   unit_price?: number | string
   /** FROZEN AT SUBMIT — what this line costs the seller to produce, stored on the line so a
