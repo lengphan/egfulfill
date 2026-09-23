@@ -1,9 +1,17 @@
-// sandbox.js — Seller-facing API keys + a safe /api/test/* SANDBOX.
+// sandbox.js — Seller-facing API keys + the public API (/api/v1/*).
 //
 // Two concerns, one isolated module (so the global JWT auth hook stays untouched):
-//   1) Key management  — /api/keys  (SESSION-authed: a seller manages THEIR OWN test keys)
-//   2) The sandbox     — /api/test/* (API-KEY-authed: simulates responses, NO side effects —
-//                        no real orders, labels, charges, or DB writes beyond last_used_at)
+//   1) Key management  — /api/keys  (SESSION-authed: a seller manages THEIR OWN keys)
+//   2) The public API  — /api/v1/*  (API-KEY-authed, MODE-AWARE: a test key simulates, a
+//                        live key does the real thing, and both take the same path)
+//
+// THE /api/test/* TWINS ARE GONE (2026-09-23). They were the first sandbox, and by the end
+// they contradicted the thing a sandbox is for: four demo products you could not order in
+// live, a caller-supplied unit_price, a hardcoded 4.63 of postage, and label routes handing
+// back invented tracking codes (EGTEST…) under a sandbox.egfulfill.com that has never
+// existed. /api/v1/* on a test key prices from the real catalogue and reaches the same
+// verdict live does, which is what makes "build against test, flip one key" true. Two
+// sandboxes disagreeing about the same order is worse than one.
 //
 // Keys look like  egk_test_xxxxxxxx…  — we store only a SHA-256 hash + a short prefix, and
 // return the full key exactly ONCE (on create). Auth is done here, by hashing the presented
@@ -71,24 +79,6 @@ export async function authKey(req) {
   if (!r.rows.length) return null;
   q('update api_keys set last_used_at=now() where id=$1', [r.rows[0].id]).catch(() => {});
   return r.rows[0];
-}
-
-// Simulated catalog the sandbox references (kept tiny + stable so examples are reproducible).
-const SANDBOX_PRODUCTS = [
-  { id: 'gild-64000', name: 'Softstyle T-Shirt',   brand: 'Gildan',           base_price: 8.50,  colors: ['Black','White','Navy','Sport Grey'], sizes: ['S','M','L','XL','2XL'] },
-  { id: 'bc-3001',    name: 'Unisex Jersey Tee',   brand: 'Bella+Canvas',     base_price: 10.25, colors: ['Black','White','Heather'],           sizes: ['S','M','L','XL'] },
-  { id: 'gild-18500', name: 'Heavy Blend Hoodie',  brand: 'Gildan',           base_price: 18.00, colors: ['Black','Navy','Maroon'],             sizes: ['S','M','L','XL','2XL','3XL'] },
-  { id: 'otto-cap-1', name: 'Classic Dad Hat',     brand: 'Otto Cap',         base_price: 6.75,  colors: ['Black','Khaki','Navy'],              sizes: ['OS'] }
-];
-
-// Simulated carrier rates for a label/rate request.
-function sandboxRates() {
-  return [
-    { rate_id: rid('rate'), carrier: 'USPS', service: 'Ground Advantage',   amount: 4.63,  currency: 'USD', est_delivery_days: 3 },
-    { rate_id: rid('rate'), carrier: 'USPS', service: 'Priority Mail',       amount: 8.10,  currency: 'USD', est_delivery_days: 2 },
-    { rate_id: rid('rate'), carrier: 'UPS',  service: 'Ground',              amount: 9.42,  currency: 'USD', est_delivery_days: 3 },
-    { rate_id: rid('rate'), carrier: 'FedEx',service: 'Home Delivery',       amount: 10.15, currency: 'USD', est_delivery_days: 3 }
-  ];
 }
 
 /**
@@ -169,8 +159,7 @@ export function sandboxRoutes(app, requireAuth) {
     return { ok: true };
   });
 
-  // ─────────────────────────  SANDBOX  (/api/test/*, API-KEY-authed)  ────────────────────
-  // Every response carries mode:'test' and simulates — nothing here creates real records.
+  // ─────────────────────────  KEY AUTH + RATE LIMIT  (every /api/v1/* route)  ────────────
   /**
    * Resolve the key, then charge the request against that key's rate limit.
    *
@@ -186,8 +175,11 @@ export function sandboxRoutes(app, requireAuth) {
     const k = await authKey(req);
     if (!k) {
       reply.code(401);
-      return { error: 'Invalid or missing API key', mode: 'test',
-        hint: 'Send your test key in the X-API-Key header (or Authorization: Bearer egk_test_…). Generate one in the API Playground.' };
+      // No `mode` here on purpose: the key did not resolve, so which world this call would
+      // have landed in is not known — and the same reasoning as bad() applies, absent beats
+      // a confident 'test' answered to someone holding a live key.
+      return { error: 'Invalid or missing API key',
+        hint: 'Send your API key in the X-API-Key header (or Authorization: Bearer egk_test_…). Generate one in the API Playground.' };
     }
     // Scope before rate limit: a call the key may never make shouldn't consume the
     // budget of one it may.
@@ -205,111 +197,6 @@ export function sandboxRoutes(app, requireAuth) {
     }
     return k;
   };
-
-  // Validate the key + reach the sandbox.
-  app.get('/api/test/ping', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
-    return { ok: true, mode: 'test', message: 'Sandbox reachable — your key is valid.', seller_id: k.seller_id, time: nowISO() };
-  });
-
-  // List catalog blanks available to print on.
-  app.get('/api/test/products', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
-    return { object: 'list', mode: 'test', data: SANDBOX_PRODUCTS, count: SANDBOX_PRODUCTS.length };
-  });
-
-  // Create an order (simulated).
-  app.post('/api/test/orders', async (req, reply) => {
-    const k = await requireKey(req, reply, true); if (k.error) return k;
-    const b = req.body || {};
-    const items = Array.isArray(b.items) ? b.items : null;
-    if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items']);
-    if (!b.shipping_address) return bad(reply, 'An order needs a "shipping_address" object.', ['shipping_address']);
-    const priced = items.map((it, i) => {
-      const prod = SANDBOX_PRODUCTS.find((p) => p.id === it.product_id);
-      const qty  = Math.max(1, parseInt(it.quantity, 10) || 1);
-      const unit = prod ? prod.base_price : (parseFloat(it.unit_price) || 12.0);
-      return { line: i + 1, product_id: it.product_id || null, product: prod ? prod.name : (it.name || 'Custom item'),
-        color: it.color || null, size: it.size || null, method: it.method || 'DTG', quantity: qty,
-        unit_price: +unit.toFixed(2), line_total: +(unit * qty).toFixed(2) };
-    });
-    const itemsTotal = +priced.reduce((s, l) => s + l.line_total, 0).toFixed(2);
-    const shipping   = 4.63;
-    return {
-      object: 'order', mode: 'test', id: rid('ord'),
-      external_id: b.external_id || null,
-      status: 'received',
-      items: priced,
-      shipping_address: b.shipping_address,
-      totals: { items: itemsTotal, shipping, total: +(itemsTotal + shipping).toFixed(2), currency: 'USD' },
-      created: nowISO(),
-      _note: 'Simulated — no real order was created. In production this would enter the fulfillment queue.'
-    };
-  });
-
-  // Retrieve an order (simulated — echoes the id with a plausible status).
-  app.get('/api/test/orders/:id', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
-    return {
-      object: 'order', mode: 'test', id: req.params.id,
-      status: 'in_production',
-      tracking: { carrier: 'USPS', code: null, url: null },
-      timeline: [
-        { status: 'received',      at: nowISO() },
-        { status: 'in_production', at: nowISO() }
-      ],
-      _note: 'Simulated lookup — any well-formed id resolves in the sandbox.'
-    };
-  });
-
-  // Rate-shop a shipment (simulated).
-  app.post('/api/test/shipping-rates', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
-    const b = req.body || {};
-    if (!b.to_address) return bad(reply, 'A rate request needs a "to_address" object.', ['to_address']);
-    return { object: 'rate_list', mode: 'test', rates: sandboxRates(),
-      _note: 'Simulated rates. Buy one with POST /api/test/shipping-labels/domestics.' };
-  });
-
-  // Buy a DOMESTIC label (simulated).
-  app.post('/api/test/shipping-labels/domestics', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
-    const b = req.body || {};
-    const miss = ['to_address', 'from_address', 'parcel'].filter((f) => !b[f]);
-    if (miss.length) return bad(reply, 'A domestic label needs to_address, from_address and parcel.', miss);
-    const chosen = sandboxRates()[0];
-    const id = rid('lbl');
-    return {
-      object: 'label', mode: 'test', id,
-      carrier: chosen.carrier, service: b.service || chosen.service,
-      tracking_code: 'EGTEST' + crypto.randomBytes(5).toString('hex').toUpperCase(),
-      rate: { amount: chosen.amount, currency: 'USD' },
-      label_url: `https://sandbox.egfulfill.com/labels/${id}.pdf`,
-      tracking_url: `https://sandbox.egfulfill.com/track/${id}`,
-      created: nowISO(),
-      _note: 'Simulated — no label was purchased and no wallet charge was made.'
-    };
-  });
-
-  // Buy an INTERNATIONAL label (simulated — adds customs).
-  app.post('/api/test/shipping-labels/internationals', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
-    const b = req.body || {};
-    const miss = ['to_address', 'from_address', 'parcel', 'customs_items'].filter((f) => !b[f]);
-    if (miss.length) return bad(reply, 'An international label needs to_address, from_address, parcel and customs_items.', miss);
-    const id = rid('lbl');
-    return {
-      object: 'label', mode: 'test', id,
-      carrier: 'USPS', service: b.service || 'Priority Mail International',
-      tracking_code: 'LZ' + crypto.randomBytes(5).toString('hex').toUpperCase() + 'US',
-      rate: { amount: 28.40, currency: 'USD' },
-      customs: { contents_type: 'merchandise', items: b.customs_items },
-      label_url: `https://sandbox.egfulfill.com/labels/${id}.pdf`,
-      tracking_url: `https://sandbox.egfulfill.com/track/${id}`,
-      created: nowISO(),
-      _note: 'Simulated — no label was purchased and no wallet charge was made.'
-    };
-  });
 
   // ─────────────────────────  /api/v1/*  (mode-aware: TEST simulates, LIVE is real)  ────────
   // A LIVE key (egk_live_…) makes these do the real thing; a TEST key simulates. Same paths,
@@ -905,15 +792,18 @@ export function sandboxRoutes(app, requireAuth) {
   // buyer, who watches a number that will never move.
   //
   // A 501 costs an integrator ten minutes. A fake tracking number costs them a customer.
-  // The /api/test/* twins keep returning samples: simulated is what a test key is FOR,
-  // and they are named so nobody mistakes them for a purchase.
+  // The /api/test/* twins that did return samples are gone (see the top of this file), so
+  // there is now no route in this API that answers a label request with a made-up number —
+  // which is what the refusal was for.
+  //
+  // It stays a 501 rather than being deleted: a refusal that says why, and says where
+  // tracking DOES come from, is a better answer than a 404 that reads like a typo.
   const notImplemented = (reply, what) => {
     reply.code(501);
     return {
       error: `${what} is not available through the API yet.`,
       code: 'not_implemented',
       detail: 'EGFUL buys carrier labels internally when it ships your order; it does not resell label purchasing. Fulfilment orders placed via POST /api/v1/orders are shipped and tracked for you — read tracking back from GET /api/v1/orders/{id}.',
-      sandbox: 'The /api/test/ equivalents return sample payloads if you are building against the shape.',
     };
   };
   app.post('/api/v1/shipping-rates', async (req, reply) => {
