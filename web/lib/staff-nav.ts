@@ -11,21 +11,13 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Board", href: "/designer", icon: Cards, roles: ["operator", "designer", "admin"] },
   // Earnings = a designer's own payout view. Admin sees designer credits in Wallet instead.
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer"] },
-  // Artwork — every picture that reached an order line, once each, keyed on the artwork
-  // itself rather than on the order. It answers "have we digitised this before", which is
-  // the question the Board asks too late: by the time a card is on it somebody has already
-  // decided to spend a designer.
-  //
-  // WAREHOUSE IS NOT HERE. The floor's work starts at the print queue — same line the Board
-  // above is drawn on — and this page names which sellers ordered a design, which is the
-  // narrowest §6 surface in the app.
-  //
-  // IT IS A DESIGN LAB TAB NOW (/design?tab=files), not its own board — the same question
-  // the Machine files tab asks from the other end. The sidebar entry stays, with its roles
-  // unchanged, because a designer is NOT in Design Lab's own STAFF_TOOLS entry below and
-  // would otherwise lose the only link they had to it. The tab itself carries the same
-  // three roles, so warehouse still never sees it.
-  { label: "Artwork", href: "/design?tab=files", icon: PenNib, roles: ["operator", "designer", "admin"] },
+  // NO "ARTWORK" ENTRY. Every picture that reached an order line — "have we digitised this
+  // before" — is Design Lab's FILES tab now (/design?tab=files), and a sidebar item whose
+  // only job is to redirect into a tab is a second name for one place: you press Artwork
+  // and land somewhere called Design Lab, which reads as a mis-click rather than a move.
+  // /artwork still redirects (next.config) because it is in bookmarks; nothing points at
+  // it from the nav any more. DESIGNER IS ON DESIGN LAB BELOW so that move costs them
+  // nothing, and the tab keeps this item's old roles, so warehouse still never sees it.
   // Shipping = Dispatch (today's out-queue) + Shipments (parcel archive) as two tabs.
   // They stay distinct tabs, NOT one merged list: Dispatch is a short queue emptied by
   // evening, Shipments is an ever-growing archive — merging the lists would bury the queue.
@@ -121,7 +113,11 @@ export const STAFF_TOOLS: StaffNavItem[] = [
   // bounces to the landing board the moment you click it — visible, unreachable, and no
   // error anywhere.
   { label: "Catalogue", href: "/published-catalog", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
-  { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
+  // DESIGNER IS HERE, and it is not a widening anyone should be surprised by: the artwork
+  // library they used to reach through the Artwork item is a tab inside this section now,
+  // and Design Lab is the set of tools a designer works in. Without it, folding Artwork in
+  // would have taken the library away from exactly the role named after it.
+  { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
   /**
    * ADMIN AND OPERATOR — exactly the roles the server's image gate allows (`IMAGE_ROLES` in
    * `support_ai.js` / `publish.js`), and no more.

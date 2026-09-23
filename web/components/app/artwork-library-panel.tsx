@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { PenNib, CircleNotch, UploadSimple, Check, MagnifyingGlass } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { SectionCard } from "@/components/app/section-card"
@@ -127,8 +127,6 @@ export function ArtworkLibraryPanel() {
     }
   }
 
-  const waiting = useMemo(() => (rows ?? []).filter((r) => !r.has_file).length, [rows])
-
   return (
     <SectionCard
       /* A plain string: SectionCard translates its own title under the `section`
@@ -168,10 +166,13 @@ export function ArtworkLibraryPanel() {
 
       {state === "ok" && rows && rows.length > 0 && (
         /* A COUNT, NOT A SENTENCE. It is a fact about the list and it is the thing that
-           says whether the filter did anything. */
+           says whether the filter did anything.
+           JUST THE COUNT. It carried "· 120 with no file" beside it, which on a library
+           where almost nothing is digitised yet is the same number twice — and it is a
+           tally of the rows LOADED, not of the library, so it would have been wrong the
+           moment Load more was pressed. Each card already says whether it has a file. */
         <p className="text-xs tabular-nums text-muted-foreground">
           {rows.length} {rows.length === 1 ? tl("artwork", "design") : tl("artwork", "designs")}
-          {waiting > 0 && <> · <span className="font-medium text-foreground">{waiting} {tl("artwork", "with no file")}</span></>}
         </p>
       )}
 
