@@ -1314,10 +1314,19 @@ export function DesignCanvasDialog({
    * ZERO WHEN THE TABLE HAS NO ENTRY, never a guess — which is also what the charge does,
    * since methodAddOn returns 0 for an unpriced key. A second DTG face genuinely is free.
    */
- const runFee = useCallback((face: string) => {
+ const runFee = useCallback((face: string): number | null => {
+    /* NULL IS "WE HAVE NOT BEEN TOLD", AND IT IS NOT ZERO.
+       Vercel deploys on push and the VPS is a manual `git pull`, so the app is ALWAYS ahead
+       of the API for a while — and during that window `faceAddOns` is simply absent. Reading
+       that as 0 prints "Included" on a face that will be charged its full run, which is a
+       worse answer than the "+ design fee" this replaced: one was vague, the other is wrong
+       and confident. The tile says nothing until the figure is real. */
+ if (!faceAddOns) return null
  const m = (faceMethod[face] ?? "").trim() || String(liveItem.print_type ?? "").trim()
  const key = m ? normTech(m)?.key : null
- return key && faceAddOns ? Number(faceAddOns[key]) || 0 : 0
+    /* A key the table has no entry for IS zero — methodAddOn returns 0 for an unpriced
+       technique, so a second DTG face genuinely costs nothing. That is an answer, not a gap. */
+ return key ? Number(faceAddOns[key]) || 0 : 0
   }, [faceMethod, liveItem.print_type, faceAddOns])
 
   /**
@@ -3391,7 +3400,7 @@ return (
                    nothing whenever the editor held no artwork for it. What a face costs is
                    the quote's business; whether this window has its picture loaded is not. */
  const owed = faceSurfaces ? faceSurfaces[k] : undefined
- const shown = owed != null ? owed
+ const shown: number | null = owed != null ? owed
                   : art ? (costingFaces[k] ? runFee(k) : 0)
                   : (billedFaces ? runFee(k) : rate)
                 /* MUTED WHENEVER THE QUOTE IS NOT ALREADY CHARGING THIS FACE. Same figure,
@@ -3403,9 +3412,10 @@ return (
                     /* One artwork per face is this window's model, so: a list of one. */
  layers={art ? [{ src: art.data, pos: art.pos }] : []}
  active={i === side} onSelect={() => goToSide(i)}
- extra={shown > 0.005
-                      ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}`
-                      : tl("designCanvas", "Included")}
+ extra={shown == null ? null
+                      : shown > 0.005
+                        ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}`
+                        : tl("designCanvas", "Included")}
  extraPending={pending}
                   />
                 )
