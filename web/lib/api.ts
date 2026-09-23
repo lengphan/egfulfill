@@ -2091,6 +2091,15 @@ export type FactoryDesign = {
   orders: number
   sellers: number
   seller_names: string[]
+  /**
+   * HOW THIS PICTURE IS PRINTED, wherever it has been ordered — normalised keys as the
+   * server read them off the face (or the line it inherits from), upper case.
+   *
+   * A SET, because the same picture genuinely can be embroidered on a cap and printed on a
+   * tee. Empty means nobody has said yet. It is what decides which FILES this artwork can
+   * take: a stitch file belongs to an embroidered face and to no other kind.
+   */
+  methods?: string[]
   /** Reads both links — a file naming this artwork, and one attributed through the order it
    *  was uploaded against — so the library cannot say "no file" about artwork the reuse
    *  panel offers a file for. */

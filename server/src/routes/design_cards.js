@@ -450,10 +450,25 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // sku alone would put this artwork on whichever sibling the key happened to reach and
     // leave the other showing it too.
     await q(
-      // 'front', and the conflict target names side: a design card has no face of its own,
-      // and the index this used to conflict on has been replaced by the per-side one.
+      /**
+       * THE FACE IT WAS SENT FROM — and it used to be the word 'front', always.
+       *
+       * The comment here said "a design card has no face of its own". That stopped being
+       * true when `design_cards.side` was added ("side + design_id together say this face
+       * went"), and both writers fill it: /api/design_cards/new has always written it, and
+       * the bulk upsert was fixed to carry it later. Only this route — the one that puts the
+       * finished artwork BACK on the order — never read it.
+       *
+       * So a card sent from the back came home to the front, and because the conflict clause
+       * updates `data` on match, it OVERWROTE the front's artwork with the back's. A designer
+       * delivering a back design silently replaced the front on the same line.
+       *
+       * coalesce, not the raw column: a card written before the column existed has no face,
+       * and 'front' is the only honest reading of a side-less card — it is what every such
+       * card has always meant and what the conflict key itself defaults to.
+       */
       `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, art_hash, updated_at)
-       values ($1,$2,$7,'raster','front',$3,$4,$5,$6, now())
+       values ($1,$2,$7,'raster',$8,$3,$4,$5,$6, now())
        on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do update set
          data=excluded.data, storage_key=excluded.storage_key, name=excluded.name,
          art_hash=excluded.art_hash, updated_at=now()`,
@@ -464,7 +479,8 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       // nothing, which is the precise failure the guard exists to prevent. Both columns hold
       // something an <img> can render, so a URL is a valid value for either.
       [orderId, sku, card.art_data || card.thumb || null, card.art_key || null,
-       card.title || null, card.art_hash || null, lineId || null]
+       card.title || null, card.art_hash || null, lineId || null,
+       String(card.side || 'front').toLowerCase() || 'front']
     );
 
     /**

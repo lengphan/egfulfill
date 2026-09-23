@@ -14,6 +14,7 @@ import { useLightbox } from "@/components/app/image-lightbox"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, deleteDesignFile, type FactoryDesign } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
+import { normalizeMethods } from "@/lib/print-method"
 
 /**
  * THE FACTORY'S DESIGN LIBRARY — every picture that reached an order line, once each.
@@ -44,6 +45,32 @@ import { numOf } from "@/lib/order-format"
 /** A page at a time. Enough that scrolling is the gesture rather than paging, small enough
  *  that the first screen arrives without waiting on a thousand rows. */
 const PAGE = 60
+
+/**
+ * WHAT KIND OF FILE EACH METHOD TAKES — and why this is a gate rather than a hint.
+ *
+ * A stitch file is a path for a needle; a print file is pixels. They are not
+ * interchangeable and neither machine can read the other's, so "attach a file" is really
+ * two different requests depending on how the picture is printed. Offering one file picker
+ * for both is how a .EMB ends up on a DTG shirt — which is exactly what happened when the
+ * library attached by artwork alone, artwork having no method.
+ *
+ * So the picker only ever offers the formats the method can run. It is a filter on the OS
+ * dialog, not a promise: a determined person can still pick "all files", which is why the
+ * press checks the extension too and says which kind was expected.
+ */
+const STITCH = [".emb", ".dst", ".pes", ".exp", ".jef", ".vp3", ".xxx"]
+const PRINT = [".png", ".jpg", ".jpeg", ".webp", ".svg", ".pdf", ".ai", ".eps"]
+/** `emb` is the only method that runs a needle. Everything else lays down ink, foil or a
+ *  laser, and all of those take a picture. */
+const acceptFor = (methods?: string[]) => {
+  const keys = normalizeMethods(methods ?? []).map((m) => m.key)
+  if (!keys.length) return [...STITCH, ...PRINT]     // nobody has said — take either
+  const wants = new Set<string>()
+  for (const k of keys) for (const ext of (k === "emb" ? STITCH : PRINT)) wants.add(ext)
+  return [...wants]
+}
+const extOf = (name: string) => (String(name).match(/\.[a-z0-9]+$/i) || [""])[0].toLowerCase()
 
 export function ArtworkLibraryPanel() {
   const tl = useLabelT()
@@ -133,6 +160,15 @@ export function ArtworkLibraryPanel() {
   }
 
   const attach = async (d: FactoryDesign, file: File) => {
+    /* THE PICKER FILTERS, THIS REFUSES. `accept` is a hint the OS dialog can be talked out
+       of, and a wrong file here is a stitch file on a printed job — the failure this whole
+       pairing exists to stop. It names the kind that was expected rather than just saying
+       no, because "wrong file" without the reason is the message people ignore. */
+    const ok = acceptFor(d.methods)
+    if (ok.length && !ok.includes(extOf(file.name))) {
+      setErr(`${file.name} — ${tl("artwork", "this artwork is")} ${(d.methods ?? []).join(" · ") || "—"}, ${tl("artwork", "which takes")} ${ok.join(" ")}`)
+      return
+    }
     setBusy(d.art_hash); setErr(null); setNote(null)
     try {
       const data = await new Promise<string>((res, rej) => {
@@ -355,6 +391,25 @@ export function ArtworkLibraryPanel() {
                     <span className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums">
                       {d.design_no != null ? `DSN-${d.design_no}` : tl("artwork", "Not numbered")}
                     </span>
+                    {/**
+                      * HOW IT IS PRINTED — a pill, because this one carries meaning (§4: a
+                      * pill must be an order stage, an HTTP method, RUSH/LATE; a technique
+                      * is the same kind of fact, and it is what decides which file the card
+                      * will accept). Both are shown when a picture is ordered both ways,
+                      * because claiming one would be the lie the library made by claiming
+                      * none. Nothing is drawn when nobody has said yet — an empty pill is
+                      * not an answer.
+                      */}
+                    {normalizeMethods(d.methods ?? []).map((m) => (
+                      <span
+                        key={m.key}
+                        className={"shrink-0 rounded-md px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide "
+                          + (m.key === "emb" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}
+                        title={m.label}
+                      >
+                        {m.key}
+                      </span>
+                    ))}
                     {d.name && <span className="min-w-0 truncate text-sm text-muted-foreground">{d.name}</span>}
                   </div>
                   {/**
@@ -505,7 +560,14 @@ export function ArtworkLibraryPanel() {
                         variant="ghost" size="sm"
                         className="-ml-2 text-muted-foreground hover:text-foreground"
                         disabled={busy === d.art_hash}
-                        onClick={() => { pending.current = d; fileRef.current?.click() }}
+                        onClick={() => {
+                          pending.current = d
+                          /* ONE INPUT, SET PER PRESS. Sixty pickers mounted is sixty
+                             elements for a control used once; the accept list is the only
+                             thing that differs per card, so it is written on the way in. */
+                          if (fileRef.current) fileRef.current.accept = acceptFor(d.methods).join(",")
+                          fileRef.current?.click()
+                        }}
                         title={tl("artwork", "Attach the machine file for this artwork — the next order carrying it will be offered this file")}
                       >
                         {busy === d.art_hash
@@ -540,7 +602,8 @@ export function ArtworkLibraryPanel() {
       <input
         ref={fileRef}
         type="file"
-        accept=".emb,.pes,.dst,.exp,.jef,.vp3,.xxx"
+        /* The union, narrowed on every press to what the pressed card's method can run. */
+        accept={[...STITCH, ...PRINT].join(",")}
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]

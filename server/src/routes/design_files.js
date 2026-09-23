@@ -497,9 +497,29 @@ export function designFilesRoutes(app, requireAuth) {
                   'id', o.id, 'ref_no', o.ref_no, 'seq', o.seq)) as order_refs,
                 count(distinct o.seller_id) as sellers,
                 array_agg(distinct coalesce(u.store_name, u.name, u.email, '—')) as seller_names,
+                /**
+                 * HOW THIS PICTURE IS PRINTED, wherever it has been ordered.
+                 *
+                 * A library row is keyed on the ARTWORK, and artwork has no method — which is
+                 * exactly how a stitch file came to be attached to a DTG shirt. The method
+                 * lives on the line, so it is read the same way every other reader reads it:
+                 * the face's own method when it has one, else the line it sits on.
+                 *
+                 * A SET, not one value. The same picture genuinely can be embroidered on a
+                 * cap and printed on a tee, and a card claiming one method for both would be
+                 * the same lie one level up. Empty means nobody has said yet.
+                 */
+                array_agg(distinct upper(nullif(trim(coalesce(
+                  nullif(d.method, ''), li.print_type, '')), ''))) as methods,
                 max(d.name) as name
            from order_designs d
            join orders o on o.id = d.order_id
+           /* The line the design sits on, for its method. LEFT, because a design row whose
+              sku matches no item still belongs in the library — it just cannot say how it
+              is printed, which is what an empty method set means. */
+           left join order_items li on li.order_id = d.order_id
+            and ( (d.line_id is not null and li.line_id = d.line_id)
+               or (d.line_id is null and li.sku = d.sku) )
            left join users u on u.id = o.seller_id
           where d.art_hash is not null
             and ($1::uuid is null or o.seller_id = $1)
@@ -581,6 +601,8 @@ export function designFilesRoutes(app, requireAuth) {
         orders: Number(r.orders) || 0,
         sellers: Number(r.sellers) || 0,
         seller_names: (r.seller_names || []).filter(Boolean),
+        /* Sorted so two cards carrying the same pair read the same way round. */
+        methods: (r.methods || []).filter(Boolean).sort(),
         /* Newest first and capped: a picture on sixty orders is a scroll nobody reads, and
            the count beside it already says there are more. */
         order_refs: (r.order_refs || [])
