@@ -82,6 +82,26 @@ export async function authKey(req) {
 }
 
 /**
+ * A 500 a partner can report, with nothing in it they should not have.
+ *
+ * These three routes returned `String(e.message)` straight out. A pg error carries the
+ * failing relation, column or constraint by name, so a partner holding a key could map our
+ * schema one malformed request at a time — and the message a driver produces is written for
+ * us, not for them. The frame still goes to the log, which is where it was needed: that is
+ * the lesson the quote route already learned in the other direction, when the stack was
+ * discarded and the route became undiagnosable.
+ *
+ * `ref` is what makes the generic message usable — the partner quotes it, we grep it.
+ */
+const oops = (reply, req, e, mode, where) => {
+  const ref = crypto.randomBytes(4).toString('hex');
+  req.log.error({ err: e, ref, where }, 'public API 500');
+  reply.code(500);
+  return { error: 'Something went wrong on our side. Quote the reference if you report it.',
+    code: 'internal_error', ref, ...(mode ? { mode } : {}) };
+};
+
+/**
  * A 400 a caller can act on.
  *
  * `mode` is a PARAMETER now. It was hardcoded to 'test', so a partner on a LIVE key who
@@ -628,7 +648,7 @@ export function sandboxRoutes(app, requireAuth) {
         return { object: 'order', mode: 'live', id: o.id, status: o.factory_status || o.status || 'received',
           tracking: { carrier: o.carrier || null, code: o.tracking || null }, total: o.total, created: o.created_at,
           ...(rej ? { reason: rej.reason || null, rejected_by: rej.by || 'factory', rejected_at: rej.at || null } : {}) };
-      } catch (e) { reply.code(500); return { error: String((e && e.message) || e), mode: 'live' }; }
+      } catch (e) { return oops(reply, req, e, 'live', 'orders.get'); }
     }
     /**
      * EVERY FIELD LIVE HAS, so a parser written against the sandbox does not meet an
@@ -722,10 +742,10 @@ export function sandboxRoutes(app, requireAuth) {
          This route answered `{"error":"Cannot read properties of undefined (reading
          'length')"}` for EVERY payload while the same functions, called directly with the
          same data in the same container, returned a correct quote — and the one thing that
-         would have said where, the stack, was being discarded here. The partner still gets
-         only the message; we get the frame. */
-      req.log.error({ err: e }, 'GET quote failed');
-      reply.code(500); return { error: String((e && e.message) || e), mode: k.mode };
+         would have said where, the stack, was being discarded here. oops() keeps that half
+         and drops the other: the partner used to receive the driver's own words, which name
+         our tables when the failure is a query. */
+      return oops(reply, req, e, k.mode, 'orders.quote');
     }
   });
 
@@ -779,7 +799,7 @@ export function sandboxRoutes(app, requireAuth) {
       emitWebhook(String(k.seller_id), 'order.cancelled', { id, refunded: back?.refunded || 0 });
       return { object: 'order', mode: 'live', id, status: 'cancelled', refunded: back?.refunded || 0,
         _note: 'Everything still owed on this order has been returned to your balance.' };
-    } catch (e) { reply.code(500); return { error: String((e && e.message) || e), mode: 'live' }; }
+    } catch (e) { return oops(reply, req, e, 'live', 'orders.cancel'); }
   });
 
   // ── Shipping (v1) ──────────────────────────────────────────────────────────

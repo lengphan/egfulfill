@@ -213,7 +213,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     path: "/api/webhooks",
     title: "Add a webhook",
     description:
-      "Register an https endpoint to be notified on. Returns a signing secret ONCE — store it. Omit `events` to receive all of them. Every delivery carries X-EG-Event and X-EG-Signature (sha256=<hex>), an HMAC-SHA256 of the raw body using that secret; compare it in constant time before trusting a payload.",
+      "Register an https endpoint to be notified on. Returns a signing secret ONCE — store it. Omit `events` to receive all of them. Every delivery carries X-EG-Event and X-EG-Signature (sha256=<hex>), an HMAC-SHA256 of the raw body using that secret; compare it in constant time before trusting a payload. The URL must resolve to a public address and redirects are not followed, so register the final one; ten endpoints per account, each URL once.",
     body: JSON.stringify(
       {
         url: "https://your-app.example.com/hooks/egful",

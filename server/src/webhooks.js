@@ -10,7 +10,14 @@
 // endpoint is down, that must not fail the floor's status update or roll anything back.
 // Failures are recorded in webhook_deliveries so they can be seen and replayed.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { q } from './db.js';
+import { limited, LIMITS } from './ratelimit.js';
+
+/** See the registration route: every endpoint multiplies one event into one more outbound
+ *  request from our egress, so the fan-out has a ceiling. */
+export const MAX_ENDPOINTS_PER_SELLER = 10;
 
 export const WEBHOOK_EVENTS = [
   'order.received',        // created through the API
@@ -59,19 +66,85 @@ export const newWebhookSecret = () => 'egwh_' + randomBytes(24).toString('hex');
  * an unvalidated one turns this server into a proxy for scanning private hosts (SSRF).
  * Plain http is refused too: the payload carries order contents and buyer addresses.
  */
+/**
+ * Is this ADDRESS one we must never send a request to?
+ *
+ * Separate from the URL check because the two questions are asked at different moments and
+ * the second one is the one that matters: a hostname is validated when the endpoint is
+ * REGISTERED, and the packet is sent minutes or months later against whatever DNS says
+ * then. `webhooks.attacker.example` is a perfectly good public name that can answer
+ * 127.0.0.1 — or 169.254.169.254, the cloud metadata address — on the lookup that counts.
+ */
+export function isPrivateAddress(addr) {
+  const a = String(addr || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!a) return true;
+  if (isIP(a) === 6) {
+    if (a === '::' || a === '::1') return true;
+    if (a.startsWith('fc') || a.startsWith('fd')) return true;          // unique-local
+    if (a.startsWith('fe80')) return true;                              // link-local
+    const mapped = a.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);        // IPv4 wearing a v6 hat
+    return mapped ? isPrivateAddress(mapped[1]) : false;
+  }
+  if (isIP(a) !== 4) return true;                                       // not an address at all
+  const [x, y] = a.split('.').map(Number);
+  if (x === 0 || x === 127 || x === 10) return true;
+  if (x === 169 && y === 254) return true;                              // link-local + metadata
+  if (x === 172 && y >= 16 && y <= 31) return true;
+  if (x === 192 && y === 168) return true;
+  if (x === 100 && y >= 64 && y <= 127) return true;                    // carrier-grade NAT
+  if (x >= 224) return true;                                            // multicast + reserved
+  return false;
+}
+
 export function validateWebhookUrl(raw) {
   let u;
   try { u = new URL(String(raw || '')); } catch { return 'Not a valid URL.'; }
   if (u.protocol !== 'https:') return 'Webhook URLs must use https.';
   const h = u.hostname.toLowerCase();
   if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.internal') || h.endsWith('.local')) return 'That host is not reachable from outside.';
-  // Literal private/loopback/link-local/carrier-grade-NAT addresses. A DNS name that
-  // RESOLVES into these still gets through — closing that needs resolution at request
-  // time, which is worth doing before this is offered to untrusted third parties.
-  if (/^(127\.|10\.|0\.|169\.254\.|::1$|\[?::1\]?$|192\.168\.)/.test(h)) return 'That host is not reachable from outside.';
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return 'That host is not reachable from outside.';
-  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return 'That host is not reachable from outside.';
+  if (isIP(h) && isPrivateAddress(h)) return 'That host is not reachable from outside.';
   return null;
+}
+
+/**
+ * The check that actually protects the network: resolve the host AT SEND TIME and refuse
+ * if any address it answers with is private.
+ *
+ * It returns a CODE rather than a message because its two callers need different answers to
+ * the same question. `unresolved` is fatal at send time (there is nowhere to send) and must
+ * NOT be fatal at registration: a partner wiring this up before DNS has propagated, or
+ * against a host that is briefly down, is doing nothing dangerous — refusing them was this
+ * check's first act and the leak gate caught it on the run that introduced it. Only
+ * `private` is a security answer, and that one is refused in both places.
+ *
+ * Registration-time validation alone was never enough, and this file said so — a DNS name
+ * that resolves inward got straight through it. Now the lookup happens on every attempt,
+ * and every address returned must be public: a name answering one public and one private
+ * address is a rebinding attack wearing a disguise, not a multi-homed server.
+ *
+ * WHAT IS LEFT. Between this lookup and the socket, the resolver can answer differently —
+ * the classic TOCTOU window. Closing it completely means connecting to a pinned IP with
+ * the hostname carried in SNI and Host, which needs an undici Agent this server does not
+ * have as a dependency. Stating the residual honestly beats implying it is gone.
+ */
+export async function checkSendTarget(rawUrl) {
+  let u;
+  try { u = new URL(String(rawUrl || '')); } catch { return { ok: false, code: 'invalid', message: 'Not a valid URL.' }; }
+  if (u.protocol !== 'https:') return { ok: false, code: 'not_https', message: 'Webhook URLs must use https.' };
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  if (isIP(host)) {
+    return isPrivateAddress(host)
+      ? { ok: false, code: 'private', message: 'That host is not reachable from outside.' }
+      : { ok: true };
+  }
+  let addrs;
+  try { addrs = await lookup(host, { all: true, verbatim: true }); }
+  catch { return { ok: false, code: 'unresolved', message: 'That host does not resolve right now.' }; }
+  if (!addrs.length) return { ok: false, code: 'unresolved', message: 'That host does not resolve right now.' };
+  if (addrs.some((a) => isPrivateAddress(a.address))) {
+    return { ok: false, code: 'private', message: 'That host resolves to a private address.' };
+  }
+  return { ok: true };
 }
 
 /** HMAC-SHA256 of the exact body bytes we send, hex. Partners verify with their secret. */
@@ -94,6 +167,11 @@ async function deliver(endpoint, event, payload) {
   for (const waitMs of [0, 1000, 5000]) {
     if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
     attempts++;
+    /* RESOLVED EVERY ATTEMPT, not once at registration. The retry is a second request and
+       deserves the same check — a name that answered publicly a second ago is not a
+       promise about this packet. */
+    const target = await checkSendTarget(endpoint.url);
+    if (!target.ok) { status = null; error = `Not sent: ${target.message}`.slice(0, 300); break; }
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 10000);
@@ -107,9 +185,20 @@ async function deliver(endpoint, event, payload) {
         },
         body,
         signal: ctrl.signal,
+        /* A REDIRECT IS NOT FOLLOWED, and this is the other half of the SSRF fix.
+           Validating the registered URL means nothing if the endpoint answers 302 to
+           http://169.254.169.254/ — fetch follows by default, so the address we refused
+           to accept is reached anyway, from inside, with a body the caller chose. It is
+           reported as a failed delivery naming the redirect, because the fix is for the
+           partner to register the final URL. */
+        redirect: 'manual',
       }).finally(() => clearTimeout(t));
       status = res.status;
       error = null;
+      if (res.status >= 300 && res.status < 400) {
+        error = 'Endpoint redirected — register the final https URL instead; redirects are not followed.';
+        break;
+      }
       if (res.ok) break;
       // 4xx that isn't 408/429 is a rejection, not a blip — retrying can't fix it.
       if (res.status < 500 && res.status !== 408 && res.status !== 429) break;
@@ -172,6 +261,14 @@ export function webhookRoutes(app, requireAuth, authKey, allows) {
   const seller = (scope) => async (req, reply) => {
     const { id, key } = await sellerOf(req);
     if (!id) { reply.code(401).send({ error: 'Sign in or send an API key (X-API-Key).' }); return; }
+    /* METERED LIKE EVERY OTHER KEY-AUTHED ROUTE. These sat outside the limiter: the docs
+       promise X-RateLimit-* on every response, and registering an endpoint is the one call
+       that ARMS outbound requests from our egress — the last place to leave unbounded. A
+       dashboard JWT is not metered here; it is a human on their own account. */
+    if (key) {
+      const over = limited(reply, `k:${key.id}`, LIMITS.global);
+      if (over) { reply.send(over); return; }
+    }
     if (key && scope && typeof allows === 'function' && !allows(key, scope)) {
       reply.code(403).send({ error: `This API key is not allowed to ${scope}.`, code: 'insufficient_scope',
         required: scope, granted: key.scopes || [] });
@@ -197,8 +294,29 @@ export function webhookRoutes(app, requireAuth, authKey, allows) {
     const b = req.body || {};
     const bad = validateWebhookUrl(b.url);
     if (bad) { reply.code(400); return { error: bad }; }
+    /* Resolved HERE TOO, so a host that points inward is refused while somebody is looking
+       at the answer rather than filling a delivery log nobody reads. Only `private` is
+       refused: a name that does not resolve YET is a partner ahead of their own DNS, and
+       delivery re-checks every attempt anyway — this is the courtesy, that is the control. */
+    const target = await checkSendTarget(b.url);
+    if (!target.ok && target.code === 'private') { reply.code(400); return { error: target.message }; }
     const events = Array.isArray(b.events) ? b.events.filter((e) => WEBHOOK_EVENTS.includes(String(e))) : [];
     if (b.events && !events.length) { reply.code(400); return { error: 'No recognised events.', supported: WEBHOOK_EVENTS }; }
+    /* A CEILING, because every endpoint multiplies our egress. One order event against 200
+       registered endpoints is 200 outbound requests, each retrying three times — a seller
+       can otherwise turn a single order into an amplifier pointed wherever they like, and
+       nothing in the product needs more than a handful.
+       The duplicate check is the same rule in the common case: the way that list grows is
+       a retried registration, not a deliberate fan-out. */
+    const mine = await q('select id, url from webhook_endpoints where seller_id=$1', [req._sellerId]);
+    const dupe = mine.rows.find((r) => String(r.url) === String(b.url));
+    if (dupe) { reply.code(409); return { error: 'That URL is already registered.', id: dupe.id,
+      hint: 'Delete it first if you need a new signing secret.' }; }
+    if (mine.rows.length >= MAX_ENDPOINTS_PER_SELLER) {
+      reply.code(409);
+      return { error: `At most ${MAX_ENDPOINTS_PER_SELLER} webhook endpoints per account.`,
+        hint: 'Delete one you no longer use, or fan out on your own side where you can see the traffic.' };
+    }
     const secret = newWebhookSecret();
     const r = await q(
       `insert into webhook_endpoints (seller_id, url, secret, events) values ($1,$2,$3,$4)

@@ -242,6 +242,14 @@ X-EG-Signature: sha256=<hex>
             we abort a delivery after 10 seconds. Acknowledge first, then do the slow work.
           </p>
           <p className="text-[var(--mk-auth-muted)]">
+            Three rules the delivery side enforces, so they are worth knowing before you wire one up.
+            <strong> Redirects are not followed</strong> — register the final URL, or the delivery is
+            recorded as failed. The host is resolved on <strong>every attempt</strong> and must answer a
+            public address; a name pointing at a private or link-local range is refused rather than sent
+            to. And an account may hold <strong>ten endpoints</strong>, with the same URL registered once —
+            fan out on your own side, where you can see the traffic.
+          </p>
+          <p className="text-[var(--mk-auth-muted)]">
             Failed deliveries retry three times with backoff. A <Code>5xx</Code>, <Code>429</Code> or
             <Code>408</Code> is treated as transient; any other <Code>4xx</Code> is a rejection and we stop.
             Because retries exist, <strong>the same event can arrive more than once</strong> — make
