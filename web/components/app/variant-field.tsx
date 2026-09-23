@@ -238,7 +238,22 @@ export function VariantField({
  const control = (
     <DropdownMenu>
       {trigger}
-      <DropdownMenuContent align="start" className="max-h-64 w-[--anchor-width] min-w-44 overflow-y-auto">
+      {/**
+        * NO WIDTH CLASS HERE, AND THAT IS THE FIX.
+        *
+        * It passed `w-[--anchor-width]`, which is Tailwind v3's spelling for a CSS variable.
+        * v4 replaced that with `w-(--anchor-width)` and the bracket form stopped resolving —
+        * so this emitted `width: --anchor-width`, an invalid declaration the browser drops.
+        * tailwind-merge still saw a `w-*` utility and dropped the Popup's own, correct
+        * `w-(--anchor-width)` in its favour, so the menu lost its anchor width entirely and
+        * fell back to `min-w-44`: a narrow panel, off to one side, sitting over the row
+        * below it. Which is why a per-face Method could be opened and not picked — the press
+        * landed on whatever the menu was covering.
+        *
+        * The Popup already sets the anchor width and the available height for every other
+        * field in the app. This one only ever needed to stop overriding them.
+        */}
+      <DropdownMenuContent align="start" className="min-w-44">
         {/* Clearing is a real choice — a line can legitimately go back to unset. Not for
  every field though: see `clearable`. */}
         {clearable && (

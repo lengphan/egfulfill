@@ -5177,6 +5177,8 @@ const vi: Dict = {
   "artwork.Attach file": "Đính kèm tệp",
   "artwork.Download": "Tải xuống",
   "artwork.Add file": "Thêm tệp",
+  "variantPicker.more faces": "mặt nữa",
+  "variantPicker.none": "chưa chọn",
   "artwork.this artwork is": "hình này là",
   "artwork.which takes": "nên chỉ nhận",
   "canvas.Upload Mockup": "Tải ảnh mockup",

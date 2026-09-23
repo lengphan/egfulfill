@@ -8,8 +8,6 @@ import { thumbSrc } from "@/lib/order-image"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { getUser } from "@/lib/auth"
 import { VariantField } from "@/components/app/variant-field"
-import { CaretDown } from "@phosphor-icons/react"
-import { cn } from "@/lib/utils"
 
 // What the fields offer when the blank can't be resolved — see the note on colorList.
 // Sizes are the ladder every apparel blank in the catalogue draws from; methods are the
@@ -59,46 +57,71 @@ export type ItemSetupPatch = Omit<Parameters<typeof postItemSetup>[1], "line_id"
  * THE ROWS ARE THE DESIGNER'S OWN FIELD — same VariantField, same face prefix, same
  * inherit-as-placeholder behaviour — so this is one pattern in two places rather than a third.
  */
-function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onPick }: {
+function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onPick, onLine }: {
   faces: string[]
-  /** Per face, as stored: "" / absent = INHERIT the line. Never "no method". */
+  /**
+   * Per face, as stored: "" / absent = INHERIT the line. Never "no method".
+   *
+   * ITS KEYS ARE THE FACES THAT CARRY ARTWORK, and that is not a coincidence to rely on
+   * loosely — the order page builds this from `sidesForLine`, which returns a row per face
+   * that has a design. So a key here means "somebody has put something on this face", which
+   * is exactly the set worth drawing without being asked.
+   */
   value: Record<string, string>
   lineMethod: string
   options: string[]
   disabled?: boolean
   onPick: (side: string, v: string) => void
+  /** The line's own method — the value every unset face inherits. */
+  onLine: (v: string) => void
 }) {
   const tl = useLabelT()
+  const [open, setOpen] = useState(false)
   /* WHAT THE GARMENT IS ACTUALLY DECORATED WITH — each face resolved through the same rule
      the charge uses (`methodOf.get(face) || lineMethod`), then deduped IN FACE ORDER so the
      summary reads front-first rather than alphabetically. */
   const resolved = faces.map((f) => (value[f] ?? "").trim() || lineMethod).filter(Boolean)
   const distinct = [...new Set(resolved)]
   const summary = distinct.join(" · ")
+  /**
+   * THE FACES THAT ARE ACTUALLY DECORATED, and the rest behind one word.
+   *
+   * Every face got a full-width row, so a hoodie printed the same way on all six read as six
+   * identical lines saying DTG — six controls for one decision. The ones worth showing are
+   * the faces somebody has put a design on, plus any face whose method DISAGREES with the
+   * line, because that is the fact the summary above cannot carry.
+   *
+   * `shown` never empties: a line with nothing on it yet still needs a way in, so it falls
+   * back to the first face.
+   */
+  const used = Object.keys(value).map((k) => k.toLowerCase())
+  const interesting = faces.filter((f) => used.includes(f.toLowerCase()) || ((value[f] ?? "").trim() && value[f] !== lineMethod))
+  const shown = open ? faces : (interesting.length ? interesting : faces.slice(0, 1))
+  const hidden = faces.length - shown.length
   return (
-    <details className="group col-span-2 min-w-0">
-      {/* Same chrome as VariantField's trigger — this is a FIELD (§4: shape says kind), and a
-          strip whose fourth control is shaped differently reads as a mistake. */}
-      <summary
-        className={cn(
-          "flex w-full min-w-0 cursor-pointer list-none items-center gap-1.5 rounded-2xl border bg-card px-2.5 text-left font-medium transition-colors",
-          "h-9 text-xs hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-          disabled ? "cursor-not-allowed opacity-60" : "",
-          "border-border",
-        )}
-      >
-        <span className="min-w-0 truncate text-muted-foreground">
-          {tl("variantPicker", "Method")}<span className="text-muted-foreground/60"> · </span>
-        </span>
-        <span className={cn("min-w-0 flex-1 truncate", !summary && "text-muted-foreground")}>
-          {summary || tl("variantPicker", "none")}
-        </span>
-        <CaretDown size={11} className="shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="mt-1.5 flex flex-col gap-1.5">
-        {faces.map((sd) => (
+    <div className="col-span-2 flex min-w-0 flex-col gap-1.5">
+      {/* THE FIELD IS A FIELD AGAIN. It was a <details> whose summary carried the same chrome
+          — so the one control in the strip that opened something looked identical to three
+          that do not, and the press that opened it felt like a box unfolding rather than a
+          menu. The line's own method is picked here like any other value; the faces sit
+          under it as marks, not as rows. */}
+      <VariantField
+        /* THE NOUN STAYS ON THIS ONE. Blank, Colour and Size are recognisable from their
+           values; "DTG" alone in a wide field is not, and the faces below it are all
+           prefixed — an unlabelled parent over labelled children reads as a fourth face. */
+        prefix={tl("variantPicker", "Method")}
+        label={tl("variantPicker", "Method")}
+        value={lineMethod}
+        options={options}
+        placeholder={summary || tl("variantPicker", "none")}
+        disabled={disabled}
+        onChange={(v) => onLine(v)}
+      />
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        {shown.map((sd) => (
           <VariantField
             key={sd}
+            compact
             prefix={tl("sides", sd)}
             label={`${tl("sides", sd)} · ${tl("variantPicker", "Method")}`}
             value={value[sd] ?? ""}
@@ -111,10 +134,22 @@ function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onP
             emptyLabel={lineMethod ? `${lineMethod} (${tl("variantPicker", "from the line")})` : undefined}
             disabled={disabled}
             onChange={(v) => onPick(sd, v)}
+            className="w-auto shrink-0"
           />
         ))}
+        {/* THE WAY TO THE REST, and it says how many rather than "more". A count is the fact
+            that decides whether it is worth pressing. */}
+        {hidden > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="eg-tap shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            +{hidden} {tl("variantPicker", "more faces")}
+          </button>
+        )}
       </div>
-    </details>
+    </div>
   )
 }
 
@@ -457,8 +492,9 @@ export function VariantPicker({
             value={faceMethods}
             lineMethod={String(item.print_type || "").trim()}
             options={methodList}
-            disabled={busy === "faceMethod"}
+            disabled={busy === "faceMethod" || busy === "method"}
             onPick={(side, v) => void saveFaceMethod(side, v)}
+            onLine={(v) => void save({ printType: v }, "method")}
           />
         ) : !hideMethod && (
         <VariantField

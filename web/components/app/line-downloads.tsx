@@ -31,8 +31,25 @@ const SIDE_ORDER = ["front", "back", "left", "right", "sleeve", "pocket"]
  * and it is what the floor and the fee rows already say); the localized label is what is
  * drawn.
  */
-const faceFile = (side: string | null | undefined, name: string) =>
-  side ? `${side.toUpperCase()} ${name}` : name
+/**
+ * THE NUMBER LEADS, then the face, then whatever the file was called.
+ *
+ * A saved file called "Screenshot 2026-09-20 at 14.22.png" identifies nothing — not the
+ * order, not the face, and not the artwork — and the owner's question is the one that
+ * follows from that: standing on an order, can you tell whether the file in the library has
+ * actually arrived? Not from a name that is different on both surfaces.
+ *
+ * DSN-#### is the one value that IS the same on both. It is minted from the artwork's own
+ * bytes the first time they are seen and reused every time they reappear, so the library
+ * card and the order's download say the same number about the same picture — which is
+ * exactly the comparison that could not be made.
+ *
+ * AND THE NAME STAYS. It is what a person recognises ("bunny-front-left-chest"), it is
+ * sometimes the only thing a seller typed, and it is never unique — so it is the hint, not
+ * the identity. Both, in that order.
+ */
+const faceFile = (side: string | null | undefined, name: string, no?: number | null) =>
+  [no != null ? `DSN-${no}` : "", side ? side.toUpperCase() : "", name].filter(Boolean).join(" ")
 
 /** The name with its extension present — "bunny" saved from a PNG is still bunny.png. */
 const withExt = (name: string, ext: string) =>
@@ -100,7 +117,8 @@ export function LineDownloads({ design, files, item, sides }: {
       const a = document.createElement("a")
       a.href = href
       /* The same string the row draws — see `faceFile`. */
-      a.download = faceFile(f.side, f.name || `${stem}.emb`)
+      a.download = faceFile(f.side, f.name || `${stem}.emb`,
+        (f.side ? sides?.[String(f.side).toLowerCase()] : design)?.design_no)
       document.body.appendChild(a); a.click(); a.remove()
     } catch { /* the row stays; a failed fetch must not remove the way to retry */ }
     finally { setBusy(null) }
@@ -152,9 +170,9 @@ export function LineDownloads({ design, files, item, sides }: {
             <a
               key={a.side || "art"}
               href={a.src}
-              download={faceFile(a.side, name ? withExt(name, ext) : `${stem}.${ext.toLowerCase()}`)}
+              download={faceFile(a.side, name ? withExt(name, ext) : `${stem}.${ext.toLowerCase()}`, a.design?.design_no)}
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-              title={faceFile(a.side, fileName)}
+              title={faceFile(a.side, fileName, a.design?.design_no)}
             >
               <DownloadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
               {a.side && (
@@ -162,12 +180,24 @@ export function LineDownloads({ design, files, item, sides }: {
                   {tl("sides", a.side)}
                 </span>
               )}
-              <span className="min-w-0 flex-1 truncate">{fileName}</span>
+              {/* THE NUMBER, then the name. See faceFile: DSN-#### is the one value this row
+                  and the Design Lab card say identically about the same picture, which is
+                  what makes "has the file arrived" answerable by looking. */}
+              {a.design?.design_no != null && (
+                <span className="shrink-0 text-xs font-semibold tabular-nums">DSN-{a.design.design_no}</span>
+              )}
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">{fileName}</span>
               <span className="shrink-0 text-2xs text-muted-foreground">{ext}</span>
             </a>
           )
         })}
-        {machine.map((f) => (
+        {machine.map((f) => {
+          /* WHICH PICTURE THIS FILE IS FOR — the artwork on the same face, which is the
+             thing the file was cut from. A file with no face belongs to the line, so it
+             takes the line's singular design. Null when neither is known, and then the row
+             is the name alone, exactly as it was. */
+          const forNo = (f.side ? sides?.[String(f.side).toLowerCase()] : design)?.design_no
+          return (
           <button
             key={f.designId}
             type="button"
@@ -183,14 +213,18 @@ export function LineDownloads({ design, files, item, sides }: {
                 {tl("sides", f.side)}
               </span>
             )}
-            <span className="min-w-0 flex-1 truncate" title={faceFile(f.side, f.name || tl("lineDownloads", "Machine file"))}>
+            {forNo != null && (
+              <span className="shrink-0 text-xs font-semibold tabular-nums">DSN-{forNo}</span>
+            )}
+            <span className="min-w-0 flex-1 truncate text-muted-foreground" title={faceFile(f.side, f.name || tl("lineDownloads", "Machine file"), forNo)}>
               {f.name || tl("lineDownloads", "Machine file")}
             </span>
             {/* The KIND, not the id. The slug this used to print is unreadable and
                 unactionable; "EMB" is the fact somebody is looking for. */}
             <span className="shrink-0 text-2xs text-muted-foreground">{fileRoleLabel(f.kind)}</span>
           </button>
-        ))}
+          )
+        })}
       </PopoverContent>
     </Popover>
   )
