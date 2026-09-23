@@ -440,19 +440,57 @@ export function ArtworkLibraryPanel() {
                 className={"flex items-start gap-3 rounded-xl border bg-card p-2.5 transition-colors "
                   + (over === d.art_hash ? "border-primary bg-accent" : "border-border")}
               >
-                {/* The picture is the identification; everything beside it is confirmation.
-                    A press opens it full size rather than navigating away — judging artwork
-                    is why anyone is on this tab. */}
-                <button
-                  type="button"
-                  onClick={() => lightbox.open(d.thumb, d.name ?? undefined)}
-                  className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                  title={tl("artwork", "Open full size")}
-                >
-                  <Thumb src={d.thumb} alt="" fit="contain"
-                    className="size-14 rounded-md border border-border bg-muted p-1"
-                    icon={<PenNib size={18} weight="duotone" className="text-muted-foreground/40" />} />
-                </button>
+                {/**
+                  * THE PICTURE IS THE IDENTIFICATION; everything beside it is confirmation.
+                  *
+                  * BIGGER, AND IT ANSWERS ON HOVER (owner, 2026-09-23: "make the images here
+                  * bigger, and hover to see a bigger image next to it — no need to click to
+                  * zoom"). 56px was enough to tell one design from another and not enough to
+                  * CHECK one, so every judgement cost a click and a dismissal. 80px reads at
+                  * a glance, and resting on it puts a 16rem copy beside the card — which is
+                  * the size an artwork is actually judged at.
+                  *
+                  * THE PRESS STAYS. Hover does not exist on a tablet, and the floor reads
+                  * these across a table; removing the click would make the picture
+                  * uninspectable on exactly the device it is inspected on. It is also what
+                  * keeps the card reachable from the keyboard.
+                  *
+                  * CSS ONLY, and `pointer-events-none` on the panel: no state, nothing to
+                  * leave open when the pointer moves away, and the panel can never intercept
+                  * a press meant for the card under it. Hidden from assistive tech too — it
+                  * is the same image, larger, and the button already names it.
+                  */}
+                <div className="group/art relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => lightbox.open(d.thumb, d.name ?? undefined)}
+                    className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    title={tl("artwork", "Open full size")}
+                  >
+                    <Thumb src={d.thumb} alt="" fit="contain"
+                      className="size-20 rounded-md border border-border bg-muted p-1"
+                      icon={<PenNib size={22} weight="duotone" className="text-muted-foreground/40" />} />
+                  </button>
+                  {/* ONLY WHERE THERE IS A PICTURE. A machine file has no preview, and a
+                      panel opening on an empty tile would promise one that never arrives. */}
+                  {d.thumb && (
+                    <div
+                      aria-hidden
+                      /* SIZED TO STAY INSIDE ITS OWN CARD. Beside the thumb, as asked — but a
+                         256px panel hanging off `left-full` would run past the viewport on
+                         every card in the last grid column, and the grid is four wide at 2xl.
+                         224px starting a little under 6rem in still ends within the narrowest
+                         card, so it overlays this card's own text and never the page edge.
+                         Overlaying the text is the point: the picture is what you came to
+                         judge, and the name is still on the card behind it. */
+                      className="pointer-events-none absolute left-full top-0 z-30 ml-2 hidden rounded-xl border border-border
+                                 bg-card p-2 shadow-lg group-hover/art:block"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={d.thumb} alt="" className="size-56 rounded-md bg-muted object-contain" />
+                    </div>
+                  )}
+                </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
