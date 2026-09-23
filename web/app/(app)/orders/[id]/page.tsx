@@ -1495,16 +1495,38 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                      the billed one; if nothing matches — an old line with no face
                                      methods recorded — it stays on its own row rather than being
                                      attached to a face we are guessing at. */
-                                  const at = billed
-                                    ? faceRows.findIndex((r) => r.method.toLowerCase() === billed.toLowerCase())
-                                    : -1
+                                  /**
+                                   * THE LINE'S METHOD FEE IS THE FIRST SURFACE'S METHOD FEE.
+                                   *
+                                   * Decomposed against the real pricer (EG-2000B, front DTG + back
+                                   * Embroidery): unitCost 23.35 = 12.35 blank + 5.00 methodFee +
+                                   * 1.00 placement + 5.00 the back's run, and `billedMethod` is the
+                                   * LINE's technique — not the dearest. Faces after the first pay a
+                                   * run each; the first one's technique is charged as the line's
+                                   * methodFee. So the model already IS "blank once, placement once,
+                                   * method per surface" — it was only being DRAWN as a charge that
+                                   * belonged to the item rather than to a face, floating under Blank
+                                   * where it read as a second Embroidery nobody could account for.
+                                   *
+                                   * INDEX 0, not "the first face whose technique matches". Matching
+                                   * put it on the BACK of a mixed line — the face that already has a
+                                   * run — which is why it was then pushed out to a row of its own.
+                                   * The placement carrier is the face this fee is for, so it goes
+                                   * there, labelled with the technique actually billed.
+                                   * Owner, 2026-09-23: "method fee per surface would look the best…
+                                   * on the front/1st surface shows the face fees on that row".
+                                   */
+                                  const at = faceRows.length ? 0 : -1
                                   /* Would attaching the surcharge put a SECOND charge on that row?
                                      True when the face it lands on already has a run of its own —
                                      a mixed line — and true when no face matches it at all. */
-                                  const surchargeStandsAlone = method > 0.005 && (
-                                    at < 0
-                                    || (faceRows[at]?.kind ?? (at === 0 ? 'placement' : 'run')) === 'run'
-                                  )
+                                  /* A ROW OF ITS OWN ONLY WHEN THERE IS NO FACE TO PUT IT ON.
+                                     It used to stand alone whenever the face it landed on already had
+                                     a run — true on every mixed line, which is exactly when the
+                                     floating row was most confusing. The first face never has a run
+                                     (runs start at the second), so attaching to it can never double a
+                                     row. */
+                                  const surchargeStandsAlone = method > 0.005 && at < 0
 
                                   /**
                                    * FEES SIT UNDER THE SURFACE THEY BELONG TO (owner, 2026-09-17).
