@@ -16,7 +16,8 @@
  *   3  another seller cannot UPDATE it by guessing its id — and does not create one either
  *   4  another seller cannot DELETE it
  *   5  a team member sees and edits their OWNER's templates (same resolution as the wallet)
- *   6  unknown fields are dropped — a template cannot become a second product record
+ *   6  unknown fields are dropped — a template cannot become a second product record, and
+ *      an image is kept only as an https URL, never as the bytes
  *   7  updating by an id that is not yours 404s rather than silently inserting a new row
  *
  * Run: node tools/check-listing-templates.mjs
@@ -153,7 +154,9 @@ const DATA = {
   colors: ['Black', 'Navy'], sizes: ['Adjustable'],
   price: 24.99, quantity: 999,
   size_prices: { Adjustable: 24.99, Bogus: 'not-a-number' },
-  /* NOT IN THE ALLOW-LIST — a photo is the field this table must never learn to hold. */
+  /* IMAGES ARE ALLOWED NOW (2026-09-23) — but only as https URLs. A `data:` URL is still
+     refused: one photo's bytes exceed the row's entire 64KB budget. This one is dropped for
+     its SCHEME, not for its field name, which is what the check below now asserts. */
   images: ['data:image/png;base64,AAAA'],
   supplier: 'SanMar',
 }
@@ -170,7 +173,7 @@ check('…with its name', mine.body?.[0]?.name, 'Hat — embroidered')
 
 // ── 6 · the allow-list holds ────────────────────────────────────────────────────────────
 const saved = mine.body?.[0]?.data ?? {}
-check('the photo field was dropped', 'images' in saved, false)
+check('a data: photo is dropped even though images are allowed', 'images' in saved, false)
 check('an unknown field was dropped', 'supplier' in saved, false)
 check('the words survived', [saved.title, saved.description], ['Embroidered Dad Hat', 'Stitched to order.'])
 check('the variants survived', [saved.colors, saved.sizes], [['Black', 'Navy'], ['Adjustable']])
@@ -211,6 +214,45 @@ const noName = await call('alice', '/api/listing_templates', {
   method: 'POST', body: JSON.stringify({ name: '   ', data: DATA }),
 })
 check('a template with no name is refused', noName.status, 400)
+
+// ── boilerplate images: a URL round-trips, the bytes never do ───────────────────────────
+/**
+ * A template may now carry the photos a seller puts on EVERY listing — a size chart, a care
+ * card. Two things have to hold, and the second is the one with teeth:
+ *
+ *   an https URL survives the round trip, because that is the whole feature;
+ *   a `data:` or `blob:` URL does NOT, because one photo's bytes exceed the row's entire
+ *   64KB budget and a blob: is dead the moment the tab that made it closes. The allow-list's
+ *   own note names "the next one that turns out to be a data: URL" as the thing it exists to
+ *   stop, so this is that note, executed.
+ */
+const IMGS = await call('alice', '/api/listing_templates', {
+  method: 'POST',
+  body: JSON.stringify({
+    name: 'With boilerplate',
+    data: {
+      ...DATA,
+      images: [
+        'https://cdn.example.com/size-chart.png',
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==',
+        'blob:https://app.egful.store/9f2c-dead-beef',
+        'https://cdn.example.com/care-card.jpg',
+      ],
+    },
+  }),
+})
+check('a template with images is saved', IMGS.status, 200)
+check('https URLs round-trip', IMGS.body?.data?.images,
+  ['https://cdn.example.com/size-chart.png', 'https://cdn.example.com/care-card.jpg'])
+check('a data: URL is dropped, not stored',
+  (IMGS.body?.data?.images ?? []).some((u) => String(u).startsWith('data:')), false)
+check('a blob: URL is dropped too',
+  (IMGS.body?.data?.images ?? []).some((u) => String(u).startsWith('blob:')), false)
+/* AND IT IS STILL SOMEBODY'S. The images are the newest thing on this row, so they are the
+   newest thing that could leak across the boundary this whole gate is about. */
+const bobSees = await call('bob', '/api/listing_templates')
+check("bob cannot see alice's image template", (bobSees.body ?? []).length, 0)
+await call('alice', `/api/listing_templates/${IMGS.body?.id}`, { method: 'DELETE' })
 
 // ── delete, by the owner ────────────────────────────────────────────────────────────────
 const del = await call('alice', `/api/listing_templates/${ID}`, { method: 'DELETE' })

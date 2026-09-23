@@ -5238,6 +5238,18 @@ export type ListingTemplateData = {
   quantity?: number
   /** Per-size retail. Absent sizes fall back to `price`, exactly as the form treats them. */
   size_prices?: Record<string, number>
+  /**
+   * BOILERPLATE PHOTOS — a size chart, a care card, a brand banner: the images that go on
+   * every listing a seller publishes.
+   *
+   * https URLs only, never the bytes. `data:` and `blob:` are refused server-side: one photo
+   * would exceed the row's whole 64KB budget, and a blob: dies with the tab.
+   *
+   * ONLY THE SELLER'S OWN. A competitor's shots reach the publish page as `referenceImages`
+   * and are shown watermarked and never published — they cannot enter `images`, which is why
+   * templating this set does not reopen the laundering path photos were excluded for.
+   */
+  images?: string[]
 }
 export type ListingTemplate = {
   id: string

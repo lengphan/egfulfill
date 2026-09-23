@@ -1018,14 +1018,18 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   }, [])
 
   /**
-   * FILL THE FORM FROM A TEMPLATE — everything but the photos.
+   * FILL THE FORM FROM A TEMPLATE — the boilerplate photos included.
    *
    * OVERWRITES, on purpose (owner, 2026-09-21). Picking a template is a deliberate act with
    * a visible result, and "fill only what is empty" makes the outcome depend on what you had
-   * already touched — two applies of the same template giving two different forms. Photos are
-   * never in a template: a listing built from a competitor's card carries their shots as
-   * reference only, and this is exactly the path that would launder them into a publishable
-   * set.
+   * already touched — two applies of the same template giving two different forms.
+   *
+   * PHOTOS USED TO BE EXCLUDED, and the reason was real: a listing built from a competitor's
+   * card carries their shots, and a template was the path that would launder them into a
+   * publishable set. That path is closed at the source now — spydeck-view stashes
+   * `images: []` and puts every competitor photo in `referenceImages`, which this page shows
+   * watermarked and never publishes. So `images` is the seller's OWN, and the boilerplate
+   * they put on every listing (a size chart, a care card) is exactly what a template is for.
    */
  const applyTemplate = (t: ListingTemplate) => {
  const d: ListingTemplateData = t.data ?? {}
@@ -1037,6 +1041,18 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
     /* Per-size prices are stored as numbers and edited as text. */
  setSizeRetail(Object.fromEntries(Object.entries(d.size_prices ?? {}).map(([k, v]) => [k, String(v)])))
  if (d.method) setMethod(d.method)
+    /**
+     * THE BOILERPLATE PHOTOS, and `imgTouched` with them.
+     *
+     * That ref is what tells the prefill re-sync effect to stop overwriting the grid. Without
+     * setting it, a template's images would be replaced the moment the async listing-detail
+     * fetch resolves — applied, visibly there, and gone a second later, which reads as the
+     * template having failed.
+     *
+     * OVERWRITES, like every other field here: two applies of one template must give one
+     * form. Appending would duplicate the size chart on the second press.
+     */
+ if (d.images?.length) { imgTouched.current = true; setImages(d.images.slice(0, MAX_IMAGES)) }
     /* The picks are handed to the reset effect rather than set here — see the ref's note. */
  tmplVariantsRef.current = { colors: [...(d.colors ?? [])], sizes: [...(d.sizes ?? [])] }
     /* THE BLANK BY SKU, THEN BY NAME — the same two-step the product picker uses, because a
@@ -1059,7 +1075,19 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  else getCatalogProducts().then((rows) => { catalogRef.current = rows ?? []; seat(catalogRef.current) }).catch(() => {})
   }
 
-  /** What the form is RIGHT NOW, as a template. Photos are absent by construction. */
+  /**
+   * THE BOILERPLATE IMAGES A TEMPLATE CARRIES — https only.
+   *
+   * A freshly chosen file is a `data:`/`blob:` URL until it is uploaded, and neither belongs
+   * in a stored template: one photo's bytes exceed the row's whole budget, and a blob: is
+   * dead the moment the tab closes. The server refuses both anyway; filtering here means the
+   * seller is not told a template saved something it did not.
+   */
+  /* https only — see the note on `images` in ListingTemplateData. A file just chosen is a
+     data:/blob: URL until it uploads, and neither belongs in a stored row. */
+  const templateImages = () => images.filter((u) => /^https?:\/\//i.test(String(u ?? "").trim()))
+
+  /** What the form is RIGHT NOW, as a template — including the boilerplate photos. */
  const asTemplateData = (): ListingTemplateData => ({
  title: title.trim(),
  description: desc,
@@ -1072,6 +1100,10 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  sizes: [...pickedSizes],
  price: Number(retail) > 0 ? Number(retail) : undefined,
  quantity: Number(qty) > 0 ? Number(qty) : undefined,
+    /* SAVED, and the reason the old note said "absent by construction" no longer holds: a
+       competitor's shots live in `referenceImages` and cannot reach `images` at all, so this
+       set is the seller's own. */
+ images: templateImages(),
  size_prices: Object.fromEntries(
  Object.entries(sizeRetail)
         .map(([k, v]) => [k, Number(v)])

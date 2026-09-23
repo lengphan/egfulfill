@@ -4,7 +4,8 @@
  * A seller publishing from SpyDeck retypes the same listing shape over and over: the same
  * description boilerplate, the same blank, the same colourways, the same per-size prices.
  * Only the title and the artwork really change. So this stores everything the publish form
- * holds EXCEPT the photos, and the picker on that page fills it back in.
+ * holds — including the boilerplate IMAGES a seller puts on every listing, as https URLs
+ * only — and the picker on that page fills it back in.
  *
  * NOT `templates`. That table is the Design Lab's — composites and artwork layers, a shared
  * library with its own object-storage pipeline. The two share a word and nothing else, and
@@ -37,6 +38,32 @@ import { effectiveSeller } from '../ai-pricing.js';
 const STRINGS = ['title', 'description', 'method', 'blank_sku', 'blank_id', 'blank_name'];
 const LISTS = ['tags', 'colors', 'sizes'];
 const NUMBERS = ['price', 'quantity'];
+
+/**
+ * IMAGES A TEMPLATE MAY CARRY — and the one kind it may not.
+ *
+ * A seller has boilerplate that belongs on every listing: a size chart, a care card, a brand
+ * banner. Re-uploading those per listing is the retyping this whole table exists to end
+ * (owner, 2026-09-23: "there are some images I would like included in every single listing").
+ *
+ * THE REASON PHOTOS WERE EXCLUDED IS NOT THIS. It was that a listing built from a SpyDeck
+ * card carries the COMPETITOR's shots, and a template would launder them into a publishable
+ * set — the seller's shop gets the DMCA, and §2.6 puts that above any feature. That path is
+ * already closed at the source: spydeck-view stashes `images: []` and puts every competitor
+ * photo in `referenceImages`, which the publish page shows watermarked and never publishes.
+ * So `images` on that form is, by construction, the seller's own.
+ *
+ * A URL, NEVER THE BYTES. `data:` and `blob:` are refused outright — the allow-list note
+ * above names "the next one that turns out to be a data: URL" as the thing it exists to
+ * stop, a single 64KB cap would be one photo, and a blob: is dead the moment the tab closes.
+ * An https URL to something we already host is a reference; the picture stays where it is.
+ */
+const MAX_TEMPLATE_IMAGES = 10;
+const httpsOnly = (v) =>
+  Array.isArray(v)
+    ? v.filter((x) => typeof x === 'string' && /^https?:\/\//i.test(x.trim()) && x.length <= 2000)
+       .map((x) => x.trim()).slice(0, MAX_TEMPLATE_IMAGES)
+    : [];
 
 /** Bytes, after JSON. A template is words and numbers; anything near this is someone pasting
  *  an image into the description, and a row that size belongs in object storage or nowhere. */
@@ -71,6 +98,10 @@ function cleanData(body) {
     }
     if (Object.keys(m).length) out.size_prices = m;
   }
+  /* Absent rather than [] when there are none, so a template saved before this existed and
+     one saved with no images read the same — the form treats both as "no boilerplate". */
+  const imgs = httpsOnly(src.images);
+  if (imgs.length) out.images = imgs;
   return out;
 }
 
