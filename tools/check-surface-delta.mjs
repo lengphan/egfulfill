@@ -287,6 +287,52 @@ console.log('\nTHE METHOD STILL MOVES THE LINE, ACROSS BOTH UNITS')
   check('exactly one fee row', (await feeRows()).length, 1)
 }
 
-console.log(bad ? `\nFAIL  ${bad} check${bad === 1 ? '' : 's'} failed.` : '\nPASS  a face adds no placement, the technique still bills, and an empty wallet refuses.')
+/**
+ * ARTWORK ON SCREEN IS ARTWORK ON THE INVOICE (2026-09-23).
+ *
+ * Two ways a face carrying a real file reached the designer and not the quote, both found on
+ * live orders and both under-charging — the only direction that matters here.
+ *
+ *   AN EMPTY `side`. The read did `coalesce(side,'front')`, which catches NULL and not ''.
+ *   The client has always done `d.side || "front"`, which catches both, so the row was drawn
+ *   on the front and dropped by priceLines, which discards a face with no name.
+ *
+ *   A ROW FILED UNDER THE SKU. `sidesOf` looked up `L:<line_id>` and stopped, while
+ *   sidesForLine, designForLine, faceChargesFor and sideRatesFor all fall back to the sku
+ *   (§5: "sku stays as the fallback for rows written before line_id existed"). A line whose
+ *   artwork predates line_id was drawn everywhere and priced as a bare front.
+ */
+console.log('\nA FACE WITH A FILE IS PRICED, HOWEVER ITS ROW IS KEYED')
+{
+  const q = async (lineId) => (await fetch(`${API}/api/orders/${ORDER}/quote`, {
+    headers: { Authorization: 'Bearer ' + token },
+  }).then((r) => r.json()).catch(() => ({})))?.lines?.find((l) => l.line_id === lineId)
+
+  /* A THIRD LINE, so neither existing one moves. Its only artwork is a row with an EMPTY
+     side — exactly the shape found on FF-12jtbd4-mquer51p-15fq31. */
+  await db.query(
+    `insert into order_items (order_id, line_id, sku, name, qty, size, blank, print_type)
+     values ($1,'L-blank-side','EG-GATE','Gate Crewneck',1,'M','EG-GATE - Gate Crewneck','DTG')`, [ORDER])
+  await db.query(
+    `insert into order_designs (order_id, sku, line_id, kind, side, data)
+     values ($1,'EG-GATE','L-blank-side','raster','','https://x/empty-side.png')`, [ORDER])
+  const a = await q('L-blank-side')
+  check('an empty side is the FRONT, not a dropped face',
+    (a?.sideParts?.parts ?? []).map((p) => p.face), ['front'])
+  check('and it is charged', (a?.sideParts?.parts ?? []).every((p) => p.amount >= 0) && (a?.sideParts?.parts ?? []).length === 1, true)
+
+  /* A FOURTH, whose artwork is filed under the SKU with no line_id — a pre-line_id row. */
+  await db.query(
+    `insert into order_items (order_id, line_id, sku, name, qty, size, blank, print_type)
+     values ($1,'L-sku-keyed','EG-SKUONLY','Gate Crewneck',1,'M','EG-GATE - Gate Crewneck','DTG')`, [ORDER])
+  await db.query(
+    `insert into order_designs (order_id, sku, line_id, kind, side, data)
+     values ($1,'EG-SKUONLY',null,'raster','back','https://x/sku-keyed.png')`, [ORDER])
+  const b = await q('L-sku-keyed')
+  check('a row filed under the SKU still names its face',
+    (b?.sideParts?.parts ?? []).map((p) => p.face), ['back'])
+}
+
+console.log(bad ? `\nFAIL  ${bad} check${bad === 1 ? '' : 's'} failed.` : '\nPASS  a face adds no placement, the technique still bills, an empty wallet refuses, and artwork on screen is artwork on the invoice.')
 await db.end()
 process.exit(bad ? 1 : 0)

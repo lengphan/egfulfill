@@ -1288,10 +1288,15 @@ export function DesignCanvasDialog({
   }, [faceArt, sideName, designUrl])
  const anyFaceHasArt = Object.values(facesWithArt).some(Boolean)
   /**
-   * The faces that are ADDING to the price: every printed face except the first.
+   * WHICH PRINTED FACES PAY A RUN — every one except the first.
    *
-   * Ordered by the garment's own face list, so the answer is stable — "the first" is front
-   * on anything that has one, not whichever row the server happened to return first.
+   * Ordered by the garment's own face list, so the answer is stable: "the first" is front on
+   * anything that has one, not whichever row the server happened to return first.
+   *
+   * THE FIRST ONE IS NOT FREE, it is the face carrying the line's single PLACEMENT — see the
+   * tile below. This memo only says which faces are past it; what each side of that line
+   * costs is the caller's question, and reading `false` here as "no charge" is what printed
+   * Free on a front that was about to be billed.
    */
  const costingFaces = useMemo(() => {
  const out: Record<string, boolean> = {}
@@ -3401,7 +3406,19 @@ return (
                    the quote's business; whether this window has its picture loaded is not. */
  const owed = faceSurfaces ? faceSurfaces[k] : undefined
  const shown: number | null = owed != null ? owed
-                  : art ? (costingFaces[k] ? runFee(k) : 0)
+                  /* THE FIRST PRINTED FACE IS NOT FREE (owner, 2026-09-23: "whichever face
+                     has design still needs to show price even if it's free").
+
+                     This printed 0 — "Free" — on the first face carrying artwork, which was
+                     right under the rule that one placement came inside the blank's price.
+                     That rule went on 2026-09-18: the first face pays the PLACEMENT and every
+                     face after it pays its own run. So a front with artwork on it read Free
+                     beside a back the summary was billing $2.00 for, which is the same figure
+                     the front is about to be charged the moment it is saved.
+
+                     Free is still printed, and still means it — a second DTG face whose run
+                     is 0 genuinely adds nothing. */
+                  : art ? (costingFaces[k] ? runFee(k) : rate)
                   : (billedFaces ? runFee(k) : rate)
                 /* MUTED WHENEVER THE QUOTE IS NOT ALREADY CHARGING THIS FACE. Same figure,
                    lighter ink — see FaceTile's `extraPending`. */

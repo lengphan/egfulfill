@@ -1532,8 +1532,21 @@ export async function quoteOrder(orderId) {
      * to a live pricing path: `data` was required until now, so nothing already stored can
      * fail it.
      */
+    /**
+     * AN EMPTY `side` IS THE FRONT, the same as a null one (2026-09-23).
+     *
+     * `coalesce(side,'front')` catches NULL and NOT ''. Live rows exist with an empty side —
+     * FF-12jtbd4-mquer51p-15fq31 carries two — and the client has always read
+     * `String(d.side || "front")`, which catches both.
+     *
+     * DEFENSIVE, NOT A FIX: priceLines already normalises `f.side || 'front'` one step
+     * later, so no face is lost today. Asserted — reverting this line leaves the gate green,
+     * which is exactly how it was found not to be the cause of anything. It stays because
+     * two readers of one column disagreeing about what '' means is a bug waiting for its
+     * third reader, and the SQL is where the column is read first.
+     */
     q(`select coalesce('L:' || line_id, 'S:' || sku) as key,
-              lower(coalesce(side,'front')) as side, method
+              lower(coalesce(nullif(btrim(side), ''), 'front')) as side, method
          from order_designs
         where order_id=$1 and (data is not null or storage_key is not null)`, [orderId])
       .then((r) => r.rows).catch(() => []),
@@ -1550,9 +1563,28 @@ export async function quoteOrder(orderId) {
   }
   /* A line with no artwork prices as ONE face, which is what "there is no count" meant before
      and must keep meaning: a missing row charges for one side, never none and never more. */
+  /**
+   * A LINE'S FACES — ITS OWN ROWS, ELSE WHATEVER IS FILED UNDER ITS SKU.
+   *
+   * THE SKU FALLBACK WAS MISSING HERE AND NOWHERE ELSE. `sidesForLine`, `designForLine`,
+   * `faceChargesFor`, `sideRatesFor` and `faceSurfacesFor` all do their own `line_id`, then
+   * `sku` — CLAUDE.md §5: "sku stays as the fallback for rows written before line_id
+   * existed". This one went straight to `L:` and stopped, so a line whose artwork predates
+   * line_id was DRAWN everywhere and PRICED as a bare front.
+   *
+   * ONE BUCKET OR THE OTHER, never merged — exactly what sidesForLine does. Merging would
+   * let a sku-keyed row from a sibling line of the same SKU attach itself to this one, which
+   * is the sibling bug §5 is about, one question earlier.
+   *
+   * WHAT MOVES: unsubmitted quotes on orders holding such rows go UP, because a face that
+   * was being printed for free starts being charged. Charged orders do not move at all —
+   * `sideParts` reads the frozen stamp for those and this never runs.
+   */
   const sidesOf = (it) => {
-    const hit = sidesByKey.get(it.line_id ? `L:${it.line_id}` : `S:${it.sku}`);
-    return hit && hit.length ? hit : ['front'];
+    const own = it.line_id ? sidesByKey.get(`L:${it.line_id}`) : undefined;
+    if (own && own.length) return own;
+    const bySku = it.sku ? sidesByKey.get(`S:${it.sku}`) : undefined;
+    return bySku && bySku.length ? bySku : ['front'];
   };
   const { lines, unpriced } = priceLines(items, idx, fees, sidesOf);
   const volume = await volumeRateFor(orderId);

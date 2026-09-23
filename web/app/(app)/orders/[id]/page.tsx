@@ -1426,9 +1426,16 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                   * "· 20% off" then announced a rate whose money is somewhere
                                   * else entirely, above the row that actually holds it.
                                   */}
-                                {!goodsOnly && discOwn > 0.005 && dpct > 0 && (
-                                  <span className="font-semibold text-success"> · {dpct}% {tl("order", "off")}</span>
-                                )}
+                                {/* THE RATE MOVED TO THE ROW THAT HOLDS THE MONEY (owner,
+                                    2026-09-23: "the discount percentage should be on the row it
+                                    has discount").
+
+                                    It was named here because it used to be spread across every
+                                    goods row of the item — six times on a three-face line, the
+                                    clutter the 2026-09-21 note is about. That stopped being
+                                    true the same week: the deduction comes off the BLANK alone
+                                    now, so it is one row, and a rate announced on the heading
+                                    sat above four rows of which three never received it. */}
                               </dt>
                               {/* ALL-IN, because everything under it now is. The heading was the
                                   GOODS while shipping and the discount sat at order level; with
@@ -1857,14 +1864,16 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                                                    else with no face is the garment. */
                                                 ? <span>{r.method}</span>
                                                 : tl("order", "Blank")}
-                                            {/* THE RATE IS NOT REPEATED HERE (owner, 2026-09-21: "this is
-                                                quite cluttered? 20% off each row"). It was printed on every
-                                                discounted row of every item — six times on a three-face
-                                                line — and it is the same rate on all of them, because it
-                                                is the ITEM's. It is named once, on the heading.
-                                                The row keeps the struck-through list price and the net, so
-                                                it still shows its own before and after: what goes is the
-                                                repeated words, not the provenance. */}
+                                            {/* AND HERE IT IS, on the one row that receives it.
+                                                The 2026-09-21 note removed this because the deduction was
+                                                spread across every goods row and said the same thing six
+                                                times. It comes off the BLANK alone now, so there is exactly
+                                                one row to name — and naming it beside the struck-through
+                                                figure is what makes the two numbers in the column readable
+                                                as one fact rather than two prices. */}
+                                            {off > 0.005 && dpct > 0 && (
+                                              <span className="font-semibold text-success"> · {dpct}% {tl("order", "off")}</span>
+                                            )}
                                           </dt>
                                           {/**
                                             * INCLUDED IS A WORD, NOT A ZERO. "$0.00" beside the
