@@ -5167,6 +5167,11 @@ const vi: Dict = {
   "artwork.File on record": "Đã có tệp",
   "artwork.Attach file": "Đính kèm tệp",
   "artwork.Download": "Tải xuống",
+  "artwork.Add file": "Thêm tệp",
+  "artwork.Remove": "Xoá",
+  "artwork.Remove this file": "Xoá tệp này",
+  "artwork.The next order carrying this artwork will not be offered it.": "Đơn tiếp theo dùng hình này sẽ không được đề xuất tệp đó nữa.",
+  "artwork.Couldn't remove that file.": "Không xoá được tệp đó.",
 
   // Settings › Platform — the four section tabs and the trimmed hints (2026-09-23).
   "settings.Settings sections": "Các mục cài đặt",

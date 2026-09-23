@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { PenNib, CircleNotch, UploadSimple, DownloadSimple, CaretDown } from "@phosphor-icons/react"
+import { PenNib, CircleNotch, UploadSimple, DownloadSimple, CaretDown, X } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { SectionCard } from "@/components/app/section-card"
 import { EmptyState } from "@/components/app/empty-state"
@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button"
 import { SearchField } from "@/components/app/search-field"
 import { FilterMenu } from "@/components/app/filter-menu"
 import { useLightbox } from "@/components/app/image-lightbox"
-import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, type FactoryDesign } from "@/lib/api"
+import { useConfirm } from "@/components/app/confirm-dialog"
+import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, deleteDesignFile, type FactoryDesign } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
 
 /**
@@ -62,6 +63,7 @@ export function ArtworkLibraryPanel() {
   const [openOrders, setOpenOrders] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const lightbox = useLightbox()
+  const confirm = useConfirm()
 
   useEffect(() => {
     let live = true
@@ -110,6 +112,23 @@ export function ArtworkLibraryPanel() {
    * The design id is derived from the hash, so re-attaching REPLACES rather than piling up
    * a second file for one picture — the server's `on conflict (design_id) do update`.
    */
+  /**
+   * A SECOND FILE IS A SECOND FILE, NOT A CORRECTION.
+   *
+   * The id was always `ART-<hash16>`, and the server's upsert is `on conflict (design_id) do
+   * update` — so attaching again REPLACED what was there, silently, which is the wrong
+   * default when the usual reason to attach twice is that a picture needs a second placement
+   * or the first file was wrong and you want both until you have checked. The first keeps the
+   * bare id (nothing existing changes name); every one after takes a suffix.
+   */
+  const nextFileId = (d: FactoryDesign) => {
+    const base = `ART-${d.art_hash.slice(0, 16)}`
+    const taken = new Set((d.files ?? []).map((f) => f.design_id))
+    if (!taken.has(base)) return base
+    for (let n = 2; n < 50; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`
+    return `${base}-${Date.now()}`
+  }
+
   const attach = async (d: FactoryDesign, file: File) => {
     setBusy(d.art_hash); setErr(null)
     try {
@@ -119,19 +138,15 @@ export function ArtworkLibraryPanel() {
         fr.onerror = () => rej(new Error(tl("artwork", "Couldn't read that file")))
         fr.readAsDataURL(file)
       })
-      const r = await uploadDesignFile({
-        designId: `ART-${d.art_hash.slice(0, 16)}`,
-        name: file.name,
-        data,
-        artHash: d.art_hash,
-      })
+      const designId = nextFileId(d)
+      const r = await uploadDesignFile({ designId, name: file.name, data, artHash: d.art_hash })
       if (r?.error) throw new Error(r.error)
       /* NAME IT IMMEDIATELY. The upload knows the file it just sent, so the card can say
-         which file is on record without waiting for a reload to tell it — the id is the
-         one the server derives from the hash, which is what makes re-attaching a REPLACE
-         rather than a second file for one picture. */
+         which file is on record without waiting for a reload to tell it. Newest first,
+         which is the order the listing returns them in. */
       setRows((prev) => (prev ?? []).map((x) => (x.art_hash === d.art_hash
-        ? { ...x, has_file: true, file_id: `ART-${d.art_hash.slice(0, 16)}`, file_name: file.name }
+        ? { ...x, has_file: true,
+            files: [{ design_id: designId, file_name: file.name, kind: "emb", own: true }, ...(x.files ?? [])] }
         : x)))
     } catch (e) {
       setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't attach that file."))
@@ -145,18 +160,48 @@ export function ArtworkLibraryPanel() {
    * answers with a data URL, an anchor saves it — because a stitch file is bytes a machine
    * needs, and a name you cannot open is barely more use than a tick.
    */
-  const download = async (d: FactoryDesign) => {
-    if (!d.file_id) return
-    setBusy(d.art_hash); setErr(null)
+  const download = async (f: { design_id: string; file_name: string | null }) => {
+    setBusy(f.design_id); setErr(null)
     try {
-      const r = await downloadDesignFile(d.file_id)
+      const r = await downloadDesignFile(f.design_id)
       if (!r?.data) throw new Error(tl("artwork", "That file has no data to download."))
       const a = document.createElement("a")
       a.href = r.data
-      a.download = r.name || d.file_name || "design"
+      a.download = r.name || f.file_name || "design"
       a.click()
     } catch (e) {
       setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't download that file."))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /**
+   * ONLY THE ONES THIS SHELF OWNS.
+   *
+   * A file reached this card by one of two links: filed against the artwork itself, or
+   * attributed through the order it was uploaded against. The second belongs to that order —
+   * the delete route refuses it unless the order is still with the seller — so removing it
+   * from here would be deleting somebody's order file from a library screen. `own` is the
+   * server's word for the first kind, and only those carry an ×.
+   */
+  const removeFile = async (d: FactoryDesign, f: { design_id: string; file_name: string | null }) => {
+    if (!(await confirm({
+      title: `${tl("artwork", "Remove")} ${f.file_name || f.design_id}?`,
+      body: tl("artwork", "The next order carrying this artwork will not be offered it."),
+      confirmLabel: tl("artwork", "Remove"),
+    }))) return
+    setBusy(f.design_id); setErr(null)
+    try {
+      const r = await deleteDesignFile(f.design_id)
+      if (r && typeof r === "object" && "error" in r && r.error) throw new Error(String(r.error))
+      setRows((prev) => (prev ?? []).map((x) => {
+        if (x.art_hash !== d.art_hash) return x
+        const files = (x.files ?? []).filter((y) => y.design_id !== f.design_id)
+        return { ...x, files, has_file: files.length > 0 }
+      }))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't remove that file."))
     } finally {
       setBusy(null)
     }
@@ -385,32 +430,54 @@ export function ArtworkLibraryPanel() {
                     * one glance. Here it is the third line of the card — read after what
                     * the thing is, which is the order the question is actually asked in.
                     */}
-                  <div className="mt-1.5">
-                    {d.has_file ? (
-                      /**
-                       * THE FILE'S NAME, AND IT OPENS. "File on record" was a tick: it said
-                       * a stitch file existed and not WHICH, and there was no way to look at
-                       * the thing it was talking about — so the only way to check the right
-                       * file was filed was to find an order carrying the artwork.
-                       *
-                       * It is a value, not a caption (§4), so the name is at `text-sm` and
-                       * truncates rather than wrapping the card. A file we hold but cannot
-                       * name still says so, because the two links `has_file` reads are not
-                       * both able to produce a filename.
-                       */
-                      <button
-                        type="button"
-                        disabled={!d.file_id || busy === d.art_hash}
-                        onClick={() => void download(d)}
-                        title={d.file_id ? `${tl("artwork", "Download")} ${d.file_name || d.file_id}` : undefined}
-                        className="flex max-w-full items-center gap-1.5 text-sm font-medium text-success enabled:hover:underline disabled:cursor-default"
-                      >
-                        {busy === d.art_hash
-                          ? <CircleNotch size={14} className="shrink-0 animate-spin" />
-                          : <DownloadSimple size={14} weight="bold" className="shrink-0" />}
-                        <span className="truncate">{d.file_name || tl("artwork", "File on record")}</span>
-                      </button>
-                    ) : (
+                  <div className="mt-1.5 space-y-1">
+                    {/**
+                      * EVERY FILE, NAMED, AND EACH ONE OPENS.
+                      *
+                      * "File on record" was a tick: it said a stitch file existed and not
+                      * WHICH, so the only way to check the right one was filed was to find an
+                      * order carrying the artwork. And it showed one — a picture can end up
+                      * with a second file because the first was wrong, or because a second
+                      * placement needs its own, and a card that draws one cannot be used to
+                      * fix either.
+                      *
+                      * A filename is a value, not a caption (§4), so `text-sm`, truncated
+                      * rather than wrapped.
+                      */}
+                    {(d.files ?? []).map((f) => (
+                      <div key={f.design_id} className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={busy === f.design_id}
+                          onClick={() => void download(f)}
+                          title={`${tl("artwork", "Download")} ${f.file_name || f.design_id}`}
+                          className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-success enabled:hover:underline disabled:cursor-default"
+                        >
+                          {busy === f.design_id
+                            ? <CircleNotch size={14} className="shrink-0 animate-spin" />
+                            : <DownloadSimple size={14} weight="bold" className="shrink-0" />}
+                          <span className="truncate">{f.file_name || tl("artwork", "File on record")}</span>
+                        </button>
+                        {f.own && (
+                          <button
+                            type="button"
+                            disabled={busy === f.design_id}
+                            onClick={() => void removeFile(d, f)}
+                            title={tl("artwork", "Remove this file")}
+                            aria-label={`${tl("artwork", "Remove")} ${f.file_name || f.design_id}`}
+                            className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <X size={10} weight="bold" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {/* THE BUTTON NEVER LEAVES. A card with a file still needs a way to add
+                        the second one or replace a wrong one, and the only way to do that was
+                        to find an order carrying the artwork. It reads "Add file" once there
+                        is one, because that is what it does — the × above removes. */}
+                    {(
+
                       /**
                        * QUIET, BECAUSE THERE ARE SIXTY OF THEM.
                        *
@@ -432,7 +499,7 @@ export function ArtworkLibraryPanel() {
                         {busy === d.art_hash
                           ? <CircleNotch size={14} className="animate-spin" />
                           : <UploadSimple size={14} weight="bold" />}
-                        {tl("artwork", "Attach file")}
+                        {d.files?.length ? tl("artwork", "Add file") : tl("artwork", "Attach file")}
                       </Button>
                     )}
                   </div>

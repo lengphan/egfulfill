@@ -2077,12 +2077,12 @@ export type FactoryDesign = {
    *  was uploaded against — so the library cannot say "no file" about artwork the reuse
    *  panel offers a file for. */
   has_file: boolean
-  /** WHICH file, so a card can name it and a press can fetch it — `has_file` alone could
-   *  say a stitch file was on record without saying which, and nothing could open it.
-   *  `file_id` is the design_id `downloadDesignFile` takes. */
-  file_id?: string | null
-  file_name?: string | null
-  file_kind?: string | null
+  /** WHICH files, so a card can name them and a press can fetch one — `has_file` alone
+   *  could say a stitch file was on record without saying which, and nothing could open it.
+   *  Newest first, capped at 6. `design_id` is what `downloadDesignFile` takes; `own` marks
+   *  one filed against the artwork itself (no order behind it), which is the only kind this
+   *  surface may delete — the rest belong to an order and the server refuses. */
+  files?: { design_id: string; file_name: string | null; kind: string | null; created_at?: string | null; own: boolean }[]
   /** WHICH orders carried it — newest first, capped at 24 while `orders` stays the true
    *  count. Carries what numOf needs so the library prints the same EGF-###### the order
    *  page does, rather than inventing a second way to name an order. */

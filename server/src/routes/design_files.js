@@ -377,27 +377,39 @@ export function designFilesRoutes(app, requireAuth) {
           group by d.art_hash
        )
        select a.*, i.design_no,
-              /* THE FILE ITSELF, NOT A TICK. It answered with an EXISTS — true, and nothing
-                 else — so the library could say a stitch file was on record and not say
-                 WHICH, and there was no way to open the thing it was talking about.
+              /* THE FILES THEMSELVES, NOT A TICK. It answered with an EXISTS — true, and
+                 nothing else — so the library could say a stitch file was on record without
+                 saying WHICH, and there was no way to open the thing it was talking about.
                  (No backticks in here: this sits inside a JS template literal and one of
                  them would end the string mid-query — the same trap noted in reuseForOrder.)
-                 The
-                 same two links the boolean read, newest first: a file that names this
-                 artwork, and one attributed through the order it was uploaded against. */
-              f.design_id as file_id, f.file_name, f.kind as file_kind, f.created_at as file_at,
-              (f.design_id is not null) as has_file
+
+                 ALL OF THEM, newest first, not just the newest one: a picture can end up
+                 with a second file because the first was wrong, and a card that shows one
+                 cannot be used to fix that. Capped at 6 — past that the card is a list, and
+                 the answer is to delete the ones that are wrong.
+
+                 The own flag is the half that decides what may be DELETED here: a file filed
+                 against the artwork itself has no order behind it and is the library's, and
+                 one attributed through an order belongs to that order — the delete route
+                 refuses it, and it should not be offered.
+
+                 The same two links the boolean read. */
+              f.files,
+              (f.files is not null) as has_file
          from art a
          left join design_ids i on i.art_hash = a.art_hash
          left join lateral (
-           select f.design_id, f.file_name, f.kind, f.created_at
-             from design_file_data f
-            where f.kind in ('pes','emb')
-              and ( f.art_hash = a.art_hash
-                 or exists (select 1 from order_designs d2
-                             where d2.order_id = f.order_id and d2.art_hash = a.art_hash) )
-            order by f.created_at desc nulls last
-            limit 1
+           select json_agg(x) as files from (
+             select f.design_id, f.file_name, f.kind, f.created_at,
+                    (f.order_id is null) as own
+               from design_file_data f
+              where f.kind in ('pes','emb')
+                and ( f.art_hash = a.art_hash
+                   or exists (select 1 from order_designs d2
+                               where d2.order_id = f.order_id and d2.art_hash = a.art_hash) )
+              order by f.created_at desc nulls last
+              limit 6
+           ) x
          ) f on true
         where ($2::bigint is null or i.design_no = $2)
           and ($3::text is null or a.name ilike '%' || $3 || '%')
@@ -447,12 +459,16 @@ export function designFilesRoutes(app, requireAuth) {
           .sort((a, b) => Number(b.ref_no || 0) - Number(a.ref_no || 0))
           .slice(0, 24),
         has_file: !!r.has_file,
-        /* Named so a card can print it and a press can fetch it. `file_id` is the
-           design_id the download route takes — ART-<hash16> for one filed against the
-           artwork itself, an order's own design id for one attributed through its order. */
-        file_id: r.file_id || null,
-        file_name: r.file_name || null,
-        file_kind: r.file_kind || null,
+        /* Named so a card can print them and a press can fetch one. `design_id` is what
+           the download route takes — ART-<hash16> for a file filed against the artwork
+           itself, an order's own design id for one attributed through its order. */
+        files: (r.files || []).map((f) => ({
+          design_id: f.design_id,
+          file_name: f.file_name || null,
+          kind: f.kind || null,
+          created_at: f.created_at || null,
+          own: !!f.own,
+        })),
         first_seen: r.first_seen,
         last_seen: r.last_seen,
       })),
