@@ -205,6 +205,81 @@ const anyFake = JSON.stringify(await Promise.all(
 check('no route hands back a fabricated tracking code or sandbox label url',
   !/EGTEST|sandbox\.egfulfill\.com/.test(anyFake))
 
+/**
+ * A SCOPED KEY IS REFUSED THE SCOPE IT LACKS — and an unscoped one is not.
+ *
+ * The server has gated every /api/v1/* route on scopes since they were added, and nothing
+ * exercised it, because `createApiKey` in web/lib/api.ts never sent a `scopes` array: every
+ * key the product could mint landed with an empty one, which `keyAllows` reads as FULL
+ * ACCESS. So the enforcement was live, dead and unmeasured at the same time — and the
+ * marketing page said keys carry only the scopes you grant.
+ *
+ * Both halves are asserted here, because they pull against each other. Scopes must bite, and
+ * an EMPTY array must keep meaning everything: that rule exists so adding the column did not
+ * revoke every integration already in the field, and quietly "fixing" it to mean nothing
+ * would break live partners on deploy.
+ */
+console.log('\nSCOPES BITE, AND A PRE-SCOPES KEY STILL WORKS')
+
+const mintKey = async (body) => (await (await fetch(`${API}/api/keys`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+  body: JSON.stringify({ mode: 'test', ...body }),
+})).json())
+
+const keyList = await (await fetch(`${API}/api/keys`, { headers: { Authorization: 'Bearer ' + token } })).json()
+const ALL = keyList.all_scopes || []
+check('GET /api/keys publishes all_scopes, which is what the picker reads',
+  ALL.length > 0 && ALL.includes('orders.write'), JSON.stringify(keyList.all_scopes))
+
+/* The picker derives Read only as the `.read`-suffixed half of that list rather than naming
+   scopes itself, so a scope added upstream joins the right preset with no second list to
+   forget. Derive it the same way here — if the suffix convention ever breaks, this fails
+   rather than the seller discovering it. */
+const READ = ALL.filter((s) => s.endsWith('.read'))
+check('the .read half is a real preset, not an empty set', READ.length >= 3, READ.join(','))
+
+const ro = await mintKey({ label: 'gate read-only', scopes: READ })
+const roCall = async (method, path, body) => {
+  const r = await fetch(API + path, {
+    method,
+    headers: { 'X-API-Key': ro.key, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+  return { status: r.status, body: await r.json().catch(() => ({})) }
+}
+check('a read-only key stores exactly what was asked for',
+  JSON.stringify((ro.scopes || []).slice().sort()) === JSON.stringify(READ.slice().sort()),
+  JSON.stringify(ro.scopes))
+
+const roProducts = await roCall('GET', '/api/v1/products')
+check('read-only CAN list products', roProducts.status === 200, String(roProducts.status))
+
+/* billing.read ends in .read, so Read only includes it — reading your own balance is a read.
+   Asserted because it is the one preset member somebody would be tempted to drop. */
+const roBalance = await roCall('GET', '/api/v1/balance')
+check('read-only CAN read the balance', roBalance.status === 200, String(roBalance.status))
+
+const ORDER = { items: [{ product_id: 'GATETEE', quantity: 1, size: 'M', method: 'DTG' }],
+  shipping_address: { name: 'A', street1: '1 St', city: 'X', state: 'MA', zip: '02719', country: 'US' } }
+const roCreate = await roCall('POST', '/api/v1/orders', ORDER)
+check('read-only CANNOT create an order', roCreate.status === 403, String(roCreate.status))
+check('...and the refusal names the scope required, so it is actionable',
+  roCreate.body.code === 'insufficient_scope' && roCreate.body.required === 'orders.write',
+  JSON.stringify(roCreate.body).slice(0, 140))
+
+/* THE LEGACY RULE. A key minted with no scopes is a key from before the column existed, and
+   it must keep full access — see keyAllows. This is the assertion that stops a later tidy-up
+   from revoking every integration in the field. */
+const open = await mintKey({ label: 'gate unscoped' })
+const openCreate = await (await fetch(`${API}/api/v1/orders`, {
+  method: 'POST',
+  headers: { 'X-API-Key': open.key, 'Content-Type': 'application/json' },
+  body: JSON.stringify(ORDER),
+})).json().catch(() => ({}))
+check('a key with NO scopes still has full access (pre-scopes keys must not be revoked)',
+  openCreate.object === 'order', JSON.stringify(openCreate).slice(0, 140))
+
 console.log(bad === 0 ? '\nPASS  the documented API answers, and a test key still simulates all of it.'
   : `\nFAIL  ${bad} problem${bad === 1 ? '' : 's'}.`)
 process.exit(bad === 0 ? 0 : 1)

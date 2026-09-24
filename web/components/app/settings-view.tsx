@@ -399,10 +399,35 @@ function ApiKeysPanel() {
   // Active keys are all most people need to see; revoked ones pile up and used to push the
   // whole Integrations page down. Tuck them behind a History tab so the panel stays short.
  const [view, setView] = useState<"active" | "history">("active")
+  /**
+   * TWO PRESETS, NOT SIX CHECKBOXES.
+   *
+   * The decision a seller actually makes is "can this thing change anything", not "should
+   * it hold webhooks.write specifically". Six boxes put a permissions matrix in front of
+   * someone who wants a key; two options put the safe one within reach, which is the whole
+   * point — a key pasted into an assistant's config should be read-only by default and
+   * that has to be the easy path, not the careful one.
+   *
+   * POST /api/keys still takes the exact array, so this is a preset over machinery that
+   * already exists rather than a ceiling on it.
+   */
+ const [grant, setGrant] = useState<"read" | "full">("read")
+  // The server's own API_SCOPES. Derived, never typed out here: add a scope upstream and
+  // Full access picks it up, and a `.read` one joins Read only, with no second list to
+  // forget. Empty until the first load resolves — the presets fall back to sending
+  // nothing, which is today's behaviour, rather than guessing at names.
+ const [allScopes, setAllScopes] = useState<string[]>([])
+ const granted = useMemo(
+    () => (grant === "full" ? allScopes : allScopes.filter((s) => s.endsWith(".read"))),
+    [grant, allScopes]
+  )
 
  const load = useCallback(() => {
  getApiKeys()
-      .then((r) => setKeys(r.keys ?? []))
+      .then((r) => {
+ setKeys(r.keys ?? [])
+ if (r.all_scopes?.length) setAllScopes(r.all_scopes)
+      })
       .catch(() => setKeys([]))
   }, [])
  useEffect(() => {
@@ -413,7 +438,7 @@ function ApiKeysPanel() {
  setCreating(true)
  setErr(null)
  try {
- const r = await createApiKey(label.trim() || (mode === "live" ? "Live key" : "Test key"), mode)
+ const r = await createApiKey(label.trim() || (mode === "live" ? "Live key" : "Test key"), mode, granted)
  setFresh({ key: r.key, label: r.label })
  setLabel("")
  setCopied(false)
@@ -488,6 +513,31 @@ function ApiKeysPanel() {
         {err && <span className="text-xs font-medium text-alert">{err}</span>}
       </div>
 
+      {/* WHAT THE KEY MAY DO. A FIELD, not a row of buttons — it is something you SET, so it
+          takes the same border and radius an Input does and carries no fill (§4: shape says
+          kind). The granted scopes read out underneath because a preset that does not say
+          what it resolved to is a black box, and because it is what turns a later 403 into
+          an answer. */}
+      <div className="flex flex-col gap-2 border-b border-border px-5 py-3 sm:flex-row sm:items-center">
+        <span className="text-sm font-medium">{tl("settings", "This key can")}</span>
+        <div className="flex rounded-lg border border-input p-0.5">
+          {([["read", "Read only"], ["full", "Full access"]] as const).map(([g, lbl]) => (
+            <button
+ key={g}
+ type="button"
+ onClick={() => setGrant(g)}
+ aria-pressed={grant === g}
+ className={"eg-tap rounded-md px-3 py-1 text-xs font-medium transition-colors " + (grant === g ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              {tl("settings", lbl)}
+            </button>
+          ))}
+        </div>
+        {granted.length > 0 && (
+          <span className="text-xs text-muted-foreground">{granted.join(" · ")}</span>
+        )}
+      </div>
+
       {/* freshly created key — shown once */}
       {fresh && (
         <div className="border-b border-border bg-shipped/12 px-5 py-4">
@@ -548,6 +598,16 @@ function ApiKeysPanel() {
                   {/* prefix••••last4 — the SAME shape the API Explorer shows, so a key can be
  matched by its first + last chars. Older keys (no stored last4) show prefix-only. */}
                   {k.last4 ? `${k.prefix.replace(/…$/, "")}••••••••${k.last4}` : k.prefix} · created {fmtDate(k.created_at)} · last used {fmtDate(k.last_used_at)}
+                </div>
+                {/* WHAT IT MAY DO — plain text, not pills. A pill has to carry meaning: an
+                    order stage, an HTTP method, RUSH. A scope list is tags, and pills on
+                    tags is what emptied the capsule of meaning everywhere else (§4).
+                    An empty array is full access and has to SAY so — a blank where other
+                    rows have text reads as missing data, not as "everything". */}
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  {k.scopes?.length
+                    ? k.scopes.join(" · ")
+                    : tl("settings", "all scopes — created before scopes existed")}
                 </div>
               </div>
               {!k.revoked_at && (

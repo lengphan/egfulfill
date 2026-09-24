@@ -5448,19 +5448,42 @@ export type ApiKey = {
   /** Last 4 chars of the key (null for keys created before this was stored). */
   last4?: string | null
   mode: string
+  /** What this key may do. EMPTY MEANS EVERYTHING — the column was added to a table that
+   *  already had keys in it, and defaulting those to "nothing" would have revoked every
+   *  live integration on deploy. Keys created from here always name their scopes, so the
+   *  permissive case shrinks to zero on its own; a row showing none is a pre-scopes key
+   *  and has to say so rather than render a blank where others have text. */
+  scopes?: string[] | null
   created_at: string
   last_used_at: string | null
   revoked_at: string | null
 }
 
+/** `all_scopes` is the server's own `API_SCOPES`, so the picker cannot drift from what the
+ *  route will accept — it filters the body against that same list and 400s on none
+ *  recognised. Never hardcode the six here. */
 export function getApiKeys() {
-  return api<{ keys: ApiKey[] }>(`/api/keys`)
+  return api<{ keys: ApiKey[]; all_scopes?: string[] }>(`/api/keys`)
 }
 
-export function createApiKey(label: string, mode: "test" | "live" = "test") {
-  return api<{ id: number | string; key: string; prefix: string; last4?: string | null; label: string; mode: string; created_at: string }>(
+/**
+ * SCOPES ARE THE THIRD ARGUMENT, and omitting them is what was wrong.
+ *
+ * The server has gated every /api/v1/* route on scopes since they were added — `keyAllows`,
+ * a 403 naming the scope required — and `POST /api/keys` has always filtered a `scopes`
+ * array against `API_SCOPES`. This function never sent one, so every key the product could
+ * mint landed with an empty array, which means FULL ACCESS. The machinery was built and
+ * dead, and the marketing page said keys carry only the scopes you grant.
+ *
+ * It matters most for a key handed to someone else — a partner integration, or an assistant
+ * holding it in a plaintext config file. `webhooks.write` lets a holder point every order's
+ * buyer name and shipping address at a URL of their choosing, and a read-only key is the
+ * only thing that closes that.
+ */
+export function createApiKey(label: string, mode: "test" | "live" = "test", scopes?: string[]) {
+  return api<{ id: number | string; key: string; prefix: string; last4?: string | null; label: string; mode: string; scopes?: string[]; created_at: string }>(
     `/api/keys`,
-    { method: "POST", body: JSON.stringify({ label, mode }) }
+    { method: "POST", body: JSON.stringify({ label, mode, ...(scopes?.length ? { scopes } : {}) }) }
   )
 }
 
