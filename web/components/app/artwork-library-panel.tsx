@@ -10,7 +10,6 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { SearchField } from "@/components/app/search-field"
 import { FilterMenu } from "@/components/app/filter-menu"
-import { useLightbox } from "@/components/app/image-lightbox"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, deleteDesignFile, type FactoryDesign } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
@@ -94,7 +93,6 @@ export function ArtworkLibraryPanel() {
   /** What just happened, when it is worth saying. Not a caption — it appears only after a
    *  press and names its result. */
   const [note, setNote] = useState<string | null>(null)
-  const lightbox = useLightbox()
   const confirm = useConfirm()
 
   useEffect(() => {
@@ -331,7 +329,8 @@ export function ArtworkLibraryPanel() {
       }
     >
       {/* Portalled to the body, so it opens above the shell rather than inside this column. */}
-      {lightbox.node}
+      {/* NO LIGHTBOX. Nothing opens one here any more — hovering a card shows the
+          picture at judging size, which is what the modal was for. */}
 
       {state === "ok" && rows && rows.length > 0 && (
         /* A COUNT, NOT A SENTENCE. It is a fact about the list and it is the thing that
@@ -460,32 +459,39 @@ export function ArtworkLibraryPanel() {
                   * a press meant for the card under it. Hidden from assistive tech too — it
                   * is the same image, larger, and the button already names it.
                   */}
+                {/**
+                  * THE PICTURE IS THE IDENTIFICATION; everything beside it is confirmation.
+                  *
+                  * BIGGER, AND IT ANSWERS ON HOVER (owner, 2026-09-23: "make the images here
+                  * bigger and hover to see a bigger image next to it, no need to click to
+                  * zoom" — then, when the press was kept anyway: "no need to enable clicking
+                  * to zoom in"). 56px was enough to tell one design from another and not
+                  * enough to CHECK one, so every judgement on the tab whose job is judging
+                  * artwork cost a click and a dismissal. 80px reads at a glance and resting
+                  * on it puts a 224px copy beside the card.
+                  *
+                  * NO LIGHTBOX. The press is gone, not disabled — a control that opens a
+                  * modal for something hovering already shows is a second way to the same
+                  * place, and the modal was the slow one.
+                  *
+                  * THE CLASS LIST IS ONE LINE, and that is load-bearing rather than style.
+                  * Split across two it still reads correctly at runtime, but Tailwind scans
+                  * SOURCE text for candidates and the wrapped copy is the version that did
+                  * not work. Every other named-group hover in this app (artwork-panel.tsx,
+                  * group/thumb) is written on one line; this now matches it exactly.
+                  *
+                  * `pointer-events-none` so the panel can never swallow a press meant for the
+                  * card under it, and `aria-hidden` because it is the same image at another
+                  * size with the name already on the card.
+                  */}
                 <div className="group/art relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => lightbox.open(d.thumb, d.name ?? undefined)}
-                    className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                    title={tl("artwork", "Open full size")}
-                  >
-                    <Thumb src={d.thumb} alt="" fit="contain"
-                      className="size-20 rounded-md border border-border bg-muted p-1"
-                      icon={<PenNib size={22} weight="duotone" className="text-muted-foreground/40" />} />
-                  </button>
-                  {/* ONLY WHERE THERE IS A PICTURE. A machine file has no preview, and a
-                      panel opening on an empty tile would promise one that never arrives. */}
+                  <Thumb src={d.thumb} alt={d.name ?? ""} fit="contain"
+                    className="size-20 rounded-md border border-border bg-muted p-1"
+                    icon={<PenNib size={22} weight="duotone" className="text-muted-foreground/40" />} />
+                  {/* ONLY WHERE THERE IS A PICTURE. A machine file has no preview, and a panel
+                      opening on an empty tile would promise one that never arrives. */}
                   {d.thumb && (
-                    <div
-                      aria-hidden
-                      /* SIZED TO STAY INSIDE ITS OWN CARD. Beside the thumb, as asked — but a
-                         256px panel hanging off `left-full` would run past the viewport on
-                         every card in the last grid column, and the grid is four wide at 2xl.
-                         224px starting a little under 6rem in still ends within the narrowest
-                         card, so it overlays this card's own text and never the page edge.
-                         Overlaying the text is the point: the picture is what you came to
-                         judge, and the name is still on the card behind it. */
-                      className="pointer-events-none absolute left-full top-0 z-30 ml-2 hidden rounded-xl border border-border
-                                 bg-card p-2 shadow-lg group-hover/art:block"
-                    >
+                    <div aria-hidden className="pointer-events-none absolute left-full top-0 z-30 ml-2 hidden rounded-xl border border-border bg-card p-2 shadow-lg group-hover/art:block">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={d.thumb} alt="" className="size-56 rounded-md bg-muted object-contain" />
                     </div>
