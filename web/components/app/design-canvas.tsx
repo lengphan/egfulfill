@@ -3982,16 +3982,10 @@ return (
                * which reads as a question rather than as an answer.
                */
               placeholder={lineMethod || tl("canvas", "Method")}
-              /* NO CLEAR ROW (owner, 2026-09-21). "Same as the line" was there so a placement
-                 could go back to inheriting — a real state (order_designs.method null) and one
-                 nobody was looking for in a list of techniques. Picking a technique is the only
-                 thing this control is opened to do, and the row sat above the two options as a
-                 third thing to read past every time.
-
-                 A placement already showing the line's method as its placeholder still reads
-                 correctly; it simply cannot be returned to that state from here, which is what
-                 was asked for. */
-              clearable={false}
+              /* A CLEAR ROW AGAIN (owner, 2026-09-24, reversing 2026-09-21): a wrong pick needs
+                 a way back. "None" saves order_designs.method = null, so the face inherits the
+                 line's method again, which the placeholder then shows. */
+              clearLabel={tl("canvas", "None")}
               emptyLabel={lineMethod ? `${lineMethod} (${tl("canvas", "from the line")})` : undefined}
               disabled={methodBusy}
               /* NOT compact. That is `text-2xs` — 11px, which §4 reserves for a MARK you

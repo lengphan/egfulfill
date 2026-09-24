@@ -50,8 +50,14 @@ function DropdownMenuContent({
          * carries `max-h-(--available-height)` and `overflow-y-auto`, so the space below is
          * what it is given and a long list scrolls inside it — which is the behaviour the
          * clamp was written for and could never take effect while flipping won first.
+         *
+         * `side: 'none'`, NOT `'shift'`. Shift on the side axis also slides the popup
+         * VERTICALLY to fit the viewport, so a 20-colour list was pushed up over its own
+         * pill and ran the height of the page — detached from the thing you pressed. 'none'
+         * pins it under the trigger and lets the height clamp do its job; `align: 'shift'`
+         * still nudges it sideways so it never runs off the right edge.
          */
-        collisionAvoidance={{ side: 'shift' }}
+        collisionAvoidance={{ side: 'none', align: 'shift' }}
       >
         {/**
           * IT COMES OUT OF THE THING YOU PRESSED.
