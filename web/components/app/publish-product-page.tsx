@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation"
 import { CircleNotch, DotsSixVertical, Trash, Package, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle, X } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
+import { revalidateCatalog } from "@/lib/revalidate-catalog"
 import { getListingTemplates, saveListingTemplate, deleteListingTemplate,
          type ListingTemplate, type ListingTemplateData } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -1487,6 +1488,10 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  : p
           )
  await saveCatalogProducts(next)
+      /* AND DROP THE PUBLIC CATALOGUE'S CACHE — see revalidateCatalog. Appearing has the
+         same 300s lag as disappearing, and a product added and then not found on the site is
+         the same doubt as one hidden and still there. Not awaited: the save is already done. */
+ void revalidateCatalog().catch(() => {})
         } catch { /* the listing is live; a failed sku write is recoverable by republishing */ }
       }
 

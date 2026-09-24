@@ -1627,7 +1627,22 @@ export type PublicProduct = {
  * 300s matches the pages' own revalidate, so publishing reaches the marketing site on the
  * same schedule either way.
  */
-const PUBLIC_CACHE = { next: { revalidate: 300 } } as RequestInit
+/**
+ * AND A TAG, so a status change reaches the website at once (owner, 2026-09-24: "I set the
+ * status of these products to staff only and they still show in public").
+ *
+ * They were not showing through the API — /api/public/products excluded them correctly, and
+ * every gate held. What still named them was the PRE-RENDERED HTML: the fetch holds 300s and
+ * the page holds 300s, so "take this off the website" took up to ten minutes and the natural
+ * response is to set it again. Status is meant to be the single visibility switch; a switch
+ * you press twice because nothing happened is not one.
+ *
+ * The tag is what `revalidateCatalog()` purges. A TAG rather than a path because the same
+ * bytes feed more than one route — the catalogue grid and any page quoting a price — and
+ * purging by path would leave whichever one nobody named still stale.
+ */
+export const PUBLIC_PRODUCTS_TAG = "public-products"
+const PUBLIC_CACHE = { next: { revalidate: 300, tags: [PUBLIC_PRODUCTS_TAG] } } as RequestInit
 
 export function getPublicProducts() {
   /** `shipping.extra` is each ADDITIONAL unit in the same box. The first unit's fee is on

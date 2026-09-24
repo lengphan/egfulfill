@@ -23,6 +23,7 @@ import {
  getCatalogProducts, saveCatalogProducts, colorNames,
  type SsStyle, type OttoStyle, type OttoImportRow, type SanmarCatalogStyle, type CatalogProduct,
 } from "@/lib/api"
+import { revalidateCatalog } from "@/lib/revalidate-catalog"
 import { getToken, getUser } from "@/lib/auth"
 import { driveImg, prettyColor, driveMap, ssCatalogProduct, ssStockByColor, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
 import { nextEgSku, egSkuFromStyle, cleanSku } from "@/lib/sku"
@@ -413,6 +414,10 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  : { ...product, sku: nextEgSku(existing), supplierSku: product.supplierSku || (staged ? undefined : product.sku) || undefined }
  const next = existing.some((p) => p.id === withSku.id) ? existing.map((p) => (p.id === withSku.id ? withSku : p)) : [...existing, withSku]
  await saveCatalogProducts(next)
+      /* AND DROP THE PUBLIC CATALOGUE'S CACHE — see revalidateCatalog. Appearing has the
+         same 300s lag as disappearing, and a product added and then not found on the site is
+         the same doubt as one hidden and still there. Not awaited: the save is already done. */
+ void revalidateCatalog().catch(() => {})
  if (previewKey) setAdded((prev) => new Set(prev).add(previewKey))
  setPreview(null); setPreviewKey(null)
       // "Products", not "catalog". Catalog is a DIFFERENT screen — /published-catalog, the

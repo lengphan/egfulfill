@@ -11,6 +11,7 @@ import {
   getCatalogProducts, saveCatalogProducts, colorNames,
   type SsStyle, type OttoFav, type CatalogProduct,
 } from "@/lib/api"
+import { revalidateCatalog } from "@/lib/revalidate-catalog"
 import { ssCatalogProduct, ottoCatalogProduct } from "@/lib/supplier-catalog"
 import { getToken } from "@/lib/auth"
 import { nextEgSku } from "@/lib/sku"
@@ -95,6 +96,10 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
       const product: CatalogProduct = built.sku ? built : { ...built, sku: nextEgSku(existing) }
       const next = existing.some((p) => p.id === product.id) ? existing.map((p) => (p.id === product.id ? product : p)) : [...existing, product]
       await saveCatalogProducts(next)
+      /* AND DROP THE PUBLIC CATALOGUE'S CACHE — see revalidateCatalog. Appearing has the
+         same 300s lag as disappearing, and a product added and then not found on the site is
+         the same doubt as one hidden and still there. Not awaited: the save is already done. */
+      void revalidateCatalog().catch(() => {})
       setAdded((prev) => new Set(prev).add(keyOf(f)))
     } catch { /* ignore */ } finally { setAddingId(null) }
   }

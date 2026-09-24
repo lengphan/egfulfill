@@ -18,6 +18,7 @@ import { planBrandSplit } from "@/lib/brand-split"
 import { nextEgSku } from "@/lib/sku"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getCatalogProducts, saveCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { revalidateCatalog } from "@/lib/revalidate-catalog"
 import { discounted } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
@@ -214,6 +215,25 @@ export function ProductsCatalog() {
  setProducts(next)
  try {
  await saveCatalogProducts(next)
+      /**
+       * AND DROP THE PUBLIC CATALOGUE'S CACHE (owner, 2026-09-24: "I set the status of these
+       * products to staff only and they still show in public" — "drop immediately please").
+       *
+       * They were never served through the API: /api/public/products excluded them the
+       * moment the status changed, and every gate held. What went on naming them was the
+       * PRE-RENDERED page — the fetch caches 300s and the route caches 300s, so the website
+       * could lag a status change by ten minutes. Status is meant to be the one visibility
+       * switch, and a switch you press twice because nothing happened is not one.
+       *
+       * AFTER THE SAVE, NEVER BEFORE. Purging a cache for a write that then fails would
+       * throw away a warm page to publish nothing.
+       *
+       * NOT AWAITED, AND FAILURE IS SWALLOWED ON PURPOSE. The catalogue is saved by this
+       * point; making the operator watch a CDN purge, or showing them an error for one, would
+       * report a problem they neither caused nor can act on — and the 300s expiry is still
+       * underneath as the floor. This makes the common case instant, it is not the guarantee.
+       */
+ void revalidateCatalog().catch(() => {})
     } catch (e) {
  setProducts(prev)
  throw e instanceof Error ? e : new Error("Couldn't save the catalogue.")
