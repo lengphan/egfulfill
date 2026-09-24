@@ -15,6 +15,7 @@ import { q } from '../db.js';
 import { orderLabel } from '../order-label.js';
 import { egBroadcast } from '../events.js';
 import { putObject, getObject, storageEnabled } from '../storage.js';
+import { imageBytesFrom } from '../images.js';
 import { generateImage, imageConfig, priceUsd, IMAGE_MODELS, ASPECT_RATIOS, RATIO_HINTS } from '../gemini.js';
 import { readPricing, quoteFor, chargeForGeneration, refundGeneration, recordGenerationCost, effectiveSeller } from '../ai-pricing.js';
 import {
@@ -405,32 +406,82 @@ async function accountContext(sellerId) {
 }
 
 // Map the stored thread into alternating Claude messages (seller=user, others=assistant).
-/** An attachment we can hand to the model as something to LOOK at. Images only, on a
- *  public http(s) url — /api/support/asset/:name is served without auth precisely so a
- *  browser can render it, which is the same reason the API can fetch it. */
+/**
+ * WE SEND THE BYTES. WE DO NOT SEND A URL.
+ *
+ * This used to hand the model `{ source: { type: 'url', … } }` pointing at
+ * /api/support/asset/:name, on the reasoning — written down right here — that the route is
+ * "served without auth precisely so a browser can render it, which is the same reason the API
+ * can fetch it".
+ *
+ * That last step is the bug, and it is a good one: a BROWSER fetching that URL is the seller's
+ * own machine, usually a short hop from the box. The model's fetcher is somewhere else
+ * entirely, and its request has to cross Cloudflare, reach a VPS in Jakarta, have the object
+ * read back out of R2 and streamed — all inside a download timeout we do not control. When it
+ * misses, the whole reply fails with "The request timed out while trying to download the
+ * file", the thread shows "A teammate will follow up", and nothing in our logs looks wrong,
+ * because on our side nobody ever asked us for anything.
+ *
+ * `imageBytesFrom` already has a branch for exactly this path (ASSET_PATH → getObject('chat/…')),
+ * so resolving it costs us a read we are already equipped to do and costs the model no network
+ * at all. Every other vision call in this codebase — the listing writer, the photo-prompt
+ * writer — has always sent base64; this was the one that did not.
+ *
+ * THE CAP IS THEIRS, NOT OURS. 3.5MB is the per-image limit with headroom for base64
+ * expansion; a phone photo occasionally clears it and the API would refuse the whole request
+ * over one picture. An image we cannot send is SKIPPED, never fatal — one oversized photo must
+ * not cost the seller an answer about the other three.
+ */
 const VIEWABLE = /^image\/(png|jpe?g|gif|webp)$/i;
-function imageBlock(att) {
-  if (!att || typeof att !== 'object') return null;
-  const url = String(att.url || '');
-  if (!/^https?:\/\//i.test(url)) return null;
-  if (!VIEWABLE.test(String(att.mime || ''))) return null;
-  return { type: 'image', source: { type: 'url', url } };
+const MAX_IMAGE_BYTES = 3.5 * 1024 * 1024;
+
+/** Can this attachment be looked at at all? Cheap, synchronous, no I/O. */
+function viewable(att) {
+  if (!att || typeof att !== 'object') return false;
+  if (!String(att.url || '')) return false;
+  return VIEWABLE.test(String(att.mime || ''));
 }
+
+/** Resolve one attachment to an image block the API can read without fetching anything. */
+async function imageBlock(att) {
+  if (!viewable(att)) return null;
+  let img = null;
+  try { img = await imageBytesFrom(String(att.url || '')); } catch { img = null; }
+  if (!img || !img.buf || !img.buf.length) return null;
+  if (img.buf.length > MAX_IMAGE_BYTES) return null;
+  if (!VIEWABLE.test(String(img.mime || ''))) return null;
+  return { type: 'image', source: { type: 'base64', media_type: img.mime, data: img.buf.toString('base64') } };
+}
+
 /* A ceiling, because a long thread of photos is the one way this call gets expensive
    without anyone deciding to spend: the newest images are the ones being talked about. */
 const MAX_IMAGES = 8;
 
-function toMessages(rows) {
-  const out = [];
+/**
+ * The pictures, resolved ONCE, before the transcript is built.
+ *
+ * `toMessages` stays synchronous — it is walked twice per row and threading awaits through it
+ * would make the ordering logic much harder to read for no gain. So the bytes are fetched here
+ * and handed in as a map keyed by row id.
+ */
+async function resolveImages(rows) {
+  const blocks = new Map();
   /* NEWEST FIRST when deciding what still fits, so a thread with twenty photos sends the
      ones the conversation is actually about rather than the twenty oldest. */
-  const keep = new Set();
-  for (let i = rows.length - 1; i >= 0 && keep.size < MAX_IMAGES; i--) {
-    if (rows[i].sender_role === 'seller' && imageBlock(rows[i].attachment)) keep.add(rows[i].id);
+  for (let i = rows.length - 1; i >= 0 && blocks.size < MAX_IMAGES; i--) {
+    const m = rows[i];
+    if (m.sender_role !== 'seller' || !viewable(m.attachment)) continue;
+    const block = await imageBlock(m.attachment);
+    if (block) blocks.set(m.id, block);
   }
+  return blocks;
+}
+
+function toMessages(rows, images = new Map()) {
+  const out = [];
   for (const m of rows) {
     let text = String(m.body || '').trim();
-    const img = (m.sender_role === 'seller' && keep.has(m.id)) ? imageBlock(m.attachment) : null;
+    const img = (m.sender_role === 'seller') ? (images.get(m.id) || null) : null;
     /*
      * AN IMAGE WITH NO CAPTION IS STILL A MESSAGE.
      *
@@ -689,7 +740,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
           where order_id=$1
           order by created_at desc, id desc limit 20
        ) t order by t.created_at asc, t.id asc`, [threadId]);
-    const messages = toMessages(hist.rows);
+    const messages = toMessages(hist.rows, await resolveImages(hist.rows));
     if (!messages.length) return { ok: false, empty: true };
     try {
       const draft = await generateReply(key, model, sellerId, messages);
@@ -863,7 +914,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
             and not coalesce((meta->>'internal')::boolean, false)
           order by created_at desc, id desc limit 20
        ) t order by t.created_at asc, t.id asc`, [threadId]);
-    const messages = toMessages(hist.rows);
+    const messages = toMessages(hist.rows, await resolveImages(hist.rows));
     // SAY WHY. Both of these are deliberate no-ops, and both used to return a bare flag the
     // client rendered as nothing — so "the assistant declined to answer" and "the assistant is
     // broken" looked identical on screen, which is exactly how this became undiagnosable.
@@ -918,7 +969,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
           where order_id=$1 and not coalesce((meta->>'note')::boolean, false)
           order by created_at desc, id desc limit 20
        ) t order by t.created_at asc, t.id asc`, [threadId]);
-    const messages = toMessages(hist.rows);
+    const messages = toMessages(hist.rows, await resolveImages(hist.rows));
     // SAY WHY. Both of these are deliberate no-ops, and both used to return a bare flag the
     // client rendered as nothing — so "the assistant declined to answer" and "the assistant is
     // broken" looked identical on screen, which is exactly how this became undiagnosable.
