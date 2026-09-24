@@ -304,7 +304,25 @@ export function ApiPlayground() {
 
         {/* Request / response */}
         <div className="space-y-4">
-          <SectionCard title={tl("apiEndpoint", selected.title)}>
+          {/* THE WAY BACK TO THE REFERENCE.
+              A docs card has always linked IN here (`/developers?endpoint=<id>`, through
+              login); nothing linked out, so the two halves of one document behaved like
+              two products and `help.ts` sent "Read the API docs" to this page — which is
+              the one behind a login. Same id on both ends, so the anchor cannot drift
+              from the endpoint it names. A plain <a>: /docs is the marketing shell with
+              its own layout and palette, and a hard navigation is the honest crossing. */}
+          <SectionCard
+ title={tl("apiEndpoint", selected.title)}
+ actions={
+              <a
+ href={`/docs#${selected.id}`}
+ className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <BookOpen size={14} weight="regular" />
+                {tl("apiPlayground", "Reference")}
+              </a>
+            }
+          >
             <div className="space-y-4 p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className={"rounded px-2 py-1 font-mono text-xs font-bold " + toneFor(selected.method)}>{selected.method}</span>

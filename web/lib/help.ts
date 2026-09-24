@@ -326,7 +326,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     body: [
       { type: "p", text: "The REST API lets you create and manage orders programmatically. Requests authenticate with an API key you generate in Settings, sent as a bearer token." },
     ],
-    action: { label: "Read the API docs", href: "/developers" },
+    action: { label: "Read the API docs", href: "/docs" },
   },
   {
     slug: "create-orders-api", category: "api",
@@ -335,7 +335,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     body: [
       { type: "p", text: "Post an order with its items, variant, quantity, and shipping address and it enters the same fulfillment flow as an order placed in the app." },
     ],
-    action: { label: "See order endpoints", href: "/developers" },
+    action: { label: "See order endpoints", href: "/docs#create-order" },
   },
   {
     slug: "playground", category: "api",
@@ -353,7 +353,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     body: [
       { type: "p", text: "Generate API keys in Settings. Keep them secret; if one is exposed, revoke it there and generate a new one — revoked keys stop working immediately." },
     ],
-    action: { label: "Manage API keys", href: "/settings" },
+    action: { label: "Manage API keys", href: "/settings?tab=keys" },
   },
   {
     slug: "rate-limits", category: "api",
@@ -362,7 +362,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     body: [
       { type: "p", text: "The API returns standard HTTP status codes — 2xx on success, 4xx for a bad request or auth problem, 5xx if something breaks on our side. Back off and retry on throttling or transient errors." },
     ],
-    action: { label: "Read the API docs", href: "/developers" },
+    action: { label: "Read the API docs", href: "/docs#limits" },
   },
 ]
 

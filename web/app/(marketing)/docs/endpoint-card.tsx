@@ -91,13 +91,20 @@ function CopyButton({ text, label, onAccent }: { text: string; label: string; on
 /**
  * One endpoint: runnable in three languages, copyable, and one click from the live
  * playground where the same call can actually be sent with a real key.
+ *
+ * THE CARD IS AN ANCHOR. `id` is the endpoint's own id, so `/docs#create-order`
+ * addresses this card — which is the half of the contract that was missing. The link
+ * OUT of here (to `/developers?endpoint=<id>`, below) has always worked; nothing could
+ * link back IN, so the playground had no way to say "read the reference for this call"
+ * and the two pages stayed separate products. `scroll-mt-24` clears the sticky header,
+ * the same offset the section headings use.
  */
 export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
  const [lang, setLang] = useState<Lang>("curl")
  const code = snippet(e, lang)
 
  return (
-    <div className="rounded-lg border border-[var(--mk-hairline)] p-4 transition-colors hover:border-[var(--mk-ink)]/30">
+    <div id={e.id} className="scroll-mt-24 rounded-lg border border-[var(--mk-hairline)] p-4 transition-colors hover:border-[var(--mk-ink)]/30">
       <div className="flex flex-wrap items-center gap-2">
         <span className={
           "rounded px-1.5 py-0.5 tabular-nums text-[11px] font-semibold " +
