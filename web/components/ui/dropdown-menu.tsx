@@ -60,6 +60,12 @@ function DropdownMenuContent({
         collisionAvoidance={{ side: 'none', align: 'shift' }}
       >
         {/**
+          * A CONTAINED HEIGHT (owner, 2026-09-24: "why don't we have a contained size?").
+          * --available-height alone let a 20-colour or 30-blank list fill the whole screen.
+          * 22rem is about ten rows, enough to scan; the rest scroll inside the menu. Shorter
+          * menus are unaffected, and near the bottom of the screen the space left still wins.
+          */}
+        {/**
           * IT COMES OUT OF THE THING YOU PRESSED.
           *
           * origin-(--transform-origin) was already anchored to the trigger by Base UI, but
@@ -77,7 +83,7 @@ function DropdownMenuContent({
           */}
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
-          className={cn("z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-2xl bg-popover p-1 text-popover-foreground  ring-1 ring-foreground/5 duration-[180ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:duration-0 data-closed:duration-100 data-closed:ease-out outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-90 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+          className={cn("z-50 max-h-[min(var(--available-height),22rem)] w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-2xl bg-popover p-1 text-popover-foreground  ring-1 ring-foreground/5 duration-[180ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:duration-0 data-closed:duration-100 data-closed:ease-out outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-90 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95", className )}
           {...props}
         />
       </MenuPrimitive.Positioner>
