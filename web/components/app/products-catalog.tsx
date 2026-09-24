@@ -118,6 +118,7 @@ const publicStateOf = (p: CatalogProduct): PublicState => {
 
 import { sizesOf } from "@/lib/variant-resolve"
 import { framingStyle } from "@/lib/product-framing"
+import { swatchChipStyle } from "@/lib/color-swatch"
 import { FilterMenu } from "@/components/app/filter-menu"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -127,14 +128,6 @@ const imageOf = (p: CatalogProduct) =>
 
 export const colorsOf = (p: CatalogProduct) => (p.colorImages ? Object.keys(p.colorImages) : [])
 
-// Common garment/thread colour names → a swatch hex (best-effort; unknown = neutral).
-const SWATCH: Record<string, string> = {
- black: "#191918", white: "#f4f2ef", navy: "#25314d", "sport grey": "#b7b7b3",
- grey: "#9ca3af", gray: "#9ca3af", heather: "#b9b6b0", sand: "#d8cbb4", natural: "#e8e0cf",
- maroon: "#6d2233", red: "#c0392b", royal: "#2f4bf0", blue: "#3457d5", green: "#3f7d4e",
- forest: "#2f5540", pink: "#e59bb4", khaki: "#c3b091", gold: "#d4a017", purple: "#6d4aec",
-}
-export const swatchHex = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd"
 
 // Placeholder for a product with no photo. Deliberately NEUTRAL: this used to rotate
 // through five pastel gradients, so a catalog without images rendered as a grid of
@@ -689,12 +682,15 @@ export function ProductsCatalog() {
                           <span
  key={c}
  title={c}
- className="size-4 shrink-0 rounded-full border border-black/10 bg-muted"
- style={
- img
-                                ? { backgroundImage: `url("${img}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
- : { background: swatchHex(c) }
-                            }
+                            /* swatchChipStyle is the ONE definition of this circle, shared
+                               with the product page and the design maker. This card carried
+                               a private eighteen-name map whose every miss was the same grey
+                               — a Comfort Colors run came back as six identical dots — while
+                               the shared map already knew two hundred of those names. It also
+                               settles the order: the NAME first (exact), the colourway's photo
+                               second (approximate), neutral only when we have neither. */
+ className="size-4 shrink-0 rounded-full border border-black/10 bg-muted bg-center"
+ style={swatchChipStyle(c, img)}
                           />
                         )
                       })}

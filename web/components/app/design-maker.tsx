@@ -29,7 +29,7 @@ import { layerDpi, dpiWarning, printedInches, useNaturalSizes } from "@/lib/prin
 import { designFaces, setTypeMockups, typeMockupOf, methodsOf, colorsOf, sizesOf, isEmbroidery } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { stashPublishDraft } from "@/lib/publish-draft"
-import { swatchBg } from "@/lib/color-swatch"
+import { swatchChipStyle } from "@/lib/color-swatch"
 import { methodByKey } from "@/lib/print-method"
 
 // The blank to DESIGN on. Falls back to the type's default mockup (Settings → Platform)
@@ -1042,9 +1042,18 @@ export function DesignMaker() {
                                 <button
                                   key={c} type="button" title={c} aria-pressed={onCol(c)}
                                   onClick={() => setPickColors((p) => toggle(p, cols, c))}
-                                  className={"size-5 shrink-0 rounded-full border transition-transform hover:scale-110 "
+                                  className={"size-5 shrink-0 rounded-full border bg-center transition-transform hover:scale-110 "
                                     + (onCol(c) ? "border-black/25 ring-2 ring-primary/40" : "border-black/10 opacity-30")}
-                                  style={{ background: swatchBg(c) ?? "var(--muted)" }}
+                                  /* swatchChipStyle, not swatchBg alone. `swatchBg(c) ?? muted`
+                                     had no second answer: a colourway whose NAME this app
+                                     cannot place — which is most of a supplier's range and
+                                     all of a freshly imported blank's — drew a grey circle,
+                                     and a row of identical grey circles says "no colours"
+                                     rather than "we have the garment but not the word". The
+                                     shared primitive falls through the name to the colourway's
+                                     OWN PHOTO, cropped into the circle, and reaches neutral
+                                     only when we have neither. */
+                                  style={swatchChipStyle(c, product.colorImages?.[c])}
                                 />
                               ))}
                             </div>
