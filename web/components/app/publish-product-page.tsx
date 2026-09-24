@@ -21,7 +21,7 @@ import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
 import { getSpecQuote, publishEtsy, publishTiktok, publishShopify, getTiktokCategories, getTiktokWarehouses, getPublishDestinations, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote, type TiktokCategory, type TiktokWarehouse, type EtsyWhoMade, type PublishedRecord, type PublishDestination, recordSpydeckUpload, keepListingPhoto} from "@/lib/api"
-import { readPublishDraft, clearPublishDraft, type PublishDraft, type PublishPrefill } from "@/lib/publish-draft"
+import { readPublishDraft, clearPublishDraft, savePublishWork, type PublishDraft, type PublishPrefill } from "@/lib/publish-draft"
 import { getUser } from "@/lib/auth"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -574,9 +574,14 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * Still never auto-requested: `runRewrite` is bound to a button, so no effect fires it and
    * no keystroke does.
    */
- const [aiPrev, setAiPrev] = useState<{ title: string; description: string } | null>(null)
+ const [aiPrev, setAiPrev] = useState<{ title: string; description: string; tags: string[] } | null>(null)
  const [aiBusy, setAiBusy] = useState(false)
  const [aiErr, setAiErr] = useState<string | null>(null)
+  /** WHAT IT ACTUALLY DID, in the listing's own units — photos read, tags added. Not a
+   *  description of the button: a result, printed after the fact, because "it read 3 of the
+   *  5 photos" silently changes what the copy is based on and nothing else on the page
+   *  would say so. Null until it has run. */
+ const [aiRead, setAiRead] = useState<string | null>(null)
  const [retail, setRetail] = useState("")
  const [qty, setQty] = useState("999")
  const [tags, setTags] = useState<string[]>([])
@@ -598,30 +603,6 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * Reads title, description AND tags together, because a term stripped from the title and
    * left in the tags is still on the listing.
    */
-  /**
-   * ONE CALL, ON A CLICK. Guarded on `aiBusy` so a double-press cannot bill twice, and it
-   * writes to `aiDraft` — the fields the seller is editing are never touched here.
-   */
- const runRewrite = async () => {
- if (aiBusy) return
- setAiBusy(true); setAiErr(null)
- try {
- const r = await rewriteListingCopy({
- title, description: desc,
- product: blank?.name ?? undefined,
- colors: pickedColors, sizes: pickedSizes,
- method: blank?.method ?? undefined,
-      })
- if (r.error) throw new Error(r.error)
-      // Snapshot BEFORE writing, so undo restores what the seller had rather than what the
-      // previous rewrite produced.
- setAiPrev({ title, description: desc })
- if (r.title) setTitle(r.title)
- if (r.description) setDesc(r.description)
-    } catch (e) {
- setAiErr(e instanceof Error ? e.message : "The assistant couldn't rewrite this.")
-    } finally { setAiBusy(false) }
-  }
 
  const tmHits = useMemo(
     () => detectTrademarks([title, desc, tags.join(" ")].filter(Boolean).join(" \n ")),
@@ -663,18 +644,21 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   *  and says so, and it disarms itself if they do anything else. */
  const [tmplArmed, setTmplArmed] = useState(false)
  /**
-  * THE VARIANTS A TEMPLATE ASKED FOR, HELD UNTIL THE BLANK'S OPTIONS ARRIVE.
+  * VARIANT PICKS THAT ARRIVED WITH THE BLANK, HELD UNTIL ITS OPTIONS DO.
+  *
+  * Written by a template, by a restored draft and by an edited listing's prefill — three
+  * sources, one problem: each knows which colourways it wants before the product's option
+  * lists exist, and the effect that offers "all of them" runs after they land.
   *
   * Applying a template sets the blank, and an effect below resets the picked colours and
   * sizes to EVERYTHING that blank offers whenever its option lists change — which is right
-  * for a blank somebody just chose and wrong for one a template chose, because the template
-  * carries the picks too. Setting them in `applyTemplate` loses: the reset is deferred by a
-  * timeout and lands after.
+  * for a blank somebody just chose and wrong for one that came with its picks. Setting them
+  * at the source loses: the reset is deferred by a timeout and lands after.
   *
   * A ref rather than state, for the same reason the drag index is one: it is written and
   * read inside one deferred pass, and a setState would not have landed in time.
   */
- const tmplVariantsRef = useRef<{ colors: string[]; sizes: string[] } | null>(null)
+ const wantVariantsRef = useRef<{ colors: string[]; sizes: string[] } | null>(null)
  const [tagDraft, setTagDraft] = useState("")
  const [images, setImages] = useState<string[]>([])
  /* WHICH TILE IS IN THE HAND, AND WHICH ONE IT IS OVER. Two pieces of state, not one:
@@ -684,6 +668,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
     the row will fall into is obvious, in a wrapping grid it is not. */
  const [dragImg, setDragImg] = useState<number | null>(null)
  const [overImg, setOverImg] = useState<number | null>(null)
+  /** A file from OUTSIDE the page is over the set. Separate from `overImg`, which is a tile
+   *  being reordered within it — the two drags mean different things and land differently. */
+ const [fileOver, setFileOver] = useState(false)
  /* THE INDEX IN THE HAND IS A REF, NOT THE STATE BESIDE IT — and that is not a detail.
     `dragstart` and the first `dragover` can land in the same tick, and a handler closed
     over the render BEFORE setDragImg still sees null: the guard then skips preventDefault,
@@ -706,6 +693,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   // costs more can be charged more, which is the whole reason cost varies by size.
  const [sizeRetail, setSizeRetail] = useState<Record<string, string>>({})
  const [busy, setBusy] = useState(false)
+  /** WHICH button is running, so only that one reports. Null when nothing is. */
+ const [busyMode, setBusyMode] = useState<"live" | "draft" | null>(null)
  const [result, setResult] = useState<{ ok: boolean; text: string; url?: string; note?: string } | null>(null)
   /**
    * WHERE THIS CAN GO — the seller's connected shops, from the server.
@@ -763,32 +752,114 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   // have, we keep syncing them from the prefill as the detail fills in, so the competitor
   // images actually attach instead of silently never showing up.
  const imgTouched = useRef(false)
+  /** Whether the automatic write has already happened on this visit. See `addImages`. */
+ const autoWrote = useRef(false)
 
-  // Seed once, on mount. In the dialog this ran per open; a page IS the open — it mounts
-  // with its draft and is thrown away when you leave.
+  /**
+   * SEED ONCE, ON MOUNT — from the hand-over, and from whatever the seller had already done
+   * to it.
+   *
+   * `prefill` is what the board hands over. `work` is the form as they left it, and it wins
+   * on every field it has: going back to the design and coming forward again used to arrive
+   * at a fresh form, so the photos somebody had uploaded, the words they had written and the
+   * tags they had picked were all simply gone. Nothing warned them, because as far as this
+   * page was concerned it had never been opened.
+   *
+   * THE PHOTOS ARE THE ONE MERGE, and the only one that needs an argument. You go back to
+   * the design to CHANGE it, so the mockups coming back are new and must appear. But a photo
+   * the seller deleted must stay deleted, and their own uploads must survive. `seenPrefill`
+   * is what separates the three: a prefill image this form has never been offered is new;
+   * one it has been offered and is no longer holding was thrown away on purpose.
+   *
+   * In the dialog this ran per open; a page IS the open — it mounts with its draft and is
+   * thrown away when you leave.
+   */
  useEffect(() => {
     // WAIT for the draft. Seeding from a not-yet-read prefill would fill the form with
     // blanks and set seeded, so the real values would never land.
  if (draft === undefined || seeded.current) return
  seeded.current = true
+ const work = draft?.work ?? null
  const id = setTimeout(() => {
- setTitle(prefill?.title ?? "")
- setDesc(prefill?.description ?? "")
- setRetail(prefill?.price != null ? String(prefill.price) : "")
- setTags((prefill?.tags ?? []).slice(0, MAX_TAGS))
+ setTitle(work?.title ?? prefill?.title ?? "")
+ setDesc(work?.description ?? prefill?.description ?? "")
+ setRetail(work?.price ?? (prefill?.price != null ? String(prefill.price) : ""))
+ setTags((work?.tags ?? prefill?.tags ?? []).slice(0, MAX_TAGS))
+ if (work?.sizePrices) setSizeRetail(work.sizePrices)
+ if (work) {
+        /* The set they left, plus anything the hand-over has brought since. Marking the
+           photos as touched keeps the prefill re-sync below off them — it exists for a
+           SpyDeck detail fetch landing late, and it would undo this merge wholesale. */
+ imgTouched.current = true
+ const seenBefore = work.seenPrefill ?? []
+ const held = (work.images ?? []).filter(Boolean)
+ const arrived = (prefill?.images ?? []).filter((u) => u && !seenBefore.includes(u) && !held.includes(u))
+ setImages([...arrived, ...held].slice(0, MAX_IMAGES))
+        /* A form that already carries words is not one to rewrite because a photo arrived.
+           Coming back to finished copy and adding a tenth mockup must leave it alone. */
+ if ((work.title ?? "").trim() || (work.description ?? "").trim()) autoWrote.current = true
+      } else {
  setImages((prefill?.images ?? []).filter(Boolean).slice(0, MAX_IMAGES))
+      }
  setBlank(prefill?.blank ?? null)
  setBlankText(prefill?.blank?.name ?? "")
       // Restore the variant selection. Guarded on the blank for the same reason the publish
       // call is: without one, `colors`/`sizes` are sent empty regardless, so showing ticks
       // here would promise variants that then don't ship.
- setPickedColors(prefill?.blank ? (prefill?.colors ?? []) : [])
- setPickedSizes(prefill?.blank ? (prefill?.sizes ?? []) : [])
+ const wantColors = work?.colors ?? prefill?.colors
+ const wantSizes = work?.sizes ?? prefill?.sizes
+      /* THROUGH THE SAME HOLDING REF THE TEMPLATE USES. Setting the state alone is not
+         enough and never was: the reset below runs when the blank's option lists arrive,
+         which is always after this, so a restored (or an edited listing's) selection was
+         replaced by "all of them" one frame later. */
+ if (wantColors?.length || wantSizes?.length) wantVariantsRef.current = { colors: wantColors ?? [], sizes: wantSizes ?? [] }
+ setPickedColors(prefill?.blank ? (wantColors ?? []) : [])
+ setPickedSizes(prefill?.blank ? (wantSizes ?? []) : [])
  setResult(null)
  getCatalogProducts().then((rows) => { catalogRef.current = rows ?? [] }).catch(() => {})
     }, 0)
  return () => clearTimeout(id)
   }, [draft, prefill])
+
+  /**
+   * THE FORM WRITES ITSELF BACK INTO ITS OWN DRAFT.
+   *
+   * "Back to the design" is a navigation, and this page is thrown away by it. Everything
+   * done here — the photos uploaded, the title, the description, the tags, the prices — lived
+   * only in React state, so pressing Back and coming forward again arrived at the hand-over
+   * as if the page had never been opened. The photos were the visible half of that and the
+   * reason it was reported; the words and the tags went the same way.
+   *
+   * DEBOUNCED, AND IT WRITES NOTHING BACK INTO REACT. This is a save, not a sync: no state
+   * is set here, so there is no condition its own result can re-satisfy (§2.8) and no loop to
+   * find. It is also why it is safe as an effect at all — a fetch here would not be.
+   *
+   * IT CANNOT RESURRECT A PUBLISHED DRAFT. `savePublishWork` refuses to recreate a row that
+   * has been cleared, which is what the effect below does the moment every ticked shop is
+   * done. Without that, a save landing after the clear would put the finished listing back
+   * and Back-then-forward would offer to publish it all over again.
+   *
+   * NOT UNTIL IT HAS SEEDED. Writing the empty form over real work is the one way this could
+   * cause the very loss it exists to prevent.
+   */
+ useEffect(() => {
+ if (!seeded.current || draft == null || !draftId) return
+ const id = setTimeout(() => {
+ void savePublishWork(draftId, {
+        /* COPIES, not the state arrays themselves — the same rule `onPublished` follows
+           below. Handing the live references to a function React Compiler cannot see into
+           reads as "these may be mutated later", and it answers by refusing to memoise this
+           whole component. */
+ title, description: desc, tags: [...tags], images: [...images],
+        /* Every prefill image this form has been OFFERED, not the ones it kept. That is what
+           makes a deleted photo stay deleted while a newly composed mockup still arrives. */
+ seenPrefill: Array.from(new Set([...(draft?.work?.seenPrefill ?? []), ...(prefill?.images ?? [])])),
+ price: retail, sizePrices: { ...sizeRetail },
+ colors: [...pickedColors], sizes: [...pickedSizes],
+      })
+    }, 700)
+ return () => clearTimeout(id)
+  }, [draft, draftId, prefill, title, desc, tags, images, retail, sizeRetail, pickedColors, pickedSizes])
 
   // Re-sync photos from the prefill as the async listing-detail fetch fills them in — until
   // the user edits them. Without this, competitor photos loaded after open never attach.
@@ -905,20 +976,21 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  useEffect(() => {
  const id = setTimeout(() => {
       /**
-       * A TEMPLATE'S PICKS WIN OVER "ALL OF THEM" — once, for the blank it just set.
+       * PICKS THAT CAME WITH THE BLANK WIN OVER "ALL OF THEM" — once, for that blank.
        *
        * Without this the feature looks broken in the most confusing way: the seller saves a
        * template with two colourways, applies it, and watches every colour tick itself on a
        * frame later. The blank arrives first and its options arrive with it, so this reset
        * always runs after `applyTemplate` has finished.
        *
-       * INTERSECTED, never taken whole. A template can outlive the product it names — a
-       * colourway gets dropped from the catalogue and the template still lists it — and
-       * publishing a variant the factory no longer stocks is an order nobody can make.
+       * INTERSECTED, never taken whole. A template — or a listing published months ago — can
+       * outlive the product it names: a colourway gets dropped from the catalogue and the
+       * saved picks still list it, and publishing a variant the factory no longer stocks is
+       * an order nobody can make.
        */
- const want = tmplVariantsRef.current
+ const want = wantVariantsRef.current
  if (want) {
- tmplVariantsRef.current = null
+ wantVariantsRef.current = null
  const c = colorOpts.filter((x) => want.colors.includes(x))
  const z = sizeOpts.filter((x) => want.sizes.includes(x))
         /* NOTHING IN COMMON means the template predates this blank entirely. Publishing no
@@ -998,17 +1070,148 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
     ? sizeRows.length > 0 && sizeRows.every((r) => r.price > 0)
  : retailN > 0
 
- const addTag = (raw: string) => {
- const t = cleanTag(raw)
- if (!t) return
- setTags((p) => (p.some((x) => x.toLowerCase() === t.toLowerCase()) || p.length >= MAX_TAGS ? p : [...p, t]))
+  /**
+   * A COMMA IS A TAG BREAK WHEREVER IT ARRIVES — typed, pasted, or written by the assistant.
+   *
+   * The box took one tag at a time and split only on the comma KEY, so a pasted
+   * "cafe apron, baker gift, personalized apron" fired no keydown at all: `cleanTag` then
+   * stripped the commas out of the whole string and sliced what was left at 20 characters,
+   * and thirteen tags became one called "personalized apron c". Nothing said so — the chip
+   * appeared, it just wasn't what was pasted.
+   *
+   * So the SPLIT lives here, in the one function that takes text and produces tags, rather
+   * than in a key handler that only sees one of the three ways text gets into this field.
+   * Newlines and semicolons split too: a tag list copied out of a spreadsheet or another
+   * listing arrives as rows, not as a sentence.
+   */
+ const TAG_SPLIT = /[,;\n\r\t]+/
+ const addTags = (raw: string) => {
+ const parts = raw.split(TAG_SPLIT).map(cleanTag).filter(Boolean)
+ if (parts.length) {
+ setTags((p) => {
+ const out = [...p]
+ for (const t of parts) {
+ if (out.length >= MAX_TAGS) break
+ if (out.some((x) => x.toLowerCase() === t.toLowerCase())) continue
+ out.push(t)
+        }
+ return out
+      })
+    }
  setTagDraft("")
   }
  const removeTag = (t: string) => setTags((p) => p.filter((x) => x !== t))
+
+  /**
+   * ONE CALL, ON A GESTURE — the button, or the drop that brings the photos in.
+   *
+   * IT ANSWERS ALL THREE FIELDS AT ONCE, and that is the point rather than a convenience:
+   * title, description and tags are one question ("what is this, and what would a buyer
+   * type to find it") that used to be asked in three places. Two of them were the seller's
+   * problem alone — the tag box has never had an assist at all, so a listing left with a
+   * rewritten title and thirteen tags about the words it used to say.
+   *
+   * `photos` is passed explicitly rather than read from `images`, because the drop that
+   * triggers this has not re-rendered yet: the state this closure can see is the set from
+   * BEFORE the files were read, and rewriting from it would ignore the photos that caused
+   * the call.
+   *
+   * Guarded on `aiBusy` so a double-press — or a press landing on top of the automatic run —
+   * cannot bill twice.
+   */
+ const runRewrite = async (photos?: string[]) => {
+ if (aiBusy) return
+ setAiBusy(true); setAiErr(null)
+ try {
+ const r = await rewriteListingCopy({
+ title, description: desc,
+ product: blank?.name ?? undefined,
+ colors: pickedColors, sizes: pickedSizes,
+ method: blank?.method ?? undefined,
+        /* FOUR, and the server caps at four too. Every photo is real tokens on a call
+           somebody is waiting for, and the first four say what the product is. */
+ images: (photos ?? images).filter(Boolean).slice(0, 4),
+        /* What the listing already carries, so the answer fills the empty slots instead of
+           proposing thirteen the seller has to de-duplicate by hand. */
+ tags,
+      })
+ if (r.error) throw new Error(r.error)
+      // Snapshot BEFORE writing, so undo restores what the seller had rather than what the
+      // previous rewrite produced. Tags travel with it: a rewrite that adds nine tags and an
+      // undo that puts back only the words is an undo that does not undo.
+ setAiPrev({ title, description: desc, tags: [...tags] })
+ if (r.title) setTitle(r.title)
+ if (r.description) setDesc(r.description)
+      /* ADDED, NEVER REPLACED. A tag the seller typed is a decision; the assistant fills
+         what is left, through the same cap and the same de-duplication a typed one goes
+         through — the server already cleaned them, and running them past `cleanTag` again
+         is what keeps one rule rather than two that agree today. */
+ const room = MAX_TAGS - tags.length
+ const landing: string[] = []
+ for (const raw of (r.tags ?? [])) {
+ const t = cleanTag(raw)
+ if (!t || landing.length >= room) continue
+ if (tags.some((x) => x.toLowerCase() === t.toLowerCase())) continue
+ if (landing.some((x) => x.toLowerCase() === t.toLowerCase())) continue
+ landing.push(t)
+      }
+      /* Through the same function a typed tag goes through, so there is ONE rule about what
+         a tag is — the count above is only what to SAY, never a second copy of the rule. */
+ if (landing.length) addTags(landing.join(","))
+ const addedTags = landing.length
+ const parts = [
+ r.photosRead ? `${r.photosRead} ${r.photosRead === 1 ? tl("publish", "photo read") : tl("publish", "photos read")}` : "",
+ addedTags ? `${addedTags} ${addedTags === 1 ? tl("publish", "tag added") : tl("publish", "tags added")}` : "",
+      ].filter(Boolean)
+ setAiRead(parts.length ? parts.join(" · ") : tl("publish", "Title and description rewritten"))
+    } catch (e) {
+ setAiErr(e instanceof Error ? e.message : "The assistant couldn't rewrite this.")
+    } finally { setAiBusy(false) }
+  }
+  /**
+   * THE PHOTOS ARRIVING IS THE BRIEF — so writing the listing happens here, not on a
+   * separate press afterwards.
+   *
+   * Dropping mockups in and then pressing "Rewrite with AI" were one intention split into
+   * two acts, and the second one was easy to skip: the pictures already said what the
+   * product was, and the form sat empty beside them until somebody remembered the button.
+   *
+   * THIS IS AN EVENT, NOT AN EFFECT, and that distinction is the whole safety argument (§2.8).
+   * A drop and a file-picker choice are gestures — they cannot recur on their own. An effect
+   * watching `images.length` could: the rewrite's own result changes the page, and a
+   * condition its own result can re-satisfy is the shape that took a machine down. There is
+   * deliberately no effect anywhere on this page that can reach `runRewrite`.
+   *
+   * ONCE PER VISIT (`autoWrote`). Adding a photo to a listing that is already written is not
+   * a request to rewrite it — the button is right there for that, and an automatic rewrite
+   * of copy somebody has since edited is a change nobody asked for. The first arrival is the
+   * only one that can be sure the form is still the empty one it was handed.
+   */
  const addImages = (files: FileList | null) => {
+ const list = Array.from(files ?? []).slice(0, MAX_IMAGES)
+ if (!list.length) return
  imgTouched.current = true
- for (const f of Array.from(files ?? []).slice(0, MAX_IMAGES)) {
- readImageFile(f, (url) => setImages((p) => (p.length >= MAX_IMAGES ? p : [...p, url])), (m) => setResult({ ok: false, text: m }))
+    // Every read settles exactly once — readImageFile calls back on success OR error, and
+    // the error path can fire synchronously for a wrong type. Counting both is what makes
+    // "all of them are in" a moment that actually arrives.
+ let pending = list.length
+ const got: string[] = []
+ const settle = () => {
+ if (--pending > 0 || !got.length) return
+ if (autoWrote.current || aiBusy) return
+ autoWrote.current = true
+ void runRewrite([...images, ...got])
+    }
+ for (const f of list) {
+ readImageFile(
+ f,
+        (url) => {
+ got.push(url)
+ setImages((p) => (p.length >= MAX_IMAGES ? p : [...p, url]))
+ settle()
+        },
+        (m) => { setResult({ ok: false, text: m }); settle() },
+      )
     }
   }
   // ── Listing templates: load, apply, save ──────────────────────────────────────────────
@@ -1066,7 +1269,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  imgTouched.current = true
  setImages((d.images ?? []).slice(0, MAX_IMAGES))
     /* The picks are handed to the reset effect rather than set here — see the ref's note. */
- tmplVariantsRef.current = { colors: [...(d.colors ?? [])], sizes: [...(d.sizes ?? [])] }
+ wantVariantsRef.current = { colors: [...(d.colors ?? [])], sizes: [...(d.sizes ?? [])] }
     /* THE BLANK BY SKU, THEN BY NAME — the same two-step the product picker uses, because a
        catalogue row re-saved under a new id keeps its sku, and a sku-shape mismatch must not
        silently drop the product and publish a listing with no cost behind it. */
@@ -1567,16 +1770,22 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * exists in a shop, which SpyDeck's Uploaded card does; nothing in the outcomes says so,
    * and pressing Publish there creates a DUPLICATE in the shop rather than editing anything.
    *
-   * The flag rides on the draft's SHAPE, not on its heading: a heading is a display string
-   * somebody will reword. An edit-existing draft is the one that arrives already carrying
-   * publishable images — SpyDeck's "make one like this" hands over `images: []` on purpose,
-   * because a listing built from a competitor has none of its own photos yet.
+   * IT IS A FLAG THE SOURCE SETS, and it used to be a guess about the draft's shape —
+   * "arrives carrying publishable images" meant an edit, because SpyDeck's two paths differ
+   * exactly there. Then the design maker started handing over every mockup the seller had
+   * ticked, and every brand-new design arrived carrying images: the button read "Reupload
+   * live" on listings that had never been published anywhere, which is the opposite of what
+   * this guard is for and teaches people to ignore it.
+   *
+   * A shape that means one thing in two callers means nothing in three. `alreadyListed` is
+   * set by the ONE path that opens a listing which exists in a shop, and nothing else has to
+   * arrange its payload to avoid being mistaken for it.
    *
    * The word on the button is a guard, not a block. It does not stop a deliberate second
    * send; it refuses to call it by the same name as the first.
    */
  const anyPublished = pickedDests.some((d) => outcomes[d.connection_id]?.state === "ok")
-    || (draft?.prefill?.images?.length ?? 0) > 0
+    || !!draft?.prefill?.alreadyListed
 
   /**
    * Publish to every ticked shop, one after another.
@@ -1719,7 +1928,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  return
     }
 
- setBusy(true); setResult(null)
+ setBusy(true); setBusyMode(goLive ? "live" : "draft"); setResult(null)
     // The pictures first, once — before any destination reports, so every write of the
     // record carries the same kept urls and the same thumbnail. Best-effort: a photo that
     // won't store must not stop the listing going out.
@@ -1741,7 +1950,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  : await publishToShopifyStore(d, goLive)
  setOutcomes((o) => ({ ...o, [cid]: out }))
     }
- setBusy(false)
+ setBusy(false); setBusyMode(null)
   }
 
   // The draft has served its purpose the moment every ticked shop is finished; leaving it
@@ -2002,7 +2211,35 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  are things to PICK from rather than study, and judging a shot happens in
  the studio. This keeps a nine-photo listing off the whole viewport without
  shrinking the print past recognising. */}
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2.5">
+                {/* DROP FILES ANYWHERE ON THE SET.
+                    The tiles already handle a drag, but only of each OTHER — a photo dragged
+ in from the desktop landed on a grid that had no opinion about it, so the
+ browser did its own default and navigated the page away from the listing.
+                    The two drags are told apart by `dragRef`, which is set only by a tile
+ starting its own drag: null means this came from outside. The `Files` type
+ check is the second half — a dragged selection of TEXT is also "from
+ outside" and is not a photo. */}
+                <div
+ onDragOver={(e) => {
+ if (dragRef.current !== null) return
+ if (!Array.from(e.dataTransfer.types || []).includes("Files")) return
+ e.preventDefault()
+ e.dataTransfer.dropEffect = "copy"
+ if (!fileOver) setFileOver(true)
+                  }}
+ onDragLeave={(e) => { if (e.target === e.currentTarget) setFileOver(false) }}
+ onDrop={(e) => {
+ if (dragRef.current !== null) return
+ if (!e.dataTransfer.files?.length) return
+ e.preventDefault()
+ setFileOver(false)
+ addImages(e.dataTransfer.files)
+                  }}
+ className={
+ "grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2.5 rounded-lg transition-shadow " +
+                    (fileOver ? "ring-2 ring-primary ring-offset-4 ring-offset-background" : "")
+                  }
+                >
                   {/* FIRST, ALWAYS — and a bare +.
                       It used to sit after the photos, so its position moved every time one
  was added or removed and the reference photos pushed it into the middle
@@ -2237,24 +2474,27 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder={tl("publish", "Describe the product…")} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
               </label>
 
-              {/* THE ASSIST, ON A BUTTON. Nothing here runs until it is pressed — no call on
- open, none on keystroke — because each one costs money and a wait. Pressing
- it again simply rewrites again, which is how it is actually used. */}
+              {/* THE ASSIST, ON A GESTURE. It runs when the photos land (see `addImages`) and
+ whenever this is pressed — never on open, never on a keystroke, because each
+ call costs money and a wait. Pressing it again simply writes it again, which
+ is how it is actually used.
+                  NO SENTENCE UNDER IT. What it does belongs in the label and the tooltip
+ (§4); what comes back is `aiRead`, which is a RESULT and only exists once
+ there is one to report. */}
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" onClick={runRewrite} disabled={aiBusy || (!title.trim() && !desc.trim())}
- title={tl("publish", "Rewrite the title and description in place")}>
+                <Button size="sm" variant="outline" onClick={() => void runRewrite()} disabled={aiBusy || (!title.trim() && !desc.trim() && images.length === 0)}
+ title={tl("publish", "Write the title, description and tags from the photos and what is here")}>
                   {aiBusy ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
-                  {aiBusy ? tl("publish", "Rewriting…") : aiPrev ? tl("publish", "Rewrite again") : tl("publish", "Rewrite with AI")}
+                  {aiBusy ? tl("publish", "Writing…") : aiPrev ? tl("publish", "Write again") : tl("publish", "Write with AI")}
                 </Button>
                 {aiPrev && !aiBusy && (
-                  <Button size="sm" variant="ghost" onClick={() => { setTitle(aiPrev.title); setDesc(aiPrev.description); setAiPrev(null) }}
- title={tl("publish", "Put back the title and description as they were before the last rewrite")}>
+                  <Button size="sm" variant="ghost"
+ onClick={() => { setTitle(aiPrev.title); setDesc(aiPrev.description); setTags(aiPrev.tags); setAiPrev(null); setAiRead(null) }}
+ title={tl("publish", "Put back the title, description and tags as they were before the last one")}>
                     {tl("publish", "Undo")}
                   </Button>
                 )}
-                <span className="text-2xs text-muted-foreground">
-                  {aiPrev ? tl("publish", "Applied — press again for another take, or undo.") : tl("publish", "Rewrites the title and description in place.")}
-                </span>
+                {aiRead && !aiBusy && <span className="text-xs text-muted-foreground">{aiRead}</span>}
               </div>
               {aiErr && <p className="text-xs text-destructive">{aiErr}</p>}
 
@@ -2262,12 +2502,23 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 <div className="text-sm font-medium">{tl("publish", "Tags")} <span className="text-muted-foreground">({tags.length}/{MAX_TAGS})</span></div>
                 <Input
  value={tagDraft}
- onChange={(e) => setTagDraft(e.target.value)}
+                  /* SPLIT ON THE WAY IN, not on the way out. Everything up to the last
+                     separator becomes tags immediately; what follows it stays in the box as
+                     the one you are still typing. This is the path a PASTE takes — it fires
+                     no keydown — and it is why the comma key needs no special case here. */
+ onChange={(e) => {
+ const v = e.target.value
+ if (!TAG_SPLIT.test(v)) { setTagDraft(v); return }
+ const parts = v.split(TAG_SPLIT)
+ const tail = parts.pop() ?? ""
+ addTags(parts.join(","))
+ setTagDraft(tail)
+                  }}
  onKeyDown={(e) => {
- if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagDraft) }
+ if (e.key === "Enter") { e.preventDefault(); addTags(tagDraft) }
  else if (e.key === "Backspace" && !tagDraft && tags.length) removeTag(tags[tags.length - 1])
                   }}
- onBlur={() => addTag(tagDraft)}
+ onBlur={() => addTags(tagDraft)}
  disabled={tags.length >= MAX_TAGS}
  placeholder={tags.length >= MAX_TAGS ? tl("publish", "13 tags is Etsy's maximum") : tl("publish", "Type a tag, press Enter")}
                 />
@@ -2626,13 +2877,21 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
 
               {result && !result.ok && <p className="text-sm text-destructive">{result.text}</p>}
 
-              {/* PER-SHOP RESULTS, live as the run walks the list. Shown here and not in a
- banner because partial success has no single sentence: two drafts and one
- refusal is three facts, and folding them into one would have to pick which
- to tell you. */}
-              {pickedDests.some((d) => outcomes[d.connection_id]) && (
+              {/* WHAT WENT WRONG — and ONLY that.
+                  This was a card per ticked shop, live from the first press: three rows that
+ said "Publishing…" under three rows that already said which shops were
+ ticked, then the same three saying "Draft listing created" a moment before
+ the success screen says it again properly. Progress belongs in the control
+ you pressed — the button says "Publishing…" now — and a run that finishes
+ has its own screen.
+                  A REFUSAL STILL SPEAKS, because nothing else on the page would say which
+ shop it was: the form stays put when a shop fails, and a silent return to an
+ unchanged form is indistinguishable from a button that does nothing. Only
+ the shops that failed, and only once the run is over. */}
+              {!busy && anyFailed && (
                 <div className="divide-y divide-border/60 rounded-lg border border-border bg-muted/30 px-3 py-1">
-                  {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
+                  {pickedDests.filter((d) => outcomes[d.connection_id]?.state === "fail")
+                    .map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} />)}
                 </div>
               )}
 
@@ -2679,7 +2938,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               <div className="flex flex-col-reverse gap-2 @sm:flex-row @sm:flex-wrap @sm:justify-end">
                 <Button variant="ghost" onClick={leave}>{tl("publish", "Cancel")}</Button>
                 <Button variant="outline" onClick={() => publish(false)} disabled={busy || !dests?.length}>
-                  {tl("publish", "Save as draft")}
+                  {busy && busyMode === "draft" && <CircleNotch size={15} className="animate-spin" />}
+                  {busy && busyMode === "draft" ? tl("publish", "Saving…") : tl("publish", "Save as draft")}
                 </Button>
                 <Button
  onClick={() => publish(true)}
@@ -2694,8 +2954,14 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     ? tl("publish", "Etsy activates after the photos upload — if it refuses, the listing stays a draft and we’ll say why.")
  : undefined}
                 >
-                  {busy && <CircleNotch size={15} className="animate-spin" />}
-                  {anyFailed ? tl("publish", "Retry live") : anyPublished ? tl("publish", "Reupload live") : tl("publish", "Publish live")}
+                  {busy && busyMode === "live" && <CircleNotch size={15} className="animate-spin" />}
+                  {/* THE RUN IS REPORTED ON THE BUTTON THAT STARTED IT. Which one is working
+                      matters: both are disabled while either runs, and a spinner on both
+                      says "something is happening" without saying what was sent. */}
+                  {busy && busyMode === "live" ? tl("publish", "Publishing…")
+ : anyFailed ? tl("publish", "Retry live")
+ : anyPublished ? tl("publish", "Reupload live")
+ : tl("publish", "Publish live")}
                 </Button>
               </div>
               </div>

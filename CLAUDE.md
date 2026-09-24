@@ -748,6 +748,37 @@ documented endpoint *and* that `orders` stays empty, EXECUTES every path in
 `api-endpoints.ts`, and asserts the retired surfaces stay retired. Run it after touching any
 `/api/v1/*` route or that array.
 
+### A LISTING IS WRITTEN FOR SEARCH (2026-09-24)
+
+**Every surface that writes listing copy writes it SEO-shaped. This is a rule, not a
+preference** — a listing nobody can find is a listing that was not published. It applies to
+`/api/publish/rewrite` and to anything that ever joins it.
+
+- **One call answers title, description AND tags.** They were three questions with three
+  answers and the seller was the only thing joining them up, which is how a listing ends up
+  titled "retro sunset tee" with thirteen tags about a "comfort colors shirt". Decide the
+  PRIMARY PHRASE — the two-to-four words a buyer types to find this exact thing — and build
+  all three around it.
+- **The title opens with that phrase, inside the first 40 characters.** That is all a buyer
+  sees in a search result. Variations after it, separated by `|`, ≤130 characters, no word
+  more than twice.
+- **The description's first sentence carries the phrase**, because the first ~160 characters
+  are what a search engine shows. Then **bullets** — `• ` per line, one buyer-decision fact
+  each — then the ordering steps if the input had them. Plain text: no HTML, no markdown.
+- **Tags are long-tail search phrases, not a summary.** Etsy's own ceiling is **13 tags of 20
+  characters**, enforced in `publish.js` (`MAX_TAGS`, `MAX_TAG_LEN`, `cleanTags`) and in the
+  page (`cleanTag`) — hand-mirrored, and a change to one that misses the other publishes tags
+  nobody can see. An over-length tag is **dropped, never truncated**: "personalized christm"
+  is not a search anybody performs, and a tag matching nothing is worse than an empty slot.
+- **It reads the photos** (≤4, through the one allowlisted resolver) because the pictures are
+  the only place the ARTWORK is described — a seller arriving from the design maker has
+  mockups and an empty form. Never stuffing, never a brand it was not given, never a fact it
+  cannot see: §2.6 and the trademark scan still stand above all of this.
+- **It runs on the GESTURE that brings the photos in**, not on a press afterwards, and never
+  from an effect. A drop cannot recur on its own; an effect watching `images.length` can, and
+  that is §2.8 exactly. Once per visit — adding a photo to a listing that is already written
+  is not a request to rewrite it.
+
 ### Auth
 Sign-in accepts an **email or a username**. Usernames exclude `@`, which is what keeps
 the namespaces from overlapping — the identifier's shape decides which column is matched,

@@ -996,6 +996,11 @@ export function SpyDeckView() {
  designUrl: sub?.design_data || l.l.product?.design_data || undefined,
  designPos: sub?.design_pos ?? l.l.product?.design_pos ?? undefined,
  designId: sub?.design_id ?? l.l.product?.design_id ?? undefined,
+          /* THIS ONE EXISTS IN A SHOP. The publish page says "Reupload" rather than
+             "Publish" because a second send creates a DUPLICATE there, not an edit — and it
+             used to work that out from the payload's shape ("it came with images"), which
+             started calling every new design from the maker an edit. */
+ alreadyListed: true,
         },
  source: l.l,
  returnTo: "/spydeck",

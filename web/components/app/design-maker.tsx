@@ -28,7 +28,7 @@ import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { layerDpi, dpiWarning, printedInches, useNaturalSizes } from "@/lib/print-quality"
 import { designFaces, setTypeMockups, typeMockupOf, methodsOf, colorsOf, sizesOf, isEmbroidery } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
-import { stashPublishDraft } from "@/lib/publish-draft"
+import { stashPublishDraft, newPublishDraftId } from "@/lib/publish-draft"
 import { swatchChipStyle } from "@/lib/color-swatch"
 import { methodByKey } from "@/lib/print-method"
 
@@ -207,6 +207,18 @@ export function DesignMaker() {
   const tl = useLabelT()
  const search = useSearchParams()
  const productParam = search.get("product")
+  /**
+   * THE PUBLISH DRAFT THIS PAGE CAME BACK FROM, if it did.
+   *
+   * The publish page's Back button returns here with `?d=` on it, so pressing Publish again
+   * lands on the SAME draft rather than minting a new one — which is what made going back
+   * destructive: everything the seller had added on the publish form (their own photos, the
+   * title, the description, the tags) belonged to a draft id nothing could find any more.
+   *
+   * Absent on a first visit, which is the ordinary case and needs no handling: `stashPublishDraft`
+   * mints an id when it is given none.
+   */
+ const resumeDraft = search.get("d")
  const templateParam = search.get("template")
  const [mockup, setMockup] = useState("")
   /**
@@ -759,6 +771,13 @@ export function DesignMaker() {
  const shot = await composeOnMockup(m, frontStack.images, frontStack.texts, 1200).catch(() => "")
  if (shot) shots.push(shot)
               }
+              /* THE ID FIRST, because `returnTo` has to contain it — the draft carries the
+                 path that comes back to this page, and that path is how the next press of
+                 Publish finds this same draft again. */
+ const pubId = resumeDraft || newPublishDraftId()
+ const backTo = product?.id
+                ? `/design/maker?product=${encodeURIComponent(String(product.id))}&d=${pubId}`
+ : `/design/maker?d=${pubId}`
  const id = await stashPublishDraft({
  prefill: { title: name, images: shots, blank: product, designUrl: art, designPos: artPos,
                   /* The variant axes as CHOSEN here, so publish does not ask again for a
@@ -769,12 +788,15 @@ export function DesignMaker() {
                  away the garment you had chosen and asked you to choose it again — the one
                  question you had already answered twice. The maker reads `?product=` on
                  mount, which is the same route the catalogue's own "Design this" uses.
+                 THE PUBLISH FORM survives the round trip now: the `d=` above carries the
+                 draft, so the photos, words and tags added over there are still there when
+                 you come forward again.
                  The LAYERS are still lost — they live in memory — and that is a separate
                  gap; landing on the right blank is the half that costs nothing. */
- returnTo: product?.id ? `/design/maker?product=${encodeURIComponent(String(product.id))}` : "/design/maker",
+ returnTo: backTo,
  returnLabel: "Back to the design",
  title: tl("designMaker", "Publish product"),
-              })
+              }, pubId)
  if (!id) { setPubErr("Couldn't open the publish page — this design is too large for the browser to hand over."); return }
  router.push(`/publish?d=${id}`)
   }

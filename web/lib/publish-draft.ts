@@ -33,6 +33,45 @@ export type PublishPrefill = {
   designUrl?: string
   designPos?: unknown
   designId?: string | number
+  /**
+   * THIS LISTING ALREADY EXISTS IN A SHOP — so publishing again makes a DUPLICATE, not an
+   * edit, and the button says "Reupload" rather than "Publish".
+   *
+   * A flag the source sets, because it was a guess about the payload's shape ("it arrived
+   * with publishable images, so it must be an edit") and the design maker then started
+   * handing over the seller's mockups. Every new design suddenly read as already published.
+   * Only the path that opens a listing which exists in a shop sets this.
+   */
+  alreadyListed?: boolean
+}
+
+/**
+ * THE FORM AS THE SELLER LEFT IT — everything they changed after the handover.
+ *
+ * `prefill` is what a board HANDS OVER, written once and never again. This is the other
+ * half: what the person then did to it. They are kept apart deliberately — going back to
+ * the design and returning must bring the NEW mockups in (that is why you went back) while
+ * keeping the photos, words and tags that were already there (they were never the design's
+ * to replace).
+ *
+ * `seenPrefill` is what makes that possible without either side lying. It is the prefill
+ * images this form has already been offered. An image in `seenPrefill` but not in `images`
+ * was DELETED by the seller and must not come back; a prefill image in neither is new, and
+ * belongs in the set. Without it the two rules are contradictory — "keep what they have"
+ * restores nothing new, "take what the prefill says" undeletes what they removed.
+ */
+export type PublishWork = {
+  title?: string
+  description?: string
+  tags?: string[]
+  images?: string[]
+  seenPrefill?: string[]
+  price?: string
+  sizePrices?: Record<string, string>
+  colors?: string[]
+  sizes?: string[]
+  /** When it was last written. Only for the sweep — the draft's own clock covers the rest. */
+  at?: number
 }
 
 /**
@@ -58,6 +97,8 @@ const KEY = "eg_publish_draft"
  *  state once it is its own route. */
 export type PublishDraft = {
   prefill: PublishPrefill
+  /** What the publish page has done to `prefill` since. Absent until it saves once. */
+  work?: PublishWork
   /** Where Back goes. A stored path, never history — see above. */
   returnTo: string
   /** What the Back button says, so it names the place rather than "Back". */
@@ -124,29 +165,76 @@ async function sweep(db: IDBDatabase) {
 }
 
 /**
+ * An id for a draft that does not exist yet.
+ *
+ * Needed because a caller can have to know the id BEFORE it has the draft: the design maker
+ * writes the id into its own `returnTo`, so coming back and pressing Publish again lands on
+ * the same draft rather than a new one, and that path is inside the object being stored.
+ *
+ * Deterministic-ish and collision-proof enough for a per-tab store: the clock plus a random
+ * tail. Not an identifier anything else relies on.
+ */
+export function newPublishDraftId(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+}
+
+/**
  * Stash a draft and return its id, or null if it could not be stored ANYWHERE.
  *
  * NULL IS STILL A REAL ANSWER — a blocked store, a private window that refuses IndexedDB
  * and a sessionStorage over quota all end here — and the caller says "couldn't open the
  * publish page" rather than navigating to a page that will find nothing and look broken.
+ *
+ * `id` REUSES A DRAFT the caller already owns, and that is what makes going back
+ * non-destructive. The maker hands over a fresh prefill — new artwork, new mockups — while
+ * the `work` already stored under that id (the photos, words and tags the seller added on
+ * the publish page) is carried across untouched. A new id would be a new draft, which is
+ * precisely the bug: everything on the form disappeared because it was never the same form.
  */
-export async function stashPublishDraft(draft: PublishDraft): Promise<string | null> {
+export async function stashPublishDraft(draft: PublishDraft, id = newPublishDraftId()): Promise<string | null> {
   if (typeof window === "undefined") return null
-  // Deterministic-ish and collision-proof enough for a per-tab store: the clock plus a
-  // random tail. Not an identifier anything else relies on — it lives for one navigation.
-  const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+  // The work belongs to the ID, not to this hand-over. Read it back and keep it, unless the
+  // caller is deliberately supplying its own.
+  const prior = draft.work ? null : await readPublishDraft(id)
+  const row: PublishDraft = prior?.work ? { ...draft, work: prior.work } : draft
   const db = await openDb()
   if (db) {
-    const ok = await tx(db, "readwrite", (st) => st.put({ at: Date.now(), draft }, id))
+    const ok = await tx(db, "readwrite", (st) => st.put({ at: Date.now(), draft: row }, id))
     // put() resolves with the key; null means the transaction failed.
     if (ok != null) { void sweep(db).catch(() => {}); return id }
   }
   try {
-    sessionStorage.setItem(idFor(id), JSON.stringify(draft))
+    sessionStorage.setItem(idFor(id), JSON.stringify(row))
     return id
   } catch {
     return null
   }
+}
+
+/**
+ * SAVE WHAT THE SELLER HAS DONE TO THE FORM, under the draft they are working in.
+ *
+ * Called from the publish page as it is edited, debounced — see the page. Best-effort and
+ * silent: a store that refuses must not interrupt somebody typing a description, and the
+ * worst case is the form behaving exactly as it did before this existed.
+ *
+ * A MERGE ONTO THE STORED ROW, never a replacement of it: the prefill, the return path and
+ * the SpyDeck source all live in the same record and none of them are this function's to
+ * rewrite. A draft that has since been cleared (the listing published) is NOT recreated —
+ * `clearPublishDraft` deleting a row and a save putting it straight back is how a published
+ * listing comes back from the dead on the next Back press.
+ */
+export async function savePublishWork(id: string | null, work: PublishWork): Promise<void> {
+  if (!id || typeof window === "undefined") return
+  const existing = await readPublishDraft(id)
+  if (!existing) return
+  const row: PublishDraft = { ...existing, work: { ...work, at: Date.now() } }
+  const db = await openDb()
+  if (db) {
+    const ok = await tx(db, "readwrite", (st) => st.put({ at: Date.now(), draft: row }, id))
+    if (ok != null) return
+  }
+  try { sessionStorage.setItem(idFor(id), JSON.stringify(row)) } catch { /* ignore */ }
 }
 
 export async function readPublishDraft(id: string | null): Promise<PublishDraft | null> {

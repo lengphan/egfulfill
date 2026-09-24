@@ -4665,19 +4665,38 @@ export type PublishDestination = {
   dry_run: boolean
 }
 /**
- * Ask the assistant to rewrite listing copy. CALLED ON A CLICK, never from an effect —
- * every call costs money and a second of waiting, and a dialog that regenerated copy while
- * you typed would spend both on work nobody asked for.
+ * WRITE THE LISTING — title, description AND the tags, in one call.
  *
- * Returns a SUGGESTION. The caller shows it for review; it must not be written straight
- * into the fields, because the copy is the seller's voice and their legal exposure.
+ * CALLED ON A GESTURE, never from an effect: a click on the button, or the drop that puts
+ * photos on the page. Every call costs money and a second of waiting, and a page that
+ * regenerated copy while you typed would spend both on work nobody asked for. A drop cannot
+ * recur on its own, which is the whole test — an effect watching `images.length` can.
+ *
+ * `images` are the SAME source strings the publish payload carries (a data: URL from the
+ * design maker, a competitor's etsystatic URL, one of our own stored renders); the server
+ * resolves them through its one allowlisted resolver, so nothing here can aim a fetch at an
+ * arbitrary host. It reads at most four — they are what tells it what the artwork IS.
+ *
+ * `tags` is what the listing ALREADY carries, sent so the answer fills the empty slots
+ * rather than proposing thirteen the seller has to de-duplicate by hand.
+ *
+ * The result is applied in place with a one-step undo (see the publish page) — reviewing a
+ * suggestion beside the original is the same act as reading the field after it changed.
  */
 export function rewriteListingCopy(body: {
   title?: string; description?: string
   product?: string; colors?: string[]; sizes?: string[]; method?: string
+  images?: string[]; tags?: string[]
 }) {
-  return api<{ title?: string; description?: string; error?: string; disabled?: boolean }>(
-    `/api/publish/rewrite`, { method: "POST", body: JSON.stringify(body) })
+  return api<{
+    title?: string; description?: string
+    /** New tags only — already cleaned to the marketplace's 13 × 20 characters. */
+    tags?: string[]
+    /** How many of the photos were actually readable. Said on screen, because "I sent 5 and
+     *  it read 3" silently changes what the copy is based on. */
+    photosRead?: number
+    error?: string; disabled?: boolean
+  }>(`/api/publish/rewrite`, { method: "POST", body: JSON.stringify(body) })
 }
 /**
  * READ THE COMPETITOR'S PHOTOS AND WRITE A PROMPT FOR OURS.
