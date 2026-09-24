@@ -1490,8 +1490,23 @@ export function ProductEditorDialog({
     })()
   }
 
+  /**
+   * A STRAY CLICK NO LONGER THROWS THE PRODUCT AWAY (owner, 2026-09-24: "I accidentally
+   * clicked out and lost my product during creation").
+   *
+   * This is the longest form in the app — name, brand, sku, type, a size table, colours,
+   * photos, placements, prices, box dimensions — and all of it lives in component state
+   * that goes when the dialog does. An outside press dismissed it, nothing asked and
+   * nothing was kept, so a product built over several minutes was lost to a click on the
+   * page behind it.
+   *
+   * ESCAPE AND ✕ STILL CLOSE IT, deliberately. The gesture that was costing work is the
+   * ACCIDENTAL one: nobody presses Escape or aims at the close button by mistake, and a
+   * dialog with no way out but Save is its own trap. This removes only the gesture whose
+   * whole problem is how easy it is to make without meaning to.
+   */
  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
       {/* Wider than it was (2xl → 4xl) so the two-column layout below has somewhere to go.
           The dialog was ~770px and scrolled regardless; the images were the thing being
  squeezed for a width that wasn't buying anything. */}
