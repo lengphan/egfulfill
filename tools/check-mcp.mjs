@@ -186,6 +186,20 @@ const undocumented = declared.filter((t) => !documented.includes(t.path))
 check('no tool points at a route the public docs do not document (§6)',
   undocumented.length === 0, undocumented.map((u) => `${u.tool} -> ${u.path}`).join(', '))
 
+/* THE TWO LISTS ARE ONE LIST, and this is the assertion that makes that true rather than
+   merely intended. api-endpoints.ts marks each MCP-reachable entry with `mcp: { tool }`,
+   the Connect MCP table on /docs renders from those marks, and mcp.js registers from its
+   own table. Equal sets or the page describes a tool nobody is offered — or worse, an
+   assistant is offered one the page never mentions. */
+const advertised = [...docs.matchAll(/mcp:\s*\{\s*tool:\s*"([a-z_]+)"/g)].map((m) => m[1]).sort()
+const registered = declared.map((t) => t.tool).sort()
+check('the docs table and the server register the SAME tools',
+  JSON.stringify(advertised) === JSON.stringify(registered),
+  `docs=[${advertised.join(',')}] server=[${registered.join(',')}]`)
+check('...and that is the set tools/list actually returns',
+  JSON.stringify(names) === JSON.stringify(registered),
+  `live=[${names.join(',')}] server=[${registered.join(',')}]`)
+
 console.log('\nSCOPES DECIDE WHAT IS ADVERTISED')
 const ro = await mintKey({ label: 'mcp gate products-only', scopes: ['products.read'] })
 const roTools = (await rpc(ro.key, 'tools/list')).body?.result?.tools || []

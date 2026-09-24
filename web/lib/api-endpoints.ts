@@ -19,6 +19,21 @@ export type ApiEndpoint = {
    *  docs so an integrator can write their parsing before holding a key — guessing the
    *  shape from prose is where wrong field names come from. */
   response?: string
+  /**
+   * The MCP tool that reaches this route, if one does.
+   *
+   * ONE LIST, TWO SURFACES. server/src/routes/mcp.js registers a tool per entry marked
+   * here, and the Connect MCP section on /docs renders its table from the same marks —
+   * so the tools a seller reads about and the tools their assistant is offered cannot
+   * disagree. tools/check-mcp.mjs asserts the two sets are equal, which is what stops a
+   * tool appearing that nothing documents (§6: this list is the promise).
+   *
+   * Absent means no tool, and that is a decision each time: webhooks are integration
+   * plumbing rather than something to ask an assistant for, and the routes that WRITE
+   * wait for Idempotency-Key, because an agent retries and a retried create is a second
+   * garment.
+   */
+  mcp?: { tool: string; readOnly: boolean }
 }
 
 export const API_ENDPOINTS: ApiEndpoint[] = [
@@ -51,6 +66,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     method: "GET",
     path: "/api/v1/products",
     title: "List products",
+    mcp: { tool: "list_products", readOnly: true },
     description: "The blanks you can print on — your real catalogue, in both test and live mode. Order lines must match a sku from here or the order is refused.",
   },
   {
@@ -106,6 +122,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     method: "POST",
     path: "/api/v1/orders/quote",
     title: "Quote an order",
+    mcp: { tool: "quote_order", readOnly: true },
     description: "What a basket costs, before there is an order. Same items array as Create order; the shipping address is not needed. It runs the SAME pricing the charge runs — the per-size cost ladder, the print-method surcharge, the dearest line setting postage, the extra-item rate and your own discount — so the figure here is the figure you are billed. Shipping is our fulfilment charge for the basket, not a live carrier rate. Nothing is created and nothing is charged.",
     body: JSON.stringify(
       { items: [{ product_id: "16468", quantity: 2, color: "Black", size: "L", method: "DTG" }] },
@@ -142,6 +159,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     method: "GET",
     path: "/api/v1/orders/:id",
     title: "Retrieve order",
+    mcp: { tool: "get_order", readOnly: true },
     description: "Looks up an order by id. A test key resolves ANY well-formed id to a simulated order with the same fields live returns — `total` comes back null there, because the id matches no real order. A cancelled order also carries `reason`, `rejected_by` and `rejected_at`, so a refusal is readable here even if the webhook never arrived.",
     param: { name: "id", placeholder: "ord_test123" },
   },
@@ -167,6 +185,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     method: "GET",
     path: "/api/v1/stock",
     title: "Check stock",
+    mcp: { tool: "check_stock", readOnly: true },
     description:
       "What we can make right now. Returns available quantity per blank sku plus a status band (in_stock / low / out_of_stock). Pass ?sku= to check one. Available is on-hand minus already committed; stock is held per BLANK, so a print-method suffix (-EMB, -DTG, …) is stripped before matching.",
   },
@@ -182,6 +201,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     method: "GET",
     path: "/api/v1/balance",
     title: "Account balance",
+    mcp: { tool: "get_balance", readOnly: true },
     description: "What is currently on account. Negative means charges exceed funds. Needs the billing.read scope.",
   },
   {

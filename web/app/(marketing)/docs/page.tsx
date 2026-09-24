@@ -29,6 +29,11 @@ const BASE = "https://api.egful.store"
 const SECTIONS: [string, string][] = [
   ["auth", "Authentication"],
   ["limits", "Rate limits"],
+  /* AFTER Authentication and Rate limits, never before: the connect command IS the API
+     key, so a reader who has not met keys yet cannot act on it. And not first — most
+     people arriving here are writing code, and burying Endpoints under a section they do
+     not want is how a reference stops being one. */
+  ["mcp", "Connect MCP"],
   ["endpoints", "Endpoints"],
   ["billing", "Billing"],
   ["webhooks", "Webhooks"],
@@ -52,6 +57,16 @@ const SCOPES: { name: string; allows: string }[] = [
   { name: "webhooks.write", allows: "Add, remove and test endpoints." },
   { name: "billing.read", allows: "Read your account balance." },
 ]
+
+/**
+ * The MCP tools, DERIVED from the endpoint list rather than typed out here.
+ *
+ * server/src/routes/mcp.js registers a tool per marked entry and this table renders from
+ * the same marks, so what a seller reads and what their assistant is offered cannot
+ * disagree — tools/check-mcp.mjs asserts the two sets are equal. A hand-written table here
+ * would be a third opinion, and the first one to go stale.
+ */
+const MCP_TOOLS = API_ENDPOINTS.filter((e) => e.mcp)
 
 const LIMITS: { scope: string; limit: string }[] = [
   { scope: "All endpoints", limit: "600 requests / minute / key" },
@@ -168,6 +183,97 @@ export default function DocsPage() {
             <Code>X-RateLimit-Reset</Code> (seconds until the window rolls) — so you can slow down before
             you are cut off rather than after. Exceeding a limit returns <Code>429</Code> with
             <Code>Retry-After</Code>.
+          </p>
+        </Section>
+
+        {/* CONNECT MCP — the same API, reached by an assistant instead of by code.
+            A STEPPER, because this is a thing you DO in order, and a numbered rail is the
+            one place numbering encodes something true rather than decorating. Three steps
+            and no more: there is no plugin to install and nothing to authorise, so the
+            usual middle and end of a connect flow are simply absent here and inventing
+            them would be theatre. */}
+        <Section id="mcp" title="Connect MCP">
+          <p className="text-[var(--mk-auth-muted)]">
+            Give an AI assistant your API key and it can answer questions about your orders,
+            price a basket and check stock — through the same endpoints documented below, as you,
+            with the same scopes and the same limits.
+          </p>
+
+          <ol className="space-y-6">
+            <li className="border-l border-[var(--mk-hairline)] pl-5">
+              <h3 className="font-medium">1 · Create a read-only key</h3>
+              <p className="mt-1 text-[var(--mk-auth-muted)]">
+                In the app, Settings → API keys → <strong>Read only</strong>. It is shown once, so copy
+                it then. Start on a <Code>egk_test_…</Code> key: it prices and validates exactly as live
+                and creates nothing.
+              </p>
+            </li>
+
+            <li className="border-l border-[var(--mk-hairline)] pl-5">
+              <h3 className="font-medium">2 · Point your tool at the server</h3>
+              <p className="mt-1 text-[var(--mk-auth-muted)]">In Claude Code:</p>
+              <div className="mt-2">
+                <Block>{`claude mcp add --transport http egful \\
+  ${BASE}/api/mcp \\
+  --header "X-API-Key: egk_test_..."`}</Block>
+              </div>
+              <p className="mt-2 text-[var(--mk-auth-muted)]">
+                Any other client: it is a Streamable HTTP MCP server at{" "}
+                <Code>{BASE}/api/mcp</Code>, authenticated with the same{" "}
+                <Code>X-API-Key</Code> header the REST API takes.
+              </p>
+            </li>
+
+            <li className="border-l border-[var(--mk-hairline)] pl-5">
+              <h3 className="font-medium">3 · Ask it something</h3>
+              <p className="mt-1 text-[var(--mk-auth-muted)]">
+                <em>“Which of my orders haven’t shipped yet?”</em> or{" "}
+                <em>“What would 40 black tees in L cost?”</em>
+              </p>
+            </li>
+          </ol>
+
+          <h3 className="pt-2 font-medium">What it can do</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-[var(--mk-hairline)] text-left text-[var(--mk-auth-muted)]">
+                <th className="py-2 font-medium">Tool</th>
+                <th className="py-2 font-medium">Does</th>
+                <th className="py-2 font-medium">Endpoint</th>
+              </tr></thead>
+              <tbody>
+                {/* BASELINE, NOT TOP — and one size for all three cells.
+                    A tool name and an endpoint path are both things you TYPE somewhere, so
+                    neither may be smaller than the prose describing it (§4: a value is at
+                    least text-sm; a label may be smaller, and none of these is a label).
+                    Setting the tool name at text-xs beside a text-sm description also put
+                    their baselines 3px apart under align-top, which is the crooked column
+                    §4 warns about — fixed once on the row rather than per cell. */}
+                {MCP_TOOLS.map((e) => (
+                  <tr key={e.id} className="border-b border-[var(--mk-hairline)] align-baseline">
+                    <td className="py-2 pr-4 font-medium">{e.mcp!.tool}</td>
+                    <td className="py-2 pr-4 text-[var(--mk-auth-muted)]">{e.title}</td>
+                    <td className="py-2">
+                      <a href={`#${e.id}`} className="underline decoration-[var(--mk-hairline)] underline-offset-2 hover:decoration-[var(--mk-ink)]">{e.path}</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* WHAT IT CANNOT DO, said plainly rather than left to be discovered. A seller
+              who expects an assistant to place orders and finds it cannot has been misled
+              by silence; §4 forbids an absence that reads the same as a fault. */}
+          <p className="text-[var(--mk-auth-muted)]">
+            <strong>Every tool is read-only.</strong> An assistant can look things up and price
+            work; it cannot place or cancel an order. That is deliberate — an AI agent retries a
+            failed call, and a retried order is a second garment printed and a second charge taken.
+            Ordering arrives once a retry is provably safe.
+          </p>
+          <p className="text-sm text-[var(--mk-auth-muted)]">
+            A key limited to <Code>products.read</Code> is offered only the product tools. Nothing
+            appears that your key would be refused.
           </p>
         </Section>
 
