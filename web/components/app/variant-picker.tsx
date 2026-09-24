@@ -180,7 +180,10 @@ function FaceMethodDisclosure({ faces, value, lineMethod, options, disabled, onP
                  notice by comparison; the words are the fact, and they are what stops the
                  panel reading as six faces all set to DTG. */
               placeholder={lineMethod ? `${lineMethod} ${tl("variantPicker", "from the line")}` : tl("variantPicker", "Method")}
-              clearable={false}
+              /* A WAY BACK (owner, 2026-09-24: "what if I choose wrong — how can I unselect?").
+                 Without a clear row a face, once set, could only be moved to another technique,
+                 never returned to inheriting the line. "None" saves method: null. */
+              clearLabel={tl("variantPicker", "None")}
               emptyLabel={lineMethod ? `${lineMethod} (${tl("variantPicker", "from the line")})` : undefined}
               disabled={disabled}
               onChange={(v) => onPick(sd, v)}
