@@ -237,10 +237,21 @@ function ttCleanText(s, max) {
  * put the raw string into body_html, this one split on blank lines a scraped description does
  * not contain, and Etsy passed it straight through.
  */
-function ttDescriptionHtml(text, fallback) {
+export function ttDescriptionHtml(text, fallback) {
+  /* THE NEWLINE IS NOT A CONTROL CHARACTER HERE, it is the structure.
+     `[\x00-\x1f]` contains \n (\x0a) and \r (\x0d), so this cleaned every line break to a
+     space BEFORE the shared parser ran — and the parser reads line-start markers to find
+     the seller's bullets. TikTok therefore kept publishing the one-paragraph wall after
+     Etsy and Shopify had stopped: the fix was in the parser, and this line undid it on one
+     channel only, which is the hardest kind of half-fix to notice.
+     No raw newline reaches TikTok regardless — descriptionHtml turns them into <p>/<ul> — so
+     keeping them costs nothing against the validation this strip exists for (12052931/932).
+     Exported so tools/check-listing-description.mjs can execute the real thing rather than
+     keep a copy of this pipeline that agrees with it only on the day it is written. */
   const clean = String(text || '')
     .replace(/&[a-z]+;|&#\d+;/gi, ' ')
-    .replace(/[\x00-\x1f\x7f]/g, ' ')
+    .replace(/\r\n?/g, '\n')                      // CRLF/CR -> LF, before the strip below
+    .replace(/[\x00-\x09\x0b-\x1f\x7f]/g, ' ')   // control chars EXCEPT the newline
     .replace(/<[^>]*>/g, ' ')                     // drop whole source HTML tags, not just <>
     .replace(/[<>]/g, ' ')                        // and any stray angle brackets
     .replace(/&/g, ' and ');                      // no bare ampersands -> no entities

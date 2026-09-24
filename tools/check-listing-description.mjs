@@ -16,6 +16,7 @@
 import {
   descriptionBlocks, descriptionText, descriptionHtml,
 } from '../server/src/listing-description.js'
+import { ttDescriptionHtml } from '../server/src/routes/tiktok.js'
 
 let failures = 0
 const shape = (t) => descriptionBlocks(t).map((b) => (b.type === 'ul' ? `UL${b.items.length}` : 'P')).join(' ')
@@ -54,6 +55,17 @@ check('numbered lines still become a list', shape('Read first.\n1- Check photos\
 check('prose after a list is not swallowed',
   shape('Lead.\n- one\n- two\nShipping takes 3-5 business days and is tracked throughout.'),
   'P UL2 P')
+
+/* TIKTOK CLEANS BEFORE THE PARSER RUNS, and that is its own chance to undo all of this.
+   Its strip used to include \n, so it published the wall for a while after the other two
+   were fixed. Executed, not read: this calls the real exported function. */
+check('TikTok keeps the seller\'s bullets',
+  ttDescriptionHtml(bulletDot, 'Apron').includes('<ul><li>Full-Length'), true)
+check('TikTok still drops angle brackets',
+  /[<>]/.test(ttDescriptionHtml('Hi <script>x</script> there\n- one\n- two', 'x')
+    .replace(/<\/?(p|ul|li)>/g, '')), false)
+check('TikTok still kills entities',
+  ttDescriptionHtml('a &nbsp; b\n- one\n- two', 'x').includes('&nbsp;'), false)
 
 console.log('\nFLAT — a scraped description parses as it always did')
 
