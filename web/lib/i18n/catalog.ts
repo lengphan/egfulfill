@@ -2124,6 +2124,8 @@ const vi: Dict = {
   "product.Photos": "Hình ảnh",
   "product.Shipping": "Vận chuyển",
   "product.No sizes yet — add one above to price it.": "Chưa có kích cỡ nào — hãy thêm ở trên để đặt giá.",
+  "product.Custom size…": "Kích cỡ tùy chỉnh…",
+  "product.Add a custom size": "Thêm kích cỡ tùy chỉnh",
   "product.Base cost ($)": "Giá gốc ($)",
   "product.Product cost ($)": "Giá vốn sản phẩm ($)",
   "product.Blank ($)": "Phôi ($)",

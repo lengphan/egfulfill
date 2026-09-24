@@ -184,6 +184,12 @@ const NEW_TYPE = "__new_type__"
 const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "OS", "OSFM - Adult", "OSFM - Youth"]
 /** Seeded on a NEW product — the standard run, S through 3XL. Deletable per product. */
 const DEFAULT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"]
+/** THE SHELF A SIZE NAME KEYS TO. variantSku collapses punctuation, so "OSFM Adult" and
+ *  "OSFM - Adult" are two words for ONE stock row — offering both, or holding both, gives
+ *  that row two writers. Asked here rather than re-derived, so the chips that are OFFERED
+ *  and the sizes that are ACCEPTED can never disagree about what counts as a duplicate. */
+const sizeKey = (s: string) => variantSku("X", s)
+
 const SUGGESTED_COLORS = ["Black", "White", "Navy", "Sand", "Heather Grey", "Red", "Royal", "Forest", "Maroon", "Charcoal"]
 
 /**
@@ -272,11 +278,16 @@ type Tier = { price: string; shipping: string; cost: string; blank: string; weig
  * construction site, instead of every site needing to remember it. */
 /** The size table's columns. ONE definition, because the header row and the value rows are
  *  separate elements and a column added to one and not the other is a table that lines up
- *  until somebody scrolls. Base cost is dropped when no size still needs it. */
+ *  until somebody scrolls. Base cost is dropped when no size still needs it.
+ *
+ *  The size column is minmax, not a fixed 3rem: sizes are TYPED now, so the label is no
+ *  longer always three characters. At 3rem "One Size Fits Most" wrapped to four lines and
+ *  dragged that row to four times the height of its neighbours. It grows to content up to
+ *  7rem and wraps after that, so an S/M/L table is exactly as tight as it was. */
 const SIZE_GRID = (withBase: boolean) =>
   withBase
-    ? "grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
-    : "grid-cols-[3rem_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
+    ? "grid-cols-[minmax(3rem,7rem)_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
+    : "grid-cols-[minmax(3rem,7rem)_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
 
 const EMPTY_TIER: Tier = { price: "", shipping: "", cost: "", blank: "", weightOz: "" }
 function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
@@ -671,6 +682,7 @@ export function ProductEditorDialog({
    * the grid of 496 fields the table replaced. */
  const [stockOpen, setStockOpen] = useState<string | null>(null)
  const [colorInput, setColorInput] = useState("")
+ const [sizeInput, setSizeInput] = useState("")
  const [status, setStatus] = useState("Active")
   /**
    * WHICH PRODUCTS LEAD THE PUBLIC CATALOGUE — the Starter essentials row on the marketing
@@ -839,8 +851,28 @@ export function ProductEditorDialog({
   }, [product, colors])
  const sizeSuggestions = useMemo(() => {
  const fromProduct = product?.sizes ?? []
- return Array.from(new Set([...fromProduct, ...SUGGESTED_SIZES])).filter((s) => !sizes.includes(s))
+    /* Filtered on the stock key, the same question addSize asks. On `!sizes.includes(s)` a
+       typed "OSFM Adult" left the "OSFM - Adult" chip on screen, and pressing it did
+       nothing at all — a control that is offered must do something when pressed. */
+ const held = new Set(sizes.map(sizeKey))
+ return Array.from(new Set([...fromProduct, ...SUGGESTED_SIZES])).filter((s) => !held.has(sizeKey(s)))
   }, [product, sizes])
+
+  /**
+   * ADD A SIZE THE CHIPS DO NOT OFFER.
+   *
+   * The chip row only ever carries SUGGESTED_SIZES plus whatever the supplier sent, so a
+   * real size outside both vocabularies — "4T", "One Size Fits Most", a numeric shoe run —
+   * could not be built here at all. A typed size is kept EXACTLY as typed: a size is a
+   * label printed on a garment, not a code we normalise, and upper-casing "One Size" would
+   * put shouting on the product page. De-duplication is on the STOCK KEY (see sizeKey),
+   * not on the letters, so two spellings of one shelf cannot both be added.
+   */
+ const addSize = (sz: string) => {
+ const v = sz.trim()
+ if (v && !sizes.some((x) => sizeKey(x) === sizeKey(v))) setSizes((p) => [...p, v])
+ setSizeInput("")
+  }
 
  const addColor = (c: string) => {
  const v = c.trim()
@@ -2236,21 +2268,38 @@ export function ProductEditorDialog({
                 {/* sizeSuggestions, not the static list — it also carries sizes the
                     SUPPLIER sent (e.g. "OSFM - Adult"), which a hardcoded S–3XL list
  would make unaddable. */}
-                {sizeSuggestions.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {/* The typed field is NOT gated on there being suggestions left. Tick every
+                    chip and the row would otherwise disappear, taking the only way to add a
+                    size with it — at exactly the moment the standard run has been exhausted
+                    and a non-standard one is what you came for. */}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {sizeSuggestions.length > 0 && (<>
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> {tl("product", "Add:")}</span>
                     {sizeSuggestions.map((s) => (
                       <button
  key={s}
  type="button"
- onClick={() => setSizes((p) => [...p, s])}
+ onClick={() => addSize(s)}
  className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                       >
                         + {s}
                       </button>
                     ))}
+                  </>)}
+                  <div className="flex items-center gap-1">
+                    <Input
+ value={sizeInput}
+ onChange={(e) => setSizeInput(e.target.value)}
+ onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSize(sizeInput) } }}
+ placeholder={tl("product", "Custom size…")}
+ className="h-7 w-32 text-xs"
+ aria-label={tl("product", "Add a custom size")}
+                    />
+                    <Button type="button" size="sm" variant="outline" className="h-7 shrink-0 px-2"
+ onClick={() => addSize(sizeInput)} disabled={!sizeInput.trim()}
+ aria-label={tl("product", "Add a custom size")}><Plus size={13} weight="bold" /></Button>
                   </div>
-                )}
+                </div>
                 {sizes.length === 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">{tl("product", "No sizes yet — add one above to price it.")}</p>
                 )}
