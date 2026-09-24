@@ -2254,25 +2254,6 @@ export function ProductEditorDialog({
                 {sizes.length === 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">{tl("product", "No sizes yet — add one above to price it.")}</p>
                 )}
-                {/* STOCK IN BULK, on its own line and saying out loud what it fills.
-                    It used to sit in the rule row above, beside Base / Blank / Shipping —
-                    which made one "Apply to all" mean two different things: those three
-                    write per SIZE, this writes per VARIANT, every colourway of every size.
-                    Its own button, its own label, and the count is still the same number
-                    the cells in the Stock column hold, so nothing about the shelf moved. */}
-                {sizes.length > 0 && (
-                  <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2 border-t border-border pt-3">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">{tl("product", "Stock")}</span>
-                      <Input value={bulkStock} onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
- className="h-8 w-20 text-sm tabular-nums" inputMode="numeric" disabled={!ourSku}
- aria-label={tl("product", "Stock for every variant")}
- title={ourSku ? tl("product", "The same count on every size and colourway") : tl("product", "Give the product a SKU — stock is held against it")} />
-                    </label>
-                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulkStock}
- disabled={!bulkStock.trim() || !ourSku}>{tl("product", "Fill every variant")}</Button>
-                  </div>
-                )}
               </div>
           </div>
 
