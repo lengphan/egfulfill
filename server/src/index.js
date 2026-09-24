@@ -46,6 +46,7 @@ import { cashAccountRoutes } from './routes/cash_accounts.js';
 import { factoryListsRoutes } from './routes/factory_lists.js';
 import { teamRoutes } from './routes/team.js';
 import { sandboxRoutes, authKey, keyAllows } from './routes/sandbox.js';
+import { mcpRoutes } from './routes/mcp.js';   // POST /api/mcp — a seller's assistant, re-dispatching through the same /api/v1/* routes a partner calls
 import { webhookRoutes } from './webhooks.js';
 import { adminSecretsRoutes } from './routes/admin_secrets.js';
 import { brandingRoutes } from './routes/branding.js';
@@ -753,6 +754,7 @@ app.post('/api/auth/google', async (req, reply) => {
 });
 
 // ── Data routes ──
+mcpRoutes(app);                                         // MCP: key-authed, read-only tools; every one re-enters /api/v1/* via app.inject
 ordersRoutes(app, requireAuth);
   orderSheetsRoutes(app, requireAuth);                    // saved order sheets: drafts, and the record of what was submitted
 reportsRoutes(app, requireStaff);                       // dashboard figures computed in SQL — see the note in reports.js on the 2.3MB it replaces

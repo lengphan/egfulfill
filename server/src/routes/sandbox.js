@@ -69,10 +69,23 @@ function ensure() {
 // Resolve the presented API key → the api_keys row (or null). Accepts the key in either
 // the X-API-Key header or `Authorization: Bearer egk_…` (the global hook already tried to
 // verify() that Bearer as a JWT and got null — harmless; we re-read the raw header here).
-export async function authKey(req) {
+/**
+ * The key as PRESENTED, before it is resolved to a row.
+ *
+ * Split out of authKey because the MCP server needs the raw secret and not the row: every
+ * tool re-dispatches through `app.inject` and has to forward the caller's own credential,
+ * so the inner route re-authenticates exactly as it would for a direct call. authKey hands
+ * back the api_keys row, which deliberately holds only a hash. Three lines of header
+ * parsing copied into mcp.js would be a second opinion about what counts as a key.
+ */
+export function presentedKey(req) {
   const hdr  = (req.headers['x-api-key'] || '').toString().trim();
   const bear = (req.headers.authorization || '').match(/^Bearer\s+(egk_[A-Za-z0-9_-]+)\s*$/);
-  const key  = hdr.startsWith('egk_') ? hdr : (bear ? bear[1] : '');
+  return hdr.startsWith('egk_') ? hdr : (bear ? bear[1] : '');
+}
+
+export async function authKey(req) {
+  const key = presentedKey(req);
   if (!key) return null;
   await ensure();
   const r = await q('select * from api_keys where key_hash=$1 and revoked_at is null', [hashKey(key)]);
