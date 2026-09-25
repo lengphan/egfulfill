@@ -476,7 +476,7 @@ export function ArtworkLibraryPanel() {
                   */}
                 <div className="group/art relative shrink-0">
                   <Thumb src={d.thumb} alt={d.name ?? ""} fit="contain"
-                    className="size-20 rounded-md border border-border bg-muted p-1"
+                    className="size-20 rounded-md border border-border bg-white p-1"
                     icon={<PenNib size={22} weight="duotone" className="text-muted-foreground/40" />} />
                   {/* ONLY WHERE THERE IS A PICTURE. A machine file has no preview, and a panel
                       opening on an empty tile would promise one that never arrives. */}
@@ -487,7 +487,7 @@ export function ArtworkLibraryPanel() {
                           `img { max-width: 100% }` then resolved to 0 — a 224px-tall white
                           strip with no picture in it. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={d.thumb} alt="" className="size-56 max-w-none rounded-md bg-muted object-contain" />
+                      <img src={d.thumb} alt="" className="size-56 max-w-none rounded-md bg-white object-contain" />
                     </div>
                   )}
                 </div>
