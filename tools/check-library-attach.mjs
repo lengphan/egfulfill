@@ -206,6 +206,17 @@ console.log('history')
   for (const a of ['design_file.library_added', 'design_file.auto_attached', 'design_file.library_replaced']) {
     check(`the artwork's history records ${a}`, acts.has(a), [...acts].join(','))
   }
+  /* THE CARD'S OWN ROUTE — file events plus the orders the picture was put on, which is
+     what gives a card with no library file a history at all. */
+  const s = await call('a', 'GET', `/api/design_files/library/${H}/history`)
+  check('a seller cannot read an artwork’s history', s.status === 403, String(s.status))
+  await call('op', 'POST', '/api/orders/G-NEW/designs', { line_id: 'L-G-NEW', sku: 'SKU-G-NEW', side: 'front', data: ART, pos: { x: 1 } })
+  await new Promise((z) => setTimeout(z, 300))
+  const card = (await call('op', 'GET', `/api/design_files/library/${H}/history`)).body
+  const saves = (Array.isArray(card) ? card : []).filter((x) => x.action === 'design.saved')
+  check('the card history carries when the artwork was put on an order', saves.some((x) => x.order?.id === 'G-NEW'), JSON.stringify(card).slice(0, 200))
+  check('…once per order, not once per re-save', saves.filter((x) => x.entity_id === 'G-NEW').length === 1, String(saves.length))
+  check('…alongside the file events', (Array.isArray(card) ? card : []).some((x) => x.action === 'design_file.library_replaced'))
   const o = (await call('op', 'GET', `/api/audit/entity?entityId=G-EMB`)).body
   const rep = (Array.isArray(o) ? o : []).find((x) => x.action === 'design_file.replaced')
   check('the order’s own history carries before AND after', rep?.before?.name === 'logo.emb' && rep?.after?.name === 'logo-v2.emb', JSON.stringify(rep))

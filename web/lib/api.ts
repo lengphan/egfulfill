@@ -2198,6 +2198,12 @@ export type LibraryCopy = {
   /** Nothing stitched yet — the "Unshipped" choice swaps this one. */
   unshipped: boolean
 }
+/** An artwork's history: its library-file events plus when it was put on each order.
+ *  `order` is set on those rows so the card prints the same number the order page does. */
+export function getArtworkHistory(artHash: string) {
+  return api<(AuditRow & { order?: { id: string; ref_no?: number | string | null; seq?: number | null } })[]>(
+    `/api/design_files/library/${encodeURIComponent(artHash)}/history`)
+}
 export function getLibraryCopies(designId: string) {
   return api<{ copies: LibraryCopy[]; error?: string }>(`/api/design_files/library/file/${encodeURIComponent(designId)}/copies`)
 }

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { SearchField } from "@/components/app/search-field"
 import { FilterMenu } from "@/components/app/filter-menu"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, deleteDesignFile, getLibraryPreview, getLibraryCopies, replaceLibraryFile, getOrderHistory, type FactoryDesign, type LibraryFace, type LibraryCopy, type AuditRow } from "@/lib/api"
+import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, deleteDesignFile, getLibraryPreview, getLibraryCopies, replaceLibraryFile, getArtworkHistory, type FactoryDesign, type LibraryFace, type LibraryCopy, type AuditRow } from "@/lib/api"
 import { LibraryAttachDialog, LibraryReplaceDialog, type AttachTarget } from "@/components/app/library-file-dialogs"
 import { numOf } from "@/lib/order-format"
 import { normalizeMethods } from "@/lib/print-method"
@@ -87,7 +87,8 @@ type SwapAsk = { d: FactoryDesign; f: LibraryFileRef; file: File; data: string; 
 
 /** One line of an artwork's history, in words. Unknown actions fall back to their name
  *  rather than vanishing — a history with gaps is worse than one with a plain label. */
-function historyLine(r: AuditRow, tl: (ns: string, s: string) => string): string {
+type HistoryRow = AuditRow & { order?: { id: string; ref_no?: number | string | null; seq?: number | null } }
+function historyLine(r: HistoryRow, tl: (ns: string, s: string) => string): string {
   const a = (r.after ?? {}) as Record<string, unknown>
   const b = (r.before ?? {}) as Record<string, unknown>
   const n = (v: unknown) => Number(v) || 0
@@ -107,6 +108,9 @@ function historyLine(r: AuditRow, tl: (ns: string, s: string) => string): string
       return `${tl("artwork", "Replaced with")} ${a.name} · ${n(a.swapped)} ${tl("artwork", "swapped")}, ${n(a.kept)} ${tl("artwork", "kept")}`
     case "design_file.library_removed":
       return `${b.name} ${tl("artwork", "removed")}`
+    case "design.saved":
+      /* When the picture was put on an order — the history every design has, file or not. */
+      return `${tl("artwork", "Put on")} ${r.order ? numOf(r.order as Parameters<typeof numOf>[0]) : r.entity_id}`
     case "design_file.removed":
       return `${b.name} ${tl("artwork", "removed from an order")}`
     default:
@@ -141,7 +145,7 @@ export function ArtworkLibraryPanel() {
   const [swap, setSwap] = useState<SwapAsk | null>(null)
   /** One card's history open at a time, like its orders — and fetched only when opened. */
   const [openHistory, setOpenHistory] = useState<string | null>(null)
-  const [history, setHistory] = useState<Record<string, AuditRow[] | "loading" | "error">>({})
+  const [history, setHistory] = useState<Record<string, HistoryRow[] | "loading" | "error">>({})
   const replaceRef = useRef<HTMLInputElement>(null)
   /** A fresh key per dialog, so each mounts clean (a clock reading is refused in render). */
   const seqRef = useRef(0)
@@ -370,7 +374,7 @@ export function ArtworkLibraryPanel() {
     setOpenHistory(opening ? d.art_hash : null)
     if (!opening || history[d.art_hash]) return
     setHistory((h) => ({ ...h, [d.art_hash]: "loading" }))
-    getOrderHistory(d.art_hash)
+    getArtworkHistory(d.art_hash)
       .then((rows) => setHistory((h) => ({ ...h, [d.art_hash]: Array.isArray(rows) ? rows : [] })))
       .catch(() => setHistory((h) => ({ ...h, [d.art_hash]: "error" })))
   }
@@ -591,8 +595,13 @@ export function ArtworkLibraryPanel() {
                 className={"flex flex-col gap-3 rounded-xl border bg-card p-3.5 transition-colors "
                   + (over === d.art_hash ? "border-primary bg-accent" : "border-border")}
               >
+                {/* THE WHOLE PICTURE, FULL WIDTH (owner: it read "clipped inside the image
+                    area"). Its own proportions rather than a 4:3 well with a frame inset in it,
+                    so a wide screenshot fills the card instead of sitting in white bands. Very
+                    tall artwork is capped and centred, so one poster cannot make a card a
+                    screen high; the min height keeps a missing picture a tile, not a line. */}
                 <Thumb src={d.thumb} alt={d.name ?? ""} fit="contain"
-                  className="aspect-[4/3] w-full rounded-lg border border-border bg-white p-2"
+                  className="h-auto max-h-80 min-h-24 w-full rounded-lg border border-border bg-white"
                   icon={<PenNib size={28} weight="duotone" className="text-muted-foreground/40" />} />
 
                 <div className="min-w-0 space-y-0.5">
@@ -726,10 +735,11 @@ export function ArtworkLibraryPanel() {
 
                 {/**
                   * HISTORY, FOLDED TO ONE LINE (owner: "should be smaller or collapsible").
-                  * Only on a card with a file of its own — a card with nothing filed has no
-                  * file history to tell.
+                  * On EVERY card: a design has a history before it has a file — the orders it
+                  * was put on — and hiding the row on those cards read as the feature missing.
                   */}
-                {own.length > 0 && (
+                {(
+
                   <div className="border-t border-border pt-1.5">
                     <button type="button" onClick={() => toggleHistory(d)} aria-expanded={histOpen}
                       className="flex h-7 w-full items-center gap-2 text-left text-xs text-muted-foreground hover:text-foreground">
@@ -743,9 +753,9 @@ export function ArtworkLibraryPanel() {
                       ) : hist === "error" ? (
                         <p className="py-1 text-xs text-destructive">{tl("artwork", "Couldn't load the history.")}</p>
                       ) : !hist.length ? (
-                        /* Files filed before history was kept have none — say which kind of
-                           empty this is (§4), not a blank. */
-                        <p className="py-1 text-xs text-muted-foreground">{tl("artwork", "Nothing recorded yet — history starts from today.")}</p>
+                        /* An old design whose saves predate the DSN in the record — say which kind
+                           of empty this is (§4), not a blank. */
+                        <p className="py-1 text-xs text-muted-foreground">{tl("artwork", "Nothing recorded for this design yet.")}</p>
                       ) : (
                         <ol className="space-y-2 py-1.5">
                           {hist.map((r) => (

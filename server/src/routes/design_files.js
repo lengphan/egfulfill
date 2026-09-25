@@ -814,6 +814,46 @@ export function designFilesRoutes(app, requireAuth) {
     return src && /^[0-9a-f]{64}$/.test(String(src.art_hash || '')) ? src : null;
   }
 
+  /**
+   * AN ARTWORK'S HISTORY — every card has one, not only a card with a file.
+   *
+   * Two sources, read together: the artwork's own entries (library file added, attached,
+   * replaced, removed — written since 2026-09-25) and the moment the picture was put on
+   * each order, which design.saved has recorded all along, keyed by its DSN. Without the
+   * second, a card with no library file had no history at all, and every older design
+   * started blank. One row per order for the artwork save: nudging a placement re-saves,
+   * and "put on EGF-002155" six times is not six events.
+   *
+   * STAFF ONLY: the rows name who put the artwork on which shop's order (§6).
+   */
+  q(`create index if not exists audit_log_design_no_idx on audit_log ((after->>'design_no')) where action = 'design.saved'`).catch(() => {});
+  app.get('/api/design_files/library/:artHash/history', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const h = String(req.params.artHash || '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(h)) { reply.code(400); return { error: 'bad artwork' }; }
+    const no = await q('select design_no from design_ids where art_hash=$1', [h])
+      .then((r) => (r.rows[0] ? String(r.rows[0].design_no) : null)).catch(() => null);
+    const rows = await q(
+      `select id, ts, action, actor as actor_email, actor_name, actor_role, entity_type, entity_id, before, after
+         from audit_log
+        where (entity_type = 'artwork' and entity_id = $1)
+           or ($2::text is not null and action = 'design.saved' and after->>'design_no' = $2)
+        order by ts desc limit 200`, [h, no]).then((r) => r.rows);
+    /* Oldest save per order wins — that is when it was PUT there; later ones are edits. */
+    const firstSave = new Map();
+    for (const r of rows) if (r.action === 'design.saved') firstSave.set(String(r.entity_id), r.id);
+    const kept = rows.filter((r) => r.action !== 'design.saved' || firstSave.get(String(r.entity_id)) === r.id).slice(0, 60);
+    const ids = [...new Set(kept.filter((r) => r.action === 'design.saved').map((r) => String(r.entity_id)))];
+    const orders = ids.length
+      ? await q('select id, ref_no, seq from orders where id = any($1::text[])', [ids])
+          .then((r) => new Map(r.rows.map((o) => [String(o.id), o]))).catch(() => new Map())
+      : new Map();
+    return kept.map((r) => {
+      const o = r.action === 'design.saved' ? orders.get(String(r.entity_id)) : null;
+      return o ? { ...r, order: { id: o.id, ref_no: o.ref_no ?? null, seq: o.seq ?? null } } : r;
+    });
+  });
+
   app.get('/api/design_files/library/file/:designId/copies', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
     const src = await libraryFile(req.params.designId);
