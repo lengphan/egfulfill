@@ -789,6 +789,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  onOpenChange={(v) => { if (!v) { setPreview(null); setPreviewKey(null) } }}
  product={preview}
  onSave={confirmAdd}
+ requireBlank
  newIdSeed={0}
  nextSku={previewNextSku}
  takenSkus={previewTaken}

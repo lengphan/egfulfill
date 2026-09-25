@@ -278,16 +278,13 @@ type Tier = { price: string; shipping: string; cost: string; blank: string; weig
  * construction site, instead of every site needing to remember it. */
 /** The size table's columns. ONE definition, because the header row and the value rows are
  *  separate elements and a column added to one and not the other is a table that lines up
- *  until somebody scrolls. Base cost is dropped when no size still needs it.
+ *  until somebody scrolls. No Base cost column — see the note where the tiers are held.
  *
  *  The size column is minmax, not a fixed 3rem: sizes are TYPED now, so the label is no
  *  longer always three characters. At 3rem "One Size Fits Most" wrapped to four lines and
  *  dragged that row to four times the height of its neighbours. It grows to content up to
  *  7rem and wraps after that, so an S/M/L table is exactly as tight as it was. */
-const SIZE_GRID = (withBase: boolean) =>
-  withBase
-    ? "grid-cols-[minmax(3rem,7rem)_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
-    : "grid-cols-[minmax(3rem,7rem)_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
+const SIZE_GRID = "grid-cols-[minmax(3rem,7rem)_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem]"
 
 const EMPTY_TIER: Tier = { price: "", shipping: "", cost: "", blank: "", weightOz: "" }
 function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
@@ -381,7 +378,7 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
 // pricing shows the live margin, and supplier-derived blanks pre-fill description + cost.
 export function ProductEditorDialog({
  open, onOpenChange, product, onSave, newIdSeed, nextSku, takenSkus, title, ctaLabel,
- stockByColor,
+ stockByColor, requireBlank,
 }: {
  open: boolean
  onOpenChange: (v: boolean) => void
@@ -414,6 +411,10 @@ export function ProductEditorDialog({
   /** Per-colour supplier stock, when the caller has it (S&S review step). null/undefined
    * means NOT ASKED — never zero — so the trim control simply does not appear. */
  stockByColor?: Record<string, number> | null
+ /** A supplier product being ADDED: refuse the add until every size carries a Blank price.
+  *  Its only figure is the supplier's cost, so without a Blank it would go on sale at cost
+  *  plus whatever the markup setting happens to be, and read 0.00 wherever Blank is shown. */
+ requireBlank?: boolean
 }) {
   const tl = useLabelT()
  const [name, setName] = useState("")
@@ -619,33 +620,14 @@ export function ProductEditorDialog({
   // through Number and fight the input. Empty = no override for that size.
  const [tiers, setTiers] = useState<Record<string, Tier>>({})
   /**
-   * DOES ANY SIZE STILL NEED BASE COST?
+   * NO BASE COST COLUMN (owner, 2026-09-25: "drop").
    *
-   * Only sizes actually on the product count — an unadded size has no tier and no opinion. A
-   * field that cannot affect the price is not clarified by a caption; it is a box somebody
-   * has to decide to ignore on every visit, so it comes off the table entirely.
-   *
-   * IT WAS SHOWN WHENEVER BLANK WAS EMPTY, and that is wrong on the one flow where it hurts
-   * most (owner, 2026-09-23: "remove this base cost column when I add products from the
-   * supplier page"). A supplier import arrives with Product cost on every size and Blank on
-   * none — so the column appeared, empty, on exactly the products that have never needed it.
-   *
-   * THE OLD REASON DOES NOT HOLD. It said dropping it would leave such a size unpriceable.
-   * costPartsOf's ladder says otherwise: blank, then base cost, then PRODUCT COST + markup,
-   * then the product-level figures. A supplier row sits on the third rung and prices fine.
-   *
-   * So it is shown where it is actually load-bearing, which is two cases and not one:
-   *
-   *   a size already HOLDS a base cost — legacy data, which you must be able to see and
-   *   clear, because it silently outranks Product cost on the ladder;
-   *
-   *   a size has neither Blank nor Product cost — there really is nothing else to price it
-   *   with, and hiding the field would make it unpriceable for real.
+   * Blank is what a size is priced at; Product cost + markup covers a size with no Blank.
+   * Base cost only ever showed up empty beside those two and got typed into instead of
+   * Blank. A base cost already stored on a tier is still loaded and saved back untouched
+   * (strToTiers keeps `price`), so nothing a product bills today moves — and any size given
+   * a Blank outranks it on the ladder anyway.
    */
- const showBaseCost = useMemo(
-    () => sizes.some((s) => Number(tiers[s]?.price) > 0)
-       || sizes.some((s) => !(Number(tiers[s]?.blank) > 0) && !(Number(tiers[s]?.cost) > 0)),
-    [sizes, tiers])
   // Bulk-fill the whole size table in one go. Base can be a flat $ or a % markup over each
   // size's own product cost (so a pricier 3XL still lands a proportional base); shipping is
   // always a flat $. Writes into the editable rows — nothing is charged until you Save.
@@ -1256,6 +1238,23 @@ export function ProductEditorDialog({
  if (mySku && (takenSkus ?? []).some((t) => cleanSku(t) === mySku)) {
  fail("details", `${mySku} already belongs to another product. Give this one its own number — stock and pricing are both held against it.`)
  return
+    }
+    /**
+     * A SUPPLIER PRODUCT IS ADDED WITH A BLANK PRICE ON EVERY SIZE, or not at all (owner,
+     * 2026-09-25). The refusal lands on the Pricing tab with the first empty Blank box
+     * focused, so the person is taken to the field rather than told about it.
+     */
+ if (requireBlank) {
+ if (sizes.length === 0) { fail("pricing", "Add at least one size and give it a Blank price before adding this product."); return }
+ const missing = sizes.filter((s) => !(num(tiers[s]?.blank) > 0))
+ if (missing.length) {
+ fail("pricing", `Set a Blank price for ${missing.length === sizes.length ? "every size" : missing.join(", ")} before adding this product — it is what the seller is charged.`)
+ setTimeout(() => {
+ const el = document.querySelector<HTMLInputElement>(`input[aria-label="Blank price for size ${CSS.escape(missing[0])}"]`)
+ el?.focus(); el?.scrollIntoView({ block: "center" })
+        }, 50)
+ return
+      }
     }
     /**
      * NO BASE COST, NO PRODUCT — the one refusal that protects the margin.
@@ -2000,28 +1999,8 @@ export function ProductEditorDialog({
                     two. An empty state may carry one sentence (§4); this is a populated screen,
                     so it earns its place by being the only statement of a rule that is
                     otherwise invisible. */}
-                {/* A size with no Blank price still has nothing else to price the garment
-                    from, so the column survives until every size has one — which is also the
-                    moment the product has finished migrating. */}
-                {/**
-                  * BASE COST IS ONLY SHOWN WHERE IT IS STILL READ.
-                  *
-                  * Labelling it "legacy" and leaving it there was the wrong answer: a field
-                  * that can never affect the price is not clarified by a caption, it is just a
-                  * box somebody has to decide to ignore on every visit. On a product whose
-                  * sizes all carry a Blank price, pricing.js never looks at this column at all
-                  * — the garment is Blank, the print is the placement charge, the technique is
-                  * its own surcharge.
-                  *
-                  * It stays for the products that have no Blank price yet, because there it is
-                  * the ONLY statement of what the garment costs and removing it would leave
-                  * them unpriceable. So the column disappears exactly when it stops mattering,
-                  * which is also the moment a product finishes migrating.
-                  */}
-                <div className={`mt-2 grid ${SIZE_GRID(showBaseCost)} gap-2 text-xs text-muted-foreground`}>
-                  <span /><span>{tl("product", "Product cost ($)")}</span>{showBaseCost && (
-                    <span title={tl("product", "Only read where a size has no Blank price. Set Blank instead — the garment, the placement and the method are priced separately now.")}>{tl("product", "Base cost ($)")}</span>
-                  )}<span title={tl("product", "What this size costs as a bare garment. This is the base of every price now — the placement charge and the method are added on top — and a size with no Blank price cannot be ordered undecorated: \"Blank Only\" is not offered on it.")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
+                <div className={`mt-2 grid ${SIZE_GRID} gap-2 text-xs text-muted-foreground`}>
+                  <span /><span>{tl("product", "Product cost ($)")}</span><span title={tl("product", "What this size costs as a bare garment. This is the base of every price now — the placement charge and the method are added on top — and a size with no Blank price cannot be ordered undecorated: \"Blank Only\" is not offered on it.")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
                   {/* WEIGHT IS PER SIZE, which is the whole reason it is a column here. A 3XL
  crewneck runs several ounces over an S, and postage is priced in bands
                       (4 / 8 / 12 / 15.999oz, then 1lb), so one size can sit a band above
@@ -2049,7 +2028,7 @@ export function ProductEditorDialog({
  setTiers((p) => ({ ...p, [s]: { ...EMPTY_TIER, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
  return (
                     <Fragment key={s}>
-                    <div className={`grid ${SIZE_GRID(showBaseCost)} items-center gap-2`}>
+                    <div className={`grid ${SIZE_GRID} items-center gap-2`}>
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
  value={t?.cost ?? ""}
@@ -2061,29 +2040,6 @@ export function ProductEditorDialog({
  title={productCost.trim() !== "" ? `Using the product-level supplier cost ${Number(productCost).toFixed(2)}` : tl("product", "Enter the supplier cost for this size")}
  className="h-8 text-xs" inputMode="decimal" aria-label={`Product cost for size ${s}`}
                       />
-                      {/* CONDITIONAL LIKE ITS HEADER. Hiding the header alone left this input
-                          in the row, so the row had one more cell than the header and every
-                          value after it rendered a column to the left: the base cost appeared
-                          under "Blank", the blank under "Shipping", and editing what looked
-                          like a blank price wrote to base cost — which is exactly the "it
-                          doesn't save" the owner saw. The grid template is shared by both rows
-                          for this reason; the cells have to be too. */}
-                      {showBaseCost && (
-                      <Input
- value={t?.price ?? ""}
- onChange={(e) => patch("price", e.target.value)}
-                        /* Show the NUMBER that will actually be charged, never the word
-                           "auto". A placeholder saying "auto" tells you a rule exists but
- not what it produced, so the only way to learn the price was to
- save and go look. Falls back through: this row's derived
- cost + markup → the product-level base → nothing known. */
- placeholder={derived || (basePrice.trim() !== "" ? Number(basePrice).toFixed(2) : "—")}
- title={derived
-                          ? `Auto: product cost ${costN.toFixed(2)} + ${markup.toFixed(2)} markup = ${derived}`
- : basePrice.trim() !== "" ? tl("product", "Using the product-level base cost above") : tl("product", "Enter a product cost to price this size")}
- className="h-8 text-xs" inputMode="decimal" aria-label={`Base cost for size ${s}`}
-                      />
-                      )}
                       <Input
  value={t?.blank ?? ""}
  onChange={(e) => patch("blank", e.target.value)}
@@ -2107,7 +2063,7 @@ export function ProductEditorDialog({
                          */
  title={belowCost
                           ? `$${Number(t?.blank).toFixed(2)} is below the $${rowCost.toFixed(2)} it costs us`
- : tl("product", "What a seller pays for this size with nothing printed on it. Leave empty to charge the base cost.")}
+ : tl("product", "What a seller pays for this size with nothing printed on it. Leave empty to charge product cost plus the markup.")}
  className={"h-8 text-xs" + (belowCost ? " border-destructive text-destructive" : "")}
                         inputMode="decimal" aria-label={`Blank price for size ${s}`}
                       />

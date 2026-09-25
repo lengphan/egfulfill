@@ -2173,7 +2173,7 @@ const vi: Dict = {
   "product.Opens straight from the cart, so “order by hand” is one click.": "Mở thẳng từ giỏ hàng, nên “đặt thủ công” chỉ mất một cú bấm.",
   "product.Stock is held against this, and the seller sees it on their listing.": "Tồn kho được giữ theo mã này, và người bán nhìn thấy nó trên tin đăng.",
   "product.No method picked — an order for this blank won’t be able to choose one.": "Chưa chọn phương pháp in — đơn hàng cho phôi này sẽ không chọn được phương pháp nào.",
-  "product.What a seller pays for this size with nothing printed on it. Leave empty to charge the base cost.": "Số tiền người bán trả cho cỡ này khi không in gì lên. Để trống thì tính theo giá gốc.",
+  "product.What a seller pays for this size with nothing printed on it. Leave empty to charge product cost plus the markup.": "Số tiền người bán trả cho cỡ này khi không in gì lên. Để trống thì tính theo giá vốn cộng phần chênh.",
   "product.What this size costs undecorated — charged when a line carries no print method": "Giá của cỡ này khi không trang trí — áp dụng khi một dòng không có phương pháp in",
   "product.What one of this size weighs, in ounces — what postage is quoted against": "Một sản phẩm cỡ này nặng bao nhiêu, tính bằng ounce — bưu phí được báo dựa trên số này",
   "product.What one of this size weighs, in ounces. Postage is quoted against it; the carrier re-weighs the parcel and bills the difference.": "Một sản phẩm cỡ này nặng bao nhiêu, tính bằng ounce. Bưu phí được báo dựa trên số này; đơn vị vận chuyển sẽ cân lại kiện hàng và tính phần chênh lệch.",
@@ -5177,7 +5177,6 @@ const vi: Dict = {
   "wallet.AI billed on": "AI tính phí vào",
 
   // Design Lab › Files — the factory's artwork library (was its own /artwork board).
-  "section.Artwork we have been asked to print": "Hình thiết kế xưởng được yêu cầu in",
   "artwork.All sellers": "Tất cả người bán",
   "artwork.Filter by seller": "Lọc theo người bán",
   "artwork.DSN-1042, or a design name": "DSN-1042, hoặc tên thiết kế",

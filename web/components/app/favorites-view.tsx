@@ -15,6 +15,7 @@ import { revalidateCatalog } from "@/lib/revalidate-catalog"
 import { ssCatalogProduct, ottoCatalogProduct } from "@/lib/supplier-catalog"
 import { getToken } from "@/lib/auth"
 import { nextEgSku } from "@/lib/sku"
+import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 
 // Otto images are Google Drive links — rewrite to the embeddable thumbnail URL.
 function driveImg(url?: string | null): string {
@@ -38,6 +39,8 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [addingId, setAddingId] = useState<string | null>(null)
   const [removed, setRemoved] = useState<Set<string>>(new Set())
+  /** The product being reviewed before it is added — see addToCatalog. */
+  const [review, setReview] = useState<{ key: string; product: CatalogProduct; nextSku: string; taken: string[] } | null>(null)
 
   const load = useCallback(() => {
     if (!getToken()) { setItems([]); return }
@@ -55,53 +58,49 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
 
   const keyOf = (f: FavItem) => `${f.supplier}:${f.id}`
 
+  /**
+   * THROUGH THE REVIEW STEP, NOT STRAIGHT INTO PRODUCTS (owner, 2026-09-25).
+   *
+   * This saved the built product directly, so a favourite arrived with the supplier's cost
+   * and no Blank price — on sale at cost + the markup setting, and 0.00 wherever Blank is
+   * read. It now opens the same editor the supplier page uses, which refuses the add until
+   * every size has a Blank price.
+   */
   const addToCatalog = async (f: FavItem) => {
     setAddingId(keyOf(f))
     try {
-      /*
-       * NEVER SAVE A FULL LIST BUILT ON A FAILED READ.
-       *
-       * This was `.catch(() => [])`, and POST /api/catalog_products is a whole-list REPLACE
-       * that PRUNES: `delete from catalog_products where id <> all($1)`. So a read that
-       * failed for any reason — a slow response, a dropped connection, a 502 — turned into
-       * `existing = []`, then a one-item payload, and the other products on the shelf were
-       * deleted. The server's own guards cannot catch it: the list is not empty and every
-       * entry has an id, so it looks exactly like a deliberate "the catalogue is now this
-       * one product".
-       *
-       * Catalogue rows carry base_price, which BILLS ORDERS, so this is the §2.6 case — an
-       * accident here destroys data nobody asked to touch. Failing the add is the safe
-       * outcome and the honest one: nothing was added, and it says so.
-       */
-      const existing = await getCatalogProducts().catch(() => { throw new Error("Couldn't read the current products, so nothing was added — try again.") })
-      /**
-       * THE SAME BUILDER THE BROWSE GRID USES. This was a private copy, and it had drifted
-       * in the two ways a copy always does:
-       *
-       *  - `sku: f.id` wrote S&S's INTERNAL style id ("16") into OUR sku — the field publish
-       *    writes onto the seller's listing. A supplier's code belongs in supplierSku, which
-       *    sellerSafe strips; the shared builder puts it there.
-       *  - it put the supplier's wholesale price into `price` AND `basePrice`, which is the
-       *    exact mistake the shared builder documents against: base cost is meant to DERIVE
-       *    as productCost + the base_markup setting, so writing cost into base charged the
-       *    seller our raw cost with no margin.
-       *
-       * CLAUDE.md §5: import shared logic, never re-derive it.
-       */
+      const existing = await getCatalogProducts()
+      /* THE SAME BUILDER THE BROWSE GRID USES — CLAUDE.md §5: import shared logic, never
+         re-derive it. It puts the supplier's price in productCost and its code in
+         supplierSku, and leaves our sku for the editor to fill. */
       const built: CatalogProduct = f.supplier === "ss"
         ? await ssCatalogProduct(f.id, { title: f.title, price: f.price, image: f.image, colors: f.colors, brand: f.brand })
         : await ottoCatalogProduct(f.id, { name: f.title, price: f.price, image: f.image, colors: f.colors, brand: f.brand })
-      // This tab saves straight through with no review step, so the sku the builders leave
-      // unset has to be assigned here — a product without one can't be stocked or resolved.
-      const product: CatalogProduct = built.sku ? built : { ...built, sku: nextEgSku(existing) }
-      const next = existing.some((p) => p.id === product.id) ? existing.map((p) => (p.id === product.id ? product : p)) : [...existing, product]
-      await saveCatalogProducts(next)
-      /* AND DROP THE PUBLIC CATALOGUE'S CACHE — see revalidateCatalog. Appearing has the
-         same 300s lag as disappearing, and a product added and then not found on the site is
-         the same doubt as one hidden and still there. Not awaited: the save is already done. */
-      void revalidateCatalog().catch(() => {})
-      setAdded((prev) => new Set(prev).add(keyOf(f)))
+      setReview({
+        key: keyOf(f), product: built, nextSku: nextEgSku(existing),
+        taken: existing.filter((p) => p.id !== built.id).map((p) => String(p.sku ?? "")).filter(Boolean),
+      })
     } catch { /* ignore */ } finally { setAddingId(null) }
+  }
+
+  const confirmAdd = async (product: CatalogProduct) => {
+    if (!review) return
+    /*
+     * NEVER SAVE A FULL LIST BUILT ON A FAILED READ.
+     *
+     * POST /api/catalog_products is a whole-list REPLACE that PRUNES, so a failed read turned
+     * into `existing = []` would delete every other product. Re-read at save time (not the
+     * copy from when the review opened), and let a failure throw — the editor stays open
+     * and says so.
+     */
+    const existing = await getCatalogProducts().catch(() => { throw new Error("Couldn't read the current products, so nothing was added — try again.") })
+    const withSku: CatalogProduct = product.sku ? product : { ...product, sku: nextEgSku(existing) }
+    const next = existing.some((p) => p.id === withSku.id) ? existing.map((p) => (p.id === withSku.id ? withSku : p)) : [...existing, withSku]
+    await saveCatalogProducts(next)
+    // See revalidateCatalog — appearing has the same 300s lag as disappearing.
+    void revalidateCatalog().catch(() => {})
+    setAdded((prev) => new Set(prev).add(review.key))
+    setReview(null)
   }
 
   const unfavorite = (f: FavItem) => {
@@ -123,6 +122,7 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
   }
 
   return (
+    <>
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
       {visible.map((f) => (
         <SupplierProductCard
@@ -138,5 +138,18 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
         />
       ))}
     </div>
+    <ProductEditorDialog
+      open={!!review}
+      onOpenChange={(v) => { if (!v) setReview(null) }}
+      product={review?.product ?? null}
+      onSave={confirmAdd}
+      requireBlank
+      newIdSeed={0}
+      nextSku={review?.nextSku}
+      takenSkus={review?.taken}
+      title={tl("allSuppliers", "Review before adding")}
+      ctaLabel="Add to Products"
+    />
+    </>
   )
 }

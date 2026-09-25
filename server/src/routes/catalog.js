@@ -2391,6 +2391,25 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const statusFor = (p) => {
       const want = p.status || 'Active';
       if (String(want).toLowerCase() !== 'active') return want;
+      /**
+       * A SUPPLIER PRODUCT ARRIVES WITH A BLANK PRICE ON EVERY SIZE, or switched off (owner,
+       * 2026-09-25). The editor refuses the add without one; this is the backstop for every
+       * other way a supplier row gets here (Alibaba receive, an old tab, a script). Its only
+       * figure is our COST, so without a Blank it would sell at cost + the markup setting and
+       * read 0.00 wherever Blank is shown. New rows only — an existing product is priced by
+       * whatever it already carries, and switching it off on an unrelated save would be a
+       * change nobody asked for.
+       */
+      const fromSupplier = !!(p.supplier || p.supplierSku || p.supplier_sku);
+      if (fromSupplier && !existingIds.has(String(p.id))) {
+        const tiers = Array.isArray(p.sizePrices) ? p.sizePrices : [];
+        const sizes = Array.isArray(p.sizes) && p.sizes.length ? p.sizes.map(String) : tiers.map((t) => t && String(t.size));
+        const blankOf = (sz) => Number((tiers.find((t) => t && String(t.size) === sz) || {}).blank) || 0;
+        if (!sizes.length || sizes.some((sz) => !(blankOf(sz) > 0))) {
+          heldInactive.push({ id: p.id, name: p.name || p.id, reason: 'no-blank-price' });
+          return 'Inactive';
+        }
+      }
       // The same shape the pricer reads: it walks `row.data`, which for a save IS the payload.
       if (pricedOk({ data: p, base_price: p.basePrice ?? p.base_price }, gateFees)) return want;
       heldInactive.push({ id: p.id, name: p.name || p.id });
