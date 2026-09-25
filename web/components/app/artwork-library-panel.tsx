@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { PenNib, CircleNotch, UploadSimple, DownloadSimple, CaretDown, X } from "@phosphor-icons/react"
+import { PenNib, CircleNotch, UploadSimple, DownloadSimple, CaretDown, X, ArrowsClockwise } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { SectionCard } from "@/components/app/section-card"
 import { EmptyState } from "@/components/app/empty-state"
@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button"
 import { SearchField } from "@/components/app/search-field"
 import { FilterMenu } from "@/components/app/filter-menu"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, deleteDesignFile, type FactoryDesign } from "@/lib/api"
+import { getFactoryDesigns, getFactoryDesignSellers, uploadDesignFile, downloadDesignFile, deleteDesignFile, getLibraryPreview, getLibraryCopies, replaceLibraryFile, getOrderHistory, type FactoryDesign, type LibraryFace, type LibraryCopy, type AuditRow } from "@/lib/api"
+import { LibraryAttachDialog, LibraryReplaceDialog, type AttachTarget } from "@/components/app/library-file-dialogs"
 import { numOf } from "@/lib/order-format"
 import { normalizeMethods } from "@/lib/print-method"
 
@@ -70,6 +71,48 @@ const acceptFor = (methods?: string[]) => {
   return [...wants]
 }
 const extOf = (name: string) => (String(name).match(/\.[a-z0-9]+$/i) || [""])[0].toLowerCase()
+const readFile = (file: File) => new Promise<string>((res, rej) => {
+  const fr = new FileReader()
+  fr.onload = () => res(String(fr.result || ""))
+  fr.onerror = () => rej(new Error(`Couldn't read ${file.name}`))
+  fr.readAsDataURL(file)
+})
+
+type LibraryFileRef = { design_id: string; file_name: string | null }
+/** A stitch file read and waiting on the attach dialog's answer. Nothing is uploaded until
+ *  the person confirms — Cancel leaves the library exactly as it was. */
+type AttachAsk = { d: FactoryDesign; file: File; designId: string; data: string; seq: number
+  preview: { attach: LibraryFace[]; needsMethod: LibraryFace[]; notAttached: LibraryFace[]; admin?: boolean } }
+type SwapAsk = { d: FactoryDesign; f: LibraryFileRef; file: File; data: string; copies: LibraryCopy[]; seq: number }
+
+/** One line of an artwork's history, in words. Unknown actions fall back to their name
+ *  rather than vanishing — a history with gaps is worse than one with a plain label. */
+function historyLine(r: AuditRow, tl: (ns: string, s: string) => string): string {
+  const a = (r.after ?? {}) as Record<string, unknown>
+  const b = (r.before ?? {}) as Record<string, unknown>
+  const n = (v: unknown) => Number(v) || 0
+  const ordersOf = (v: unknown) => (Array.isArray(v) ? v.length : 0)
+  switch (r.action) {
+    case "design_file.library_added": {
+      const lines = n(a.lines)
+      return lines
+        ? `${a.name} ${tl("artwork", "added")} · ${tl("artwork", "on")} ${lines} ${lines === 1 ? tl("artwork", "line") : tl("artwork", "lines")}`
+        : `${a.name} ${tl("artwork", "added")} · ${tl("artwork", "for future orders")}`
+    }
+    case "design_file.auto_attached": {
+      const k = ordersOf(a.orders)
+      return `${tl("artwork", "Auto-attached to")} ${k} ${k === 1 ? tl("artwork", "order") : tl("artwork", "orders")}`
+    }
+    case "design_file.library_replaced":
+      return `${tl("artwork", "Replaced with")} ${a.name} · ${n(a.swapped)} ${tl("artwork", "swapped")}, ${n(a.kept)} ${tl("artwork", "kept")}`
+    case "design_file.library_removed":
+      return `${b.name} ${tl("artwork", "removed")}`
+    case "design_file.removed":
+      return `${b.name} ${tl("artwork", "removed from an order")}`
+    default:
+      return r.action
+  }
+}
 
 export function ArtworkLibraryPanel() {
   const tl = useLabelT()
@@ -94,6 +137,15 @@ export function ArtworkLibraryPanel() {
    *  press and names its result. */
   const [note, setNote] = useState<string | null>(null)
   const confirm = useConfirm()
+  const [ask, setAsk] = useState<AttachAsk | null>(null)
+  const [swap, setSwap] = useState<SwapAsk | null>(null)
+  /** One card's history open at a time, like its orders — and fetched only when opened. */
+  const [openHistory, setOpenHistory] = useState<string | null>(null)
+  const [history, setHistory] = useState<Record<string, AuditRow[] | "loading" | "error">>({})
+  const replaceRef = useRef<HTMLInputElement>(null)
+  /** A fresh key per dialog, so each mounts clean (a clock reading is refused in render). */
+  const seqRef = useRef(0)
+  const pendingReplace = useRef<{ d: FactoryDesign; f: LibraryFileRef } | null>(null)
 
   useEffect(() => {
     let live = true
@@ -162,6 +214,18 @@ export function ArtworkLibraryPanel() {
     return null
   }
 
+  /** Store one file against the artwork, with the faces it may land on, and name it on the
+   *  card at once rather than waiting on a reload. Returns how many lines it reached. */
+  const fileOne = async (d: FactoryDesign, r: { file: File; designId: string; data: string }, targets: AttachTarget[]) => {
+    const res = await uploadDesignFile({ designId: r.designId, name: r.file.name, data: r.data, artHash: d.art_hash, targets })
+    if (res?.error) throw new Error(res.error)
+    setRows((prev) => (prev ?? []).map((x) => (x.art_hash === d.art_hash
+      ? { ...x, has_file: true, files: [{ design_id: r.designId, file_name: r.file.name, kind: "emb", own: true }, ...(x.files ?? [])] }
+      : x)))
+    setHistory((h) => { const n = { ...h }; delete n[d.art_hash]; return n })
+    return res?.attached ?? 0
+  }
+
   /**
    * ATTACH WHAT WAS DROPPED — several at once, because that is how they arrive.
    *
@@ -192,46 +256,123 @@ export function ArtworkLibraryPanel() {
        state, which does not change between iterations, so three files in one drop would all
        have claimed the same id and overwritten each other. */
     const taken = new Set((d.files ?? []).map((f) => f.design_id))
-    const added: { design_id: string; file_name: string; kind: string; own: boolean }[] = []
-    let reached = 0
     try {
-      for (const file of good) {
-        const data = await new Promise<string>((res, rej) => {
-          const fr = new FileReader()
-          fr.onload = () => res(String(fr.result || ""))
-          fr.onerror = () => rej(new Error(tl("artwork", "Couldn't read that file")))
-          fr.readAsDataURL(file)
-        })
+      const read = await Promise.all(good.map(async (file) => {
         const designId = nextFileId(d, taken)
         /* Two hundred files for one picture is not a case to design for; it is a case to
            refuse out loud rather than overwrite something. */
         if (!designId) throw new Error(tl("artwork", "This design already has too many files."))
         taken.add(designId)
-        const r = await uploadDesignFile({ designId, name: file.name, data, artHash: d.art_hash })
-        if (r?.error) throw new Error(r.error)
-        reached += r?.attached ?? 0
-        added.push({ design_id: designId, file_name: file.name, kind: "emb", own: true })
+        return { file, designId, data: await readFile(file) }
+      }))
+      /**
+       * ONE STITCH FILE ASKS FIRST; everything else is simply filed.
+       *
+       * A stitch file is the only kind that lands on orders, so it is the only kind with a
+       * question to ask — and it asks it ONCE, for the first one dropped. A second stitch
+       * file in the same drop is filed against the artwork without being attached: the
+       * first answers every waiting face, and attaching the second after it would find
+       * nothing left to fill anyway.
+       */
+      const first = read.find((r) => STITCH.includes(extOf(r.file.name)))
+      const rest = read.filter((r) => r !== first)
+      for (const r of rest) await fileOne(d, r, [])
+      if (!first) return
+      const preview = await getLibraryPreview(d.art_hash)
+      if (preview?.error) throw new Error(preview.error)
+      if (!preview.attach.length && !preview.needsMethod.length) {
+        /* NOTHING IS WAITING — no dialog. Asking "attach to 0 lines?" is a question with
+           nothing to decide; the file is filed and the next order carrying this picture
+           takes it. */
+        await fileOne(d, first, [])
+        setNote(tl("artwork", "Filed — the next order carrying this artwork will get it"))
+        return
       }
-      /* WHERE THEY WENT, SAID ONCE. The upload puts each file on every order line carrying
-         this exact artwork and waiting for one, and that is a bigger thing than "uploaded" —
-         it is the answer to the question this tab exists to ask. 0 gets no line: nothing
-         waiting is the ordinary case and not news. */
-      if (reached) {
-        setNote(`${reached} ${reached === 1 ? tl("artwork", "order now has it") : tl("artwork", "orders now have it")}`)
-      }
-      /* NAME THEM IMMEDIATELY. The upload knows what it just sent, so the card can say what
-         is on record without waiting for a reload. Newest first, which is the order the
-         listing returns them in. */
-      if (added.length) {
-        setRows((prev) => (prev ?? []).map((x) => (x.art_hash === d.art_hash
-          ? { ...x, has_file: true, files: [...added.reverse(), ...(x.files ?? [])] }
-          : x)))
-      }
+      setAsk({ ...first, d, preview, seq: ++seqRef.current })
     } catch (e) {
       setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't attach that file."))
     } finally {
       setBusy(null)
     }
+  }
+
+  /** The dialog's answer: file it, on the faces the person left ticked. */
+  const confirmAttach = async (targets: AttachTarget[]) => {
+    const a = ask
+    if (!a) return
+    setBusy(a.d.art_hash); setErr(null)
+    try {
+      const reached = await fileOne(a.d, a, targets)
+      /* WHERE IT WENT, SAID ONCE — a bigger thing than "uploaded". */
+      setNote(reached
+        ? `${reached} ${reached === 1 ? tl("artwork", "line now has it") : tl("artwork", "lines now have it")}`
+        : tl("artwork", "Filed — the next order carrying this artwork will get it"))
+      setAsk(null)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't attach that file."))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /**
+   * REPLACE: pick the new file, then say which orders it reaches before it reaches them.
+   * The copies are read AFTER the pick — the dialog is about this file and these orders now.
+   */
+  const pickReplacement = async (d: FactoryDesign, f: LibraryFileRef, file: File) => {
+    if (!STITCH.includes(extOf(file.name))) {
+      setErr(`${file.name} — ${tl("artwork", "a replacement has to be a stitch file")}`)
+      return
+    }
+    setBusy(f.design_id); setErr(null); setNote(null)
+    try {
+      const [data, c] = await Promise.all([readFile(file), getLibraryCopies(f.design_id)])
+      if (c?.error) throw new Error(c.error)
+      setSwap({ d, f, file, data, copies: c.copies ?? [], seq: ++seqRef.current })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't read that file."))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const confirmReplace = async (scope: "unshipped" | "all") => {
+    const a = swap
+    if (!a) return
+    setBusy(a.f.design_id); setErr(null)
+    try {
+      const r = await replaceLibraryFile(a.f.design_id, { name: a.file.name, mime: a.file.type || undefined, data: a.data, scope })
+      if (r?.error || !r?.designId) throw new Error(r?.error || tl("artwork", "Couldn't replace that file."))
+      const newId = r.designId
+      setRows((prev) => (prev ?? []).map((x) => (x.art_hash === a.d.art_hash
+        ? { ...x, files: (x.files ?? []).map((y) => (y.design_id === a.f.design_id
+            ? { ...y, design_id: newId, file_name: r.fileName ?? a.file.name } : y)) }
+        : x)))
+      setHistory((h) => { const n = { ...h }; delete n[a.d.art_hash]; return n })
+      setNote(r.swapped
+        ? `${tl("artwork", "Replaced on")} ${r.swapped} ${r.swapped === 1 ? tl("artwork", "line") : tl("artwork", "lines")}`
+        : tl("artwork", "Replaced for new orders"))
+      setSwap(null)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : tl("artwork", "Couldn't replace that file."))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /**
+   * HISTORY IS FETCHED ON THE PRESS THAT OPENS IT — an event, never an effect watching the
+   * list (§2.8). Sixty cards each asking for their history on mount is sixty requests for
+   * something almost nobody opens.
+   */
+  const toggleHistory = (d: FactoryDesign) => {
+    const opening = openHistory !== d.art_hash
+    setOpenHistory(opening ? d.art_hash : null)
+    if (!opening || history[d.art_hash]) return
+    setHistory((h) => ({ ...h, [d.art_hash]: "loading" }))
+    getOrderHistory(d.art_hash)
+      .then((rows) => setHistory((h) => ({ ...h, [d.art_hash]: Array.isArray(rows) ? rows : [] })))
+      .catch(() => setHistory((h) => ({ ...h, [d.art_hash]: "error" })))
   }
 
   /**
@@ -267,7 +408,7 @@ export function ArtworkLibraryPanel() {
   const removeFile = async (d: FactoryDesign, f: { design_id: string; file_name: string | null }) => {
     if (!(await confirm({
       title: `${tl("artwork", "Remove")} ${f.file_name || f.design_id}?`,
-      body: tl("artwork", "The next order carrying this artwork will not be offered it."),
+      body: tl("artwork", "New orders carrying this artwork stop getting it. Orders that already have it keep it."),
       confirmLabel: tl("artwork", "Remove"),
     }))) return
     setBusy(f.design_id); setErr(null)
@@ -405,38 +546,39 @@ export function ArtworkLibraryPanel() {
             * uses, which is the point — they are two halves of one question and they now
             * read as one shelf.
             */}
-          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {/**
+            * A CARD IS A PICTURE FIRST (owner, 2026-09-25: the cards were "way too small or
+            * quite squished together"). The artwork fills the card's width at the size it is
+            * judged at — which is why the hover copy is gone: it existed to make an 80px tile
+            * checkable, and the tile is now bigger than that copy was.
+            *
+            * Beneath it, in the order the question is asked: which design, how many orders,
+            * the file we hold (download · Replace · ×), a way to attach one, and the history
+            * of that file folded to one line.
+            */}
+          <ul className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {rows.map((d) => {
               const open = openOrders === d.art_hash
+              const own = (d.files ?? []).filter((f) => f.own)
+              /* A file reached this card either filed against the artwork (own) or through an
+                 order it was uploaded on. Copies the library itself put on orders carry the
+                 artwork too, so listing everything would print one filename once per order.
+                 The library's own file is the answer when there is one; order files are
+                 shown only when there is not, once per name. */
+              const shown = own.length ? own : (d.files ?? []).filter((f, i, all) => all.findIndex((x) => x.file_name === f.file_name) === i)
+              const hist = history[d.art_hash]
+              const histOpen = openHistory === d.art_hash
               return (
-              /* items-start once a card can grow: centred, the thumbnail drifts down the
-                 card as the order list opens under the text beside it. */
-              /**
-                * THE WHOLE CARD TAKES THE DROP.
-                *
-                * Not `components/app/dropzone.tsx`, and the rule says to check: that
-                * primitive DRAWS a zone — its own box, label, hint and receipt — and what is
-                * wanted here is for an existing object to accept a drop, the way a column
-                * accepts a card. Wrapping every row in a second bordered box to get four
-                * event handlers would be the ring-inside-a-ring this card already fixed once.
-                *
-                * A stitch file arrives in an email and leaves the browser again as a drag, so
-                * dragging IS the gesture — a button is the fallback, not the route. The
-                * button stays because a drop target with no click route cannot be reached
-                * from a keyboard.
-                */
+              /* THE WHOLE CARD TAKES THE DROP — a stitch file arrives in an email and leaves
+                 the browser again as a drag, so dragging IS the gesture; the button is the
+                 keyboard route. Only a FILE drag lights it. */
               <li
                 key={d.art_hash}
                 onDragOver={(e) => {
-                  /* Only a FILE drag. Without this a dragged link or a selected word lights
-                     up every card it crosses and the page looks like it is malfunctioning. */
                   if (!e.dataTransfer.types.includes("Files")) return
                   e.preventDefault()
                   if (over !== d.art_hash) setOver(d.art_hash)
                 }}
-                /* relatedTarget is where the pointer WENT. Crossing onto a child fires
-                   dragleave on the parent, so without this test the highlight flickers off
-                   the moment the pointer reaches the thumbnail. */
                 onDragLeave={(e) => {
                   if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(null)
                 }}
@@ -446,107 +588,38 @@ export function ArtworkLibraryPanel() {
                   setOver(null)
                   void attachFiles(d, e.dataTransfer.files)
                 }}
-                className={"flex items-start gap-3 rounded-xl border bg-card p-2.5 transition-colors "
+                className={"flex flex-col gap-3 rounded-xl border bg-card p-3.5 transition-colors "
                   + (over === d.art_hash ? "border-primary bg-accent" : "border-border")}
               >
-                {/**
-                  * THE PICTURE IS THE IDENTIFICATION; everything beside it is confirmation.
-                  *
-                  * BIGGER, AND IT ANSWERS ON HOVER (owner, 2026-09-23: "make the images here
-                  * bigger and hover to see a bigger image next to it, no need to click to
-                  * zoom" — then, when the press was kept anyway: "no need to enable clicking
-                  * to zoom in"). 56px was enough to tell one design from another and not
-                  * enough to CHECK one, so every judgement on the tab whose job is judging
-                  * artwork cost a click and a dismissal. 80px reads at a glance and resting
-                  * on it puts a 224px copy beside the card.
-                  *
-                  * NO LIGHTBOX. The press is gone, not disabled — a control that opens a
-                  * modal for something hovering already shows is a second way to the same
-                  * place, and the modal was the slow one.
-                  *
-                  * THE CLASS LIST IS ONE LINE, and that is load-bearing rather than style.
-                  * Split across two it still reads correctly at runtime, but Tailwind scans
-                  * SOURCE text for candidates and the wrapped copy is the version that did
-                  * not work. Every other named-group hover in this app (artwork-panel.tsx,
-                  * group/thumb) is written on one line; this now matches it exactly.
-                  *
-                  * `pointer-events-none` so the panel can never swallow a press meant for the
-                  * card under it, and `aria-hidden` because it is the same image at another
-                  * size with the name already on the card.
-                  */}
-                <div className="group/art relative shrink-0">
-                  <Thumb src={d.thumb} alt={d.name ?? ""} fit="contain"
-                    className="size-20 rounded-md border border-border bg-white p-1"
-                    icon={<PenNib size={22} weight="duotone" className="text-muted-foreground/40" />} />
-                  {/* ONLY WHERE THERE IS A PICTURE. A machine file has no preview, and a panel
-                      opening on an empty tile would promise one that never arrives. */}
-                  {d.thumb && (
-                    <div aria-hidden className="pointer-events-none absolute left-full top-0 z-30 ml-2 hidden rounded-xl border border-border bg-card p-2 shadow-lg group-hover/art:block">
-                      {/* MAX-W-NONE IS LOAD-BEARING. The panel sits at `left-full` of an 80px box, so
-                          its shrink-to-fit width has nothing to grow into, and preflight's
-                          `img { max-width: 100% }` then resolved to 0 — a 224px-tall white
-                          strip with no picture in it. */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={d.thumb} alt="" className="size-56 max-w-none rounded-md bg-white object-contain" />
-                    </div>
-                  )}
-                </div>
+                <Thumb src={d.thumb} alt={d.name ?? ""} fit="contain"
+                  className="aspect-[4/3] w-full rounded-lg border border-border bg-white p-2"
+                  icon={<PenNib size={28} weight="duotone" className="text-muted-foreground/40" />} />
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    {/* THE NUMBER IS THE NAME. It is what the board card and the designer
-                        call this picture, and it is an identifier — so `text-sm`, never
-                        the 11px a mark gets (§4: a value is not a caption). */}
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    {/* THE NUMBER IS THE NAME — an identifier, so text-sm (§4). */}
                     <span className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums">
                       {d.design_no != null ? `DSN-${d.design_no}` : tl("artwork", "Not numbered")}
                     </span>
-                    {/**
-                      * HOW IT IS PRINTED — a pill, because this one carries meaning (§4: a
-                      * pill must be an order stage, an HTTP method, RUSH/LATE; a technique
-                      * is the same kind of fact, and it is what decides which file the card
-                      * will accept). Both are shown when a picture is ordered both ways,
-                      * because claiming one would be the lie the library made by claiming
-                      * none. Nothing is drawn when nobody has said yet — an empty pill is
-                      * not an answer.
-                      */}
                     {(() => {
+                      /* HOW IT IS PRINTED — a pill that carries meaning: it decides which file
+                         this card accepts. Both when a picture has been ordered both ways. */
                       const ms = normalizeMethods(d.methods ?? [])
-                      /* WHAT THE PILL IS A FACT ABOUT. Two of them beside a DSN read as
-                         "this design IS both", which is a property of the picture and not
-                         what this says. It says the picture has been ORDERED both ways — on
-                         DSN-1131, a cotton shirt printed DTG on one order and an apron
-                         embroidered on another. Same artwork, two jobs, and it needs a file
-                         of each kind. The title says so in words; one method needs no
-                         explaining and gets the short form. */
                       const why = ms.length > 1
                         ? `${tl("artwork", "Ordered as")} ${ms.map((m) => m.label).join(" + ")}`
                         : ms[0]?.label
                       return ms.map((m) => (
-                        <span
-                          key={m.key}
+                        <span key={m.key} title={why}
                           className={"shrink-0 rounded-md px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide "
-                            + (m.key === "emb" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}
-                          title={why}
-                        >
+                            + (m.key === "emb" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
                           {m.key}
                         </span>
                       ))
                     })()}
                     {d.name && <span className="min-w-0 truncate text-sm text-muted-foreground">{d.name}</span>}
                   </div>
-                  {/**
-                    * THE COUNT IS A DOOR. "3 orders" was the end of the sentence, and the
-                    * question it leaves is always WHICH — that is what somebody types into
-                    * the order search to go and look at the job. So the count opens the
-                    * numbers rather than a second line carrying them on every card: sixty
-                    * cards each printing three order refs is a wall of digits, and the
-                    * picture stops being the thing you see.
-                    *
-                    * A CARET, because that is what says "this opens". The seller names stay
-                    * beside it and outside the button — they are a fact about the row, not
-                    * part of the control, and §6 already decides they are staff-only.
-                    */}
-                  <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                  {/* THE COUNT IS A DOOR to which orders; the sellers sit beside it (staff-only, §6). */}
+                  <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                     <button
                       type="button"
                       onClick={() => setOpenOrders((k) => (k === d.art_hash ? null : d.art_hash))}
@@ -558,148 +631,137 @@ export function ArtworkLibraryPanel() {
                       <CaretDown size={10} weight="bold" className={"opacity-60 transition-transform " + (open ? "rotate-180" : "")} />
                     </button>
                     <span className="shrink-0" aria-hidden>·</span>
-                    {/* WHO ORDERED IT, named rather than counted when the list is short —
-                        "3 sellers" is the fact a support question starts from, and the names
-                        are what answers it. Staff-only surface; §6 governs where this may
-                        be read, and it is read nowhere else. */}
                     <span className="truncate">
                       {d.seller_names.length <= 2
                         ? d.seller_names.join(", ")
                         : <span title={d.seller_names.join(", ")}>{d.sellers} {tl("artwork", "sellers")}</span>}
                     </span>
                   </div>
+                </div>
 
-                  {/**
-                    * THE ORDERS, NESTED UNDER THE COUNT THAT OPENED THEM.
-                    *
-                    * Inside the card and under a hairline, so it reads as part of this row
-                    * and not as a new one. Each is a LINK to the order: an order number a
-                    * person then has to copy into a search is half an answer.
-                    *
-                    * `text-sm`, not the 12px of the line above it (§4 — a value is not a
-                    * caption). EGF-002247 is read digit by digit and typed somewhere else,
-                    * which is the whole definition of a value; the words around it are
-                    * labels and stay at 12.
-                    */}
-                  {open && (
-                    <div className="mt-2 border-t border-border pt-2">
-                      {d.order_refs?.length ? (
-                        <>
-                          <div className="flex flex-wrap gap-x-3 gap-y-1">
-                            {d.order_refs.map((o) => (
-                              <Link
-                                key={o.id}
-                                href={`/orders/${encodeURIComponent(o.id)}`}
-                                className="text-sm tabular-nums text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                              >
-                                {numOf(o as Parameters<typeof numOf>[0])}
-                              </Link>
-                            ))}
-                          </div>
-                          {d.orders > d.order_refs.length && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              +{d.orders - d.order_refs.length} {tl("artwork", "more")}
-                            </p>
-                          )}
-                        </>
-                      ) : (
-                        /* The listing is capped and an older row may carry none. Say which
-                           it is rather than opening onto nothing (§4). */
-                        <p className="text-xs text-muted-foreground">{tl("artwork", "The orders for this design are not listed here.")}</p>
+                {open && (
+                  <div className="border-t border-border pt-2">
+                    {d.order_refs?.length ? (
+                      <>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                          {d.order_refs.map((o) => (
+                            <Link key={o.id} href={`/orders/${encodeURIComponent(o.id)}`}
+                              className="text-sm tabular-nums text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                              {numOf(o as Parameters<typeof numOf>[0])}
+                            </Link>
+                          ))}
+                        </div>
+                        {d.orders > d.order_refs.length && (
+                          <p className="mt-1 text-xs text-muted-foreground">+{d.orders - d.order_refs.length} {tl("artwork", "more")}</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">{tl("artwork", "The orders for this design are not listed here.")}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* THE ANSWER THE TAB EXISTS FOR: the file we hold, named, and each one opens. */}
+                <div className="space-y-1">
+                  {shown.map((f) => (
+                    <div key={f.design_id} className="flex min-w-0 items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={busy === f.design_id}
+                        onClick={() => void download(f)}
+                        title={`${tl("artwork", "Download")} ${f.file_name || f.design_id}`}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium text-success enabled:hover:underline disabled:cursor-default"
+                      >
+                        {busy === f.design_id
+                          ? <CircleNotch size={14} className="shrink-0 animate-spin" />
+                          : <DownloadSimple size={14} weight="bold" className="shrink-0" />}
+                        <span className="truncate">{f.file_name || tl("artwork", "File on record")}</span>
+                      </button>
+                      {f.own && (f.kind === "emb" || f.kind === "pes") && (
+                        <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          disabled={busy === f.design_id}
+                          title={tl("artwork", "Replace this file — you choose which orders get the new one")}
+                          onClick={() => {
+                            pendingReplace.current = { d, f }
+                            if (replaceRef.current) replaceRef.current.accept = STITCH.join(",")
+                            replaceRef.current?.click()
+                          }}>
+                          <ArrowsClockwise size={12} weight="bold" />
+                          {tl("artwork", "Replace")}
+                        </Button>
                       )}
-                    </div>
-                  )}
-
-                  {/**
-                    * THE ANSWER THE TAB EXISTS FOR, UNDER THE NAME RATHER THAN ACROSS THE
-                    * PAGE FROM IT: do we already hold a stitch file for this picture.
-                    *
-                    * It was pinned to the far end of a full-width row, so the mark that
-                    * answers the question and the picture it answers it about never sat in
-                    * one glance. Here it is the third line of the card — read after what
-                    * the thing is, which is the order the question is actually asked in.
-                    */}
-                  <div className="mt-1.5 space-y-1">
-                    {/**
-                      * EVERY FILE, NAMED, AND EACH ONE OPENS.
-                      *
-                      * "File on record" was a tick: it said a stitch file existed and not
-                      * WHICH, so the only way to check the right one was filed was to find an
-                      * order carrying the artwork. And it showed one — a picture can end up
-                      * with a second file because the first was wrong, or because a second
-                      * placement needs its own, and a card that draws one cannot be used to
-                      * fix either.
-                      *
-                      * A filename is a value, not a caption (§4), so `text-sm`, truncated
-                      * rather than wrapped.
-                      */}
-                    {(d.files ?? []).map((f) => (
-                      <div key={f.design_id} className="flex items-center gap-1">
+                      {f.own && (
                         <button
                           type="button"
                           disabled={busy === f.design_id}
-                          onClick={() => void download(f)}
-                          title={`${tl("artwork", "Download")} ${f.file_name || f.design_id}`}
-                          className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-success enabled:hover:underline disabled:cursor-default"
+                          onClick={() => void removeFile(d, f)}
+                          title={tl("artwork", "Remove this file")}
+                          aria-label={`${tl("artwork", "Remove")} ${f.file_name || f.design_id}`}
+                          className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
                         >
-                          {busy === f.design_id
-                            ? <CircleNotch size={14} className="shrink-0 animate-spin" />
-                            : <DownloadSimple size={14} weight="bold" className="shrink-0" />}
-                          <span className="truncate">{f.file_name || tl("artwork", "File on record")}</span>
+                          <X size={10} weight="bold" />
                         </button>
-                        {f.own && (
-                          <button
-                            type="button"
-                            disabled={busy === f.design_id}
-                            onClick={() => void removeFile(d, f)}
-                            title={tl("artwork", "Remove this file")}
-                            aria-label={`${tl("artwork", "Remove")} ${f.file_name || f.design_id}`}
-                            className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
-                          >
-                            <X size={10} weight="bold" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    {/* THE BUTTON NEVER LEAVES. A card with a file still needs a way to add
-                        the second one or replace a wrong one, and the only way to do that was
-                        to find an order carrying the artwork. It reads "Add file" once there
-                        is one, because that is what it does — the × above removes. */}
-                    {(
+                      )}
+                    </div>
+                  ))}
+                  {/* THE BUTTON NEVER LEAVES — a card with a file still takes a second one.
+                      Ghost, because there are sixty of them on the page. */}
+                  <Button
+                    variant="ghost" size="sm"
+                    className="-ml-2 text-muted-foreground hover:text-foreground"
+                    disabled={busy === d.art_hash}
+                    onClick={() => {
+                      pending.current = d
+                      if (fileRef.current) fileRef.current.accept = acceptFor(d.methods).join(",")
+                      fileRef.current?.click()
+                    }}
+                    title={tl("artwork", "Attach a file for this artwork — you'll see which orders it goes onto before it does")}
+                  >
+                    {busy === d.art_hash
+                      ? <CircleNotch size={14} className="animate-spin" />
+                      : <UploadSimple size={14} weight="bold" />}
+                    {shown.length ? tl("artwork", "Add file") : tl("artwork", "Attach file")}
+                  </Button>
+                </div>
 
-                      /**
-                       * QUIET, BECAUSE THERE ARE SIXTY OF THEM.
-                       *
-                       * It was `outline`, which draws a ring inside a card that is already a
-                       * ring — and on a page where almost every card is waiting for a file,
-                       * sixty outlined buttons are sixty claims to be the main action, which
-                       * is §4's count of 211 outlines happening again on one screen. Ghost
-                       * keeps the hover and the press and drops the second border, so it
-                       * sits at the same weight as the filename that replaces it once a file
-                       * lands — the two states of one slot, drawn alike.
-                       */
-                      <Button
-                        variant="ghost" size="sm"
-                        className="-ml-2 text-muted-foreground hover:text-foreground"
-                        disabled={busy === d.art_hash}
-                        onClick={() => {
-                          pending.current = d
-                          /* ONE INPUT, SET PER PRESS. Sixty pickers mounted is sixty
-                             elements for a control used once; the accept list is the only
-                             thing that differs per card, so it is written on the way in. */
-                          if (fileRef.current) fileRef.current.accept = acceptFor(d.methods).join(",")
-                          fileRef.current?.click()
-                        }}
-                        title={tl("artwork", "Attach the machine file for this artwork — the next order carrying it will be offered this file")}
-                      >
-                        {busy === d.art_hash
-                          ? <CircleNotch size={14} className="animate-spin" />
-                          : <UploadSimple size={14} weight="bold" />}
-                        {d.files?.length ? tl("artwork", "Add file") : tl("artwork", "Attach file")}
-                      </Button>
+                {/**
+                  * HISTORY, FOLDED TO ONE LINE (owner: "should be smaller or collapsible").
+                  * Only on a card with a file of its own — a card with nothing filed has no
+                  * file history to tell.
+                  */}
+                {own.length > 0 && (
+                  <div className="border-t border-border pt-1.5">
+                    <button type="button" onClick={() => toggleHistory(d)} aria-expanded={histOpen}
+                      className="flex h-7 w-full items-center gap-2 text-left text-xs text-muted-foreground hover:text-foreground">
+                      <span className="flex-1">{tl("artwork", "History")}</span>
+                      {Array.isArray(hist) && <span className="tabular-nums">{hist.length}</span>}
+                      <CaretDown size={10} weight="bold" className={"transition-transform " + (histOpen ? "rotate-180" : "")} />
+                    </button>
+                    {histOpen && (
+                      hist === "loading" || !hist ? (
+                        <div className="py-2 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /></div>
+                      ) : hist === "error" ? (
+                        <p className="py-1 text-xs text-destructive">{tl("artwork", "Couldn't load the history.")}</p>
+                      ) : !hist.length ? (
+                        /* Files filed before history was kept have none — say which kind of
+                           empty this is (§4), not a blank. */
+                        <p className="py-1 text-xs text-muted-foreground">{tl("artwork", "Nothing recorded yet — history starts from today.")}</p>
+                      ) : (
+                        <ol className="space-y-2 py-1.5">
+                          {hist.map((r) => (
+                            <li key={r.id} className="space-y-px">
+                              <div className="text-xs font-medium">{historyLine(r, tl)}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(r.ts).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                                {" · "}{r.actor_name || r.actor_email || (r.actor_role === "system" ? tl("artwork", "System") : r.actor_role) || tl("artwork", "System")}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      )
                     )}
                   </div>
-                </div>
+                )}
               </li>
             )})}
           </ul>
@@ -737,6 +799,47 @@ export function ArtworkLibraryPanel() {
           if (picked.length && d) void attachFiles(d, picked)
         }}
       />
+      <input
+        ref={replaceRef}
+        type="file"
+        accept={STITCH.join(",")}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          const p = pendingReplace.current
+          e.target.value = ""
+          pendingReplace.current = null
+          if (file && p) void pickReplacement(p.d, p.f, file)
+        }}
+      />
+
+      {/* KEYED PER UPLOAD, so each opens with its own ticks rather than resetting in an effect. */}
+      {ask && (
+        <LibraryAttachDialog
+          key={ask.seq}
+          fileName={ask.file.name}
+          designNo={ask.d.design_no}
+          attach={ask.preview.attach}
+          needsMethod={ask.preview.needsMethod}
+          notAttached={ask.preview.notAttached}
+          admin={!!ask.preview.admin}
+          busy={busy === ask.d.art_hash}
+          onCancel={() => setAsk(null)}
+          onConfirm={(t) => void confirmAttach(t)}
+        />
+      )}
+      {swap && (
+        <LibraryReplaceDialog
+          key={swap.seq}
+          designNo={swap.d.design_no}
+          oldName={swap.f.file_name || swap.f.design_id}
+          newName={swap.file.name}
+          copies={swap.copies}
+          busy={busy === swap.f.design_id}
+          onCancel={() => setSwap(null)}
+          onConfirm={(scope) => void confirmReplace(scope)}
+        />
+      )}
     </SectionCard>
   )
 }

@@ -10,7 +10,7 @@ import { COST_TYPES } from '../costs.js';
 import { sendImage } from '../image.js';
 import { refreshStaleTracking } from './dispatch.js';
 import { egBroadcast } from '../events.js';
-import { attachLibraryFileForArtwork } from './design_files.js';
+import { attachLibraryFileForArtwork, faceKey } from './design_files.js';
 import { notify } from './notifications.js';
 import { aiComplete } from './support_ai.js';
 import { sendMail, mailConfigured } from '../mailer.js';
@@ -4280,8 +4280,29 @@ export function ordersRoutes(app, requireAuth) {
      * an open board already re-reads on. A method-only save carries no new artwork and is
      * skipped — the picture it is about has already been through here.
      */
+    /* THIS FACE'S KEY, spelled as design_files.faceKey spells it. The design row stores its
+       side lower-cased with 'front' as the default, which is the value the key carries. */
+    const thisFace = faceKey(req.params.id, lineId, sku, side);
     if (artHash && !methodOnly) {
-      attachLibraryFileForArtwork(artHash, req.user).catch(() => {});
+      attachLibraryFileForArtwork(artHash, req.user, [thisFace]).catch(() => {});
+    }
+    /**
+     * …EXCEPT WHEN THE METHOD-ONLY SAVE IS WHAT MADE THE FACE EMBROIDERY.
+     *
+     * The picture has been through here, but it went through as DTG (or as nothing), so the
+     * library skipped it — a stitch file has no machine there. Switching the face to
+     * Embroidery afterwards left it waiting, and billed for digitising, until someone
+     * re-saved the artwork. The face's stored art_hash is the picture; nothing is re-read.
+     */
+    /* skipLibrary: the Design Lab dialog sets the method and attaches in one request of its
+       own; attaching here as well would race it onto the same face. */
+    if (methodOnly && method && /emb|stitch|embroid/i.test(method) && !(req.body || {}).skipLibrary) {
+      q(`select art_hash from order_designs
+          where order_id = $1 and coalesce('L:' || line_id, 'S:' || sku) = $2
+            and coalesce(side, 'front') = $3 and art_hash is not null limit 1`,
+        [req.params.id, lineId ? 'L:' + lineId : 'S:' + sku, side])
+        .then((r) => r.rows[0] && attachLibraryFileForArtwork(r.rows[0].art_hash, req.user, [thisFace]))
+        .catch(() => {});
     }
     /* WHAT THIS PLACEMENT COST, when it cost anything. The caller has just moved the seller's
        money and has to be able to say so on the spot — a debit discovered later on a statement

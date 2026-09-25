@@ -1993,7 +1993,10 @@ export type DesignFileRow = { designId: string; sku?: string | null; lineId?: st
    * reader showing a face's files must ask for BOTH this face and the line-wide ones, or a
    * file that legitimately applies everywhere disappears from every surface.
    */
-  side?: string | null }
+  side?: string | null
+  /** STAFF ONLY: the Design Lab library put this file here, off artwork DSN-<design_no>.
+   *  Never sent to a seller (§6). */
+  library?: { design_no: number | null } }
 
 /** Which files apply to THIS line: its own, else the order-wide ones. Line beats whole-order,
  *  the same precedence designForLine uses for artwork — so a file filed against one item
@@ -2074,7 +2077,13 @@ export function uploadDesignFile(body: { designId: string; orderId?: string; sku
    * is the factory library's whole situation. Omitted on an ordinary per-order upload,
    * which keeps resolving through the order's own line exactly as before.
    */
-  artHash?: string | null }) {
+  artHash?: string | null
+  /**
+   * WHAT THE PERSON TICKED in the Design Lab attach dialog — face keys from
+   * `getLibraryPreview`, `setMethod` on a face that had none. Omitted = the old behaviour
+   * (every face waiting on this artwork); `[]` = file it and attach to nothing.
+   */
+  targets?: { key: string; setMethod?: boolean }[] }) {
   return api<{ ok?: boolean; stored?: string; error?: string
     /**
      * HOW MANY ORDERS IT LANDED ON. A file filed against artwork with no order behind it
@@ -2143,6 +2152,41 @@ export function getFactoryDesigns(opts: { seller?: string | null; q?: string; li
     /** Design rows carrying artwork but no fingerprint, so an empty library can say WHICH
      *  kind of empty it is: nothing printed, or nothing hashed yet. */
     unhashed?: number }>(`/api/design_files/library${qs ? `?${qs}` : ""}`)
+}
+/** One face a library file could land on — see libraryCandidates in design_files.js. */
+export type LibraryFace = {
+  key: string
+  order_id: string; ref_no?: number | string | null; seq?: number | null
+  line_id: string | null; sku: string | null; side: string | null
+  item: string | null; method: string | null
+  /** Normalised stage id ('' = new/draft) — the line's when it has one, else the order's. */
+  stage: string
+  seller: string | null
+  /** Still the seller's draft: the file may go on, the method is theirs to set. */
+  seller_draft: boolean
+  /** The design fee was already charged — attaching changes no money on this one. */
+  charged: boolean
+  /** Only on `notAttached`: a method that runs no stitches, or a finished order. */
+  reason?: "method" | "finished"
+}
+/** What filing a stitch file against this artwork WOULD do. Staff only. */
+export function getLibraryPreview(artHash: string) {
+  return api<{ attach: LibraryFace[]; needsMethod: LibraryFace[]; notAttached: LibraryFace[]; admin?: boolean; error?: string }>(
+    `/api/design_files/library/${encodeURIComponent(artHash)}/preview`)
+}
+/** A library file's copies on orders, and whether "Unshipped" reaches each. Staff only. */
+export type LibraryCopy = {
+  design_id: string; order_id: string; ref_no?: number | string | null; seq?: number | null
+  line_id: string | null; side: string | null; item: string | null; stage: string
+  /** Nothing stitched yet — the "Unshipped" choice swaps this one. */
+  unshipped: boolean
+}
+export function getLibraryCopies(designId: string) {
+  return api<{ copies: LibraryCopy[]; error?: string }>(`/api/design_files/library/file/${encodeURIComponent(designId)}/copies`)
+}
+export function replaceLibraryFile(designId: string, body: { name: string; mime?: string; data: string; scope: "unshipped" | "all" }) {
+  return api<{ ok?: boolean; designId?: string; fileName?: string; swapped?: number; kept?: number; error?: string }>(
+    `/api/design_files/library/file/${encodeURIComponent(designId)}/replace`, { method: "POST", body: JSON.stringify(body) })
 }
 export function getFactoryDesignSellers() {
   return api<{ sellers: { id: string; name: string; designs: number }[] }>(`/api/design_files/library/sellers`)

@@ -534,6 +534,13 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                           : null
                     )}
                     {scopeLabel(f)}{k.hint}
+                    {/* WHERE IT CAME FROM, when the Design Lab library put it here — staff
+                        only, the server never sends it to a seller (§6). The DSN is the card
+                        to go to to replace it everywhere; the × on this row takes it off
+                        this order alone. */}
+                    {f.library && (
+                      <> · {tl("designFiles", "From library")}{f.library.design_no != null ? ` · DSN-${f.library.design_no}` : ""}</>
+                    )}
                   </div>
                 </div>
 

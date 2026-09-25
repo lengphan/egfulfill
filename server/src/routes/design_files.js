@@ -3,7 +3,7 @@
 // never reached another device. Bytes are stored inline as a base64 data-URL string, keyed by the
 // design id (DL-…/DSN-…). Access-controlled: staff any; a seller only their OWN files (seller_id,
 // resolved from the order the design belongs to; a seller's active team member counts as the owner).
-import { q } from '../db.js';
+import { q, pool } from '../db.js';
 import { readAll } from './factory_settings.js';
 import { isStaff, canMoveMoney } from '../auth.js';
 import { storageEnabled, putObject, getObject, fromDataUrl } from '../storage.js';
@@ -11,7 +11,129 @@ import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
 import { phashDistance, PHASH_NEAR } from '../fingerprint.js';
+/* Circular with orders.js (which imports attachLibraryFileForArtwork from here). Safe: both
+   sides only CALL the other's functions at request time, never at module load. */
+import { normalizeStage } from './orders.js';
 
+
+/** A stage id that means the order is finished with: nothing is attached to it and nothing
+ *  on it is swapped unless someone chooses "All orders". Read through normalizeStage so the
+ *  aliases (fulfilled, delivered, in_transit …) land where the ladder puts them. */
+const FINISHED_STAGES = new Set(['shipped', 'cancelled', 'refunded']);
+/** Stages before anything has been stitched. "Unshipped" on Replace means THESE: an order at
+ *  working has already been hooped, and swapping its file would make the record claim a
+ *  file the machine never ran. on_hold is left out because a hold can come from any stage,
+ *  and "probably not stitched yet" is not good enough for a record. */
+const UNSTITCHED_STAGES = new Set(['', 'in_review', 'approved']);
+const STITCH_RE = /emb|stitch|embroid/i;
+
+/** The face's key as the dialog and the attach route both spell it. */
+export const faceKey = (orderId, lineId, sku, side) =>
+  `${orderId}|${lineId ? 'L:' + lineId : 'S:' + (sku || '')}|${side || ''}`;
+
+/**
+ * EVERY FACE CARRYING THIS EXACT ARTWORK, sorted into what a library file may do to it.
+ *
+ * ONE ANSWER for the automatic attach, the Design Lab preview and the dialog's confirm, so
+ * the list a person reads is the list that gets written (§5 — a preview computed by a second
+ * query is a promise the write does not keep).
+ *
+ *   attach       an embroidered face (its own method, else the line's) with no stitch file,
+ *                on an order that is not finished
+ *   needsMethod  the same, except neither the face nor the line says how it is decorated —
+ *                a person may attach there, never the automatic path
+ *   notAttached  a face with a method that runs no stitches, or on a finished order; listed
+ *                so the dialog can say why, never written to
+ *
+ * A face that already has a stitch file is omitted entirely: filling gaps is the whole job,
+ * and it never overwrites (§2.6).
+ */
+export async function libraryCandidates(artHash) {
+  const h = String(artHash || '').toLowerCase();
+  const out = { attach: [], needsMethod: [], notAttached: [] };
+  if (!/^[0-9a-f]{64}$/.test(h)) return out;
+  const rows = await q(
+    `select distinct on (d.order_id, coalesce('L:' || d.line_id, 'S:' || d.sku), lower(coalesce(d.side, '')))
+            d.order_id, d.line_id, d.sku,
+            nullif(lower(trim(coalesce(d.side, ''))), '') as side,
+            nullif(trim(coalesce(d.method, '')), '') as face_method,
+            i.print_type, i.name as item_name, i.color, i.size,
+            i.factory_status as line_stage, i.design_charged_at,
+            o.factory_status as order_stage, o.factory_order, o.seller_id, o.ref_no, o.seq,
+            coalesce(u.store_name, u.name, u.email) as seller,
+            exists (
+              select 1 from design_file_data f
+               where f.order_id = d.order_id
+                 and f.kind in ('pes','emb')
+                 and ( (d.line_id is not null and f.line_id = d.line_id)
+                    or (d.line_id is null and f.sku is not null and f.sku = d.sku)
+                    or (f.line_id is null and f.sku is null) )
+                 and ( coalesce(f.side, '') = '' or lower(f.side) = lower(coalesce(d.side, '')) )
+            ) as answered
+       from order_designs d
+       /* The line it would land on is REQUIRED: a design row whose sku matches no item has
+          no line to be a file for (see the note this replaced, in git history). */
+       join order_items i on i.order_id = d.order_id
+        and ( (d.line_id is not null and i.line_id = d.line_id)
+           or (d.line_id is null and i.sku = d.sku) )
+       join orders o on o.id = d.order_id
+       left join users u on u.id = o.seller_id
+      where d.art_hash = $1
+      order by d.order_id, coalesce('L:' || d.line_id, 'S:' || d.sku), lower(coalesce(d.side, '')), d.updated_at desc nulls last`,
+    [h]).then((r) => r.rows).catch(() => []);
+
+  for (const r of rows) {
+    if (r.answered) continue;
+    const orderStage = normalizeStage(r.order_stage);
+    const lineStage = normalizeStage(r.line_stage);
+    const method = r.face_method || r.print_type || '';
+    const stitches = STITCH_RE.test(method) || /-emb$/i.test(String(r.sku || ''));
+    const row = {
+      key: faceKey(r.order_id, r.line_id, r.sku, r.side),
+      order_id: r.order_id, ref_no: r.ref_no ?? null, seq: r.seq ?? null,
+      line_id: r.line_id || null, sku: r.sku || null, side: r.side || null,
+      item: [r.item_name, [r.color, r.size].filter(Boolean).join(' / ')].filter(Boolean).join(' · ') || null,
+      method: method || null,
+      /* The line's own stage when it has one, else the order's — a line can be ahead of its
+         order, and the line is what gets hooped. */
+      stage: lineStage || orderStage,
+      seller: r.seller || null,
+      /* Still the seller's draft: staff may attach (the file is ours to supply), but what the
+         seller ORDERED is theirs, so the method is not ours to set. Admin excepted. */
+      seller_draft: !r.factory_order && orderStage === '',
+      charged: !!r.design_charged_at,
+    };
+    if (FINISHED_STAGES.has(orderStage) || FINISHED_STAGES.has(lineStage)) {
+      out.notAttached.push({ ...row, reason: 'finished' });
+    } else if (!method && !stitches) {
+      out.needsMethod.push(row);
+    } else if (!stitches) {
+      out.notAttached.push({ ...row, reason: 'method' });
+    } else {
+      out.attach.push(row);
+    }
+  }
+  return out;
+}
+
+/** The stage a copy's order and line are at, for Replace. */
+async function copyStages(copies) {
+  const ids = [...new Set(copies.map((c) => c.order_id))];
+  if (!ids.length) return new Map();
+  const r = await q(
+    `select o.id, o.factory_status as order_stage, o.ref_no, o.seq,
+            i.line_id, i.sku, i.name as item_name, i.factory_status as line_stage
+       from orders o left join order_items i on i.order_id = o.id
+      where o.id = any($1::text[])`, [ids]).then((x) => x.rows).catch(() => []);
+  const m = new Map();
+  for (const x of r) {
+    const key = x.id;
+    const o = m.get(key) || { ref_no: x.ref_no, seq: x.seq, order_stage: normalizeStage(x.order_stage), lines: [] };
+    o.lines.push({ line_id: x.line_id, sku: x.sku, name: x.item_name, stage: normalizeStage(x.line_stage) });
+    m.set(key, o);
+  }
+  return m;
+}
 
 /**
  * A FILE FILED AGAINST ARTWORK GOES ONTO THE ORDERS WAITING FOR IT — no press, no prompt.
@@ -37,7 +159,7 @@ import { phashDistance, PHASH_NEAR } from '../fingerprint.js';
  * already digitised. An order already charged keeps its charge; nothing here reverses one,
  * the same rule the delete route records.
  */
-export async function applyToWaitingLines(srcDesignId, artHash, user) {
+export async function applyToWaitingLines(srcDesignId, artHash, user, targets = null, { auto = false } = {}) {
   if (!/^[0-9a-f]{64}$/.test(String(artHash || ''))) return [];
   const src = await q('select * from design_file_data where design_id=$1', [String(srcDesignId)])
     .then((r) => r.rows[0]);
@@ -46,60 +168,23 @@ export async function applyToWaitingLines(srcDesignId, artHash, user) {
      confusion the two kinds exist to prevent. */
   if (!src || !['pes', 'emb'].includes(String(src.kind))) return [];
 
-  const waiting = await q(
-    `select distinct d.order_id, d.line_id, d.sku,
-            /* THE FACE, and null when the design row has none. A row written before sides
-               existed has no face to land on, and null is what every reader already means
-               by "this whole line" — so old data keeps behaving exactly as it did. */
-            nullif(lower(trim(coalesce(d.side, ''))), '') as side
-       from order_designs d
-       /* THE LINE IT WOULD LAND ON. Required, not optional: a design row whose sku matches
-          no item on the order has no line to be a file FOR, and attaching there produced a
-          stitch file floating on the order, attributed to nothing, which the fee engine
-          cannot see and a person cannot place. */
-       join order_items i on i.order_id = d.order_id
-        and ( (d.line_id is not null and i.line_id = d.line_id)
-           or (d.line_id is null and i.sku = d.sku) )
-      where d.art_hash = $1
-        /**
-         * ONLY AN EMBROIDERED FACE TAKES A STITCH FILE.
-         *
-         * Without this it attached a .EMB to a DTG shirt and to an appliqué line, because the
-         * artwork is what matched and artwork has no method. The floor then finds a stitch
-         * file on a job no machine will hoop.
-         *
-         * THE SAME TEST designLines ALREADY USES, verbatim: a face with its own method is
-         * taken at its word, one that says nothing inherits the line. Two spellings of "is
-         * this embroidery" is how the fee engine and the file engine come to disagree about
-         * the same line (§5).
-         */
-        and (d.method ~* 'emb' or (coalesce(d.method, '') = '' and coalesce(i.print_type, '') ~* 'emb'))
-        /**
-         * IS THIS FACE ALREADY ANSWERED? — per FACE, not per line.
-         *
-         * It used to ask whether the LINE had any stitch file, so a cap with a file on the
-         * front and nothing on the back was "done" and the back never got one. A face is
-         * answered by a file ON that face, or by a file with no face at all — which is what
-         * every reader here already means by "covers the whole line" (designLines keeps a
-         * sideless file as '' and reads it exactly that way).
-         */
-        and not exists (
-          select 1 from design_file_data f
-           where f.order_id = d.order_id
-             and f.kind in ('pes','emb')
-             and (
-               /* the same line, the same sku-scoped file, or a file that covers the whole
-                  order — any of the three reaches this line */
-               (d.line_id is not null and f.line_id = d.line_id)
-               or (d.line_id is null and f.sku is not null and f.sku = d.sku)
-               or (f.line_id is null and f.sku is null)
-             )
-             and (
-               coalesce(f.side, '') = ''
-               or lower(f.side) = lower(coalesce(d.side, ''))
-             )
-        )`, [String(artHash)]).then((r) => r.rows).catch(() => []);
-
+  /**
+   * WHICH FACES, AND WHO CHOSE THEM.
+   *
+   * No `targets` — the automatic path (artwork arrived on a line we already hold a file for):
+   * every face in the `attach` group, exactly what this did before, minus finished orders.
+   *
+   * `targets` — the Design Lab dialog, where a person has read the list and unticked what
+   * they did not want. Only those keys, and only from `attach` or `needsMethod`: a key the
+   * preview put under `notAttached` (a DTG face, a shipped order) is refused here even if a
+   * client sends it, because the dialog is a view of this rule, not a way round it.
+   */
+  const groups = await libraryCandidates(artHash);
+  /* The automatic path never reaches a needsMethod face — only a person may decide one is
+     embroidery — and, given keys, touches only those faces (see attachLibraryFileForArtwork). */
+  const pool = auto ? groups.attach : [...groups.attach, ...groups.needsMethod];
+  const allowed = targets ? pool.filter((c) => targets.has(c.key)) : groups.attach;
+  const waiting = allowed.map((c) => ({ order_id: c.order_id, line_id: c.line_id, sku: c.sku, side: c.side }));
   const done = [];
   for (const w of waiting) {
     /* The order's own seller, read here rather than through the routes' ownerOfOrder —
@@ -126,9 +211,10 @@ export async function applyToWaitingLines(srcDesignId, artHash, user) {
             the second is never billed and the floor is told a face is ready that is not.
             Null only when the design row itself has no face. */
          w.side || null]);
-      audit({ user }, 'design_file.auto_attached', {
+      audit({ user }, targets && !auto ? 'design_file.library_attached' : 'design_file.auto_attached', {
         entityType: 'order', entityId: String(w.order_id),
-        after: { from: String(srcDesignId), to: newId, line_id: w.line_id || null, sku: w.sku || null, art_hash: String(artHash) },
+        after: { from: String(srcDesignId), to: newId, name: src.file_name || null, line_id: w.line_id || null,
+                 sku: w.sku || null, side: w.side || null, art_hash: String(artHash) },
       });
       /* The boards re-read on this ping, so an order open on somebody's screen picks the
          file up without a reload — the same broadcast an ordinary upload sends. */
@@ -152,7 +238,7 @@ export async function applyToWaitingLines(srcDesignId, artHash, user) {
  * the corrected one, and the same choice the reuse panel already makes when it offers the
  * first of several.
  */
-export async function attachLibraryFileForArtwork(artHash, user) {
+export async function attachLibraryFileForArtwork(artHash, user, faceKeys = null) {
   const h = String(artHash || '').toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(h)) return [];
   const src = await q(
@@ -161,7 +247,21 @@ export async function attachLibraryFileForArtwork(artHash, user) {
       order by created_at desc nulls last
       limit 1`, [h]).then((r) => r.rows[0]).catch(() => null);
   if (!src) return [];
-  return applyToWaitingLines(src.design_id, h, user);
+  /* ONLY THE FACE THAT JUST ARRIVED, when the caller names it. Attaching to every waiting
+     face of the picture undid the dialog: a face somebody deliberately left unticked would
+     take the file the next time ANY order saved the same artwork. */
+  const done = await applyToWaitingLines(src.design_id, h, user,
+    faceKeys ? new Set(faceKeys) : null, { auto: true });
+  /* ON THE ARTWORK'S OWN HISTORY TOO. Each order already records the attach; the library
+     card reads the artwork's entity, and "it went onto EGF-002098 by itself" is exactly the
+     line a person looks there for. */
+  if (done.length) {
+    audit({ user }, 'design_file.auto_attached', {
+      entityType: 'artwork', entityId: h,
+      after: { from: src.design_id, orders: [...new Set(done.map((d) => d.order_id))], lines: done.length },
+    });
+  }
+  return done;
 }
 
 export function designFilesRoutes(app, requireAuth) {
@@ -669,6 +769,155 @@ export function designFilesRoutes(app, requireAuth) {
     return { sellers: r.map((x) => ({ id: x.id, name: x.name, designs: Number(x.designs) || 0 })) };
   });
 
+  /**
+   * WHAT FILING A STITCH FILE AGAINST THIS ARTWORK WOULD DO — before it does it.
+   *
+   * The Design Lab dialog is drawn from this, and the confirm posts back the keys it chose;
+   * both read libraryCandidates, so what a person ticked is what gets written. Staff only,
+   * for the same reason as the library: the rows name every seller carrying the picture.
+   */
+  app.get('/api/design_files/library/:artHash/preview', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const h = String(req.params.artHash || '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(h)) { reply.code(400); return { error: 'bad artwork' }; }
+    return { ...(await libraryCandidates(h)), admin: req.user.role === 'admin' };
+  });
+
+  /** The orders that hold a copy of this library file, and whether "Unshipped" reaches each. */
+  async function copiesOf(src) {
+    const rows = await q(
+      `select design_id, order_id, line_id, sku, side, file_name, kind
+         from design_file_data
+        where order_id is not null and art_hash = $1 and kind in ('pes','emb')
+          and ( ($2::text is not null and storage_key = $2)
+             or ($3::text is not null and content_hash = $3)
+             /* Inline storage with no hash on record: the name is all that is left. */
+             or ($2::text is null and $3::text is null and file_name = $4) )`,
+      [src.art_hash, src.storage_key || null, src.content_hash || null, src.file_name || '']).then((r) => r.rows).catch(() => []);
+    const stages = await copyStages(rows);
+    return rows.map((c) => {
+      const o = stages.get(c.order_id) || { lines: [], order_stage: '' };
+      const line = o.lines.find((l) => (c.line_id ? l.line_id === c.line_id : c.sku && l.sku === c.sku)) || null;
+      const stage = (line && line.stage) || o.order_stage || '';
+      return {
+        design_id: c.design_id, order_id: c.order_id, ref_no: o.ref_no ?? null, seq: o.seq ?? null,
+        line_id: c.line_id || null, side: c.side || null, item: line ? line.name || null : null, stage,
+        unshipped: UNSTITCHED_STAGES.has(stage) && UNSTITCHED_STAGES.has(o.order_stage || ''),
+      };
+    });
+  }
+
+  async function libraryFile(designId) {
+    const src = await q(
+      `select * from design_file_data where design_id=$1 and order_id is null and kind in ('pes','emb')`,
+      [String(designId)]).then((r) => r.rows[0]).catch(() => null);
+    return src && /^[0-9a-f]{64}$/.test(String(src.art_hash || '')) ? src : null;
+  }
+
+  app.get('/api/design_files/library/file/:designId/copies', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const src = await libraryFile(req.params.designId);
+    if (!src) { reply.code(404); return { error: 'No such library file.' }; }
+    return { copies: await copiesOf(src) };
+  });
+
+  /**
+   * REPLACE A LIBRARY FILE — and, if asked, the copies it already put on orders.
+   *
+   * Without this a corrected file only ever reached NEW orders: the attach fills gaps and
+   * never overwrites, so every order that took the wrong file kept it, silently.
+   *
+   *   scope 'unshipped'  copies on orders nothing has been stitched for yet (UNSTITCHED_STAGES)
+   *   scope 'all'        every copy, shipped included — the record then says which file it
+   *                      carries NOW, so each one is audited with before AND after
+   *
+   * A copy is swapped IN PLACE — same design_id, new bytes — so whatever already points at
+   * it (the download button, the readiness tag) follows. Charges are not touched: a check
+   * fee billed for the old file paid for a person's time, the same rule the delete route keeps.
+   *
+   * The new file is stored through POST /api/design_files like any other upload (targets: []
+   * so it fans out onto nothing new), and the old library row is removed — newest-wins would
+   * pick the new one anyway, and a card listing both invites attaching the wrong one again.
+   * The old object is NOT deleted: copies left on it (a shipped order under 'unshipped')
+   * still download.
+   */
+  app.post('/api/design_files/library/file/:designId/replace', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const b = req.body || {};
+    const scope = b.scope === 'all' ? 'all' : 'unshipped';
+    const src = await libraryFile(req.params.designId);
+    if (!src) { reply.code(404); return { error: 'No such library file.' }; }
+    if (!b.data || !b.name) { reply.code(400); return { error: 'data + name required' }; }
+    const nextKind = kindOf(b.name, b.mime);
+    if (!['pes', 'emb'].includes(nextKind)) { reply.code(400); return { error: `${b.name} is not a stitch file.` }; }
+
+    const newId = `ART-${src.art_hash.slice(0, 16)}-${Date.now().toString(36)}`;
+    const up = await app.inject({
+      method: 'POST', url: '/api/design_files',
+      headers: { authorization: req.headers.authorization || '' },
+      payload: { designId: newId, name: b.name, mime: b.mime, data: b.data, hash: b.hash, artHash: src.art_hash, targets: [], replacing: true },
+    });
+    if (up.statusCode >= 400) { reply.code(up.statusCode); return up.json(); }
+    const next = await q('select * from design_file_data where design_id=$1', [newId]).then((r) => r.rows[0]);
+    if (!next) { reply.code(500); return { error: "The new file didn't save." }; }
+
+    const copies = await copiesOf(src);
+    const swap = copies.filter((c) => scope === 'all' || c.unshipped);
+    /**
+     * ALL OR NOTHING. Every copy swapped and the old library row removed in ONE transaction:
+     * a failure halfway would leave some orders on the new file and some on the old, two
+     * library files for one picture (newest-wins then attaching the new one to later orders
+     * while the failed copies were never fixed), and no history entry saying any of it
+     * happened. On failure the new library file is withdrawn too, so the answer is simply
+     * "nothing changed".
+     */
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      for (const c of swap) {
+        await client.query(
+          `update design_file_data
+              set file_name=$2, mime=$3, data=$4, url=$5, storage_key=$6, content_hash=$7, kind=$8, updated_at=now()
+            where design_id=$1`,
+          [c.design_id, next.file_name, next.mime, next.data, next.url, next.storage_key, next.content_hash, next.kind]);
+      }
+      await client.query('delete from design_file_data where design_id=$1', [src.design_id]);
+      await client.query('commit');
+    } catch (e) {
+      await client.query('rollback').catch(() => {});
+      await q('delete from design_file_data where design_id=$1', [newId]).catch(() => {});
+      reply.code(500);
+      return { error: "The file couldn't be replaced — nothing was changed. Try again." };
+    } finally {
+      client.release();
+    }
+    /* Recorded only once it is true — after the commit. */
+    for (const c of swap) {
+      audit(req, 'design_file.replaced', {
+        entityType: 'order', entityId: String(c.order_id),
+        before: { name: src.file_name, design_id: src.design_id },
+        after: { name: next.file_name, design_id: newId, line_id: c.line_id, side: c.side, stage: c.stage || 'new', scope },
+      });
+      egBroadcast({ type: 'design-file', orderId: String(c.order_id), sku: null, kind: next.kind });
+    }
+    /* A SELLER WHO CAN SEE THE FILE IS TOLD IT CHANGED. Only the paid deliverable (.pes) is
+       theirs to see; a factory .emb changing is not news to them. One note per order. */
+    if (next.kind === 'pes') {
+      for (const orderId of new Set(swap.map((c) => c.order_id))) {
+        const seller = await ownerOfOrder(orderId, null);
+        if (seller) notify({ userIds: [seller], type: 'design-file', title: 'Your design file was updated',
+          body: `${src.file_name} → ${next.file_name}`, href: `/orders/${orderId}`, entityId: String(orderId) }).catch(() => {});
+      }
+    }
+    audit(req, 'design_file.library_replaced', {
+      entityType: 'artwork', entityId: src.art_hash,
+      before: { name: src.file_name, design_id: src.design_id },
+      after: { name: next.file_name, design_id: newId, scope, swapped: swap.length,
+               kept: copies.length - swap.length, orders: [...new Set(swap.map((c) => c.order_id))] },
+    });
+    return { ok: true, designId: newId, fileName: next.file_name, swapped: swap.length, kept: copies.length - swap.length };
+  });
+
   app.get('/api/orders/:id/design_reuse', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     return { lines: await reuseForOrder(String(req.params.id)) };
@@ -786,6 +1035,46 @@ export function designFilesRoutes(app, requireAuth) {
       reply.code(400);
       return { error: 'Send the file itself, not a link to it — a link would overwrite the file with its own text.' };
     }
+    /**
+     * FILING AGAINST ARTWORK IS THE FACTORY'S. A file with an artHash and no order fans out
+     * onto every order carrying that picture — any seller's — so a seller able to send one
+     * could put their file on somebody else's job. The ownership test above cannot see
+     * that: with no order, the "owner" falls back to the caller themselves.
+     */
+    if (!b.orderId && b.artHash && !isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    /**
+     * A STITCH FILE ON A FACE THAT RUNS NO STITCHES IS REFUSED HERE TOO.
+     *
+     * machine_files' attach refused it and the design canvas refused it, but this route —
+     * the one an order-page upload actually calls — took whatever it was sent, so any other
+     * caller could put a .EMB on a DTG back and the floor would find a file for a job no
+     * machine will hoop. The same test as the attach route, verbatim: the face's own method,
+     * else the line's; nothing set means nothing to refuse on.
+     */
+    const lineForCheck = (b.lineId || b.line_id) ? String(b.lineId || b.line_id) : null;
+    if (b.orderId && lineForCheck && ['pes', 'emb'].includes(kindOf(b.name, b.mime))) {
+      const faceSide = b.side ? String(b.side).trim().toLowerCase() : '';
+      const line = await q('select sku, print_type from order_items where order_id=$1 and line_id=$2 limit 1',
+        [String(b.orderId), lineForCheck]).then((r) => r.rows[0]).catch(() => null);
+      if (line) {
+        const faceMethod = faceSide
+          ? await q(
+              `select method from order_designs
+                where order_id = $1
+                  and (line_id = $2 or (line_id is null and coalesce(sku,'') = coalesce($3,'')))
+                  and lower(coalesce(side,'')) = $4 and coalesce(method,'') <> ''
+                limit 1`, [String(b.orderId), lineForCheck, line.sku, faceSide]
+            ).then((r) => String(r.rows[0]?.method || '')).catch(() => '')
+          : '';
+        const effective = String(faceMethod || line.print_type || '');
+        if (effective && !/emb|stitch|embroid/i.test(effective) && !/-emb$/i.test(String(line.sku || ''))) {
+          reply.code(409);
+          return { error: faceSide
+            ? `The ${faceSide} of that line is ${effective} — a stitch file has no machine to run there, so it was not saved.`
+            : `That line is ${effective} — a stitch file has no machine to run on it, so it was not saved.` };
+        }
+      }
+    }
     // Prefer object storage (Spaces/S3) — keep the big base64 OUT of Postgres. Falls back to inline.
     let data = String(b.data), url = null, storageKey = null;
     if (storageEnabled()) {
@@ -890,8 +1179,43 @@ export function designFilesRoutes(app, requireAuth) {
      */
     let attached = [];
     if (!b.orderId && b.artHash) {
-      attached = await applyToWaitingLines(String(b.designId), String(b.artHash).toLowerCase(), req.user)
-        .catch(() => []);
+      const h = String(b.artHash).toLowerCase();
+      /**
+       * `targets` IS WHAT THE PERSON TICKED in the Design Lab dialog: face keys, some with
+       * `setMethod`. Absent means an older client, which keeps the old behaviour (every face
+       * in the attach group). An EMPTY list is a real answer — "file it, attach to nothing".
+       */
+      let targets = null;
+      if (Array.isArray(b.targets)) {
+        targets = new Set(b.targets.map((t) => String((t && t.key) || '')).filter(Boolean));
+        /* SET THE METHOD FIRST, through the design route itself rather than a column write
+           here — that route is where a newly-decorated face is surcharged and audited, and a
+           second writer would skip both. Only faces the preview put under needsMethod, and
+           never on a seller's draft unless the caller is admin: what they ORDERED is theirs. */
+        const wantMethod = new Set(b.targets.filter((t) => t && t.setMethod).map((t) => String(t.key)));
+        if (wantMethod.size) {
+          const { needsMethod } = await libraryCandidates(h);
+          const admin = req.user && req.user.role === 'admin';
+          for (const c of needsMethod) {
+            if (!wantMethod.has(c.key) || (c.seller_draft && !admin)) continue;
+            await app.inject({
+              method: 'POST', url: `/api/orders/${encodeURIComponent(c.order_id)}/designs`,
+              headers: { authorization: req.headers.authorization || '' },
+              payload: { line_id: c.line_id || undefined, sku: c.sku || undefined, side: c.side || 'front', method: 'Embroidery', skipLibrary: true },
+            }).catch(() => null);
+          }
+        }
+      }
+      attached = await applyToWaitingLines(String(b.designId), h, req.user, targets).catch(() => []);
+      /* THE ARTWORK'S OWN HISTORY — the library card reads this entity. Written even when
+         nothing was waiting, because "filed for future orders" is the event. */
+      /* Replace stores its new file through here and writes its own, better entry. */
+      if (!b.replacing) audit(req, 'design_file.library_added', {
+        entityType: 'artwork', entityId: h,
+        after: { name: b.name || String(b.designId), design_id: String(b.designId),
+                 orders: [...new Set(attached.map((d) => d.order_id))], lines: attached.length,
+                 left_out: targets ? Math.max(0, (await libraryCandidates(h)).attach.length) : 0 },
+      });
     }
     /**
      * A SELLER'S OWN MACHINE FILE enters the verification queue.
@@ -976,7 +1300,7 @@ export function designFilesRoutes(app, requireAuth) {
    */
   app.delete('/api/design_files/:designId', { preHandler: requireAuth }, async (req, reply) => {
     const designId = String(req.params.designId || '');
-    const row = await q('select order_id, sku, file_name, kind from design_file_data where design_id=$1', [designId]).then((r) => r.rows[0]);
+    const row = await q('select order_id, sku, file_name, kind, art_hash, line_id, side from design_file_data where design_id=$1', [designId]).then((r) => r.rows[0]);
     if (!row) { reply.code(404); return { error: 'File not found.' }; }
     const staff = isStaff(req.user);
     const admin = !!req.user && req.user.role === 'admin';
@@ -1009,6 +1333,16 @@ export function designFilesRoutes(app, requireAuth) {
       }
     }
     await q('delete from design_file_data where design_id=$1', [designId]);
+    /* THE ARTWORK'S HISTORY HEARS OF IT TOO — a library file removed wrote nothing at all
+       before (the audit below is order-only), and a copy taken off one order is the "Removed
+       from EGF-…" line the library card shows. */
+    if (/^[0-9a-f]{64}$/.test(String(row.art_hash || '')) && ['pes', 'emb'].includes(String(row.kind))) {
+      audit(req, row.order_id ? 'design_file.removed' : 'design_file.library_removed', {
+        entityType: 'artwork', entityId: String(row.art_hash),
+        before: { name: row.file_name || designId, design_id: designId },
+        after: row.order_id ? { order_id: String(row.order_id), line_id: row.line_id || null, side: row.side || null } : null,
+      });
+    }
     if (row.order_id) {
       audit(req, 'design_file.removed', {
         entityType: 'order', entityId: String(row.order_id),
@@ -1164,8 +1498,25 @@ export function designFilesRoutes(app, requireAuth) {
         paid: x.source === 'seller' || (Number(x.price) || 0) <= 0 || (await isPaid(x, eff)),
       })));
     }
+    /**
+     * WHERE A FILE CAME FROM, when the library put it here — STAFF ONLY.
+     *
+     * An order-page upload never carries an artwork hash; only the Design Lab library's
+     * attach does, so a row with one is a library copy, and its DSN is the card to go to.
+     * Never on the seller branch above: §6 — a seller must not learn their file came off
+     * artwork another shop also ordered.
+     */
+    const hashes = await q('select design_id, art_hash from design_file_data where order_id=$1 and art_hash is not null', [orderId])
+      .then((x) => x.rows).catch(() => []);
+    const dsn = new Map();
+    if (hashes.length) {
+      const ids = await q('select art_hash, design_no from design_ids where art_hash = any($1::text[])', [[...new Set(hashes.map((h) => h.art_hash))]])
+        .then((x) => new Map(x.rows.map((y) => [y.art_hash, Number(y.design_no)]))).catch(() => new Map());
+      for (const h of hashes) dsn.set(h.design_id, ids.get(h.art_hash) ?? null);
+    }
     // Staff (every factory board) see every file on the order.
-    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, lineId: x.line_id, side: x.side ?? null, name: x.file_name, mime: x.mime, kind: x.kind, source: x.source || "factory", price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
+    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, lineId: x.line_id, side: x.side ?? null, name: x.file_name, mime: x.mime, kind: x.kind, source: x.source || "factory", price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user),
+      ...(dsn.has(x.design_id) ? { library: { design_no: dsn.get(x.design_id) } } : null) }));
   });
 
   /**
