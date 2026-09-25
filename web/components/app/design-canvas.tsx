@@ -1309,7 +1309,9 @@ export function DesignCanvasDialog({
        NO TECHNIQUE NAMED IS NOT ZERO. Neither the face nor the line has said how this is
        decorated, so there is no fee to quote and the tile prints nothing — "+$0.00" there
        would be a statement about a charge nobody has decided. */
- return key ? Number(faceAddOns[key]) || 0 : null
+    /* ABSENT FROM THE MAP IS NOT ZERO. The API only priced the methods it had heard of until
+       2026-09-25, so an unsaved pick found no entry and printed "Free" for embroidery. */
+ return key && key in faceAddOns ? Number(faceAddOns[key]) || 0 : null
   }, [faceMethod, liveItem.print_type, faceAddOns])
 
   /* `billedFaces` is gone with it: the tile asked it only to choose between a placement

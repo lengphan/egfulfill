@@ -848,6 +848,9 @@ function supplierCostOf(row, item) {
 
 // Print-method surcharge (EMB stitches cost more than DTG ink). Method aliases are
 // normalised exactly as eg-design-tools.js does it.
+/** One name per technique key methodAddOnsFor recognises — for asking about all of them. */
+const ALL_TECHNIQUES = ['DTG', 'DTF', 'Embroidery', 'Applique', 'Laser', 'Screen', 'Sublimation', 'Vinyl'];
+
 /**
  * THE SURCHARGE FOR EVERY METHOD A PRODUCT OFFERS, keyed the way the client keys them.
  *
@@ -1333,6 +1336,13 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
                       chosen, which is before any face carries it. Reading only what is on
                       the garment would answer every method except the one just picked. */
                    ...(Array.isArray(srow && srow.data && srow.data.methods) ? srow.data.methods : []),
+                   /* AND EVERY TECHNIQUE THERE IS. A face's method is picked in the designer
+                      BEFORE it is saved, so neither list above has heard of it yet — and a
+                      product may carry a single `method` rather than `methods`. Asking only
+                      for what was named left the map EMPTY on an embroidered front, and the
+                      tile had nothing to print. Passed here, not built into methodAddOnsFor:
+                      its other callers read "only the methods I asked about" from its keys. */
+                   ...ALL_TECHNIQUES,
                  ]),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
