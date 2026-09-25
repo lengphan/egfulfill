@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { TabBar, type TabBarItem } from "@/components/app/tab-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { readImageFile } from "@/components/app/design-canvas"
+import { downscaleImage } from "@/lib/image-downscale"
 import { setTypeMockups, typeMockupOf, ALL_SIDES } from "@/lib/variant-resolve"
 import { getFactorySettings, setFactorySettings, getInventory, saveVariantStock, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { getUser } from "@/lib/auth"
@@ -690,14 +690,28 @@ export function ProductEditorDialog({
   /** One path for every way an image arrives — drop, paste, or the file input. Non-images
    * are ignored rather than erroring, because dragging a folder or a PDF onto a picture
    * well is a slip, not a request. */
+  /**
+   * A PRODUCT PHOTO IS A LISTING PICTURE, NOT A PRINT FILE (2026-09-25).
+   *
+   * These went through readImageFile — the ARTWORK reader, which keeps every pixel on purpose
+   * because a print needs them. A photo on a product card does not, and saving the catalogue
+   * posts the whole product with its photos inline, so a few phone photos put one add over the
+   * API's 60MB body limit: "payload too large", and nothing could be added. Six products were
+   * already 18–30MB each. downscaleImage caps the long edge at 2400px (PNG keeps its alpha at
+   * 1600px) and leaves an already-small file untouched.
+   */
+ const readPhoto = (f: File, onData: (u: string) => void) => {
+ if (!f.type.startsWith("image/")) { setErr("Please choose an image (PNG/JPG/WEBP)."); return }
+ downscaleImage(f).then(onData).catch(() => setErr("Couldn't read that image."))
+  }
  const addImageFiles = (files: File[]) => {
  const imgs = files.filter((f) => f.type.startsWith("image/"))
  if (!imgs.length) return
- imgs.forEach((f) => readImageFile(f, (u) => {
+ imgs.forEach((f) => readPhoto(f, (u) => {
  setGallery((g) => (g.includes(u) ? g : [...g, u]))
       // First picture in becomes the main one, so the commonest case needs no extra click.
  setImg((cur) => cur || u)
-    }, setErr))
+    }))
   }
 
   /**
@@ -719,11 +733,11 @@ export function ProductEditorDialog({
  const setSideFromFiles = (side: string, files: File[]) => {
  const f = files.filter((x) => x.type.startsWith("image/"))[0]
  if (!f) return
- readImageFile(f, (u) => {
+ readPhoto(f, (u) => {
  setGallery((g) => (g.includes(u) ? g : [...g, u]))
  setImg((cur) => cur || u)
  setSideMockups((m) => ({ ...m, [side]: u }))
-    }, setErr)
+    })
   }
 
  useEffect(() => {

@@ -1671,8 +1671,25 @@ export function getCatalogProducts() {
   return cachedList("catalog_products", 120_000, () => api<CatalogProduct[]>(`/api/catalog_products`))
 }
 // Staff: whole-catalog upsert (send the full array; missing ids are removed).
+/**
+ * THE API REFUSES A BODY OVER 60MB, and this sends the WHOLE catalogue — so a product carrying
+ * full-size photos inline used to fail with the server's bare "payload too large" and nobody
+ * could tell which product or why (2026-09-25). Measured here, before the request, with a
+ * sentence someone can act on. The editor now shrinks photos on the way in, so this should
+ * never fire; it is the backstop for any path that adds a picture without doing that.
+ */
+const CATALOG_BODY_LIMIT = 55 * 1024 * 1024
 export function saveCatalogProducts(products: CatalogProduct[]) {
-  return api<{ ok?: boolean; count?: number; error?: string }>(`/api/catalog_products`, { method: "POST", body: JSON.stringify(products) })
+  const body = JSON.stringify(products)
+  if (body.length > CATALOG_BODY_LIMIT) {
+    const heaviest = products.map((p) => ({ p, n: JSON.stringify(p).length })).sort((a, b) => b.n - a.n)[0]
+    const mb = (n: number) => (n / 1024 / 1024).toFixed(0)
+    return Promise.reject(new Error(
+      `Can't save — the photos are too large (${mb(body.length)}MB, the limit is 60MB). `
+      + (heaviest ? `${heaviest.p.name || heaviest.p.sku || heaviest.p.id} alone is ${mb(heaviest.n)}MB. ` : "")
+      + "Remove some photos or use smaller ones."))
+  }
+  return api<{ ok?: boolean; count?: number; error?: string }>(`/api/catalog_products`, { method: "POST", body })
 }
 
 // ── Suppliers: S&S Activewear (browse from the synced DB — fast) + Otto Cap (stock) ──
