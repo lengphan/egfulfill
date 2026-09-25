@@ -3277,7 +3277,7 @@ return (
             `min-h-0` on a flex child is what actually lets it shrink; without it the column
             refuses to go below its content and the action bar gets pushed off the bottom,
             which is the same "Save below the fold" defect in a different container. */}
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 lg:flex-row lg:gap-6 lg:overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-4 pb-6 lg:flex-row lg:gap-6 lg:overflow-hidden">
         {/* The left column is sized to the stage itself rather than to half the dialog. An
  even 50/50 split gave the controls far more width than their cards use and stranded
  the remainder as dead space beside them; letting the garment take what it needs and
