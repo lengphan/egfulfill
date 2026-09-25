@@ -5803,6 +5803,8 @@ export type SpecQuote = {
   unitCost: number | null
   shipping: number | null
   total: number | null
+  /** What each method adds per face on this blank, keyed like normTech (emb, dtg, …). */
+  faceAddOns?: Record<string, number>
 }
 export function getSpecQuote(spec: { blank?: string; sku?: string; size?: string; printType?: string }) {
   const p = new URLSearchParams()

@@ -1097,6 +1097,11 @@ export async function quoteSpec({ blank, sku, size, printType }) {
     unitCost: cost == null ? null : money(cost),
     shipping: money(ship),
     total: cost == null ? null : money(cost + ship),
+    /* WHAT EACH METHOD ADDS PER FACE on this blank — the designer's rail asks this when the
+       line's own quote cannot answer: no blank saved yet (every marketplace order arrives
+       that way) or a different one picked and not saved. The same resolver the order quote
+       uses, so the tile cannot quote a figure the charge will not. */
+    faceAddOns: methodAddOnsFor(row, fees, ALL_TECHNIQUES),
   };
 }
 

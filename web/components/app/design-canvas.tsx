@@ -25,7 +25,7 @@ import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sid
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery, methodsOf, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
 import { normTech } from "@/lib/print-method"
-import { postItemSetup } from "@/lib/api"
+import { postItemSetup, getSpecQuote } from "@/lib/api"
 import { designLabel } from "@/lib/design-id"
 import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
 import { printZoneOf, printSizeOf, outsideZone } from "@/lib/print-zone"
@@ -1283,6 +1283,32 @@ export function DesignCanvasDialog({
      placement, and that is the summary's row to print. */
 
   /**
+   * THE BLANK ON SCREEN, NOT THE ONE ON RECORD (2026-09-25).
+   *
+   * `faceAddOns` comes from the ORDER's quote, which prices the line as SAVED. So the rail was
+   * blank exactly when it was needed: a marketplace line arrives with no blank (unpriced, no
+   * map), and a blank picked here is not on the record until Save. Front · Embroidery sat
+   * there with no fee on every order anyone was actually setting up.
+   *
+   * When the picked blank differs from the saved one, or the saved line could not be priced,
+   * ask /api/pricing/spec about the picked blank — the same resolver the charge uses. Fetched
+   * only when the BLANK (or size) changes; the answer cannot change either, so this cannot
+   * loop (§2.8).
+   */
+ const blankNow = String(liveItem.blank ?? "").trim()
+ const needSpec = !!blankNow && (blankNow !== String(item.blank ?? "").trim() || !faceAddOns)
+ const [spec, setSpec] = useState<{ blank: string; addOns: Record<string, number> | null } | null>(null)
+ useEffect(() => {
+ if (!needSpec) return
+ let live = true
+ getSpecQuote({ blank: blankNow, size: liveItem.size ?? undefined })
+      .then((r) => { if (live) setSpec({ blank: blankNow, addOns: r?.faceAddOns ?? null }) })
+      .catch(() => {})
+ return () => { live = false }
+  }, [needSpec, blankNow, liveItem.size])
+ const addOns = needSpec ? (spec?.blank === blankNow ? spec.addOns : null) : (faceAddOns ?? null)
+
+  /**
    * WHAT A RUN COSTS ON A GIVEN FACE — the surface fee for every face after the first.
    *
    * THE FACE'S OWN TECHNIQUE, else the LINE'S. A face that says nothing is decorated the way
@@ -1300,7 +1326,7 @@ export function DesignCanvasDialog({
        that as 0 prints "Included" on a face that will be charged its full run, which is a
        worse answer than the "+ design fee" this replaced: one was vague, the other is wrong
        and confident. The tile says nothing until the figure is real. */
- if (!faceAddOns) return null
+ if (!addOns) return null
  const m = (faceMethod[face] ?? "").trim() || String(liveItem.print_type ?? "").trim()
  const key = m ? normTech(m)?.key : null
     /* A key the table has no entry for IS zero — methodAddOn returns 0 for an unpriced
@@ -1311,8 +1337,8 @@ export function DesignCanvasDialog({
        would be a statement about a charge nobody has decided. */
     /* ABSENT FROM THE MAP IS NOT ZERO. The API only priced the methods it had heard of until
        2026-09-25, so an unsaved pick found no entry and printed "Free" for embroidery. */
- return key && key in faceAddOns ? Number(faceAddOns[key]) || 0 : null
-  }, [faceMethod, liveItem.print_type, faceAddOns])
+ return key && key in addOns ? Number(addOns[key]) || 0 : null
+  }, [faceMethod, liveItem.print_type, addOns])
 
   /* `billedFaces` is gone with it: the tile asked it only to choose between a placement
      and a run, and it chooses neither now. */
