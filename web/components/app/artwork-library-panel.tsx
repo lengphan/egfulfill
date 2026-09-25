@@ -560,7 +560,7 @@ export function ArtworkLibraryPanel() {
             * the file we hold (download · Replace · ×), a way to attach one, and the history
             * of that file folded to one line.
             */}
-          <ul className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <ul className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {rows.map((d) => {
               const open = openOrders === d.art_hash
               const own = (d.files ?? []).filter((f) => f.own)
@@ -592,16 +592,16 @@ export function ArtworkLibraryPanel() {
                   setOver(null)
                   void attachFiles(d, e.dataTransfer.files)
                 }}
-                className={"flex flex-col gap-3 rounded-xl border bg-card p-3.5 transition-colors "
+                className={"flex h-full flex-col gap-3 rounded-xl border bg-card p-3.5 transition-colors "
                   + (over === d.art_hash ? "border-primary bg-accent" : "border-border")}
               >
-                {/* THE WHOLE PICTURE, FULL WIDTH (owner: it read "clipped inside the image
-                    area"). Its own proportions rather than a 4:3 well with a frame inset in it,
-                    so a wide screenshot fills the card instead of sitting in white bands. Very
-                    tall artwork is capped and centred, so one poster cannot make a card a
-                    screen high; the min height keeps a missing picture a tile, not a line. */}
+                {/* THE WHOLE PICTURE, FULL WIDTH, IN ONE 4:3 FRAME (owner, 2026-09-25: "card height
+                    mismatch"). Its own proportions made every card a different height — a wide
+                    screenshot short, a square logo tall — so the grid read ragged. The frame is
+                    the same on every card and the picture is contained in it on white, never
+                    cropped: nothing is clipped, it just sits in margin when its shape differs. */}
                 <Thumb src={d.thumb} alt={d.name ?? ""} fit="contain"
-                  className="h-auto max-h-80 min-h-24 w-full rounded-lg border border-border bg-white"
+                  className="aspect-[4/3] h-auto w-full rounded-lg border border-border bg-white"
                   icon={<PenNib size={28} weight="duotone" className="text-muted-foreground/40" />} />
 
                 <div className="min-w-0 space-y-0.5">
@@ -740,7 +740,9 @@ export function ArtworkLibraryPanel() {
                   */}
                 {(
 
-                  <div className="border-t border-border pt-1.5">
+                  /* mt-auto: the last row sits on the card's floor, so History lines up across a
+                     row of cards whatever sits above it. */
+                  <div className="mt-auto border-t border-border pt-1.5">
                     <button type="button" onClick={() => toggleHistory(d)} aria-expanded={histOpen}
                       className="flex h-7 w-full items-center gap-2 text-left text-xs text-muted-foreground hover:text-foreground">
                       <span className="flex-1">{tl("artwork", "History")}</span>
