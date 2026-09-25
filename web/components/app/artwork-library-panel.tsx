@@ -288,9 +288,21 @@ export function ArtworkLibraryPanel() {
 
   return (
     <SectionCard
-      /* A plain string: SectionCard translates its own title under the `section`
-         namespace, so wrapping it here would ask for the key twice. */
-      title="Artwork we have been asked to print"
+      /* THE COUNT IS THE TITLE. "Artwork we have been asked to print" was the tab's own name
+         — Files, directly above, with this as the only thing under it — said again in bolder
+         type, which is the doubling a dialog's title bar used to hide.
+         What belongs in a list's header is the size of the list, and it was a 12px line
+         floating under the rule where the filter that CHANGES it sits two inches away in the
+         same row. Now the control and the number it moves are on one line.
+         JSX, not a string: SectionCard looks a string title up in the `section` namespace,
+         and a composed count has no key to look up.
+         Absent while loading or empty — a card headed "0 designs" over an empty state that
+         already says so is the same fact twice, and the header still draws for `actions`. */
+      title={state === "ok" && rows && rows.length > 0 ? (
+        <span className="tabular-nums">
+          {rows.length} {rows.length === 1 ? tl("artwork", "design") : tl("artwork", "designs")}
+        </span>
+      ) : undefined}
       bodyClassName="space-y-4 p-5"
       actions={
         /**
@@ -332,17 +344,11 @@ export function ArtworkLibraryPanel() {
       {/* NO LIGHTBOX. Nothing opens one here any more — hovering a card shows the
           picture at judging size, which is what the modal was for. */}
 
-      {state === "ok" && rows && rows.length > 0 && (
-        /* A COUNT, NOT A SENTENCE. It is a fact about the list and it is the thing that
-           says whether the filter did anything.
-           JUST THE COUNT. It carried "· 120 with no file" beside it, which on a library
-           where almost nothing is digitised yet is the same number twice — and it is a
-           tally of the rows LOADED, not of the library, so it would have been wrong the
-           moment Load more was pressed. Each card already says whether it has a file. */
-        <p className="text-xs tabular-nums text-muted-foreground">
-          {rows.length} {rows.length === 1 ? tl("artwork", "design") : tl("artwork", "designs")}
-        </p>
-      )}
+      {/* THE COUNT MOVED INTO THE HEADER — see the title above. It was a line of its own
+          under the rule, which is the one place it could not be read beside the filter that
+          changes it. It is still just the count: "· 120 with no file" was the same number
+          twice on a library where almost nothing is digitised, and it counted the rows
+          LOADED rather than the library, so Load more made it wrong. */}
 
       {err && <p className="text-sm text-destructive">{err}</p>}
       {note && !err && <p className="text-sm font-medium text-success">{note}</p>}
