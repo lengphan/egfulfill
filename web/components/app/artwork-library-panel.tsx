@@ -303,6 +303,10 @@ export function ArtworkLibraryPanel() {
           {rows.length} {rows.length === 1 ? tl("artwork", "design") : tl("artwork", "designs")}
         </span>
       ) : undefined}
+      /* OVERFLOW-VISIBLE so the hover preview can leave the card: Card clips by default, and
+         on the last row the 224px copy was cut off at the card's bottom edge. Nothing in this
+         card relies on the clip — the header carries no background of its own. */
+      className="overflow-visible"
       bodyClassName="space-y-4 p-5"
       actions={
         /**
@@ -449,26 +453,6 @@ export function ArtworkLibraryPanel() {
                   * THE PICTURE IS THE IDENTIFICATION; everything beside it is confirmation.
                   *
                   * BIGGER, AND IT ANSWERS ON HOVER (owner, 2026-09-23: "make the images here
-                  * bigger, and hover to see a bigger image next to it — no need to click to
-                  * zoom"). 56px was enough to tell one design from another and not enough to
-                  * CHECK one, so every judgement cost a click and a dismissal. 80px reads at
-                  * a glance, and resting on it puts a 16rem copy beside the card — which is
-                  * the size an artwork is actually judged at.
-                  *
-                  * THE PRESS STAYS. Hover does not exist on a tablet, and the floor reads
-                  * these across a table; removing the click would make the picture
-                  * uninspectable on exactly the device it is inspected on. It is also what
-                  * keeps the card reachable from the keyboard.
-                  *
-                  * CSS ONLY, and `pointer-events-none` on the panel: no state, nothing to
-                  * leave open when the pointer moves away, and the panel can never intercept
-                  * a press meant for the card under it. Hidden from assistive tech too — it
-                  * is the same image, larger, and the button already names it.
-                  */}
-                {/**
-                  * THE PICTURE IS THE IDENTIFICATION; everything beside it is confirmation.
-                  *
-                  * BIGGER, AND IT ANSWERS ON HOVER (owner, 2026-09-23: "make the images here
                   * bigger and hover to see a bigger image next to it, no need to click to
                   * zoom" — then, when the press was kept anyway: "no need to enable clicking
                   * to zoom in"). 56px was enough to tell one design from another and not
@@ -498,8 +482,12 @@ export function ArtworkLibraryPanel() {
                       opening on an empty tile would promise one that never arrives. */}
                   {d.thumb && (
                     <div aria-hidden className="pointer-events-none absolute left-full top-0 z-30 ml-2 hidden rounded-xl border border-border bg-card p-2 shadow-lg group-hover/art:block">
+                      {/* MAX-W-NONE IS LOAD-BEARING. The panel sits at `left-full` of an 80px box, so
+                          its shrink-to-fit width has nothing to grow into, and preflight's
+                          `img { max-width: 100% }` then resolved to 0 — a 224px-tall white
+                          strip with no picture in it. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={d.thumb} alt="" className="size-56 rounded-md bg-muted object-contain" />
+                      <img src={d.thumb} alt="" className="size-56 max-w-none rounded-md bg-muted object-contain" />
                     </div>
                   )}
                 </div>
