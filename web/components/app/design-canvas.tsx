@@ -1438,6 +1438,10 @@ export function DesignCanvasDialog({
   const showCustomerFile = !!item.design_src && faceArt !== null
     && !Object.values(faceArt).some((a) => a?.data && a.data === item.design_src)
  const [threads, setThreads] = useState<Thread[]>([])
+ /** A thread change worth WRITING — a hand edit, a re-match, or new artwork's colours. The
+     colours computed for artwork that was already saved when the window opened are not. */
+ const [threadsDirty, setThreadsDirty] = useState(false)
+ const openedArt = useRef<Set<string>>(new Set())
  const [picking, setPicking] = useState(false)
   // The thread MAP: which colour covers which part. ALWAYS on now — it was behind a "Map"
   // toggle next to a row of colour chips, which is two ways of saying the same thing where
@@ -1459,7 +1463,7 @@ export function DesignCanvasDialog({
  const next = r.options.find((o) => o.code === code)
  if (!next) return
  const current = picks[r.srcHex] ?? r.thread.code
- setTouched(true)
+ setTouched(true); setThreadsDirty(true)
  setPicks((p) => ({ ...p, [r.srcHex]: code }))
  setThreads((prev) => {
       // Drop the cone this colour used to claim, then add the new one — but only if no
@@ -1487,7 +1491,7 @@ export function DesignCanvasDialog({
  const dropRegion = (r: ThreadRegion) => {
  const code = picks[r.srcHex] ?? r.thread.code
  const rest = (regions ?? []).filter((o) => o.srcHex !== r.srcHex)
- setTouched(true)
+ setTouched(true); setThreadsDirty(true)
  setRegions(rest)
  setPicks((p) => { const n = { ...p }; delete n[r.srcHex]; return n })
  const stillUsed = rest.some((o) => (picks[o.srcHex] ?? o.thread.code) === code)
@@ -1510,7 +1514,7 @@ export function DesignCanvasDialog({
  setTouched(false)
  loadThreadPalette()
       .then(() => Promise.all([matchThreadRegions(designUrl), matchThreadColors(designUrl)]))
-      .then(([rs, ts]) => { setRegions(rs); setThreads(ts); setThreadErr(ts.length === 0) })
+      .then(([rs, ts]) => { setRegions(rs); setThreads(ts); setThreadErr(ts.length === 0); setThreadsDirty(true) })
       .catch(() => { setRegions([]); setThreadErr(true) })
       .finally(() => setRematching(false))
   }
@@ -1532,6 +1536,7 @@ export function DesignCanvasDialog({
  if (!live) return
  setThreads(t)
  setThreadErr(t.length === 0)
+ if (!openedArt.current.has(designUrl)) setThreadsDirty(true)
       }).catch(() => { if (live) setThreadErr(true) })
     }, 0)
  return () => { live = false; clearTimeout(id) }
@@ -1568,7 +1573,7 @@ export function DesignCanvasDialog({
  const onPickColor = (hex: string) => {
  const { r, g, b } = hexToRgb(hex)
  const t = nearestThread(r, g, b)
- if (t) setThreads((prev) => (prev.some((x) => x.code === t.code) ? prev : [...prev, t]))
+ if (t) { setThreads((prev) => (prev.some((x) => x.code === t.code) ? prev : [...prev, t])); setThreadsDirty(true) }
     // AND a row for it. The chip row used to be the only place a picked colour appeared;
     // with the chips gone, a pick that only bumped a counter would look like nothing had
     // happened — and it would be unchangeable, since the dropdowns are per row. No crop
@@ -1946,6 +1951,7 @@ export function DesignCanvasDialog({
  const conf: Record<string, { data: string; pos: Pos }> = {}
  for (const [sd, a] of Object.entries(seeded)) if (a?.data) conf[sd] = { data: a.data, pos: a.pos }
  setSavedFaces(conf)
+ openedArt.current = new Set(Object.values(conf).map((a) => a.data))
         })
         .catch(() => { if (live) setFaceArt({}) })
     }, 0)
@@ -2799,7 +2805,7 @@ export function DesignCanvasDialog({
       (m) => { refused.push(`${f.name}: ${m}`); done() })
     })))
  const ok = landed.filter(Boolean)
- if (ok.length) notes.push(`Placed ${ok.join(", ")}. Nothing is saved until you press Save.`)
+ if (ok.length) notes.push(`Placed ${ok.join(", ")}.`)
  if (refused.length) notes.push(refused.join(" "))
 
  readImageFile(art, (u) => { settle(); setDesignUrl(u); setDesignName(art.name); setDesignSize(art.size); setPos(DEFAULT_POS); noteArtSource(sideName, "") }, setErr)
@@ -2957,7 +2963,7 @@ return (
       }
  return next
     })
- setNotice(`Copied to the other ${faces.length - 1 === 1 ? "side" : `${faces.length - 1} sides`} — press Save to keep it.`)
+ setNotice(`Copied to the other ${faces.length - 1 === 1 ? "side" : `${faces.length - 1} sides`} .`)
   }
 
   /** `close` is false when saving as a STEP in something else (sending to a designer),
@@ -3053,8 +3059,62 @@ return (
     } finally { setSaving(false) }
   }
 
+  /**
+   * SAVING IS AUTOMATIC (owner, 2026-09-25: "save should become auto save — immediate response
+   * upon dropping in the files or images"). The Cancel/Save bar is gone: a file already
+   * saves the moment it lands, and every picture has its own remove, so the bar was a second,
+   * slower way to the same place — and a window you could close with artwork unsaved.
+   *
+   * ARTWORK saves 600ms after it lands or stops moving (a drag is many positions; one write
+   * when it settles). THREADS save after a real edit only — they are computed from the picture
+   * and never read back, so writing them on open would overwrite a hand-picked colour.
+   * CLOSING flushes whatever is still pending first.
+   *
+   * CANNOT LOOP (§2.8): a save clears the condition that triggered it (savedFaces catches up),
+   * and a FAILED save records the exact state it failed on and is not retried until something
+   * changes — a persistent error is shown once, not re-posted every 600ms.
+   */
+ const artDirty = useMemo(() => {
+ const same = (a: Pos, b?: Pos | null) => !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.r === b.r
+ const pending: Record<string, FaceArt | null> = { ...(faceArt ?? {}), [sideName]: designUrl ? { data: designUrl, pos, name: designName } : null }
+ return Object.entries(pending).some(([sd, art]) => {
+ if (!art?.data) return false
+ const was = savedFaces[sd]
+ return !was || was.data !== art.data || !same(art.pos, was.pos)
+    })
+  }, [faceArt, sideName, designUrl, pos, designName, savedFaces])
+ const failedAt = useRef<unknown[] | null>(null)
+ const sigNow = [faceArt, designUrl, pos, sideName]
+ const failedHere = !!failedAt.current && failedAt.current.every((v, i) => v === sigNow[i])
+ useEffect(() => {
+ if (!open || !artDirty || saving || filesLocked || failedHere) return
+ const sig = [faceArt, designUrl, pos, sideName]
+ const id = setTimeout(() => { void save(false).then((ok) => { failedAt.current = ok ? null : sig }) }, 600)
+ return () => clearTimeout(id)
+  }, [open, artDirty, saving, filesLocked, failedHere, faceArt, designUrl, pos, sideName, save])
+
+ useEffect(() => {
+ if (!open || !threadsDirty || filesLocked || !isEmb || !item.sku || saving) return
+ const sku = item.sku
+ const id = setTimeout(() => {
+ setThreadsDirty(false)
+ postOrderThreads(orderId, sku, threads).catch(() => setErr("Couldn't save the thread colours."))
+    }, 600)
+ return () => clearTimeout(id)
+  }, [open, threadsDirty, filesLocked, isEmb, item.sku, saving, orderId, threads])
+
+  /** Close only after pending artwork is written. A save that fails keeps the window open to
+   *  show why; closing again on that same state lets it go rather than trapping anyone. */
+ const closeAfterSave = async (v: boolean) => {
+ if (!v && artDirty && !filesLocked && !failedHere) {
+ const ok = await save(false)
+ if (!ok) { failedAt.current = [faceArt, designUrl, pos, sideName]; return }
+    }
+ onOpenChange(v)
+  }
+
  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { void closeAfterSave(v) }}>
       <DialogContent
         // Wide enough for two real columns. Capped against the VIEWPORT as well as a pixel
         // ceiling so it can't outgrow a small laptop: 1180px is about the point where the
@@ -4932,15 +4992,10 @@ return (
             which is what you reach for when the window itself is the scroller. It isn't any
             more: the shell is a fixed-height column, only the controls column scrolls, and a
             shrink-0 row at the bottom of that column holds the edge without sticky at all. */}
+        {/* NO CANCEL, NO SAVE — saving is automatic (see closeAfterSave). The bar survives only
+            for what it still carries: Apply All, and the stale-card warning. */}
+        {(((designUrl || latestMachine) && !!siblings?.length) || staleFaces.length > 0) && (
         <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-popover px-6 py-3">
-          {/* Say WHY Save is refused — and ONLY when it is. This printed "add an image so we
-              can show where your file sits on the product" whenever no image was placed,
-              including on a line carrying a machine file, which is now saveable. A sentence
-              under an ENABLED button is a subtitle and §4 forbids it; a refusal carries its
-              reason, which is what this is. */}
-          {!canSave && (
-            <p className="text-xs text-muted-foreground">{tl("canvas", "Add your design or a machine file, then save.")}</p>
-          )}
           {/* ONE ACTION BAR. Apply-to-all sat halfway up a column while Save sat at the
  bottom, so the two things you press at the END of the job were in different
  places. The shortcut goes LEFT, away from Save: "and the other nine" is a
@@ -4988,34 +5043,9 @@ return (
                   : `The board has cards for ${staleFaces.map((f) => tl("sides", f)).join(", ")} with the artwork this replaced — send them again.`}
               </p>
             )}
-            <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("canvas", "Cancel")}</Button>
-            {/* "Save", not "Save design" — it saves the item: every face's artwork at once,
- and the threads with it. And enabled whenever ANY face carries artwork, not
- just the visible one: standing on an empty back with a finished front is not
- a reason to grey out Save. */}
-            {/**
-              * SAVE IS THE BACKSTOP, and it earned the name the same day it was argued
-              * against.
-              *
-              * The first pass left it enabled on the reasoning that with the stage read-only
-              * and every intake refusing there was nothing left to write. Then "Use this" on
-              * the buyer's file turned out to set the artwork directly, so there was — and
-              * the reasoning was only ever as good as the enumeration behind it. A control
-              * that PERSISTS is the one place a missed entry point becomes a stored change,
-              * so it answers to the lock too.
-              *
-              * It also closes the thread picks, which ride along in the same save: a colour
-              * list is what the floor loads, and changing one after the order is charged is
-              * a production instruction nobody agreed to. For staff that means a draft
-              * cannot be saved from here — which is the rule as stated, not a side effect:
-              * before submit the line is the seller's. If picking threads on a draft turns
-              * out to be a real staff workflow, the fix is to give threads their own save,
-              * never to reopen this.
-              */}
-            <Button onClick={() => void save()} disabled={saving || !canSave || filesLocked}
-              title={filesLocked ? lockedWhy : undefined}>{saving ? <CircleNotch size={15} className="animate-spin" /> : tl("canvas", "Save")}</Button>
           </div>
         </div>
+        )}
         <LibraryPickerDialog
  open={libOpen} onOpenChange={setLibOpen}
  initialSource={libSource}
