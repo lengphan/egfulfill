@@ -1327,7 +1327,13 @@ export function DesignCanvasDialog({
        worse answer than the "+ design fee" this replaced: one was vague, the other is wrong
        and confident. The tile says nothing until the figure is real. */
  if (!addOns) return null
+ /* AN EMPTY FACE QUOTES WHAT IT WOULD COST (owner, 2026-09-25: "even if the image is not
+       dropped on that face, show the method fee per face so the user knows how much this face
+       will cost if a design is added"). Its own method, else the line's, else the method
+       another face on this garment already has — the one it would most likely be decorated
+       with. Nothing chosen anywhere still prints nothing (owner, 2026-09-23). */
  const m = (faceMethod[face] ?? "").trim() || String(liveItem.print_type ?? "").trim()
+      || (faceMethod.front ?? "").trim() || Object.values(faceMethod).map((v) => (v ?? "").trim()).find(Boolean) || ""
  const key = m ? normTech(m)?.key : null
     /* A key the table has no entry for IS zero — methodAddOn returns 0 for an unpriced
        technique, so a second DTG face genuinely costs nothing. That is an answer, not a gap.
