@@ -670,7 +670,9 @@ export function ArtworkLibraryPanel() {
                   </div>
                 )}
 
-                {/* THE ANSWER THE TAB EXISTS FOR: the file we hold, named, and each one opens. */}
+                {/* THE ANSWER THE TAB EXISTS FOR: the file we hold, named, and each one opens.
+                    Only when there is one — an empty block would still take the card's gap. */}
+                {shown.length > 0 && (
                 <div className="space-y-1">
                   {shown.map((f) => (
                     <div key={f.design_id} className="flex min-w-0 items-center gap-1">
@@ -713,25 +715,8 @@ export function ArtworkLibraryPanel() {
                       )}
                     </div>
                   ))}
-                  {/* THE BUTTON NEVER LEAVES — a card with a file still takes a second one.
-                      Ghost, because there are sixty of them on the page. */}
-                  <Button
-                    variant="ghost" size="sm"
-                    className="-ml-2 text-muted-foreground hover:text-foreground"
-                    disabled={busy === d.art_hash}
-                    onClick={() => {
-                      pending.current = d
-                      if (fileRef.current) fileRef.current.accept = acceptFor(d.methods).join(",")
-                      fileRef.current?.click()
-                    }}
-                    title={tl("artwork", "Attach a file for this artwork — you'll see which orders it goes onto before it does")}
-                  >
-                    {busy === d.art_hash
-                      ? <CircleNotch size={14} className="animate-spin" />
-                      : <UploadSimple size={14} weight="bold" />}
-                    {shown.length ? tl("artwork", "Add file") : tl("artwork", "Attach file")}
-                  </Button>
                 </div>
+                )}
 
                 {/**
                   * HISTORY, FOLDED TO ONE LINE (owner: "should be smaller or collapsible").
@@ -743,12 +728,34 @@ export function ArtworkLibraryPanel() {
                   /* mt-auto: the last row sits on the card's floor, so History lines up across a
                      row of cards whatever sits above it. */
                   <div className="mt-auto border-t border-border pt-1.5">
-                    <button type="button" onClick={() => toggleHistory(d)} aria-expanded={histOpen}
-                      className="flex h-7 w-full items-center gap-2 text-left text-xs text-muted-foreground hover:text-foreground">
-                      <span className="flex-1">{tl("artwork", "History")}</span>
-                      {Array.isArray(hist) && <span className="tabular-nums">{hist.length}</span>}
-                      <CaretDown size={10} weight="bold" className={"transition-transform " + (histOpen ? "rotate-180" : "")} />
-                    </button>
+                    {/* ATTACH LIVES IN THE FOOTER (owner, 2026-09-25, from four laid out side by
+                        side): the same place on every card, on the row every card ends with, so
+                        sixty of them line up instead of floating at sixty heights. The whole
+                        card still takes a dropped file; this is the click and keyboard route. */}
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => toggleHistory(d)} aria-expanded={histOpen}
+                        className="flex h-7 min-w-0 flex-1 items-center gap-2 text-left text-xs text-muted-foreground hover:text-foreground">
+                        <span className="flex-1">{tl("artwork", "History")}</span>
+                        {Array.isArray(hist) && <span className="tabular-nums">{hist.length}</span>}
+                        <CaretDown size={10} weight="bold" className={"transition-transform " + (histOpen ? "rotate-180" : "")} />
+                      </button>
+                      <Button
+                        variant="ghost" size="sm"
+                        className="-mr-2 h-7 shrink-0 gap-1.5 px-2 text-xs"
+                        disabled={busy === d.art_hash}
+                        onClick={() => {
+                          pending.current = d
+                          if (fileRef.current) fileRef.current.accept = acceptFor(d.methods).join(",")
+                          fileRef.current?.click()
+                        }}
+                        title={tl("artwork", "Attach a file for this artwork — you'll see which orders it goes onto before it does")}
+                      >
+                        {busy === d.art_hash
+                          ? <CircleNotch size={13} className="animate-spin" />
+                          : <UploadSimple size={13} weight="bold" />}
+                        {shown.length ? tl("artwork", "Add") : tl("artwork", "Attach")}
+                      </Button>
+                    </div>
                     {histOpen && (
                       hist === "loading" || !hist ? (
                         <div className="py-2 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /></div>
