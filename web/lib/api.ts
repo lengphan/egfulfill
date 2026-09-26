@@ -226,15 +226,22 @@ export class ApiError extends Error {
  *
  * Errors are never cached — a rejected load leaves the entry absent, so the next call retries.
  */
-const _lists = new Map<string, { at: number; data: unknown }>()
+const _lists = new Map<string, { at: number; data: unknown; stale?: boolean }>()
 const _listInflight = new Map<string, Promise<unknown>>()
 
-/** Drop every cached list. Called on any write, and by live.ts on any server event. */
-export function invalidateLists() { _lists.clear() }
+/**
+ * Mark every cached list OUT OF DATE. Called on any write, and by live.ts on any server event.
+ *
+ * MARKED, not dropped (2026-09-26). A marked list is never served as fresh — cachedList and
+ * cachedOrders re-fetch exactly as before — but staleOrders can still paint it for the moment
+ * a fresh copy takes to arrive. Dropping it meant any write, anywhere, sent the next visit to
+ * a board back to an empty page.
+ */
+export function invalidateLists() { for (const v of _lists.values()) v.stale = true }
 
 async function cachedList<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
   const hit = _lists.get(key)
-  if (hit && Date.now() - hit.at < ttlMs) return hit.data as T
+  if (hit && !hit.stale && Date.now() - hit.at < ttlMs) return hit.data as T
   const flight = _listInflight.get(key) as Promise<T> | undefined
   if (flight) return flight
   const p = (async () => {
@@ -2799,7 +2806,7 @@ async function loadOrders() {
  *  stream doesn't start streaming over a list another board just fetched in full. */
 export function cachedOrders(): OrderRow[] | null {
   const hit = _lists.get("orders")
-  return hit && Date.now() - hit.at < 30_000 ? (hit.data as OrderRow[]).slice() : null
+  return hit && !hit.stale && Date.now() - hit.at < 30_000 ? (hit.data as OrderRow[]).slice() : null
 }
 /**
  * THE LAST COMPLETE LIST, even if it is past the 30-second freshness line — up to ten minutes.
@@ -2809,6 +2816,22 @@ export function cachedOrders(): OrderRow[] | null {
  * away and start from an empty page; now the old list paints at once and the new one replaces
  * it when it is complete. Never for decisions — only for what is on screen for a moment.
  */
+/**
+ * JUST THESE ORDERS, in exactly the list's shape (GET /api/orders?ids=). After a change to one
+ * order, a board re-fetches that row instead of all ~1,300. The rows are also written into the
+ * held list, so the next board to paint from it shows them current.
+ */
+export async function getOrdersByIds(ids: string[]): Promise<OrderRow[]> {
+  const want = [...new Set(ids.filter(Boolean))].slice(0, 100)
+  if (!want.length) return []
+  const rows = await api<OrderRow[]>(`/api/orders?ids=${encodeURIComponent(want.join(","))}`).then(resolveImgRefs)
+  const hit = _lists.get("orders")
+  if (hit && Array.isArray(hit.data)) {
+    const by = new Map(rows.map((r) => [String(r.id), r]))
+    hit.data = (hit.data as OrderRow[]).map((o) => by.get(String(o.id)) ?? o)
+  }
+  return rows
+}
 export function staleOrders(maxAgeMs = 10 * 60_000): OrderRow[] | null {
   const hit = _lists.get("orders")
   return hit && Date.now() - hit.at < maxAgeMs ? (hit.data as OrderRow[]).slice() : null

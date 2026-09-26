@@ -9,7 +9,7 @@ import { isStaff, isUserId, resolveSeller as _resolveSeller, canSurface, canSeeM
 import { COST_TYPES } from '../costs.js';
 import { sendImage } from '../image.js';
 import { refreshStaleTracking } from './dispatch.js';
-import { egBroadcast } from '../events.js';
+import { egBroadcast, egBroadcastOrder } from '../events.js';
 import { attachLibraryFileForArtwork, faceKey } from './design_files.js';
 import { notify } from './notifications.js';
 import { aiComplete } from './support_ai.js';
@@ -2260,12 +2260,23 @@ export function ordersRoutes(app, requireAuth) {
       : null;
     /** The keyset predicate + ORDER BY + LIMIT, numbered from however many params the
      *  branch already has. Returns SQL and the params to append. */
+    /**
+     * ?ids=a,b — JUST THESE ORDERS, through the same query, so a refreshed row has exactly the
+     * shape of the list it replaces (the single-order route does not: it lacks the list's
+     * readiness flags and costs). A board re-fetches the one order that changed instead of
+     * all ~1,300. Capped; the visibility rules below still apply to every id.
+     */
+    const onlyIds = String(qy.ids || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 100);
     const page = (base) => {
       const p = [];
       let where = '';
+      if (onlyIds.length) {
+        p.push(onlyIds);
+        where += ` and o.id = any($${base + p.length}::text[])`;
+      }
       if (cursor) {
         p.push(cursor.ts, cursor.id);
-        where = ` and (o.created_at, o.id) < ($${base + 1}::timestamptz, $${base + 2}::text)`;
+        where += ` and (o.created_at, o.id) < ($${base + p.length - 1}::timestamptz, $${base + p.length}::text)`;
       }
       const tail = ` order by o.created_at desc, o.id desc${pageSize ? ` limit ${pageSize}` : ''}`;
       return { where, tail, params: p };
@@ -3056,7 +3067,7 @@ export function ordersRoutes(app, requireAuth) {
         _parked = await autoReplenish(req.params.id).catch(() => null);
       }
     }
-    egBroadcast({ type: 'orders' });
+    egBroadcastOrder(req.params.id);
     // The cart badge is a live count in every open tab, so a shortage parked here has to
     // announce itself the same way an order does.
     if (_parked && _parked.saved) egBroadcast({ type: 'cart' });
@@ -3403,7 +3414,7 @@ export function ordersRoutes(app, requireAuth) {
        */
       if (want === 'approved' || want === 'working') replenish = await autoReplenish(req.params.id).catch(() => null);
     }
-    egBroadcast({ type: 'item-status' });   // no id/sku — see the note above
+    egBroadcastOrder(req.params.id, 'item-status');   // id to staff only — events.js
     // Same as the order route: a parked shortage moves the cart badge for everyone looking.
     if (replenish && replenish.saved) egBroadcast({ type: 'cart' });
     return { ok: true, design, replenish, reserved };
@@ -3751,7 +3762,7 @@ export function ordersRoutes(app, requireAuth) {
         }
       } catch (e) { priced = { error: e.message }; }
     }
-    egBroadcast({ type: 'orders' });
+    egBroadcastOrder(req.params.id);
     return { ok: true, ...(priced ? { priced } : null) };
   });
 
@@ -3839,7 +3850,7 @@ export function ordersRoutes(app, requireAuth) {
        b.blank ? String(b.blank) : null, lineId]
     );
     audit(req, 'item.add', { entityType: 'order', entityId: req.params.id, after: { line_id: lineId, name: b.name || 'New item', qty } });
-    egBroadcast({ type: 'orders' });
+    egBroadcastOrder(req.params.id);
     return { ok: true, lineId };
   });
 
@@ -3933,7 +3944,7 @@ export function ordersRoutes(app, requireAuth) {
       [req.params.id, key]
     );
     audit(req, 'item.remove', { entityType: 'order', entityId: req.params.id, before: found.rows[0] });
-    egBroadcast({ type: 'orders' });
+    egBroadcastOrder(req.params.id);
     return { ok: true };
   };
   app.delete('/api/orders/:id/items/:lineId', { preHandler: requireAuth }, removeLine);
@@ -5177,7 +5188,7 @@ export function ordersRoutes(app, requireAuth) {
         [String(req.params.id), lineId || sku]).then((x) => (x.rows[0] ? x.rows[0].design_fee_override : null)).catch(() => null);
       charged = await chargeDesign(req, String(req.params.id), lineId, sku, tier, fees, stored);
     }
-    egBroadcast({ type: 'orders' });
+    egBroadcastOrder(req.params.id);
     return { ok: true, tier, lines: r.rowCount, quoted, charged };
   });
 
@@ -5235,7 +5246,7 @@ export function ordersRoutes(app, requireAuth) {
         body: `${orderId} · ${sku || lineId} — the seller declined the complex design fee. Cancel the line or agree something else.`,
         href: `/operator?order=${orderId}`, entityId: orderId,
       }).catch(() => {});
-      egBroadcast({ type: 'orders' });
+      egBroadcastOrder(req.params.id);
       return { ok: true, decision: 'declined' };
     }
 
@@ -5270,7 +5281,7 @@ export function ordersRoutes(app, requireAuth) {
       body: `${orderId} · ${sku || lineId} — cleared to digitise.`,
       href: `/operator?order=${orderId}`, entityId: orderId,
     }).catch(() => {});
-    egBroadcast({ type: 'orders' });
+    egBroadcastOrder(req.params.id);
     return { ok: true, decision: 'accepted', charged: amount };
   });
 

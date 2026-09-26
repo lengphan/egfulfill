@@ -44,6 +44,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
  getOrders,
  staleOrders,
+ getOrdersByIds,
  getOrder,
  indexDesigns,
  designsBySide,
@@ -250,7 +251,14 @@ export function OrderDetail({ id, embedded = false, seed }: {
  const reload = () => { getOrders().then((rows) => setOrders(rows ?? [])).catch(() => {}) }
   // `one` (the direct fetch) wins over the list, so a stage change must refresh IT too or
   // the badge and menu would show stale state after a move.
- const reloadAll = () => { getOrder(String(id)).then((o) => { if (o && !o.error) setOne(o) }).catch(() => {}); reload() }
+ /* THIS ORDER, not all of them. It re-downloaded the whole order list (~1,300 orders) after
+    every action, though what this page shows comes from `one`. The list here is neighbouring
+    context only; the one row that changed is refreshed in the held list so the board it came
+    from paints it current. */
+ const reloadAll = () => {
+   getOrder(String(id)).then((o) => { if (o && !o.error) setOne(o) }).catch(() => {})
+   getOrdersByIds([String(id)]).catch(() => {})
+ }
 
   /**
    * Refresh THIS ORDER only — for the variant pickers, which fire on every colour/size click.

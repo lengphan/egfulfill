@@ -31,6 +31,22 @@ export function egBroadcast(event) {
 }
 
 /**
+ * "THIS ORDER CHANGED" — with its id for STAFF sockets, bare for everyone else.
+ *
+ * A bare ping made every open board re-download the whole order list (~1,300 orders) on
+ * every change anyone made; with the id, a staff board re-fetches that one row. The id goes
+ * ONLY to staff: a seller's socket hears the same bare ping as before, because another
+ * shop's order id is not theirs to see (the rule this file's header states). Sellers' own
+ * lists are small, so their full re-fetch stays cheap.
+ */
+export function egBroadcastOrder(orderId, type = 'orders') {
+  for (const [res, c] of clients) {
+    const staff = !!(c && c.role && c.role !== 'seller');
+    write(res, staff && orderId ? { type, orderId: String(orderId) } : { type });
+  }
+}
+
+/**
  * Push to specific users only — for anything carrying content (titles, names,
  * bodies). A user with no open socket just misses the live ping and picks the
  * notification up on their next load.

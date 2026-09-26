@@ -16,7 +16,7 @@ import { StageBadge } from "@/components/app/stage-badge"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { pushToDispatch, getDispatchStatus, getOrders, cachedOrders, staleOrders, streamOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getOrderDesignsBatch, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder, getOrderQuote, type OrderQuote } from "@/lib/api"
+import { pushToDispatch, getDispatchStatus, getOrders, getOrdersByIds, cachedOrders, staleOrders, streamOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getOrderDesignsBatch, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder, getOrderQuote, type OrderQuote } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock, stockSkuOf } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -560,6 +560,47 @@ export function OrdersHub() {
       .catch((e) => { setOrders([]); setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.") })
   }, [])
   /**
+   * RE-FETCH ONLY THE ORDERS THAT CHANGED (2026-09-26: "per action … very laggy").
+   *
+   * Every change used to re-download all ~1,300 orders, on this board and on every other open
+   * one. Now the server names the order (to staff sockets) and this pulls that row through
+   * GET /api/orders?ids= — the list's own query, so the row keeps exactly the shape the table
+   * draws. Ids arriving within 250ms share one request. A row that no longer comes back (it
+   * left this board's view) is dropped; one that is new to this board is added at the top.
+   */
+ const pendingIds = useRef<Set<string>>(new Set())
+ const rowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+ const refreshRows = useCallback((ids: string[]) => {
+    for (const id of ids) pendingIds.current.add(String(id))
+    if (rowTimer.current) return
+    rowTimer.current = setTimeout(() => {
+      rowTimer.current = null
+      const batch = [...pendingIds.current]
+      pendingIds.current.clear()
+      getOrdersByIds(batch).then((rows) => {
+        const by = new Map(rows.map((r) => [String(r.id), r]))
+        setOrders((prev) => {
+          if (!prev) return prev
+          const seen = new Set<string>()
+          const kept = prev.flatMap((o) => {
+            const key = String(o.id)
+            if (!batch.includes(key)) return [o]
+            const fresh = by.get(key)
+            if (!fresh) return []
+            seen.add(key)
+            return [fresh]
+          })
+          return [...rows.filter((r) => !seen.has(String(r.id))), ...kept]
+        })
+      }).catch(() => load())
+    }, 250)
+  }, [load])
+ const fullTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+ const loadSoon = useCallback(() => {
+    if (fullTimer.current) clearTimeout(fullTimer.current)
+    fullTimer.current = setTimeout(() => { fullTimer.current = null; load() }, 800)
+  }, [load])
+  /**
    * THE FIRST PAINT STREAMS; A REFRESH DOES NOT.
    *
    * The list is 971 orders / 1.37MB and the first 100 are 0.16MB, so the first screen is
@@ -599,7 +640,12 @@ export function OrdersHub() {
   // Every one of these is a cache-invalidation ping carrying no data; the refetch goes
   // through getOrders() as usual, so nothing here widens what this page can see.
  useEffect(() => {
- const off = ["orders", "order-scanned", "item-status"].map((t) => onLive(t, load))
+ /* A PING THAT NAMES ITS ORDER refreshes that row; a bare one (a seller socket, a bulk
+    job, a new order) reloads the list — debounced, so a burst of pings is one reload. */
+ const off = ["orders", "order-scanned", "item-status"].map((t) => onLive(t, (e) => {
+   const id = typeof e?.orderId === "string" ? e.orderId : null
+   if (id) refreshRows([id]); else loadSoon()
+ }))
  return () => { for (const f of off) f() }
   }, [load])
   // Catalog powers the variant picker on factory-owned marketplace orders (which arrive
@@ -764,11 +810,15 @@ export function OrdersHub() {
  const advanceOrder = async (order: OrderRow, to: string) => {
  setBusy(`ord:${order.id}`)
  try {
+ /* On screen before the round trip; the refreshed row (or a reload, on failure) settles it. */
+ setOrders((prev) => prev?.map((o) => (o.id === order.id ? { ...o, factory_status: to } : o)) ?? prev)
  await updateOrder(order.id, { factoryStatus: to })
  setActionErr(null)
+ refreshRows([order.id])
     } catch (e) {
  setActionErr(e instanceof Error ? e.message : "Couldn't move that order on.")
-    } finally { setBusy(null); load() }
+ load()
+    } finally { setBusy(null) }
   }
   /**
    * START — the one move that puts an order into production, whoever it belongs to.
@@ -793,11 +843,14 @@ export function OrdersHub() {
  try {
       /* One request. The per-line loop this replaced could stop halfway and leave an order
  that had "started" with some of it still waiting. */
+ setOrders((prev) => prev?.map((o) => (o.id === order.id ? { ...o, factory_status: "working" } : o)) ?? prev)
  await updateOrder(order.id, { factoryStatus: "working" })
  setActionErr(null)
+ refreshRows([order.id])
     } catch (e) {
  setActionErr(e instanceof Error ? e.message : "Couldn't start that order.")
-    } finally { setBusy(null); load() }
+ load()
+    } finally { setBusy(null) }
   }
   // Ship: mark every line shipped + record tracking/carrier on the order.
   // Open the fulfill panel for an order — prefill recipient from the order address.
