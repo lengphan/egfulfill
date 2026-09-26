@@ -33,6 +33,7 @@ import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { useUrlView } from "@/lib/url-view"
+import { useOrderPanel } from "@/components/app/order-panel"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, faceChargesFor, faceSurfacesFor, faceAddOnsFor, methodsLabelOf } from "@/lib/order-format"
@@ -418,6 +419,9 @@ export function OrdersList() {
   }, [orders, filter, query])
 
  const paged = usePaged(filtered, 25, { url: true })
+  /* Opens beside the list (order-panel.tsx); J/K walk the whole filtered list. */
+ const panelIds = useMemo(() => filtered.map((o) => o.id), [filtered])
+ const { openId: panelId, openOrder, panel } = useOrderPanel(panelIds)
 
   /* THE VIEW LIVES IN THE ADDRESS — tab and search, beside the page usePaged keeps — so an
      order opened from page 3 of "Shipped" comes Back to page 3 of "Shipped". lib/url-view.ts. */
@@ -554,7 +558,7 @@ export function OrdersList() {
                   <Fragment key={o.id}>
                     <TableRow
  onClick={() => toggleExpanded(o.id)}
- className={"cursor-pointer focus-visible:bg-accent focus-visible:outline-none " + (open ? "bg-accent/40" : "")}
+ className={"cursor-pointer transition-colors duration-100 focus-visible:bg-accent focus-visible:outline-none " + (open || panelId === o.id ? "bg-accent/40" : "")}
                     >
                       <TableCell className="pr-0">
                         <button
@@ -699,7 +703,7 @@ export function OrdersList() {
                                 {role && role !== "seller" && (
                                   <ApproveOrderButton order={o} catalog={catalog} onDone={load} onError={setActionErr} />
                                 )}
-                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${encodeURIComponent(o.id)}`) }}>
+                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openOrder(o.id, e) }}>
                                   {tl("ordersList", "Open order")} <CaretRight size={12} weight="bold" />
                                 </Button>
                               </span>
@@ -746,6 +750,7 @@ export function OrdersList() {
  onSaved={() => reloadDesigns(editing.order.id)}
         />
       )}
+      {panel}
     </div>
   )
 }

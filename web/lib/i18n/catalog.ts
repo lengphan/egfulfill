@@ -85,6 +85,7 @@ const en: Dict = {
   "topbar.yourProfile": "Your profile",
   "topbar.accountMenu": "Account menu",
   "topbar.profileSettings": "Profile & settings",
+  "topbar.orderPanel": "Open orders in a side panel",
   "topbar.logout": "Log out",
 
   // ── Dashboards (seller + staff) ───────────────────────────────────────────
@@ -459,6 +460,14 @@ const vi: Dict = {
   "topbar.yourProfile": "Trang cá nhân",
   "topbar.accountMenu": "Menu tài khoản",
   "topbar.profileSettings": "Hồ sơ & cài đặt",
+  "topbar.orderPanel": "Mở đơn trong khung bên cạnh",
+  "orderPanel.Order": "Đơn hàng",
+  "orderPanel.Drag to resize": "Kéo để đổi kích thước",
+  "orderPanel.of": "trên",
+  "orderPanel.Previous order": "Đơn trước",
+  "orderPanel.Next order": "Đơn sau",
+  "orderPanel.Open full page": "Mở trang đầy đủ",
+  "orderPanel.Close": "Đóng",
   "topbar.logout": "Đăng xuất",
 
   // Nav labels + section headings — keyed by their English string (see useLabelT), so

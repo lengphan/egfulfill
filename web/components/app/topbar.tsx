@@ -16,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -26,6 +27,7 @@ import { staffNavTitle } from "@/lib/staff-nav"
 import { getWallet, getFactoryList, getOrderLimitStatus, getFactoryCapacity } from "@/lib/api"
 import { onLive } from "@/lib/live"
 import { getUser, endSession, type User } from "@/lib/auth"
+import { useOrderOpen, writeOrderOpen } from "@/lib/order-open"
 import { UserAvatar } from "@/components/app/user-avatar"
 import { NotificationBell } from "@/components/app/notification-bell"
 import { OrderSearch } from "@/components/app/order-search"
@@ -94,6 +96,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   const tl = useLabelT()
  const pathname = usePathname()
  const router = useRouter()
+ const orderOpen = useOrderOpen()
  const t = useT()
  const nl = useLabelT()
  const { resolvedTheme, setTheme } = useTheme()
@@ -280,6 +283,12 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => router.push("/settings")}>{t("topbar.profileSettings")}</DropdownMenuItem>
+              {/* HOW AN ORDER OPENS FROM A LIST — per browser, no deploy to change it
+                  (lib/order-open.ts). Off is exactly the behaviour before the panel. */}
+              <DropdownMenuCheckboxItem checked={orderOpen === "panel"}
+                onCheckedChange={(v) => writeOrderOpen(v ? "panel" : "page")}>
+                {t("topbar.orderPanel")}
+              </DropdownMenuCheckboxItem>
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
                 {t("topbar.logout")}
               </DropdownMenuItem>

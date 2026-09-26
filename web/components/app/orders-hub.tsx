@@ -80,6 +80,7 @@ import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/componen
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
 import { filterOrders, matchesStatus, isRush, isOverdue, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, isOrderQueryActive, type OrderQuery } from "@/lib/order-filter"
 import { useUrlView } from "@/lib/url-view"
+import { useOrderPanel } from "@/components/app/order-panel"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { AddItemDialog } from "@/components/app/inventory-view"
@@ -1126,6 +1127,9 @@ export function OrdersHub() {
   }, [orders, query, filterCtx, sort])
 
  const paged = usePaged(filtered, 25, { url: true })
+  /* The side panel steps through the WHOLE filtered list with J/K, not just this page. */
+ const panelIds = useMemo(() => filtered.map((o) => o.id), [filtered])
+ const { openId: panelId, openOrder, panel } = useOrderPanel(panelIds)
 
   /**
    * THE VIEW LIVES IN THE ADDRESS — the tab, the search, every filter and the sort — so opening
@@ -2154,7 +2158,13 @@ export function OrdersHub() {
                   /* Staff can correct the number in place — it is orders.seq, a label, and a
                      mistyped one used to be permanent. Not the id: ten tables join on that. */
                   <div className="min-w-0 truncate" title={numOf(o)}>
-                    <OrderNumber order={o} />
+                    {/* A REAL LINK, so Cmd/Ctrl/middle-click opens a new tab as links do; a plain
+                        click opens the side panel (order-panel.tsx), or the full page when the
+                        panel is switched off in the account menu. */}
+                    <Link href={`/orders/${encodeURIComponent(o.id)}`} onClick={(e) => openOrder(o.id, e)}
+                      className="rounded hover:underline hover:underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                      <OrderNumber order={o} />
+                    </Link>
                   </div>
                 ),
                 /**
@@ -2349,7 +2359,7 @@ export function OrdersHub() {
  action: null, // rendered inline below, pinned last
               }
  return (
-                <div key={o.id} className="relative p-5">
+                <div key={o.id} className={"relative p-5 transition-colors duration-100 " + (panelId === o.id ? "bg-accent/60" : "")}>
                   {/* A BOOKMARK CLIPPED OVER THE SEPARATOR. top-0 puts its top edge on the
  row's dividing line so it hangs DOWN from it, the way a bookmark sits
  over the edge of a page — floating it above the line reads as a stray
@@ -2759,7 +2769,7 @@ export function OrdersHub() {
  files panel. A spinner is the exception, because it says
  something no word in a static label can. */}
                               {/* the non-primary pipeline actions */}
-                              <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}>{tl("ui", "Open order")}</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openOrder(o.id)}>{tl("ui", "Open order")}</DropdownMenuItem>
                               {/**
                                 * REORDER — the only thing left to do with a finished order.
                                 *
@@ -3800,6 +3810,7 @@ export function OrdersHub() {
 
       <p className="text-center text-xs text-muted-foreground">{tl("ui", "Stages")}: {FACTORY_STAGES.map((s) => tl("stage", s.label)).join(" → ")}</p>
 
+      {panel}
     </div>
   )
 }

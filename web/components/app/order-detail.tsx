@@ -1,0 +1,4227 @@
+"use client"
+
+import { useLabelT } from "@/lib/i18n"
+import { Fragment, useEffect, useMemo, useState, useCallback, useRef } from "react"
+import { ordersHomeFor } from "@/lib/staff-nav"
+import { numOf, platformOf, shipAddressOf, sellerLabelOf, addressSourceLabel, addressLines, faceChargesFor, faceSurfacesFor, faceAddOnsFor, methodsLabelOf } from "@/lib/order-format"
+import { CopyButton } from "@/components/app/copy-button"
+import { OrderNumber } from "@/components/app/order-number"
+import { getUser, canSeeMoney } from "@/lib/auth"
+import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
+import { useRouter } from "next/navigation"
+import { Package, MapPin, Truck, Clock, PaperPlaneTilt, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash, ArrowUUpLeft } from "@phosphor-icons/react"
+import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
+import { SectionCard } from "@/components/app/section-card"
+import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard, type OrderDesignFee, type ReuseMatch, getProductTypes } from "@/lib/api"
+import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
+import { deleteOrderItem } from "@/lib/api"
+import { refundOrder } from "@/lib/api"
+import { OrderRefundPanel } from "@/components/app/order-refund-panel"
+import { OrderAdjustPanel } from "@/components/app/order-adjust-panel"
+import { boardArtworkFor } from "@/lib/design-board"
+import { SendToBoardDialog } from "@/components/app/send-to-board-dialog"
+import { canvasReadableSrc } from "@/lib/thread-match"
+import { variantOf } from "@/lib/order-format"
+import { EmptyState } from "@/components/app/empty-state"
+import { DesignFeeAmount } from "@/components/app/design-charge"
+import { ItemDesignActions } from "@/components/app/item-design-actions"
+import { designCardFor } from "@/lib/api"
+import { SellerStatusBadge } from "@/components/app/seller-status-badge"
+import { StageBadge } from "@/components/app/stage-badge"
+import { DeliveryBadge } from "@/components/app/delivery-badge"
+import { DesignCanvasDialog } from "@/components/app/design-canvas"
+import { ItemAvatar } from "@/components/app/item-avatar"
+import { OrderHistory } from "@/components/app/order-history"
+import { TabBar } from "@/components/app/tab-bar"
+import { SubmitOrderButton } from "@/components/app/submit-order-button"
+import { ApproveOrderButton } from "@/components/app/approve-order-button"
+import { orderNeedsSetup, setTypeMockups } from "@/lib/variant-resolve"
+import { SellerDesignFiles } from "@/components/app/design-files-panel"
+import { Markdown, hasMarkdown } from "@/components/app/markdown"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+ getOrders,
+ getOrder,
+ indexDesigns,
+ designsBySide,
+ designForLine,
+ sidesForLine,
+ ALL_SIDES,
+ getOrderDesigns,
+ getDesignReuse,
+ getOrderDesignReuse,
+ getDesignFiles,
+ type DesignFileRow,
+ getOrderMessages,
+ getOrderQuote,
+ getOrderCharges,
+ getOrderCosts,
+ getCatalogProducts,
+ postOrderMessage,
+ uploadChatAttachment,
+ type ChatAttachment,
+ updateOrder,
+ duplicateOrder,
+ type OrderRow,
+ type OrderItem,
+ type OrderDesign,
+ type ChatEntry,
+ type OrderQuote,
+ type OrderCharges,
+ type OrderCosts,
+ type CatalogProduct,
+ type ShipAddress,
+} from "@/lib/api"
+import { resolveProduct } from "@/lib/variant-resolve"
+import { resolvedOrderStage, isFactoryOrder } from "@/lib/factory-status"
+import { VariantPicker } from "@/components/app/variant-picker"
+import { VariantStrip } from "@/components/app/variant-field"
+import { OrderStageMenu } from "@/components/app/order-stage-menu"
+import { LabelActionButton } from "@/components/app/label-action-button"
+import { InternalNote } from "@/components/app/internal-note"
+import { printPackingSlips } from "@/lib/packing-slip"
+import { NewLabelDialog } from "@/components/app/new-label-dialog"
+import { designSrc } from "@/lib/order-image"
+import { OrderedVariant } from "@/components/app/ordered-variant"
+import { useConfirm } from "@/components/app/confirm-dialog"
+import { LineDownloads } from "@/components/app/line-downloads"
+import { designLabel } from "@/lib/design-id"
+import { TrackingNumber } from "@/components/app/tracking-number"
+import { AddTracking } from "@/components/app/add-tracking"
+
+// "Kept identical on purpose" is what this comment used to say, and it was not: this copy
+// read all four street spellings while the Customer card twelve hundred lines down read
+// only `line1`, so the label went to an address the page did not show. One reader now,
+// in lib/order-format.ts, and this just renames its fields for the label payload.
+const toShipAddress = (o: OrderRow): ShipAddress => {
+ const a = shipAddressOf(o)
+ return { name: a.name, street: a.line1, street2: a.line2, city: a.city, state: a.state, zip: a.zip }
+}
+
+const fmtMsgTime = (ts?: number) => {
+ if (!ts) return ""
+ const d = new Date(ts)
+ return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+}
+
+// Coerce rather than trust: a manual order legitimately has no total until it's priced,
+// and a quote field can be absent — either one used to take the whole page down with
+// "cannot read properties of undefined".
+const usd = (n: number | string | null | undefined) =>
+  `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+const fmtDateTime = (s?: string | null) => {
+ if (!s) return "—"
+ const d = new Date(s)
+ return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+}
+
+type Addr = { name?: string; line1?: string; line2?: string; city?: string; state?: string; zip?: string; country?: string }
+type TimelineEntry = { status?: string; at?: string }
+
+/**
+ * THE ORDER, as one component — rendered by the /orders/[id] page AND by the side panel the
+ * order lists open (order-panel.tsx). One body, two frames: a second copy of this page would
+ * drift from the first the way every hand-kept mirror in this codebase has.
+ *
+ * `embedded` is the panel's frame: no "‹ Orders" back link (the panel has its own close) and
+ * one column instead of two, because the panel is narrower than the viewport breakpoint the
+ * two-column grid is written against.
+ */
+export function OrderDetail({ id, embedded = false }: { id: string; embedded?: boolean }) {
+ const router = useRouter()
+ const tl = useLabelT()
+ const [orders, setOrders] = useState<OrderRow[] | null>(null)
+ const [one, setOne] = useState<OrderRow | null>(null)
+  // Fetching TikTok's own label for this order. Kept local to the Shipping card — it's a
+  // read, not a state change on the order, so it has no business in the page-level banner.
+ const [ttLabelBusy, setTtLabelBusy] = useState(false)
+ const [ttLabelErr, setTtLabelErr] = useState<string | null>(null)
+ const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
+  /** The order's design FILES (stitch files and the like), so each line can offer its own.
+   *  Separate from `designs`, which holds artwork and placement. */
+ const [dfiles, setDfiles] = useState<DesignFileRow[]>([])
+  /**
+   * The same rows, BY FACE. `designs` is deliberately singular — one design per line, the
+   * front — because that is what a mockup, an avatar and a readiness dot each want. The
+   * Design files card wants every printed face, which is a different question about the same
+   * data, so it gets its own map rather than the singular one being widened underneath the
+   * things that rely on it.
+   */
+ const [designSides, setDesignSides] = useState<Record<string, Record<string, OrderDesign>>>({})
+  // What the buyer paid, when nothing recorded it — a manual order has no marketplace to
+  // ask, so it is typed here or it is never known.
+ const [editRetail, setEditRetail] = useState(false)
+ // Bumped after a price adjustment so the refund panel re-reads its parts.
+ const [adjRev, setAdjRev] = useState(0)
+ const [retailDraft, setRetailDraft] = useState("")
+  // The ship-to, while the order has not started. Etsy hands us receipts with the street
+  // lines withheld and the city/zip intact, so an order can look addressed and still have
+  // nowhere to go — this is the only place that gap can be closed before the floor picks
+  // it up. `addrErr` holds the SERVER's refusal, not a guess at one.
+ const [editAddr, setEditAddr] = useState(false)
+ const [addrDraft, setAddrDraft] = useState<Addr>({})
+ const [addrSaving, setAddrSaving] = useState(false)
+ const [addrErr, setAddrErr] = useState<string | null>(null)
+ const [messages, setMessages] = useState<ChatEntry[]>([])
+ const [msg, setMsg] = useState("")
+ const [detailTab, setDetailTab] = useState<"items" | "files" | "board" | "history" | "activity">("items")
+  /**
+   * WHICH TABS HAVE BEEN OPENED. Panels stay mounted once visited so a switch never drops a
+   * draft or a scroll position — but History costs an audit query, and mounting it on page
+   * load would spend that on every visit including the majority that never ask. Pressing the
+   * tab is the event that pays for it.
+   */
+ const [seen, setSeen] = useState<Set<string>>(() => new Set(["items"]))
+ const goTab = (t: "items" | "files" | "board" | "history" | "activity") => {
+ setDetailTab(t)
+ setSeen((s) => (s.has(t) ? s : new Set(s).add(t)))
+  }
+ const [customize, setCustomize] = useState<OrderItem | null>(null)
+  // Design-partner state per line. Read separately from the order so a failure costs the
+  // chip, not the page — and it 403s for sellers, which is exactly the intended result:
+  // null means "no partner UI here", not "broken".
+ const [designStatus, setDesignStatus] = useState<OrderDesignStatus | null>(null)
+ const loadDesignStatus = useCallback(() => {
+ if (!id) return
+ getOrderDesignStatus(id).then(setDesignStatus).catch(() => setDesignStatus(null))
+  }, [id])
+ useEffect(() => { const t = setTimeout(loadDesignStatus, 0); return () => clearTimeout(t) }, [loadDesignStatus])
+ const [catalog, setCatalog] = useState<CatalogProduct[]>([])
+ const [quote, setQuote] = useState<OrderQuote | null>(null)
+  /** The quote FAILED, as against "there is no quote to fetch". Two states that rendered
+   * identically — an order with no prices on it — while /quote was 500ing for every
+   * order on the platform. */
+ const [quoteErr, setQuoteErr] = useState<string | null>(null)
+  /** Bumped whenever something that AFFECTS the price changes — see the quote effect. */
+ const [quoteNonce, setQuoteNonce] = useState(0)
+ const [charges, setCharges] = useState<OrderCharges | null>(null)
+  /** Which adjustment row is being reversed — see reverseFee, below the charge rows. */
+ const [reversing, setReversing] = useState<string | null>(null)
+  /**
+   * WHY THE REVERSE DID NOT HAPPEN.
+   *
+   * It swallowed both failures: a server refusal fell through `if (!r?.error)` and a thrown
+   * request was eaten by a bare `catch {}`. So pressing ↩ on a refund the server would not
+   * make did nothing at all — no row change, no message, no spinner left behind — which is
+   * indistinguishable from a dead button, and is exactly how it was reported.
+   */
+ const [reverseErr, setReverseErr] = useState<string | null>(null)
+ /** OUR side of the same order — what we spent, from the cost ledger. Staff only;
+  *  the route refuses a seller outright, so this stays null for them. */
+ const [costs, setCosts] = useState<OrderCosts | null>(null)
+
+  // Staff processing controls (stage moves + labels). Gated exactly like the boards:
+  // canFulfill = warehouse/admin; the ⋯ menu itself is per-stage/role-gated inside.
+ const role = getUser()?.role || "seller"
+  /* The admin's grants. A HOOK, not a call to the shared predicate — see the note on
+     canEditVariants below for why this file keeps its own copy of the rule. Everything reads
+     OFF until they load, which is the rule as shipped. */
+ useRoleGrants()
+ const editAfterApproval = isGrantOn(GRANT_OPERATOR_EDIT_AFTER_APPROVAL)
+ const isStaff = role !== "seller"
+  /** Board cards for this order, one per line that has been sent to design. Staff only —
+   * the route is gated, so a seller just gets nothing rather than a factory lane name. */
+ const [boardCards, setBoardCards] = useState<OrderDesignCard[]>([])
+ useEffect(() => {
+ if (!isStaff || !id) return
+ const t = setTimeout(() => {
+ getOrderDesignCards(String(id)).then((r) => setBoardCards(r ?? [])).catch(() => setBoardCards([]))
+    }, 0)
+ return () => clearTimeout(t)
+  }, [isStaff, id])
+ const canFulfill = role === "warehouse" || role === "admin"
+ const [labelOpen, setLabelOpen] = useState(false)
+ const [actionErr, setActionErr] = useState<string | null>(null)
+
+  // Re-pull orders after an action that changes this one (submit, cancel) so the badge
+  // and the action bar reflect the new status without a manual refresh.
+ const reload = () => { getOrders().then((rows) => setOrders(rows ?? [])).catch(() => {}) }
+  // `one` (the direct fetch) wins over the list, so a stage change must refresh IT too or
+  // the badge and menu would show stale state after a move.
+ const reloadAll = () => { getOrder(String(id)).then((o) => { if (o && !o.error) setOne(o) }).catch(() => {}); reload() }
+
+  /**
+   * Refresh THIS ORDER only — for the variant pickers, which fire on every colour/size click.
+   *
+   * They used to call `reload`, which re-fetches /api/orders: the WHOLE list, every order
+   * with every line, measured at ~1.5MB on a real board. So one click on "Navy" cost a POST,
+   * then a megabyte-and-a-half download, then a re-render of the entire page — and the
+   * Summary's price could not update until all of that had landed, because the quote effect
+   * keys off `order`, which only changes when the list does.
+   *
+   * `one` is what `order` resolves from first, so refreshing it alone moves the quote (and
+   * therefore the Summary) as soon as the single-order fetch returns.
+   */
+  /** Whatever the last row action refused with. Shown at the Items card rather than
+   * swallowed: a quantity that snaps back with no explanation reads as a broken field. */
+ const confirm = useConfirm()
+ const [rowErr, setRowErr] = useState<string | null>(null)
+ const [adding, setAdding] = useState(false)
+
+ const reloadOne = useCallback(() => {
+ getOrder(String(id)).then((o) => { if (o && !o.error) setOne(o) }).catch(() => {})
+  }, [id])
+
+  /** Save a line's quantity. Clamped client-side too, so the field can't send the server
+   * something it will only reject — and reloaded either way, because the row must show
+   * what was stored, not what was typed. */
+ const setQty = async (it: OrderItem, raw: string) => {
+ const n = Math.max(1, Math.min(999, Math.round(Number(String(raw).replace(/[^0-9]/g, "")) || 0)))
+ if (n === (Number(it.qty) || 1)) return
+ try {
+ const r = await postItemSetup(String(id), { line_id: it.line_id ?? undefined, sku: it.line_id ? undefined : (it.sku ?? undefined), qty: n })
+ if (r?.error) throw new Error(r.error)
+    } catch (e) {
+ setRowErr(e instanceof Error ? e.message : "Couldn't change the quantity.")
+    } finally { reloadOne() }
+  }
+
+  /** Add a blank line for staff to fill in with the pickers already on every row. */
+  /**
+   * REMOVE A LINE — a buyer orders the wrong thing and somebody has to fix it.
+   *
+   * Its own control rather than an entry in ItemDesignActions, because that menu renders
+   * only when design status AND a sku are present — and a line added by mistake has neither.
+   * The row you most need to delete would have been the one row with no way to.
+   *
+   * The server refuses this past review; the button is hidden on the same test so the
+   * refusal is never the first thing you learn.
+   */
+ const removeItem = async (it: OrderItem) => {
+ const key = it.line_id ?? it.sku
+ if (!key) { setRowErr("This line has no id, so it can't be removed safely."); return }
+ const ok = await confirm({
+ title: "Remove this line?",
+ body: `${it.name || it.sku || "This item"} comes off the order. Its artwork goes with it.`,
+ confirmLabel: "Remove line",
+    })
+ if (!ok) return
+ setRowErr(null)
+ try {
+ const r = await deleteOrderItem(String(id), String(key))
+ if (r?.error) throw new Error(r.error)
+    } catch (e) {
+ setRowErr(e instanceof Error ? e.message : "Couldn't remove that line.")
+    } finally { reloadOne() }
+  }
+
+ const addItem = async () => {
+ setAdding(true); setRowErr(null)
+ try {
+ const r = await addOrderItem(String(id), { name: "New item", qty: 1 })
+ if (r?.error) throw new Error(r.error)
+    } catch (e) {
+ setRowErr(e instanceof Error ? e.message : "Couldn't add an item.")
+    } finally { setAdding(false); reloadOne() }
+  }
+
+ const reloadDesigns = () => {
+ getDesignFiles(id).then((r) => setDfiles(r ?? [])).catch(() => {})
+ getOrderDesigns(id)
+      .then((r) => {
+        {
+ const list = Array.isArray(r) ? r : (r?.designs ?? [])
+ setDesigns(indexDesigns(list))
+ setDesignSides(designsBySide(list))
+        }
+      })
+      .catch(() => {})
+  }
+
+ useEffect(() => {
+ let alive = true
+    // Fetch THIS order directly. Scanning getOrders() meant an order the list filters out
+    // — a freshly created factory order, say — rendered as "Order not found" despite
+    // existing. The list is still loaded for neighbouring context, but it no longer
+    // decides whether the order exists.
+ if (id) {
+ getOrder(String(id))
+        .then((o) => { if (alive && o && !o.error) setOne(o) })
+        .catch(() => {})
+    }
+ getOrders()
+      .then((rows) => alive && setOrders(rows ?? []))
+      .catch(() => alive && setOrders([]))
+    // Catalog powers the variant picker's blank/colour/size/method options.
+ getCatalogProducts().then((c) => alive && setCatalog(c ?? [])).catch(() => {})
+    /**
+     * THE CATEGORY SPECS, so `offeredSides` can answer at all.
+     *
+     * A product's faces are its own ticks, ELSE its configured type — and the type specs live
+     * in platform settings, which setTypeMockups holds in a module variable. Without this the
+     * fallback silently returns null on every blank that has not ticked its own faces, so the
+     * strip's per-face Method disclosure would appear on some products and not others with
+     * nothing on screen to say why. The mini designer already loads them for the same reason.
+     */
+ getProductTypes().then((rows) => alive && setTypeMockups(rows ?? [])).catch(() => {})
+ if (id) {
+ getOrderDesigns(id)
+        .then((r) => {
+ const list0 = Array.isArray(r) ? r : (r?.designs ?? [])
+ setDesignSides(designsBySide(list0))
+ const by = indexDesigns(list0)
+ if (alive) setDesigns(by)
+        })
+        .catch(() => {})
+ getOrderMessages(id)
+        .then((r) => alive && setMessages(Array.isArray(r) ? r : []))
+        .catch(() => {})
+    }
+ return () => {
+ alive = false
+    }
+  }, [id])
+
+  /**
+   * ATTACHMENTS ON THE ORDER THREAD.
+   *
+   * This thread could RENDER an attachment — the mobile app's package photo arrives here —
+   * and had no way to send one, so a picture of the misprint being discussed had to go via
+   * some other channel and never sat with the order it was about. The support chat already
+   * had all of this; what it did not have was the order.
+   *
+   * Held staged until send, exactly as the chat composer does, so the picture and the
+   * sentence explaining it arrive as one message rather than two.
+   */
+ const [pendingAtt, setPendingAtt] = useState<ChatAttachment | null>(null)
+ const [attaching, setAttaching] = useState(false)
+ const [attErr, setAttErr] = useState<string | null>(null)
+ const [dragging, setDragging] = useState(false)
+  // A COUNTER, not a boolean: dragenter/dragleave fire for every child element crossed, so
+  // a flag flickers off the moment the cursor passes over a message bubble.
+ const dragDepth = useRef(0)
+ const attachRef = useRef<HTMLInputElement>(null)
+
+ const onAttach = useCallback(async (file: File | undefined) => {
+ if (!file) return
+ if (file.size > MAX_ATTACHMENT_BYTES) { setAttErr("That file is over 25MB — pick a smaller one."); return }
+ setAttaching(true); setAttErr(null)
+ try {
+ const r = await uploadChatAttachment(await fileToUploadUrl(file), file.name)
+ if (r.error || !r.url) throw new Error(r.error || "Upload failed")
+ setPendingAtt({ url: r.url, name: r.name || file.name, mime: r.mime, size: r.size })
+    } catch (e) {
+ setAttErr(e instanceof Error ? e.message : "Couldn't attach that file.")
+    } finally {
+ setAttaching(false)
+ if (attachRef.current) attachRef.current.value = ""
+    }
+  }, [])
+
+ const sendMsg = async () => {
+ const text = msg.trim()
+    // A picture with no words is a message. Requiring text meant dropping a photo and then
+    // having to invent a sentence for it.
+ if (!text && !pendingAtt) return
+ setMsg("")
+ const att = pendingAtt; setPendingAtt(null); setAttErr(null)
+ const clientId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    // Attribute the optimistic bubble to whoever is actually typing. It was hardcoded to
+    // "seller", so a warehouse message showed as coming from the seller — on the one
+    // surface where who-said-what is the whole point.
+ const myRole = getUser()?.role || "seller"
+ setMessages((prev) => [...prev, { id: clientId, role: myRole, text, ts: Date.now(), attachment: att ?? undefined }])
+ try {
+ await postOrderMessage(id, text, { clientId, attachment: att ?? undefined })
+ const r = await getOrderMessages(id)
+ setMessages(Array.isArray(r) ? r : [])
+    } catch {
+      /* keep optimistic message */
+    }
+  }
+
+  // The directly-fetched order wins; the list is a fallback for anything already loaded.
+ const order = useMemo(() => one ?? (orders ?? []).find((o) => o.id === id) ?? null, [one, orders, id])
+
+  /**
+   * SENDING A LINE TO A DESIGNER, FROM THE ORDER (owner, 2026-09-17).
+   *
+   * It was only reachable from the orders hub, so working an order meant leaving it — while
+   * everything the decision needs is already on this page: the lines, their artwork, their
+   * methods, and the board cards above.
+   *
+   * THE ACT IS lib/design-board.ts, not a copy of the hub's. §5: private copies of shared
+   * logic have already been found in three separate files, and this one carries rules that
+   * each cost something — refusing a card with no artwork rather than failing silently, and
+   * asking whether we have already made this file before spending a designer on it.
+   */
+  /**
+   * WHAT THE FILES BADGE COUNTS — everything that tab lists, which is the only thing a badge
+   * may count.
+   *
+   * It counted `dfiles` alone: the machine and design files uploaded against the order. But
+   * the tab renders SellerDesignFiles, which lists the ARTWORK already on the order as well —
+   * so an order carrying a front and a back and no stitch file showed no badge at all while
+   * the tab underneath it was full. Exactly the drift the canvas's own Files badge had, from
+   * the same cause: the count names one source and the panel grew a second.
+   *
+   * Artwork is counted per FACE, because that is how the tab lists it — a front and a back are
+   * two things to look at, not one design with two halves.
+   */
+ const fileTabCount = dfiles.length
+    + Object.values(designSides).reduce((n, faces) => n + Object.keys(faces ?? {}).length, 0)
+
+ const reloadBoard = useCallback(() => {
+ if (!isStaff || !id) return
+ getOrderDesignCards(String(id)).then((r) => setBoardCards(r ?? [])).catch(() => setBoardCards([]))
+  }, [isStaff, id])
+ const [boardBusy, setBoardBusy] = useState<string | null>(null)
+ const [boardNote, setBoardNote] = useState<{ ok: boolean; text: string } | null>(null)
+  /** Reuse hits for one line — SHOWN, never acted on. §6: a perceptual match suggests and a
+   *  human confirms; auto-attaching one is how another seller's work reaches this order. */
+ const [boardReuse, setBoardReuse] = useState<{ key: string; exact: ReuseMatch[]; similar: ReuseMatch[] } | null>(null)
+  /**
+   * WHAT WE ALREADY HOLD, ASKED ON ARRIVAL (owner, 2026-09-21: "surfaces when file is
+   * submitted, not after press send to board").
+   *
+   * That was half-built. `getOrderDesignReuse` was written for exactly this and its own note
+   * says it is "read whenever staff open the order" — but its only consumer was
+   * DesignFilesPanel, which mounts inside a BOARD CARD. So the answer existed and lived
+   * behind the decision it was meant to pre-empt: you reached it by opening a card, which
+   * you open after deciding to spend a designer.
+   *
+   * The per-line lookup below still runs on the way to the board and still gates the send.
+   * This one is only for SAYING SO, on the line, from the moment the page loads.
+   */
+ const [ownedFiles, setOwnedFiles] = useState<Record<string, { exact: ReuseMatch[]; similar: ReuseMatch[]; hashed: boolean }>>({})
+
+  /**
+   * WHICH LINE AND FACE THE SEND DIALOG IS OPEN FOR.
+   *
+   * SendToBoardDialog ALREADY EXISTS and already does all of this — an editable title, a
+   * brief that lands at specs.description (the same field the board's own editor patches),
+   * band pills, and a read-only list of what the line is carrying. I built an inline form
+   * here without grepping for it first, which is §2.2 exactly: "Grep before adding a
+   * component". The inline one is gone; this opens the real one.
+   */
+ const [boardSend, setBoardSend] = useState<{ item: OrderItem; side: string | null } | null>(null)
+
+  /**
+   * ASK BEFORE SPENDING A DESIGNER, THEN OPEN THE REAL DIALOG.
+   *
+   * The reuse check happens HERE rather than inside SendToBoardDialog, because it is the
+   * question you want answered BEFORE writing a brief, not after. §6: a perceptual match
+   * SUGGESTS and a human confirms, so hits are shown and `force` is the human saying send it
+   * anyway. The lookup is an optimisation — a failure never blocks the send.
+   */
+ const beginSend = async (it: OrderItem, side: string | null, force = false) => {
+ const key = `${it.line_id || it.sku || it.name || ""}|${side ?? ""}`
+ setBoardNote(null)
+ if (force || !it.sku) { setBoardReuse(null); setBoardSend({ item: it, side }); return }
+ setBoardBusy(key)
+    try {
+ const r = await getDesignReuse(String(id), it.sku, it.line_id ?? undefined)
+ if (r && (r.exact.length || r.similar.length)) { setBoardReuse({ key, exact: r.exact, similar: r.similar }); return }
+    } catch { /* the lookup is an optimisation — never block the send on it */ }
+    finally { setBoardBusy(null) }
+ setBoardReuse(null)
+ setBoardSend({ item: it, side })
+  }
+
+  /* STAFF ONLY, and the server agrees with a 403: the answer is drawn from other sellers'
+     orders, and §6 forbids a seller ever learning theirs was used by another. A failure is
+     silent here because this is an ADDITION to the row — the line renders without it
+     exactly as it did, and an error banner about an optimisation is noise. */
+  useEffect(() => {
+    if (!order || !isStaff) return
+    let live = true
+    const t = setTimeout(() => {
+      getOrderDesignReuse(String(id)).then((r) => { if (live) setOwnedFiles(r?.lines ?? {}) }).catch(() => {})
+    }, 0)
+    return () => { live = false; clearTimeout(t) }
+  }, [order, isStaff, id])
+
+  // The quote is fetched HERE rather than inside the submit button because two places
+  // render it: the Summary card (the breakdown) and the confirm dialog (the amount).
+  // It used to live in the button, which is why the price floated loose in the header.
+ const submittable = !!order && ["", "new", "draft"].includes(String(order.factory_status || ""))
+ useEffect(() => {
+ let live = true
+    // Deferred rather than set synchronously — this codebase's lint rule (and React's
+    // guidance) rejects a straight setState in an effect body; it cascades a render.
+ const id = setTimeout(() => {
+ if (!live) return
+      /**
+       * FETCHED AT EVERY STAGE NOW, not only while the order can still be submitted.
+       *
+       * The quote carries `supplierTotal` — what the blanks cost US — and that is a fact
+       * about the products, not about whether anyone has paid yet. Gating the fetch on
+       * `submittable` made it null the moment an order left Draft, which is why the
+       * factory cost block could never render on a real order: it tested
+       * `quote?.supplierTotal != null` inside the branch that only runs when `quote` is
+       * absent. Two conditions that could not both be true.
+       *
+       * WHICH ROWS TO SHOW IS A SEPARATE QUESTION and is decided by `submittable` below.
+       * Post-submit the quote's line costs are the FROZEN ones anyway, but the ledger is
+       * still the right source there — it sees expedited shipping, express and design
+       * files, which the quote cannot.
+       */
+ if (!order) { setQuote(null); setQuoteErr(null); return }
+      // A SWALLOWED ERROR IS NOT AN EMPTY ORDER. `.catch(() => {})` left `quote` null,
+      // which the Summary renders as an order that simply has no base cost, shipping or
+      // fees — the exact picture a 500 from /quote produced, for months, with nothing on
+      // screen suggesting anything had gone wrong.
+ getOrderQuote(order.id)
+        .then((q) => { if (live) { setQuote(q); setQuoteErr(null) } })
+        .catch((e) => { if (live) { setQuote(null); setQuoteErr(e instanceof Error ? e.message : "Couldn't load the price for this order.") } })
+    }, 0)
+ return () => { live = false; clearTimeout(id) }
+    // `quoteNonce` — artwork decides the price now. A second printed side adds a surcharge
+    // per unit (pricing.js sideAddOn), so placing or removing a design changes the total,
+    // and without this the Summary kept the figure it had loaded on arrival.
+  }, [order, quoteNonce])
+
+  // What was ACTUALLY charged, from the ledger — the only complete source. The quote
+  // above covers production + shipping and is the right thing to show BEFORE submit
+  // (it's a forecast). After submit it is the wrong shape twice over: it can't see
+  // expedited shipping, express, or design files, and the page's old fallback read
+  // `order.total`, which is the BUYER's grandtotal on a marketplace order, not the
+  // factory charge. Sellers were shown their own revenue labelled as costs.
+ useEffect(() => {
+ let live = true
+ const t = setTimeout(() => {
+ if (!live || !order) return
+ getOrderCharges(order.id).then((c) => { if (live) setCharges(c) }).catch(() => { if (live) setCharges(null) })
+      // The other direction, and only for staff: a seller's request is refused, so asking
+      // would spend a round trip to be told no on every order they open.
+ if (isStaff) getOrderCosts(order.id).then((c) => { if (live) setCosts(c) }).catch(() => { if (live) setCosts(null) })
+    }, 0)
+ return () => { live = false; clearTimeout(t) }
+  }, [order, isStaff])
+
+ if (orders === null) {
+ return (
+      <div className="space-y-4">
+        <div className="h-8 w-40 animate-pulse rounded bg-muted" />
+        <div className="h-64 animate-pulse rounded-2xl bg-muted" />
+      </div>
+    )
+  }
+
+ if (!order) {
+ return (
+      <div className="flex flex-col items-center gap-3 py-24 text-center">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+          <Package size={26} weight="duotone" />
+        </span>
+        <div className="font-medium">Order not found</div>
+        <div className="text-sm text-muted-foreground">It may have been removed, or the link is stale.</div>
+        {/* Role-aware: staff belong on their production board, not the seller list. */}
+        <Button variant="outline" size="sm" onClick={() => router.push(ordersHomeFor(getUser()?.role))}>
+          Back to orders
+        </Button>
+      </div>
+    )
+  }
+
+ const items = order.items ?? []
+  /**
+   * THE LINE AS IT IS NOW, not as it was when the window opened.
+   *
+   * `customize` is a SNAPSHOT taken on click. Harmless while the dialog only placed artwork —
+   * but it now carries the variant picker, and picking a blank inside it saved to the server,
+   * refreshed the order, and then re-rendered the picker from the same stale object. The
+   * field snapped back to "Blank · Required" and the strip read as broken; it had worked
+   * every time.
+   *
+   * Re-found in `items` by line identity, so the dialog sees what the order sees. Falls back
+   * to the snapshot for the instant between the click and the next fetch. Deliberately NOT a
+   * useMemo: `items` is only available after this component's early returns, and a hook here
+   * would run conditionally.
+   */
+ const customizeKey = customize ? (customize.line_id ?? customize.sku) : null
+ const customizeLive = customize
+    ? (items.find((it) => (it.line_id ?? it.sku) === customizeKey) ?? customize)
+ : null
+  // Variants are editable only before submit — after that the cost is frozen and the
+  // server rejects changes. new/draft/"" = not yet submitted.
+ const preSubmit = ["", "new", "draft"].includes(String(order.factory_status || ""))
+  // Admin can still correct a line after submit — the price is frozen either way — until
+  // the blanks go to a supplier. Everyone else is locked at submit.
+  /**
+   * THE FLOOR MAY CORRECT A LINE UNTIL IT IS APPROVED — mirrors the same rule in
+   * server/src/routes/orders.js (item-setup). Approved is where a human has confirmed the
+   * blank on every line, so after it a change contradicts the check rather than being part
+   * of it; before it, an operator spotting the wrong colour on the way in should not have
+   * to find an admin.
+   *
+   * NOTHING HERE RE-PRICES. unit_cost/ship_fee were frozen on the line at submit, so an
+   * edit changes what we MAKE and never what was billed. That is stated at the controls.
+   */
+ const stageNow = String(order.factory_status || "").toLowerCase()
+ const beforeApproval = ["", "new", "draft", "pending", "in_review"].includes(stageNow)
+ /*
+  * KEPT IN STEP WITH mayEditVariants (shared/order-rules.ts) BY HAND, and it has to be.
+  *
+  * This is the same rule, spelled out: staff up to approval, the seller pre-submit, admin
+  * until the blanks are ordered. It does not CALL the shared predicate because the React
+  * Compiler refuses to compile this component when an imported function is invoked in its
+  * render body ("Existing memoization could not be preserved"), and a component the
+  * compiler skips loses every memo it already had — a worse trade than one hand-kept copy.
+  *
+  * So: if mayEditVariants moves, this moves in the same commit. Same standing arrangement
+  * CLAUDE.md already describes for the stage gate across server/web/mobile.
+  */
+ const canEditVariants = preSubmit
+    || (isStaff && beforeApproval)
+    || (role === "admin" && !(order as { blanks_ordered?: boolean }).blanks_ordered)
+    /* An operator gets the admin window when Settings › Permissions grants it — the same
+       end (blanks ordered), a different WHO. Mirrors mayEditVariants and the server's
+       item-setup carve-out; all three move together. */
+    || (role === "operator" && editAfterApproval && !(order as { blanks_ordered?: boolean }).blanks_ordered)
+  /**
+   * ADDING A LINE — two windows, mirroring the server's two (orders.js, POST items).
+   *
+   * Staff: up to approval. A line added after submit is made and not billed, which is the
+   * stated asymmetry on the card.
+   *
+   * Seller: only before THEY submit, and not on an order already approved. `preSubmit` is
+   * the RAW column (`"" | new | draft`) — deliberately not `beforeApproval`, which also
+   * counts `pending` and `in_review`. Both of those are past the charge, and a seller
+   * adding a line there is asking to be produced something nobody billed them for.
+   *
+   * That list is submit's own, on both sides of the wire, so the two boundaries cannot
+   * drift: if the seller can still submit it, they can still add to it.
+   */
+ const canAddItem = isStaff ? beforeApproval : (preSubmit && !order.approved_at)
+  /**
+   * REMOVING IS A DIFFERENT TEST FROM ADDING, and it mirrors the server's, not this file's
+   * `beforeApproval`.
+   *
+   * Adding is staff-only because a seller adding a line to an order they were already
+   * charged for is asking to be made something nobody billed. Taking one OFF only ever
+   * reduces what they are about to pay, and before submission nothing has been billed — so
+   * a seller who put the wrong blank on their own draft can now take it off, which is what
+   * the row was missing an X for.
+   *
+   * The seller's window is narrower than staff's on purpose. removeLine (orders.js) allows a
+   * seller only while `normalizeStage(factory_status) === ''` and approved_at is null.
+   * `stageNow` here is the RAW column, so the set is spelled out — normalizeStage collapses
+   * new / draft / none / pending onto '' — rather than reusing `beforeApproval`, which also
+   * counts in_review and never looks at approved_at. Drawing an X the API then 403s is the
+   * worst of the three possible behaviours.
+   */
+ const sellerMayPrune = !isStaff
+    && ["", "new", "draft", "none", "pending"].includes(stageNow)
+    && !order.approved_at
+ const canRemoveItem = (isStaff && beforeApproval) || sellerMayPrune
+  /**
+   * WHO MAY REWRITE THE SHIP-TO — and this mirrors the SERVER'S OWN TEST, not the
+   * `beforeApproval` two lines up.
+   *
+   * server/src/routes/orders.js (PATCH /api/orders/:id) refuses a seller's `address` or
+   * `customer` write once the order has `started`, where started =
+   *   stage is outside ['', 'new', 'draft', 'in_review']  OR  approved_at is set.
+   *
+   * `beforeApproval` differs on both halves: it also counts 'pending', and it never looks
+   * at approved_at — so reusing it here would draw a form for a seller that the API then
+   * answers 403 to, which is the worst of the three possible behaviours. Staff carry no
+   * address gate on that route at all.
+   *
+   * CLAUDE.md's rule about the stage gate living in three files applies to this one too:
+   * if SELLER_ZONE moves in orders.js, it has to move here in the same commit.
+   */
+ const addrUnstarted = ["", "new", "draft", "in_review"].includes(stageNow) && !order.approved_at
+ const canEditAddress = isStaff || addrUnstarted
+ const saveAddress = async () => {
+ setAddrSaving(true)
+ setAddrErr(null)
+    // Send the whole object, not a diff: `address` is a jsonb COLUMN and the patch
+    // replaces it wholesale, so omitting a key deletes it rather than leaving it alone.
+ const next: Record<string, string> = {}
+    for (const k of ["name", "line1", "line2", "city", "state", "zip", "country"] as const) {
+ const v = (addrDraft[k] ?? "").trim()
+      if (v) next[k] = v
+    }
+ const res = await updateOrder(String(id), { address: next }).catch((e: unknown) => ({ error: String((e as Error)?.message || e) }))
+ setAddrSaving(false)
+    // The server's sentence, verbatim — a locked order says why it is locked.
+    if (res && "error" in res && res.error) { setAddrErr(res.error); return }
+ setEditAddr(false)
+ reloadOne()
+  }
+  // Was a private copy of numOf, so the detail page still showed the raw "etsy-4120118148"
+  // after the boards were stripping the source prefix. Use the shared formatter.
+ const num = numOf(order)
+ const store = (order.store || order.source || "manual").toString()
+  /*
+   * THE SAME READER THE BOARDS USE. This was `(order.address ?? {}) as Addr`, which reads
+   * `line1` and nothing else — so an Etsy order whose street arrived through the Shippo
+   * backfill (stored as `street`) rendered with the street line simply absent, while the
+   * production queue showed it. Same row, two screens, and only one of them right.
+   */
+ const addr = shipAddressOf(order)
+  /**
+   * A street that is ABSENT, told apart from one that is merely WITHHELD.
+   *
+   * Two different facts, and they used to render as the same blank. `masked` is the server
+   * stamping "the factory holds this"; without it, a missing street means we have nothing
+   * to ship against — which is the one thing that stops a label being bought.
+   */
+ const streetMissing = !addr.line1 && !addr.masked && !!(addr.city || addr.zip)
+  // What the FORM edits — the seven address fields, without `masked`, which is the
+  // server's stamp and not a thing anyone types.
+ const addrFields: Addr = {
+ name: addr.name, line1: addr.line1, line2: addr.line2,
+ city: addr.city, state: addr.state, zip: addr.zip, country: addr.country,
+  }
+  /**
+   * A MASKED ADDRESS IS NOT EDITABLE — a data-loss guard, not a permission.
+   *
+   * The server strips street and ZIP out of the SELLER's copy of a marketplace order, so
+   * the form would open with those two fields blank over a row that has them both. And
+   * `saveAddress` writes the whole jsonb object (it must — the patch replaces the column),
+   * so pressing Save on that form would erase the real street. Staff read the unmasked row
+   * and are unaffected.
+   */
+ const addrEditable = canEditAddress && !addr.masked
+ const cust = order.customer ?? {}
+ const timeline = (Array.isArray(order.timeline) ? order.timeline : []) as TimelineEntry[]
+  // (itemsTotal / total were removed with the old Summary fallback. Both were REVENUE —
+  // unit_price is the seller's listing price and orders.total the buyer's grandtotal —
+  // and the card presented them as production costs. `revenue` below is the same figure,
+  // now labelled as what it is.)
+  // Design/check fees shown in the Summary. Complex fees under review are `amount: null`
+  // ("To Be Determined") and are NOT added to the number, only listed.
+ const designFees = quote?.designFees
+  /** WHICH ITEMS A DESIGN FEE COVERS, as 1-based positions. One fee can span several lines
+   *  (one artwork printed on two garments), which is why it cannot simply live under an
+   *  item: shown under both it would be counted twice and the column would stop summing. */
+ /* A PLAIN FUNCTION, not useCallback. This sits below an early return, and a hook after
+     one is called on some renders and not others — the "rendered more hooks than during the
+     previous render" crash. It is read during render and memoising it buys nothing. */
+  /** THE BLANK'S SKU, not its name. `blank` on a line holds "name/sku/id" — whichever the
+   *  importer happened to write — so it is a marketing title as often as a code, and a
+   *  75-character garment name in a money column pushes the figure onto a second row.
+   *  resolveProduct is the canonical matcher (CLAUDE.md §5); the raw value is the fallback
+   *  for a blank that resolves to nothing. */
+ /* A field INSIDE the grouped address box. The group owns the edge and the corners, so each
+   field gives up its own: no border, no radius, and an INSET focus ring — an outset one on a
+   child of an `overflow-hidden` parent gets its top and bottom shaved off. Height comes up
+   from the primitive's h-8 because these are read back at a glance while someone copies an
+   address off a screen. */
+const ADDR_FIELD = "h-9 rounded-none border-0 bg-transparent focus-visible:ring-inset"
+
+const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
+    (l.blank ? resolveProduct({ blank: l.blank } as never, catalog)?.sku : null) || l.blank || null
+
+ const feeCovers = (f: OrderDesignFee): number[] =>
+    (f.lines?.length ? f.lines : [{ line_id: f.line_id, sku: f.sku }])
+      .map((l) => items.findIndex((x) => (l.line_id && x.line_id === l.line_id) || (!l.line_id && !!l.sku && x.sku === l.sku)))
+      .filter((n) => n >= 0)
+      .map((n) => n + 1)
+ const dfTotal = designFees?.total ?? 0
+
+  // ── Cost, revenue, and the gap between them ──────────────────────────────────
+  // Three numbers that must never be conflated, which is exactly what the page used to
+  // do. Each has a different origin, so each is derived separately here.
+  //
+  // REVENUE is the buyer's money and reaches us only from a marketplace: etsy.js sets
+  // orders.total from the receipt grandtotal. A MANUAL order (FF-*) has no buyer of ours,
+  // so `total` is 0 or whatever someone typed — hence `hasRevenue` rather than treating
+  // 0 as "sold for nothing". An order with no retail price recorded and one genuinely
+  // sold at $0 look identical in the column and mean opposite things.
+  /**
+   * ON A MANUAL ORDER, `total` IS NOT THE BUYER'S MONEY.
+   *
+   * The new-order form computes it as Σ(price you typed × qty) PLUS our shipping fees, so
+   * an order created with the price column left at 0 still carries a total — the postage.
+   * Read as revenue it says the customer paid $9.00 for two beanies that cost $44.99 to
+   * make, and the card reported a $35.99 loss in red. The loss is arithmetic on a number
+   * that was never a retail price.
+   *
+   * NOR DO THE LINES ANSWER IT. Falling back to Σ(unit_price × qty) was the next attempt,
+   * on the argument that a seller records the buyer's price there. On a manual order they
+   * often don't: the create form prefilled that column with the blank's BASE COST — what
+   * we charge THEM — so the card reported our own invoice back as "Customer paid $7.16",
+   * and the profit line subtracted a number from itself. The form no longer prefills it
+   * (see orders/new), but orders created before that still carry those figures.
+   *
+   * SO THERE IS EXACTLY ONE SOURCE: a total someone deliberately recorded.
+   *   · a marketplace order — etsy.js/shopify set `total` from the receipt grandtotal,
+   * which IS the buyer's money, so it syncs on its own;
+   *   · `retail_set` — typed into this card, or imported from a sheet's Item Price column.
+   * Anything else reads "not recorded", with no profit figure. A manual order left blank
+   * is the normal case, not a defect: nobody but the seller knows what their buyer paid.
+   */
+ const lineRevenue = (order.items ?? []).reduce(
+    (s, it) => s + (Number(it.unit_price) || 0) * (Number(it.qty) || 1), 0)
+ const fromMarketplace = platformOf(order) !== "Manual"
+ const retailSet = !!(order.meta as { retail_set?: boolean } | undefined)?.retail_set
+ const saveRetail = async () => {
+ const v = Number(retailDraft)
+ if (!isFinite(v) || v < 0) { setEditRetail(false); return }
+ setEditRetail(false)
+    // `retail_set` is what makes `total` authoritative: without it a manual order's total
+    // is the create form's subtotal + shipping, which is not the buyer's money.
+ await updateOrder(String(id), { total: v, meta: { ...(order.meta ?? {}), retail_set: true } })
+      .catch(() => {})
+ reloadOne()
+  }
+  // The line fallback survives for a MARKETPLACE order only, where unit_price is the
+  // seller's own listing price and the grandtotal is occasionally missing. A manual order
+  // gets no fallback at all — see above.
+ const revenue = fromMarketplace || retailSet ? (Number(order.total ?? 0) || 0) || (fromMarketplace ? lineRevenue : 0) : 0
+ const hasRevenue = revenue > 0
+  // COST is what the seller paid US, read off the ledger — every part, including the ones
+  // the quote can't see. Falls back to the quote before submit, when nothing is charged yet.
+ const feesGated = !!charges?.gated
+ const cost = charges && charges.charged > 0 ? charges.charged : null
+ const refundedTotal = charges?.refunded ?? 0
+  // What they actually bear once refunds are returned — refunding $9 of shipping makes the
+  // order cost $9 less, and a margin computed off the gross charge would understate it.
+ const netCost = cost != null ? Math.max(0, cost - refundedTotal) : null
+  // ESTIMATED PROFIT, and estimated is the operative word: marketplace fees (Etsy's
+  // transaction + listing + payment processing, ~10% all in) are taken before the money
+  // ever reaches us, so they cannot appear here. Named and hinted accordingly rather than
+  // presented as take-home.
+ const estProfit = hasRevenue && netCost != null ? revenue - netCost : null
+  // OUR margin, not the seller's: what they paid us, less what the goods and the parcel
+  // cost us. Null until they have actually been charged — subtracting real costs from a
+  // quote nobody has paid reports a loss that hasn't happened.
+ const labelCost = Number(order.label_cost ?? 0) || 0
+
+  /**
+   * ── OUR SIDE: what this order cost the factory ────────────────────────────────────
+   *
+   * Two sources, and the difference between them is the point of the panel:
+   *
+   *   RECORDED  every external cost booked by recordCost against this order — postage,
+   *             the dispatch partner, an outsourced design task. Written the moment it was
+   *             incurred, net of any credit that came back. These are facts.
+   *   ESTIMATED the blanks. Stock is expensed when a PO is RECEIVED and one PO covers many
+   *             orders, so no honest per-order actual exists; the quote's supplierTotal is
+   *             the best figure there is. It is labelled as an estimate on the row, because
+   *             a guess printed beside three facts stops being readable as a guess.
+   */
+ const isFactory = isFactoryOrder(order)
+ const costLines = costs?.gated ? [] : (costs?.lines ?? [])
+ const recordedCost = costs?.gated ? null : (costs?.net ?? null)
+  /**
+   * POSTAGE IS IN BOTH PLACES, and adding both bills it twice.
+   *
+   * `orders.label_cost` and the ledger's `label-cost` row are the same money — recordCost
+   * writes the row at the same moment the column is stamped. So the ledger wins, and the
+   * column is used ONLY for orders bought before that ledger existed, which have the
+   * column and no row. Summing them was the obvious arithmetic and it is wrong.
+   */
+ const ledgerHasPostage = costLines.some((l) => l.type === "label-cost" && !l.credit)
+ const legacyPostage = !ledgerHasPostage && labelCost > 0 ? labelCost : 0
+ const blanksEstimate = quote?.supplierTotal ?? null
+  /** Null when we know NOTHING — "$0.00 of costs" and "nothing recorded" are different
+   *  answers, and only one of them may be subtracted from revenue. */
+ const ourTotal = recordedCost == null && blanksEstimate == null && !legacyPostage
+    ? null
+ : (recordedCost ?? 0) + (blanksEstimate ?? 0) + legacyPostage
+
+  /**
+   * WHAT IS LEFT — and the money coming IN is a different number on the two kinds of order.
+   *
+   *   A seller's order  what THEY paid us, net of refunds (netCost).
+   *   Our own order     what the BUYER paid, because nobody is billed internally: a factory
+   *                     order never passes in_review (FACTORY_LINE omits it) so
+   *                     chargeForSubmit never runs, and design fees skip it outright. The
+   *                     card used to report that as "not charged yet" forever, which is
+   *                     true and useless — the order has real revenue and real costs.
+   */
+ const takeIn = isFactory ? (hasRevenue ? revenue : null) : netCost
+ const factoryMargin = takeIn != null && ourTotal != null ? takeIn - ourTotal : null
+
+  /**
+   * ONE WORD FOR THE STATE OF THE MONEY, in the card's header rather than a sentence under
+   * every row. "Not charged yet" stated what had NOT happened, which tells a reader nothing
+   * they can act on; these say what IS true. The vocabulary is the one the design fees
+   * already use (OrderDesignFee.status) rather than a second one invented here.
+   */
+  /**
+   * WHAT THE BUYER PAID, as an editable cell — one copy, used on both kinds of order.
+   *
+   * It used to exist only inside the seller branch, which a factory order never reaches. So
+   * on our own orders the one number Gross margin needs had no field to be typed into, and
+   * the margin sat at "no sale price recorded" permanently.
+   */
+ const customerPaidCell = (
+    <dd className="tabular-nums">
+      {editRetail ? (
+        <span className="flex items-center gap-1">
+          <Input
+ autoFocus value={retailDraft} inputMode="decimal"
+ onChange={(e) => setRetailDraft(e.target.value)}
+ onKeyDown={(e) => { if (e.key === "Enter") void saveRetail(); if (e.key === "Escape") setEditRetail(false) }}
+ className="h-7 w-24 text-right text-sm"
+          />
+          <Button size="sm" variant="ghost" onClick={() => void saveRetail()}>Save</Button>
+        </span>
+      ) : (
+        <button
+ onClick={() => { setRetailDraft(revenue ? String(revenue) : ""); setEditRetail(true) }}
+ className="underline-offset-2 hover:underline"
+        >
+          {hasRevenue ? usd(revenue) : <span className="italic text-muted-foreground">not recorded</span>}
+        </button>
+      )}
+    </dd>
+  )
+
+  /**
+   * WHAT WENT OUT — the factory's own costs, as rows. ONE definition, rendered on our own
+   * orders and inside the staff block on a seller's, because two copies of this list is how
+   * the two views come to disagree about what an order cost.
+   *
+   * The "· estimated" tag on Blanks is gone (owner's call). It was there because blanks are
+   * the only figure on this list that is not a booked cost — stock is expensed when a PO is
+   * received and one PO covers many orders, so no honest per-order actual exists. That is
+   * still true and the reasoning is kept here, on the row that has it; what changed is that
+   * the word was riding in the margin of every order forever to say something that is a
+   * property of how we buy stock rather than news about this one.
+   */
+  /**
+   * THE CARD READS IN THE ORDER THE ITEMS TAB NUMBERS THEM.
+   *
+   * `quote.lines` comes back ordered by `order_items.id`, which is a uuid — so the Summary
+   * listed Item 2 above Item 1 while the Items tab above it numbered them the other way, in
+   * BOTH halves (owner: "item numbering not clear"). Nothing was wrong with either list; they
+   * were sorted by two different things, and the one the reader can see is the numbering.
+   *
+   * A line the tab does not hold sorts last rather than first: an unknown position is not
+   * position zero, and putting it at the top would move every numbered row down.
+   */
+ const byItemNo = (lines: NonNullable<OrderQuote["lines"]>) =>
+    [...lines].sort((a, b) => {
+ const at = (l: (typeof lines)[number]) => {
+ const i = items.findIndex((x) =>
+          (l.line_id && x.line_id === l.line_id)
+          || (!l.line_id && !!l.sku && x.sku === l.sku))
+ return i < 0 ? Number.MAX_SAFE_INTEGER : i
+      }
+ return at(a) - at(b)
+    })
+
+ const spendRows = (
+    <>
+      {/**
+       * SUPPLIER COST LIVES DOWN HERE, WITH THE REST OF WHAT THE FACTORY SPENDS
+       * (owner, 2026-09-21, reversing the same day's move up onto the item heading).
+       *
+       * Riding it on the item's own row put one number the SELLER is charged and one number
+       * only the FACTORY may see on the same line, a word apart — "$40.00 cost $11.50". That
+       * is two different audiences' money in one row, and the reason it is wrong is not
+       * layout: every other thing we spend — postage, a partner's fee, the lines we cannot
+       * cost — is gathered in one block, and a factory reading "what did this order cost us"
+       * should find all of it in one place rather than one figure up in the seller's column
+       * and the rest below.
+       *
+       * So the per-item rows come back, under their own heading. The duplication the move was
+       * meant to solve is real and is handled by the HEADING instead: the group says what
+       * these figures are once, so the rows need no word of their own.
+       */}
+      {(() => {
+        const rows = byItemNo(quote?.lines ?? []).map((l, i) => {
+          const c = Number(l.supplierCost)
+          if (!Number.isFinite(c) || c <= 0) return null
+          const qty = Number(l.qty) || 1
+          const n = items.findIndex((x) =>
+            (l.line_id && x.line_id === l.line_id)
+            || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+          const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.sku || "Item")
+          return (
+            <div key={`cost-${i}`} className="flex justify-between text-sm">
+              <dt className="min-w-0 truncate text-muted-foreground">
+                {who}
+                {blankSkuOf(l) && <span className="text-muted-foreground/70"> · {blankSkuOf(l)}</span>}
+                {qty > 1 && <span className="text-muted-foreground/70"> × {qty}</span>}
+              </dt>
+              <dd className="shrink-0 tabular-nums">−{usd(c * qty)}</dd>
+            </div>
+          )
+        }).filter(Boolean)
+        if (!rows.length) return null
+        return (
+          <>
+            {/* SUPPLIER COST, not "Blanks" — the row above in the seller's half is already
+                called Blank, and the same word on both sides of the card for two different
+                numbers is what sent this figure up to the heading in the first place. */}
+            <div className="pt-0.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+              {tl("order", "Supplier cost")}
+            </div>
+            {rows}
+          </>
+        )
+      })()}
+      {/* WHAT IS NOT COVERED, named. The per-item rows above only exist for lines we know a
+          supplier cost for; this says which ones we do not, so a short total explains itself. */}
+      {(() => {
+        const missing = (quote?.lines ?? []).filter((l) => !(Number(l.supplierCost) > 0))
+        if (!missing.length || blanksEstimate == null) return null
+        const who = missing.map((l) => {
+          const n = items.findIndex((x) =>
+            (l.line_id && x.line_id === l.line_id)
+            || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+          return n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.sku || "?")
+        })
+        return (
+          <div className="flex justify-between text-sm">
+            <dt className="text-muted-foreground/70">{who.join(", ")} · no blank cost</dt>
+            <dd className="tabular-nums text-muted-foreground/70">—</dd>
+          </div>
+        )
+      })()}
+      {/* NAMED, because with the item costs gone these are all that is left and an unlabelled
+          "Postage · Partner fee · —" stack reads as the continuation of the list above it. One
+          word for the group, not a sentence under each row (§4). */}
+      {/* ALWAYS, not `costLines.length > 0` — which was a condition I wrote without reading
+          far enough: the Postage and Partner fee rows below render their own $0.00 when the
+          ledger has NOTHING, so on the common order the rows appeared and their heading did
+          not. This block only exists at all when there are order costs to show. */}
+      <div className="pt-0.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+        {tl("order", "Order costs")}
+      </div>
+      {costLines.map((l, i) => (
+        <div key={i} className="flex justify-between text-sm">
+          <dt className="text-muted-foreground" title={l.note ?? undefined}>{l.label}</dt>
+          <dd className={"tabular-nums " + (l.credit ? "text-success" : "")}>
+            {l.credit ? "+" : "−"}{usd(l.amount)}
+          </dd>
+        </div>
+      ))}
+      {legacyPostage > 0 && (
+        <div className="flex justify-between text-sm">
+          {/* Bought before costs were booked to the ledger, so the order row is the only
+              record of it. Never added alongside a ledger row for the same label — that
+              would bill the postage twice. */}
+          <dt className="text-muted-foreground">Postage</dt>
+          <dd className="tabular-nums">−{usd(legacyPostage)}</dd>
+        </div>
+      )}
+      {/*
+        * NOT YET SPENT, AS A ROW — not as a sentence.
+        *
+        * This was a paragraph explaining that no postage had been bought and no partner work
+        * booked. A line of prose under a column of figures is the wrong shape for the answer:
+        * you are reading a list of costs, and the honest reading of "postage" on an order
+        * nobody has bought a label for is a cost of nothing.
+        *
+        * $0.00 rather than a dash, and it is literally true: zero has been spent on it so
+        * far. The row appears only while the real one is absent, and is replaced the moment
+        * money is actually booked — so the column never carries both.
+        */}
+      {!costLines.some((l) => l.type === "label-cost") && !legacyPostage && (
+        <div className="flex justify-between text-sm">
+          <dt className="text-muted-foreground">Postage</dt>
+          <dd className="tabular-nums text-muted-foreground">{usd(0)}</dd>
+        </div>
+      )}
+      {!costLines.some((l) => l.type === "expedite-cost" || l.type === "design-partner-cost") && (
+        <div className="flex justify-between text-sm">
+          <dt className="text-muted-foreground">Partner fee</dt>
+          <dd className="tabular-nums text-muted-foreground">{usd(0)}</dd>
+        </div>
+      )}
+    </>
+  )
+
+  /** WHAT IS LEFT. Gross, and it says so: labour and consumables are not tracked anywhere,
+   *  so calling this the margin full stop would overstate what we keep. */
+ const grossMarginRow = (
+    <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
+      <dt>Gross margin</dt>
+      <dd className={"tabular-nums " + (factoryMargin != null && factoryMargin < 0 ? "text-destructive" : "")}>
+        {factoryMargin != null ? usd(factoryMargin)
+ : <span className="font-normal italic text-muted-foreground">{isFactory ? "no sale price recorded" : "not charged yet"}</span>}
+      </dd>
+    </div>
+  )
+
+  /**
+   * WHAT THE SELLER IS CHARGED, AS ROWS — one definition, read by both the seller's card
+   * and the factory's. Before submit it is the quote (base cost, shipping, discount, design
+   * fees); after, the ledger's itemised parts and any refund. Two copies of either list is
+   * how the two views come to disagree about what an order cost.
+   */
+  /**
+   * WHICH FACES ADDED MONEY TO A LINE — ONE FUNCTION, BOTH BRANCHES.
+   *
+   * These rows existed only on the QUOTE (added 2026-09-10: "the summary table right now
+   * doesn't show extra surface cost of which item"). The moment an order is charged this
+   * card switches to `chargedRows`, which maps ledger entries and has no per-face detail —
+   * so the explanation disappeared exactly when a seller is most likely to go looking for
+   * it. Measured on a real order: two lines printing front+left and front+back, $3.00 each,
+   * both genuinely billed inside the frozen unit cost, and nothing on the charged card able
+   * to say so. Base cost simply read $88.69.
+   *
+   * AFTER THE CHARGE THE ROWS COME WITH A CONDITION, and it is the whole reason this is not
+   * just `quoteRows`' block moved somewhere shared. `sideParts` is priced off the artwork
+   * that is on the garment NOW, and a face added after submit deliberately does not re-price
+   * a paid order (see priceLines). So on a charged order the breakdown is only allowed to
+   * name faces when what it describes is what was billed: `sideFeeCharged` is the side money
+   * actually inside the frozen cost, and the two have to agree.
+   *
+   * They don't always, and that case gets a row of its own rather than silence — "the
+   * artwork changed after this was charged" is the answer to the question, and §4 forbids
+   * rendering "cannot say" and "nothing here" the same way.
+   */
+ const sideRowsFor = (l: NonNullable<OrderQuote["lines"]>[number], i: number, charged: boolean) => {
+ const parts = l.sideParts?.parts ?? []
+ if (!parts.length) return []
+ const qty = Number(l.qty) || 1
+    /* BY LINE ID, which is the only thing that identifies one line.
+       This matched on SKU and fell through to a bare "Item": sku is null on a manual line,
+       so the lookup never hit — and on an order with two lines of the same SKU it would have
+       hit the WRONG one, which is the sibling bug CLAUDE.md §5 describes. sku stays as the
+       fallback for rows written before line_id existed. */
+ const n = items.findIndex((x) =>
+      (l.line_id && x.line_id === l.line_id)
+      || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+ const who = n > 0 ? `Item ${n}` : (l.name || l.sku || "Item")
+ if (charged) {
+ const paid = l.sideFeeCharged
+      // The catalogue could not give a base cost, so there is nothing to subtract and
+      // nothing we can honestly say about this line's faces.
+ if (paid == null) return []
+ /* AGAINST THE LIVE FIGURE, not `sideFee`. On a charged line `sideFee` IS the stamp and
+         `paid` is derived from the same frozen cost, so this test compared a number with itself
+         and never once fired — a face attached after billing was silent on every order. Falls
+         back to `sideFee` only for a line quoted by a server too old to send `sideFeeNow`,
+         where the old (never-true) comparison is still the honest answer. */
+ const now = l.sideFeeNow ?? l.sideFee
+ if (Math.abs(paid - (Number(now) || 0)) > 0.005) {
+        /* THE REASON IS A `title`, NOT A SUBTITLE (§4, and the owner: "too long of
+           description"). It shipped as a two-line sentence under the label, which in a
+           380px column wrapped to three and put more prose on this card than the whole
+           rest of the summary carries — to qualify a figure that is already correct.
+           The row says what it is and the amount says what was billed; both are true with
+           no sentence attached. The nuance a reader might want — that the garment has
+           faces this charge predates — is one hover away, which is where §4 puts the
+           explanation of something already on screen. */
+        return [(
+          <div key={`side-${i}-moved`} className="flex justify-between"
+               title={tl("orders", "The artwork changed after this was charged — this is what was billed.")}>
+            <dt className="pl-3 text-muted-foreground">
+              {who}
+              {/* "POSITIONS" — the word the item rows on this same screen already use ("2
+                  positions · Front · Left"), not "extra faces" (owner). It is only reached
+                  when the faces cannot be named, which from now on means a line charged
+                  before freezeQuote began stamping its split: the stamp is what lets every
+                  other charged line name the face exactly, as the quote does. */}
+              <span className="opacity-70"> · {tl("orders", "positions")}</span>
+            </dt>
+            <dd className="tabular-nums text-muted-foreground">{usd(paid * qty)}</dd>
+          </div>
+        )]
+      }
+    }
+ return parts.map((p, j) => (
+      <div key={`side-${i}-${j}`} className="flex justify-between">
+        <dt className="pl-3 text-muted-foreground">
+          {who}
+          <span className="opacity-70">
+            {" · "}<span className="capitalize">{tl("sides", p.face)}</span>
+            {qty > 1 ? ` × ${qty}` : ""}
+          </span>
+        </dt>
+        <dd className="tabular-nums text-muted-foreground">{usd(p.amount * qty)}</dd>
+      </div>
+    ))
+  }
+  /**
+   * THE PER-ITEM GROUPS — ONE FUNCTION, BOTH BRANCHES.
+   *
+   * The quote has read this way for a while: each line heads with its own total and breaks
+   * into the parts that made it, so a group always sums to its heading and the headings sum
+   * to the subtotal. The CHARGED view did not — it printed the ledger's single "Base cost"
+   * with the face rows hanging under it, so a reader saw $53.91 and then $3 + $4 + $5 with no
+   * way to tell whether those were inside it or added to it. And the half below it is already
+   * per item, so the same order was grouped two different ways on one card (owner: "still
+   * quite confusing on the upper seller part … reconcile with the lower factory").
+   *
+   * IT SUMS, AND THAT IS WHY IT IS ALLOWED AFTER THE CHARGE. order_refunds.js pushes the
+   * product line as `split.gross` with the discount as its OWN line, so the item totals add
+   * up to the charged figure exactly rather than to a number net of a deduction shown
+   * separately below. The caller checks that before switching the aggregate out — if the two
+   * disagree the aggregate stays, because a column that does not add up is unreadable however
+   * correct its total is.
+   */
+  /**
+   * `goodsOnly` — THE SAME ITEM BLOCK, AS A LEDGER ENTRY RATHER THAN AS A QUOTE.
+   *
+   * Before the charge this block is the WHOLE price: its heading is goods + shipping −
+   * discount + fees, and Σ(headings) is quote.total. After the charge it is substituted for
+   * one ledger line — `product`, which is Σ(unitCost × qty) and nothing else — while
+   * shipping, the design fee and the discount are ledger lines of their OWN, listed
+   * immediately underneath.
+   *
+   * So the all-in block swallowed three entries the ledger then printed again. Measured on
+   * EGF-002188: `Shipping · first item $5.00` inside the item, `Shipping $5.00` under it,
+   * `Design fee $2.00` inside the item, `Design service · Item 1 $2.00` under it — a column
+   * reading $28 beneath a heading of $23 beneath a total of $23. Nothing was charged twice;
+   * the card said it was.
+   *
+   * In this mode the heading is the goods alone, so it equals the ledger line it replaces,
+   * and the rows the ledger owns are not drawn. A face then has no children and stays the
+   * single line it always was, which is what the grouping rule already asks for.
+   */
+  /**
+   * THE ORDER'S DISCOUNT RATE — ONE definition, read in two places.
+   *
+   * The plan's rate when the discount came from a plan, else the volume tier's;
+   * `discountFrom` is the server's own word for which one won, and they are a BEST-OF rather
+   * than a sum. Shown for the LABEL only — the money always comes from the ratio the charge
+   * itself used, because a rate rounded for display and then re-applied is how a breakdown
+   * stops adding up.
+   *
+   * Declared here rather than inside itemGroups because the ledger's Discount row names it
+   * too, and a second computation of one rate is how the heading and the row come to
+   * disagree about the same deduction (§5).
+   */
+  const dpct = quote?.discountFrom === "plan" ? (Number(quote?.planPct) || 0) : (Number(quote?.volumePct) || 0)
+
+  const itemGroups = (lines: NonNullable<OrderQuote["lines"]>, goodsOnly = false) => (
+    <>
+                      {/**
+                        * SHIPPING, SPLIT OVER THE ITEMS THAT CAUSED IT (owner, 2026-09-17).
+                        *
+                        * It is not a flat order charge and never was — pricing.js's own header
+                        * states the model: the DEAREST line's shipping, plus ship_extra for
+                        * every other unit. The parcel is sized by the biggest thing in it, so
+                        * one item carries the postage and the rest carry only what they add to
+                        * the box. That is per-item information presented as an order-level
+                        * lump, which is why "why is shipping $8.99" had no answer on screen.
+                        *
+                        * THE ARITHMETIC IS MIRRORED EXACTLY, not re-derived loosely:
+                        *   first  = the line with the highest shipFee
+                        *   extra  = THAT line's extraFee, else the platform rate
+                        *   total  = first.shipFee + extra × (units − 1)
+                        * so Σ(per-item shipping) is quote.shipping to the cent. A summary whose
+                        * parts do not add up to its own total is worse than one that never
+                        * broke the figure down.
+                        */}
+                      {(() => null)()}
+                      {lines.map((l, i) => {
+                        const qty = Number(l.qty) || 1
+                        /* The postage-bearing line and the per-unit extra, resolved the same
+                           way pricing.js resolves them. `reduce` with lines[0] as the seed
+                           matches its tie-breaking too — first line wins an equal rate. */
+                        const shipLine = lines.reduce((a, b) => ((Number(b.shipFee) || 0) > (Number(a.shipFee) || 0) ? b : a), lines[0])
+                        const shipExtra = shipLine?.extraFee != null ? Number(shipLine.extraFee) || 0 : (Number(quote?.fees?.ship_extra) || 0)
+                        const isShipLine = shipLine === l
+                        /* This line's share: the postage if it is the parcel-sizing line, plus
+                           the extra rate for every unit beyond the first one in the box. */
+                        const shipOwn = (isShipLine ? (Number(l.shipFee) || 0) : 0)
+                          + shipExtra * (isShipLine ? qty - 1 : qty)
+                        const parts = l.sideParts?.parts ?? []
+                        /**
+                         * THE DISCOUNT COMES OFF THE GOODS, so it belongs beside them.
+                         *
+                         * pricing.js: volumeDiscount = subtotal × pct — never shipping, which is
+                         * a courier's price and not ours to discount. So each item's share is
+                         * exactly its own goods × pct, and the shares sum to the whole.
+                         *
+                         * THE LAST ITEM ABSORBS THE ROUNDING. Each share is rounded to the cent
+                         * and the sum of rounded shares can miss the rounded total by one; the
+                         * remainder goes on the final line rather than leaving a summary whose
+                         * parts do not reach its own total.
+                         */
+                        /* THE RATE THAT ACTUALLY APPLIED — best-of plan vs volume, never the
+                           sum, and `discountFrom` is the server's own word for which one won.
+                           Shown for the label only. See `dpct` above itemGroups — it is read
+                           by the ledger's Discount row as well now, and two computations of
+                           one rate is how the heading and the row come to disagree (§5). */
+                        /* THE MONEY comes from the ratio the charge itself used, not from that
+                           percentage. A rate rounded for display and then re-applied is how a
+                           breakdown ends up a cent away from the total it is breaking down. */
+                        const goods = (Number(l.unitCost) || 0) * qty
+                        /* DECLARED HERE, NOT BESIDE `who`. `ownFees` below reads `n` inside a
+                           filter callback, so a line with design fees hit the temporal dead zone
+                           and threw "Cannot access 'n' before initialization" — the whole order
+                           page rendered as the error boundary. */
+                        const n = items.findIndex((x) =>
+                          (l.line_id && x.line_id === l.line_id)
+                          || (!l.line_id && !!l.sku && x.sku === l.sku)) + 1
+                        const who = n > 0 ? `Item ${n}` : (blankSkuOf(l) || l.name || l.sku || "Item")
+                        /**
+                         * THE ITEM'S OWN DESIGN FEES COUNT TOWARDS ITS HEADING.
+                         *
+                         * They are listed under the item — a fee covering exactly one line
+                         * belongs to it — but were left out of the figure above them, so the
+                         * rows added up to two dollars more than the heading they sat under.
+                         * Precisely the defect the shipping and discount split was careful to
+                         * avoid: a breakdown whose parts do not reach its own total.
+                         *
+                         * A fee covering SEVERAL items is not here and must not be — it stays
+                         * at order level, where it names them all and is counted once.
+                         */
+                        const ownFees = (designFees?.items ?? [])
+                          .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
+                          .reduce((t, f) => t + (Number(f.amount) || 0), 0)
+                                               /**
+                         * AGAINST THE BLANKS, NOT THE GOODS (owner, 2026-09-21: "the discount would
+                         * apply to the blank only not the methods or surfaces as well").
+                         *
+                         * The ratio has to be taken against the same number the CHARGE used, which
+                         * is now `discountBase` — Σ(blank × qty) — and not `subtotal`, which still
+                         * includes the method and every face. Splitting against the wrong base would
+                         * hand each row a share that does not add up to the deduction at the bottom,
+                         * which is the one defect this breakdown exists to avoid.
+                         *
+                         * Falls back to `subtotal` only for a quote from a server too old to send
+                         * `discountBase`, where the old rule is still the honest answer.
+                         */
+ const dBase = Number(quote?.discountBase ?? quote?.subtotal) || 0
+ const dRatio = dBase > 0 ? (Number(quote?.volumeDiscount) || 0) / dBase : 0
+                        const isLast = i === lines.length - 1
+                        /* The last line absorbs the rounding, so the shares always reach the
+                           whole. Everything before it takes its own exact share. */
+                                               /* EACH LINE'S OWN BLANK, by the same rule the server totals — so the shares
+                           reconcile to the deduction however many lines they are spread over. */
+ const blankOfLine = (x: NonNullable<OrderQuote["lines"]>[number]) => {
+                          const b = Number(x.baseCost)
+                          if (isFinite(b) && b > 0) return b
+                          const d = (Number(x.unitCost) || 0) - (Number(x.methodFee) || 0) - (Number(x.sideFee) || 0)
+                          return d > 0 ? d : 0
+                        }
+ const shareBefore = lines.slice(0, i).reduce((n, x) => n + Math.round(blankOfLine(x) * (Number(x.qty) || 1) * dRatio * 100) / 100, 0)
+                        const discOwn = isLast
+                          ? Math.max(0, Math.round(((Number(quote?.volumeDiscount) || 0) - shareBefore) * 100) / 100)
+                          : Math.round(blankOfLine(l) * qty * dRatio * 100) / 100
+                        const method = Number(l.methodFee) || 0
+                        const sideTotal = parts.reduce((n, p) => n + p.amount, 0)
+                        const blank = (Number(l.unitCost) || 0) - method - sideTotal
+                        /**
+                         * EVERY ITEM BREAKS DOWN THE SAME WAY (owner, 2026-09-17).
+                         *
+                         * This was "a single-part line needs no breakdown — a heading and one
+                         * row restating the same figure is repetition, not clarification",
+                         * which was true when the only row would have been the blank. It is
+                         * the wrong trade now: one item listing Blank, its faces and its
+                         * design fee while the next lists nothing reads as MISSING
+                         * information, not as an absence of it, and the reader cannot tell
+                         * whether item 2 has no extras or simply failed to load them.
+                         *
+                         * A repeated figure is a cost worth paying for that: it is legible at
+                         * a glance and wrong about nothing.
+                         */
+                        const split = method > 0.005 || parts.length > 0 || blank > 0.005
+                        return (
+                          <Fragment key={`line-${i}`}>
+                            {/* Two cells again — the cost moved down to the factory block, so
+                                there is no third figure to reserve a gutter for. */}
+                            <div className="flex items-baseline justify-between gap-2">
+                              <dt className="min-w-0 truncate font-medium">
+                                {who}
+                                {blankSkuOf(l) && <span className="font-normal text-muted-foreground"> · {blankSkuOf(l)}</span>}
+                                {qty > 1 && <span className="font-normal text-muted-foreground/70"> × {qty}</span>}
+                                {/* ONCE, WHERE IT IS DECIDED. The rate applies to this item's goods, so
+                                    the item is the right place to say it — and saying it here is what lets
+                                    every row below drop the words and keep only its own figures.
+                                    `discOwn`, not `dpct` alone: a rate shown on an item that earned no
+                                    deduction would be a promise the rows underneath do not keep. */}
+                                {/**
+                                  * THE RATE GOES WHERE THE MONEY IS (owner, today: "should
+                                  * have 20% off next to discount below").
+                                  *
+                                  * Before the charge there is no separate discount row — the
+                                  * deduction is struck through on this item's own rows — so the
+                                  * heading is the only place that can name the rate, and it
+                                  * still does.
+                                  *
+                                  * AFTER the charge the ledger carries "Discount −$8.80" as a
+                                  * row of its own, and `goodsOnly` has already stopped this
+                                  * block striking anything through. A heading still reading
+                                  * "· 20% off" then announced a rate whose money is somewhere
+                                  * else entirely, above the row that actually holds it.
+                                  */}
+                                {/* THE RATE MOVED TO THE ROW THAT HOLDS THE MONEY (owner,
+                                    2026-09-23: "the discount percentage should be on the row it
+                                    has discount").
+
+                                    It was named here because it used to be spread across every
+                                    goods row of the item — six times on a three-face line, the
+                                    clutter the 2026-09-21 note is about. That stopped being
+                                    true the same week: the deduction comes off the BLANK alone
+                                    now, so it is one row, and a rate announced on the heading
+                                    sat above four rows of which three never received it. */}
+                              </dt>
+                              {/* ALL-IN, because everything under it now is. The heading was the
+                                  GOODS while shipping and the discount sat at order level; with
+                                  both moved onto the item that caused them, a goods-only heading
+                                  would no longer be the sum of its own children — and a
+                                  breakdown whose parts do not reach its total is worse than one
+                                  that never broke the figure down. Σ(headings) is quote.total. */}
+                              <dd className="shrink-0 tabular-nums">{usd(goodsOnly ? goods : goods + shipOwn - discOwn + ownFees)}</dd>
+                            </div>
+                            {split && (
+                              <>
+                                {/**
+                                  * WHICH SURFACE OF WHICH ITEM COST HOW MUCH (owner, 2026-09-17).
+                                  *
+                                  * This listed three unattributable things: a "Front · included"
+                                  * row carrying the GARMENT's price, a bare method fee, and each
+                                  * extra face with no technique beside it. So the one question a
+                                  * summary of a decorated garment has to answer — what did the
+                                  * back cost me, and for what — could not be answered from it.
+                                  *
+                                  * Now: the garment on its own line, then ONE LINE PER SURFACE
+                                  * naming its technique and its money.
+                                  *
+                                  * THE METHOD FEE RIDES WITH THE FACE THAT CAUSED IT. One
+                                  * surcharge is charged per line, at the DEAREST face's technique
+                                  * (billingMethodOf) — so it is not a property of the line in any
+                                  * way a reader can act on, and leaving it loose is what made the
+                                  * embroidery somebody chose look unbilled. Folded into the face
+                                  * whose method was billed; the hover still splits it, because a
+                                  * seller querying a charge needs the parts.
+                                  */}
+                                {(() => {
+                                  const billed = String(l.billedMethod || "").trim()
+                                  const lineMethod = (n > 0 ? items[n - 1]?.print_type : null) || ""
+                                  const inc = l.sideParts?.included ?? null
+                                  const incMethod = l.sideParts?.includedMethod || null
+                                  /* Every surface, the included one first — it is the face the
+                                     base cost already paid for and so belongs at the top of the
+                                     list, not missing from it. */
+                                  /**
+                                   * EVERY FACE IS CHARGED (owner, 2026-09-18), so there is no
+                                   * free face to name and no rule to explain beside it.
+                                   *
+                                   * `inc` IS STILL READ, and must be: a CHARGED line's stamp
+                                   * carries the face that was inside the blank when it was
+                                   * billed. Dropping the row would rewrite what somebody was
+                                   * told they paid — "recorded history never changes silently".
+                                   * A live quote sets no `included`, so the row simply stops
+                                   * appearing on everything priced from here on.
+                                   */
+                                  const faceRows: { face: string; method: string; amount: number; kind?: string }[] = [
+                                    ...(inc && !parts.some((pt) => pt.face === inc)
+                                      ? [{ face: inc, method: incMethod || lineMethod, amount: 0, kind: 'placement' }] : []),
+                                    ...parts.map((pt) => ({ face: pt.face, method: pt.method || lineMethod, amount: pt.amount, kind: pt.kind })),
+                                  ]
+                                  /* WHERE THE SURCHARGE LANDS. The first face whose technique IS
+                                     the billed one; if nothing matches — an old line with no face
+                                     methods recorded — it stays on its own row rather than being
+                                     attached to a face we are guessing at. */
+                                  /**
+                                   * THE LINE'S METHOD FEE IS THE FIRST SURFACE'S METHOD FEE.
+                                   *
+                                   * Decomposed against the real pricer (EG-2000B, front DTG + back
+                                   * Embroidery): unitCost 23.35 = 12.35 blank + 5.00 methodFee +
+                                   * 1.00 placement + 5.00 the back's run, and `billedMethod` is the
+                                   * LINE's technique — not the dearest. Faces after the first pay a
+                                   * run each; the first one's technique is charged as the line's
+                                   * methodFee. So the model already IS "blank once, placement once,
+                                   * method per surface" — it was only being DRAWN as a charge that
+                                   * belonged to the item rather than to a face, floating under Blank
+                                   * where it read as a second Embroidery nobody could account for.
+                                   *
+                                   * INDEX 0, not "the first face whose technique matches". Matching
+                                   * put it on the BACK of a mixed line — the face that already has a
+                                   * run — which is why it was then pushed out to a row of its own.
+                                   * The placement carrier is the face this fee is for, so it goes
+                                   * there, labelled with the technique actually billed.
+                                   * Owner, 2026-09-23: "method fee per surface would look the best…
+                                   * on the front/1st surface shows the face fees on that row".
+                                   */
+                                  const at = faceRows.length ? 0 : -1
+                                  /* Would attaching the surcharge put a SECOND charge on that row?
+                                     True when the face it lands on already has a run of its own —
+                                     a mixed line — and true when no face matches it at all. */
+                                  /* A ROW OF ITS OWN ONLY WHEN THERE IS NO FACE TO PUT IT ON.
+                                     It used to stand alone whenever the face it landed on already had
+                                     a run — true on every mixed line, which is exactly when the
+                                     floating row was most confusing. The first face never has a run
+                                     (runs start at the second), so attaching to it can never double a
+                                     row. */
+                                  const surchargeStandsAlone = method > 0.005 && at < 0
+
+                                  /**
+                                   * FEES SIT UNDER THE SURFACE THEY BELONG TO (owner, 2026-09-17).
+                                   *
+                                   * They were listed after every face, so a reader had to carry
+                                   * "Front" down three rows to join "Front · Design fee" back to
+                                   * the surface it pays for. Grouping by KIND is how a ledger is
+                                   * written; grouping by SURFACE is how the garment is made, and
+                                   * this summary exists to answer "what did the back cost me".
+                                   *
+                                   * Only a fee covering THIS line and no other — a shared fee
+                                   * stays at order level, where it can name every item it covers
+                                   * without being counted twice.
+                                   */
+                                  const mine = goodsOnly ? [] : (designFees?.items ?? [])
+                                    .filter((f) => { const c = feeCovers(f); return c.length === 1 && c[0] === n })
+                                  const feesFor = (face: string) =>
+                                    mine.filter((f) => (f.sides ?? []).some((sd) => sd.toLowerCase() === face.toLowerCase()))
+                                  /**
+                                   * THE FEE ROWS FOR ONE FACE, in one place — they are now rendered
+                                   * from two branches (a face with one row, and a face with a
+                                   * placement and a run), and two copies would be two places for the
+                                   * pencil rule to drift.
+                                   */
+                                  const feeRowsFor = (f: string, fees: typeof mine, i: number, j: number) =>
+                                    fees.map((fe, k) => {
+                                      const sds = fe.sides ?? []
+                                      const split = sds.length > 1
+                                      /* The pencil goes on the fee's TOPMOST drawn face and nowhere
+                                         else, so one job shows one price to set. */
+                                      const first = topDrawn(fe)
+                                      return feeRow(fe, `fee-${i}-${j}-${k}`, false, "pl-6", {
+                                        amount: shareOf(fe, f),
+                                        editable: !first || first.toLowerCase() === f.toLowerCase(),
+                                        /* The JOB's own sentence, on the control that prices it —
+                                           the only place "3 designs · $6.00" is true. */
+                                        whole: split && fe.amount != null ? `${fe.label} · ${usd(fe.amount)}` : undefined,
+                                        label: split ? labelFor(fe, [f]) : undefined,
+                                      })
+                                    })
+                                  /**
+                                   * ONE FEE, SPLIT ACROSS THE FACES IT NAMES (owner, 2026-09-21).
+                                   *
+                                   * A design fee is per DESIGN, so three pictures on three faces is a
+                                   * SINGLE row covering all three — and this listed it under every
+                                   * face it named at its WHOLE figure. Measured on EGF-002155: one
+                                   * $6.00 fee printed $6.00 under Back and $6.00 under Left, both
+                                   * subtotals absorbed it, and the item's rows came to $46.95 under a
+                                   * heading of $40.95. A breakdown that does not reach its own total
+                                   * is the one defect this card exists to avoid.
+                                   *
+                                   * The SPLIT is display; the JOB is still one price charged once.
+                                   * Several fees would read the same on screen and bill $2 instead of
+                                   * $6 — submit loops them into chargeDesign and the first stamps
+                                   * every line the design covers.
+                                   */
+                                  const shareOf = (f: typeof mine[number], face: string): number | null => {
+                                    if (f.amount == null) return null
+                                    const sds = (f.sides ?? [])
+                                    const key = sds.find((sd) => sd.toLowerCase() === face.toLowerCase())
+                                    if (!key) return null
+                                    const own = f.perSide ? f.perSide[key] : null
+                                    if (own != null && isFinite(Number(own))) return Number(own)
+                                    /* A server too old to send the split: even shares with the LAST
+                                       face absorbing the rounding — the server's own rule, and the
+                                       one the item and order discounts already follow. Identical to
+                                       the old behaviour for the single-face fees that were most of
+                                       them, so nothing that read correctly starts moving. */
+                                    const i = sds.indexOf(key)
+                                    const each = Math.round((f.amount / sds.length) * 100) / 100
+                                    return i === sds.length - 1
+                                      ? Math.round((f.amount - each * (sds.length - 1)) * 100) / 100
+                                      : each
+                                  }
+                                  /** The faces of this fee that this card actually draws. A face added
+                                   *  after the charge is not in the frozen stamp, so it has no row —
+                                   *  see the remainder below, which is what keeps its share visible. */
+                                  const drawn = (f: typeof mine[number]) =>
+                                    (f.sides ?? []).filter((sd) => faceRows.some((r) => r.face.toLowerCase() === sd.toLowerCase()))
+                                  /** The fee's TOPMOST row on this card — faceRows order, not the
+                                   *  fee's own. `sides` arrives in the order the server happened to
+                                   *  walk the designs, so anchoring the pencil to sides[0] put it on
+                                   *  Left while Back was drawn above it: one control on the second of
+                                   *  two identical rows, which reads as arbitrary. Measured on
+                                   *  EGF-002155, whose sides are [left, right, back]. */
+                                  /**
+                                   * HOW A SPLIT ROW READS (owner, 2026-09-21: "why is the wording 3
+                                   * designs — that doesn't seem clear").
+                                   *
+                                   * `label` counts the whole JOB, and that is the right sentence for
+                                   * the $6.00 the seller is billed. It is the wrong one on a row
+                                   * showing what ONE face costs: "Design fee · 3 designs  $2.00"
+                                   * reads as three jobs for two dollars. The face heading above
+                                   * already names the surface and the figure already says the price,
+                                   * so a face carrying one design needs no count at all.
+                                   *
+                                   * The job's own phrasing stays in orders.js. These are two
+                                   * sentences about two different things — what was billed, and what
+                                   * this surface came to — not one duplicated.
+                                   */
+                                  const labelFor = (f: typeof mine[number], faces: string[]) => {
+                                    const c = f.perSideCount
+                                    if (!c) return f.label
+                                    const n = faces.reduce((t, sd) => t + (Number(c[sd]) || 0), 0)
+                                    if (!n) return f.label
+                                    return n > 1 ? `${tl("order", "Design fee")} · ${n} ${tl("order", "designs")}` : tl("order", "Design fee")
+                                  }
+                                  const topDrawn = (f: typeof mine[number]) =>
+                                    faceRows.find((r) => (f.sides ?? []).some((sd) => sd.toLowerCase() === r.face.toLowerCase()))?.face ?? null
+                                  /** What is left of a fee once every drawn face has taken its share.
+                                   *  Zero on an ordinary fee; on one covering a face this line does not
+                                   *  print it is real money, and dropping it would leave the item short
+                                   *  — the same defect in the other direction. */
+                                  const remainderOf = (f: typeof mine[number]) => {
+                                    if (f.amount == null) return null
+                                    const taken = drawn(f).reduce((n, sd) => n + (shareOf(f, sd) ?? 0), 0)
+                                    return Math.round((f.amount - taken) * 100) / 100
+                                  }
+                                  /* A fee whose surface we never recorded, one naming a face this line
+                                     no longer prints, or the unclaimed PART of one that names a face
+                                     alongside others. It still has to be shown — it is money — so it
+                                     falls to the end of the item rather than being dropped. */
+                                  const orphanFees = mine.filter((f) => {
+                                    const sds = (f.sides ?? [])
+                                    if (!sds.length) return true
+                                    if (f.amount == null) return drawn(f).length === 0
+                                    return (remainderOf(f) ?? 0) > 0.005
+                                  })
+                                  /* `face`: a string names it, null falls back to the fee's OWN sides,
+                                     and FALSE hides it — which is the case inside a face group, where
+                                     the heading above has already said it. Null could not mean "hide":
+                                     it fell through to `f.sides`, so a fee under a Back heading still
+                                     printed "Back · Design Fee". */
+                                  /**
+                                   * `part` is this ROW's figure when the fee is split across faces —
+                                   * see shareOf. Absent means the row IS the whole fee, which is every
+                                   * single-face fee and was the only case before today.
+                                   *
+                                   * ONE PENCIL PER JOB. The editor prices the job, not the surface, so
+                                   * three share rows carrying three pencils would claim three prices
+                                   * where the server holds one. It rides on the fee's first drawn face
+                                   * and names the whole figure in its title — §4 puts the explanation
+                                   * of a control in its title, never in a line underneath it.
+                                   */
+                                  const feeRow = (f: typeof mine[number], key: string, face: string | string[] | null | false, indent = "pl-3",
+                                                  part?: { amount: number | null; editable: boolean; whole?: string; label?: string }) => (
+                                    <div key={key} className="flex justify-between">
+                                      <dt className={`${indent} text-muted-foreground`}>
+                                        {/* The face is named here ONLY when this fee is not inside a
+                                            face group. Repeating it used to be the rule — a row read
+                                            one at a time has to stand alone — and under a HEADING that
+                                            names the face and totals it, it no longer does: the parent
+                                            is the context, and repeating it three rows running is what
+                                            the owner called out (2026-09-21). A fee with no face, or
+                                            one naming a face this line no longer prints, still says so
+                                            because nothing above it will. */}
+                                        {/* An ARRAY names several: the unclaimed part of a split fee
+                                            belongs to the faces this card did not draw, and naming
+                                            all of the fee's faces there would claim the row covers
+                                            surfaces already listed above it. */}
+                                        {(() => {
+                                          const names = face === false ? []
+                                            : Array.isArray(face) ? face
+                                            : face ? [face] : (f.sides ?? [])
+                                          if (!names.length) return null
+                                          return (
+                                            <span className="capitalize">
+                                              {names.map((sd) => tl("sides", sd)).join(", ")}
+                                              <span className="text-muted-foreground/60"> · </span>
+                                            </span>
+                                          )
+                                        })()}
+                                        {part?.label ?? f.label}
+                                      </dt>
+                                      {isStaff && (part ? part.editable : true)
+                                        ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll}
+                                                           show={part ? part.amount : undefined}
+                                                           whole={part ? part.whole : undefined} />
+                                        : <dd className="tabular-nums text-muted-foreground">
+                                            {(part ? part.amount : f.amount) == null
+                                              ? <span className="italic">To Be Determined</span>
+                                              : usd((part ? part.amount : f.amount) as number)}
+                                          </dd>}
+                                    </div>
+                                  )
+
+                                  /**
+                                   * THE DISCOUNT IS SHOWN ON THE ROWS IT COMES OFF (owner,
+                                   * 2026-09-17): list price struck through, what you pay beside
+                                   * it, and the rate on the row.
+                                   *
+                                   * ONLY THE GOODS. subtotal is Σ(unitCost × qty) — the blank,
+                                   * the method and the surfaces — and the total adds design fees
+                                   * AFTER the deduction. So a design fee and shipping are never
+                                   * struck through: showing a rate against them would claim a
+                                   * discount the charge does not give.
+                                   *
+                                   * ROUNDING IS ABSORBED BY THE LAST GOODS ROW of the item, the
+                                   * same way the last item absorbs the order's. Each row takes
+                                   * its exact share of the ITEM's discount, which is itself an
+                                   * exact share of the order's — so the strikethroughs reconcile
+                                   * to the total however many rows they are spread over.
+                                   */
+                                  /**
+                                   * BREAK DOWN, DON'T COMPILE (owner, 2026-09-23: "whatever fees
+                                   * need break down, break down, don't compile — that would always
+                                   * be what we need").
+                                   *
+                                   * A face used to print ONE figure that was two purchases added
+                                   * together: `own + mf`, the surface plus the line's method
+                                   * surcharge, split only in a hover nobody hovers. On EG-300 that
+                                   * read `Front · DTG  $5.00` for a $2.00 placement and a $3.00 DTG
+                                   * run — and the designer's rail, which quotes the placement alone,
+                                   * then correctly said $2.00 and looked like it was lying.
+                                   *
+                                   * Each face is now its SURFACE and its METHOD, one under the other:
+                                   *
+                                   *     Front            $2.00      the placement — one per line
+                                   *       DTG            $3.00      the run for that face
+                                   *     Back              Free      no second placement
+                                   *       DTG            $3.00      its own run
+                                   *
+                                   * Same total, and now every figure on the card is a thing somebody
+                                   * can point at. A zero prints "Free" rather than $0.00 — already
+                                   * the rule in the amount cell below.
+                                   *
+                                   * WHICH KIND EACH AMOUNT IS COMES FROM THE SERVER (`kind`), never
+                                   * from its position. parts[0] is the placement only while the first
+                                   * face's rate is above zero; when it is not, sideDetail hands the
+                                   * placement to the SECOND face and an index-based guess mislabels
+                                   * both. A stamp written before `kind` existed has none, and there
+                                   * index 0 is right because it is exactly what that code did.
+                                   *
+                                   * THE METHOD ROW IS OMITTED WHEN IT IS ZERO. A second DTG face
+                                   * costs nothing, and "Back Free / DTG Free" is one fact written
+                                   * twice — the surface row already said it.
+                                   */
+                                  const goodsRowsAll: { key: string; face: string | null; method: string; amount: number; surfaceFree?: boolean; isSurface?: boolean; isMethod?: boolean; hover?: string }[] = [
+                                    { key: 'blank', face: null, method: '', amount: blank * qty },
+                                    /**
+                                     * THE LINE'S METHOD CHARGE, WHEN IT CANNOT RIDE A FACE.
+                                     *
+                                     * It is charged ONCE per line at the DEAREST technique, and on
+                                     * the single-method lines that are almost all of them it simply
+                                     * IS the first face's run — so it sits under that face, which is
+                                     * what makes "Front $2.00 / DTG $3.00" read as one purchase each.
+                                     *
+                                     * A MIXED LINE BREAKS THAT. Front DTG with an embroidered back
+                                     * bills at embroidery, so `at` lands on the back — which already
+                                     * carries its OWN run, and adding the two produced a single
+                                     * "Embroidery $12.00". Two charges, one figure, which is the
+                                     * thing this whole section exists to stop. It takes its own row
+                                     * here instead, beside the blank, where it belongs in the model:
+                                     * price = blank + method + Σ faces.
+                                     */
+                                    ...(surchargeStandsAlone
+                                      ? [{ key: 'method', face: null, method: billed, amount: method * qty,
+                                           hover: tl("order", "Charged once for the item, at the dearest technique on it.") }]
+                                      : []),
+                                    ...faceRows.flatMap((r, j) => {
+                                      const kind = r.kind ?? (j === 0 ? 'placement' : 'run')
+                                      const placement = (kind === 'placement' ? r.amount : 0) * qty
+                                      /* The line's single method surcharge IS the billed face's own
+                                         run on a single-method line — costPartsOf charges it once
+                                         rather than in `parts`, so it belongs on that face's method
+                                         row. Unless it would double up there; see above. */
+                                      const run = (kind === 'run' ? r.amount : 0) * qty
+                                        + (at === j && !surchargeStandsAlone ? method * qty : 0)
+                                      return [
+                                        { key: `face-${j}`, face: r.face, method: '', amount: placement,
+                                          surfaceFree: placement <= 0.005, isSurface: true,
+                                          hover: placement <= 0.005
+                                            ? tl("order", "One placement is charged per item — this face adds nothing to the garment.")
+                                            : tl("order", "The placement — hooping and aligning, charged once for the whole garment.") },
+                                        /**
+                                         * A FREE TECHNIQUE IS STILL THE TECHNIQUE.
+                                         *
+                                         * This drew the method row only when it cost something, so a
+                                         * DTG face on a platform where method_dtg is 0 showed its
+                                         * placement and nothing else — and an embroidered back beside
+                                         * it showed "Embroidery $5.00". A reader compared the two and
+                                         * concluded the front had no method recorded. It did; it was
+                                         * free. Reported twice, in those words.
+                                         *
+                                         * The technique cannot move onto the placement row or the
+                                         * heading — both carried it once and both had it removed as
+                                         * repetition (owner, 2026-09-21) — so it stays its own row and
+                                         * that row now appears whenever the face HAS a technique,
+                                         * printing "Free" at zero exactly as a free placement does.
+                                         * §4: a thing that cannot be read and a thing that does not
+                                         * exist must not look the same.
+                                         */
+                                        ...((r.method || lineMethod) || run > 0.005
+                                          ? [{ key: `face-${j}-m`, face: r.face, method: r.method || lineMethod, amount: run,
+                                               isMethod: true,
+                                               hover: run > 0.005
+                                                 ? tl("order", "A pass through the machine for this face.")
+                                                 : tl("order", "This technique adds nothing to this face.") }]
+                                          : []),
+                                      ]
+                                    }),
+                                  ]
+                                  /**
+                                   * A $0 PLACEMENT UNDER ITS OWN HEADING SAYS NOTHING TWICE.
+                                     *
+                                     * Every face emits a placement row, and on all but one face that
+                                     * row is 0 — the line's single placement is charged elsewhere. Read
+                                     * on its own that is worth saying ("this face adds nothing"), and
+                                     * it is kept for a face that has nothing else. But when the same
+                                     * face also has a machine run, the group already reads
+                                     *     Back            <- heading, with the face's subtotal
+                                     *     Back      Free  <- this row, naming the face a second time
+                                     *     Embroidery $5.00
+                                     * and the middle line is the face's own name repeated above a
+                                     * charge it does not carry. Dropping it removes a row and no money:
+                                     * the amount is zero, so every subtotal and the total are unchanged.
+                                     */
+                                  const goodsRows = goodsRowsAll.filter((r, _j, all) => !(
+                                    r.isSurface && r.amount <= 0.005
+                                    && all.some((x) => x.isMethod && x.face === r.face)
+                                  ))
+                                  /**
+                                   * ALL OF IT ON THE BLANK ROW (owner, 2026-09-21).
+                                   *
+                                   * This used to spread the item's deduction across every goods row in
+                                   * proportion to its amount, which is what the old rule required —
+                                   * the discount came off the whole of `unitCost`. It comes off the
+                                   * BLANK now, so a face striking through would show a saving on a
+                                   * charge that never received one, and the faces would not add up to
+                                   * what they are billed.
+                                   *
+                                   * No rounding to spread and so no remainder to absorb: one row takes
+                                   * the whole figure, and the figure is already the item's exact share.
+                                   */
+                                  /* NOT IN THE LEDGER VIEW: `itemsSumToCharge` matches against
+                                     GROSS goods, so the volume discount is a ledger line of its
+                                     own and striking a row through here would deduct it twice. */
+                                  const cut = goodsRows.map((r) => (!goodsOnly && r.face === null && discOwn > 0.005 ? discOwn : 0))
+
+                                  /**
+                                   * A FACE IS SAID ONCE (owner, 2026-09-21: "i want Front once,
+                                   * then below").
+                                   *
+                                   * It used to be printed on its own charge AND on every design
+                                   * fee that named it, so one embroidered front read
+                                   *   Front · Embroidery
+                                   *   Front · Design fee · file provided
+                                   * and a two-face line said "Front" twice and "Back" twice.
+                                   *
+                                   * A face becomes a HEADING carrying its own subtotal, with its
+                                   * charges under it — but ONLY when it has more than one, because
+                                   * a heading above a single child is a row split into two rows.
+                                   * One charge stays the single line it always was.
+                                   */
+                                  const groupedFaces = new Set(
+                                    goodsRows.filter((r) => r.face && (r.isMethod || feesFor(r.face).length > 0))
+                                      .map((r) => r.face as string)
+                                  )
+                                  return (<>
+                                    {goodsRows.map((r, j) => {
+                                      const off = cut[j]
+                                      const net = r.amount - off
+                                      return (
+                                        <div key={`g-${i}-${j}`} className="flex justify-between gap-2">
+                                          {/* WHY A FACE CAN READ $0.00, in the title rather than as a
+                                              label (§4). It used to say "in the blank", which stated
+                                              the rule that ONE face was inside the blank's price —
+                                              retired on 2026-09-21, when the placement became one per
+                                              LINE. A free face is now free because the line's single
+                                              placement is already charged on another face, and
+                                              "in the blank" said something that had stopped being
+                                              true of any unpaid order. */}
+                                          <dt
+                                            className={`min-w-0 truncate text-muted-foreground ${r.face && groupedFaces.has(r.face) && !r.isSurface ? "pl-6" : "pl-3"}`}
+                                            title={r.hover
+                                              || (r.surfaceFree && r.face
+                                                ? tl("order", "One placement is charged per item — this face adds nothing to the garment.")
+                                                : undefined)}
+                                          >
+                                            {r.face
+                                              ? (r.isSurface
+                                                  /* THE FACE, AND ONLY THE FACE. It used to carry
+                                                     "· DTG" as well, which named the technique on the
+                                                     row holding the PLACEMENT — the one charge that
+                                                     has nothing to do with the technique. The method
+                                                     has its own row underneath now. */
+                                                  ? <span className="capitalize">{tl("sides", r.face)}</span>
+                                                  /* The heading above already said which face. This row
+                                                     is what was DONE to it — the technique, or the bare
+                                                     word when the line never recorded one. */
+                                                  : <span>{r.method || tl("order", "Print")}</span>)
+                                              /**
+                                                * "BLANK" — and the collision that took this name
+                                                * away resolved itself.
+                                                *
+                                                * It was renamed to "Base cost" because the
+                                                * editor's Blank column was a DIFFERENT number
+                                                * from this row: the bare garment against the
+                                                * legacy base cost, 6.00 against 17.46 on one
+                                                * size. Two unrelated figures under one word.
+                                                *
+                                                * costPartsOf reads `blank` as the base of every
+                                                * line now, so this row IS that column — same
+                                                * number, same meaning, and the model the whole
+                                                * summary states is blank + placement + method.
+                                                * Calling it Base cost now points at the legacy
+                                                * rung, which is the one thing it is not.
+                                                *
+                                                * A product with NO blank price still falls to
+                                                * that rung and this row is then the base cost
+                                                * wearing the other name — the one case where
+                                                * the label is loose, and the same case the
+                                                * editor keeps its legacy column for.
+                                                */
+                                              : r.method
+                                                /* A faceless row that names a technique is the line's
+                                                   single method charge — see goodsRows. Everything
+                                                   else with no face is the garment. */
+                                                ? <span>{r.method}</span>
+                                                : tl("order", "Blank")}
+                                            {/* AND HERE IT IS, on the one row that receives it.
+                                                The 2026-09-21 note removed this because the deduction was
+                                                spread across every goods row and said the same thing six
+                                                times. It comes off the BLANK alone now, so there is exactly
+                                                one row to name — and naming it beside the struck-through
+                                                figure is what makes the two numbers in the column readable
+                                                as one fact rather than two prices. */}
+                                            {off > 0.005 && dpct > 0 && (
+                                              <span className="font-semibold text-success"> · {dpct}% {tl("order", "off")}</span>
+                                            )}
+                                          </dt>
+                                          {/**
+                                            * INCLUDED IS A WORD, NOT A ZERO. "$0.00" beside the
+                                            * first face reads as a free extra rather than as the
+                                            * face the blank's price already covers.
+                                            *
+                                            * AND IT IS STILL TRUE WHEN THE FACE CARRIES THE
+                                            * METHOD FEE. One face is inside the blank's price;
+                                            * the technique's surcharge is a separate fact about
+                                            * the same surface. Printing "$5.00" alone answered
+                                            * the second and silently dropped the first, so the
+                                            * included face of an embroidered line looked like it
+                                            * was being charged for while the DTG line beside it
+                                            * read "included" — two rows describing the same rule
+                                            * and appearing to disagree.
+                                            */}
+                                          <dd className="shrink-0 tabular-nums text-muted-foreground">
+                                            {/* A FIGURE, ALWAYS — never a phrase where money goes.
+                                                A free face prints $0.00 and the title says why; the
+                                                words that used to sit in this column described a rule
+                                                that no longer applies, and a column of money with a
+                                                sentence in the middle of it cannot be scanned. */}
+                                            {/**
+                                              * "FREE", NOT "$0.00" (owner, today: "easier to
+                                              * read").
+                                              *
+                                              * This reverses §4's "a figure, ALWAYS — never a
+                                              * phrase where money goes", and the reason that
+                                              * rule was written no longer applies: the words it
+                                              * banned ("included") stated a pricing rule the
+                                              * reader had to already know. "Free" states
+                                              * nothing but the amount, and a column of figures
+                                              * scans BETTER with a word at the zeroes than with
+                                              * $0.00 repeated — the eye stops looking for cents
+                                              * that are not there.
+                                              *
+                                              * Only a true zero. A discounted row still prints
+                                              * both figures, because something was charged.
+                                              */}
+                                            {off > 0.005
+                                              ? (<><span className="text-muted-foreground/60 line-through">{usd(r.amount)}</span>{" "}{usd(net)}</>)
+                                              : net <= 0.005
+                                                ? <span className="text-muted-foreground">{tl("order", "Free")}</span>
+                                                : usd(r.amount)}
+                                          </dd>
+                                        </div>
+                                      )
+                                    }).flatMap((row, j) => {
+                                      const r = goodsRows[j]
+                                      const f = r.face
+                                      if (!f) return [row]
+                                      const fees = feesFor(f)
+                                      /* One charge on this face: it stays the single line it was.
+                                         A heading above one child is a row split into two rows. */
+                                      if (!fees.length) return [row]
+                                      /**
+                                       * A FACE IS A GROUP — ONCE. This ran per ROW, and a decorated
+                                       * face has TWO of them: the placement and the machine run. So
+                                       * every face with a technique printed its heading twice and its
+                                       * design fees twice, and a three-face line rendered as six
+                                       * headings, six fee lines and a "Free" row under half of them.
+                                       * Reported as "so many entries" on an order with two faces, and
+                                       * it got worse with every face added — which is exactly the
+                                       * shape of a per-row heading.
+                                       *
+                                       * The heading goes above the face's FIRST row and the fees below
+                                       * its LAST, so the face reads as one block: what it cost, what
+                                       * was done to it, then what the artwork cost.
+                                       */
+                                      /* NOT `mine` — that name is this item's FEES, two hundred lines
+                                         up, and feesFor closes over it. */
+                                      const faceRowIdx = goodsRows.reduce((acc, x, k) => {
+                                        if (x.face === f) acc.push(k)
+                                        return acc
+                                      }, [] as number[])
+                                      const isFirst = faceRowIdx[0] === j
+                                      const isLast = faceRowIdx[faceRowIdx.length - 1] === j
+                                      if (!isFirst && !isLast) return [row]
+                                      if (!isFirst) return [row, ...feeRowsFor(f, fees, i, j)]
+                                      /**
+                                       * THE HEADING'S FIGURE IS WHAT THIS FACE COST — the charge
+                                       * after its share of the discount, plus every fee under it.
+                                       * A heading that does not add up to its children is worse
+                                       * than no heading: the reader checks it once, finds it
+                                       * short, and stops trusting the rest of the card.
+                                       *
+                                       * A fee still under review has no amount (it prints "To Be
+                                       * Determined"), so the subtotal says "+" — it is a floor,
+                                       * not a total, and claiming otherwise would understate a
+                                       * bill the seller has not been given yet.
+                                       */
+                                      return [
+                                        <div key={`fh-${i}-${j}`} className="flex justify-between gap-2 pt-0.5">
+                                          <dt className="min-w-0 truncate pl-3 font-medium capitalize text-foreground">
+                                            {/* THE SURFACE, AND ONLY THE SURFACE (owner, 2026-09-21).
+                                                I put the technique here for the floor a commit ago
+                                                and it was the repetition this heading exists to
+                                                remove, one level down: the heading only appears when
+                                                the face has children, and the first child is the
+                                                print — "Front · Embroidery" over "Embroidery · 20%
+                                                off" says it twice, every time, on every face.
+                                                The floor still reads it, one line below. */}
+                                            {tl("sides", f)}
+                                          </dt>
+                                          {/**
+                                            * ONLY CHARGES CARRY MONEY (owner, today).
+                                            *
+                                            * This heading printed the face's subtotal — the charge plus
+                                            * every fee under it — and a row whose figure is a SUM of the
+                                            * rows beneath it was drawn almost exactly like a row carrying
+                                            * its own charge: same column, same indent step, only a
+                                            * difference in weight. So `Front $8.00` over `Embroidery
+                                            * $6.00` and `Design fee $2.00` read as a third charge, and the
+                                            * reader had to stop and work out whether $8 was contained or
+                                            * additional. It was contained — the arithmetic was never
+                                            * wrong — but a breakdown you have to verify is a breakdown
+                                            * that failed.
+                                            *
+                                            * With the figure gone, every number on this card is money
+                                            * somebody is billed, and they add to the item's heading and to
+                                            * the Total. The face keeps its job, which was never to price
+                                            * itself: it names the surface once so its charges do not each
+                                            * have to repeat it.
+                                            *
+                                            * WHAT THIS GIVES UP, said plainly: "what did the back cost
+                                            * me" is now a sum the reader does rather than one the card
+                                            * states. Weighed and chosen — a figure that is read wrong is
+                                            * worth less than one that isn't there.
+                                            */}
+                                          <dd aria-hidden className="shrink-0" />
+                                        </div>,
+                                        row,
+                                        /* Only when this row is ALSO the face's last — a face with a
+                                           placement and a run puts them under one heading and the fees
+                                           beneath both, not between them. */
+                                        ...(isLast ? feeRowsFor(f, fees, i, j) : []),
+                                      ]
+                                    })}
+                                    {orphanFees.map((f, k) => feeRow(f, `fee-${i}-orphan-${k}`,
+                                      /* The faces still unaccounted for. Null — every face the fee
+                                         names — only when this card drew none of them. */
+                                      drawn(f).length
+                                        ? (f.sides ?? []).filter((sd) => !drawn(f).some((d) => d.toLowerCase() === sd.toLowerCase()))
+                                        : null,
+                                      "pl-3", {
+                                      /* The UNCLAIMED part when some of this fee's faces are drawn
+                                         above — otherwise the whole fee, which is what a fee with no
+                                         face recorded has always shown here. */
+                                      amount: drawn(f).length ? remainderOf(f) : f.amount,
+                                      editable: !drawn(f).length,
+                                      whole: drawn(f).length && f.amount != null ? `${f.label} · ${usd(f.amount)}` : undefined,
+                                      /* Named for the faces THIS row covers, same as a face row. A
+                                         remainder standing for one undrawn face is one design. */
+                                      label: drawn(f).length
+                                        ? labelFor(f, (f.sides ?? []).filter((sd) => !drawn(f).some((d) => d.toLowerCase() === sd.toLowerCase())))
+                                        : undefined,
+                                    }))}
+                                    {/* SHIPPING, ON THE ITEM THAT CAUSED IT. The parcel is sized
+                                        by the biggest thing in it, so one line carries the
+                                        postage and the rest carry only what they add to the box.
+                                        The hover splits a line that does both. */}
+                                    {!goodsOnly && shipOwn > 0.005 && (
+                                      <div className="flex justify-between">
+                                        <dt
+                                          className="pl-3 text-muted-foreground"
+                                          title={isShipLine && qty > 1
+                                            ? `${usd(Number(l.shipFee) || 0)} ${tl("order", "postage")} + ${usd(shipExtra)} × ${qty - 1}`
+                                            : undefined}
+                                        >
+                                          {/* WHICH HALF OF THE POSTAGE THIS IS. One line carries
+                                              the parcel — the box is sized by the biggest thing
+                                              in it — and every other unit adds only its extra
+                                              rate. "Shipping" against both figures made the
+                                              smaller one look like an unexplained second charge. */}
+                                          {tl("order", "Shipping")}
+                                          {/* "additional" alone: the row already says Shipping and
+                                              sits under an item, so "item" was the third time one
+                                              line named the same thing. No plural either — the
+                                              figure covers however many units this line adds, and
+                                              a count that changes nothing is a word to read. */}
+                                          <span className="text-muted-foreground/70"> · {isShipLine
+                                            ? tl("order", "first item")
+                                            : tl("order", "additional")}</span>
+                                        </dt>
+                                        <dd className="shrink-0 tabular-nums text-muted-foreground">{usd(shipOwn)}</dd>
+                                      </div>
+                                    )}
+                                    {/* NO SEPARATE DISCOUNT ROW. It is struck through on the goods
+                                        rows above, which is where the money actually comes off —
+                                        a deduction at the bottom of the item said nothing about
+                                        WHICH of the rows above it was discounted, and sitting
+                                        below shipping it read as though shipping was too. */}
+                                    {/* Only when no face could claim it — see `at` above. */}
+                                    {method > 0.005 && at < 0 && (
+                                      <div className="flex justify-between">
+                                        <dt className="pl-3 text-muted-foreground">{billed || lineMethod || "Print method"}</dt>
+                                        <dd className="tabular-nums text-muted-foreground">{usd(method * qty)}</dd>
+                                      </div>
+                                    )}
+                                  </>)
+                                })()}
+                              </>
+                            )}
+                          </Fragment>
+                        )
+                      })}
+    </>
+  )
+ const quoteRows = quote ? (
+    <>
+                    {/*
+                      * ONE GROUP PER ITEM, because "Base cost $165.60" on a two-item order
+                      * says what the garments cost TOGETHER and nothing about either of
+                      * them. A duffel at $120.60 and a beanie at $45.00 are two decisions,
+                      * and the row that combined them could not be checked against either.
+                      *
+                      * Each group heads with the line's own total and breaks it into the
+                      * parts that made it: the blank, the print method, and one row per
+                      * EXTRA face. Those are exactly the three things unitCostOf adds
+                      * together, so a group always sums to its own heading and the headings
+                      * always sum to the subtotal — the column still reconciles, which is
+                      * the property a breakdown may never lose.
+                      *
+                      * The blank is computed as the remainder rather than read from
+                      * baseCost, so rounding can only ever land on the largest part instead
+                      * of leaving a stray cent that makes the arithmetic look wrong.
+                      */}
+                    {itemGroups(byItemNo(quote.lines ?? []))}
+                    {/**
+                      * SHIPPING AND THE DISCOUNT HAVE MOVED ONTO THE ITEMS (owner, 2026-09-17).
+                      *
+                      * Neither was ever an order-level fact. Shipping is the DEAREST line's
+                      * postage plus an extra rate for every other unit, and the discount comes
+                      * off the GOODS — so both are per-item figures that were being presented
+                      * as lumps, which is why "why is shipping $8.99" had no answer on screen.
+                      *
+                      * They are NOT repeated here. Each item's heading is now all-in, so these
+                      * rows would be the same money twice, and a reader adding the column would
+                      * reach a number that is not the total.
+                      *
+                      * What stays at order level is only what genuinely cannot belong to one
+                      * item: a design fee covering SEVERAL of them. The same picture on two
+                      * garments is digitised once — nesting it under both would charge twice,
+                      * under one would be arbitrary — so it sits here and names them all.
+                      */}
+                    {designFees?.items?.filter((f) => feeCovers(f).length !== 1).map((f, i) => (
+                      <div key={i} className="flex justify-between">
+                        {/**
+                          * THE ITEM'S NUMBER, NOT ITS TITLE.
+                          *
+                          * A marketplace product name is a keyword list — "Custom Embroidered
+                          * Apron with Name, Personalized Kitchen Apron, Cafe Barista Soft
+                          * Uniform, Custom Cooking Aprons, Mom Dad Gift" — and printing it
+                          * beside a $1.00 fee wrapped five lines and buried the money in a
+                          * summary whose whole job is money.
+                          *
+                          * Dropping it entirely would leave two identical "Check fee" rows on
+                          * an order with two designs, so it carries the number instead: the
+                          * same one on the item row and on the file row, and short enough to
+                          * sit on one line. One fee covering several lines names them all.
+                          */}
+                        <dt className="text-muted-foreground">
+                          {f.label}
+                          {(() => {
+   const covered = (f.lines?.length ? f.lines : [{ line_id: f.line_id, sku: f.sku }])
+                              .map((l) => items.findIndex((x) => (l.line_id && x.line_id === l.line_id) || (!l.line_id && !!l.sku && x.sku === l.sku)))
+                              .filter((n) => n >= 0)
+                              .map((n) => n + 1)
+   if (!covered.length) return null
+   return <span className="opacity-70"> · Item{covered.length > 1 ? "s" : ""} {covered.join(", ")}</span>
+                          })()}
+                        </dt>
+                        {/* STAFF PRICE IT HERE, on the row that already reports it — the
+   three-button tier panel that used to sit under the total was a
+   second, differently-shaped copy of this same fee. A seller reads
+   the figure and cannot change it; the server enforces that. */}
+                        {isStaff
+                          ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
+   : <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>}
+                      </div>
+                    ))}
+    </>
+  ) : null
+  /**
+   * THE SAME ROWS THE QUOTE SHOWED, after the charge as well as before it.
+   *
+   * This mapped the aggregated PARTS, which exist for refunds: `product` there is net of the
+   * discount and several design fees collapse into one "Design service". So a summary that
+   * read Base cost · Shipping · Volume discount · two named fees before submitting read
+   * "Base cost $96.27" afterwards — the postage and the discount the seller earned both
+   * folded silently into one number, and nothing on screen said where they went.
+   *
+   * `lines` is the itemised record: one row per ledger entry, in the order they were
+   * charged, with the goods at full price and the deduction named underneath. Parts are
+   * still what a refund is allocated against — this is only how it reads.
+   */
+  /**
+   * REVERSING A WRONG ADJUSTMENT, without editing anything.
+   *
+   * "What if I charge wrong — can I edit it?" No, and the reason is the ledger: a balance is
+   * SUM(delta) over an append-only table, so editing a row silently moves money the seller
+   * has already been told about and rewrites a statement they may have read. Settled records
+   * do not change quietly.
+   *
+   * A reversal is the honest shape of the same fix. It writes a compensating refund against
+   * the `fee` part for exactly that amount, and BOTH rows stay: charged $9 for this reason,
+   * sent back $9 for this reason. To correct a mistake, reverse it and enter it again — two
+   * rows, which is what actually happened.
+   *
+   * Only price adjustments. Every other line here is a real cost we incurred (postage, a
+   * partner's invoice, the goods), and giving those a one-press undo would be offering to
+   * un-buy a label that has already been bought.
+   */
+ const reverseFee = async (line: { part: string; label: string; amount: number; note?: string | null }, key: string) => {
+    /* Only adjustments reach this — see the note on the control. The guard stays because the
+       function takes a part and would happily refund any of them if a caller passed one. */
+ if (line.part !== "fee") return
+ setReversing(key); setReverseErr(null)
+ try {
+      /* Named part and exact amount, so it comes off the adjustment and not off the goods —
+         an unallocated refund is consumed top-down and would have taken the product cost. */
+ const r = await refundOrder(String(id), {
+ amount: { [line.part]: Math.abs(line.amount) },
+ note: line.part === "fee"
+          ? `Reversed price adjustment${line.note ? ` — ${line.note}` : ""}`
+          : `Refunded ${line.label}${line.note ? ` — ${line.note}` : ""}`,
+ clientId: `revfee-${id}-${key}`,
+      })
+ if (!r?.error) {
+        /**
+         * PAINT FROM THE ANSWER WE ALREADY HAVE.
+         *
+         * This called reloadAll() and waited, which is why the row took a beat to change:
+         * reloadAll refetches the order AND the whole orders list, the order landing sets
+         * `one`, that re-runs the effect that fetches charges — so the strike-through was
+         * three sequential round trips away, one of them a list this card does not use.
+         *
+         * The refund route already returns the recomputed charge state (it re-reads it after
+         * the money moves, precisely so the caller does not have to). Setting it is instant
+         * and it is the same object the next fetch would produce.
+         */
+ setCharges((prev) => ({ ...(prev ?? {} as OrderCharges), ...r }))
+ reloadAll()
+      } else {
+        // The server said no, and it says WHY — a refusal carries its reason (§4).
+ setReverseErr(r.error || "Couldn’t reverse that adjustment.")
+      }
+    } catch (e) {
+      // Nothing answered. The row is unchanged, which is the safe outcome — but silence
+      // about it is what made this read as a broken control.
+ setReverseErr(e instanceof Error && e.message ? e.message : "Couldn’t reach the server — nothing was reversed.")
+    }
+ finally { setReversing(null) }
+  }
+
+  /**
+   * WHICH ADJUSTMENTS HAVE BEEN SENT BACK — allocated, not matched by text.
+   *
+   * The first attempt paired a refund to a line by reading its note, and it only ever worked
+   * for reversals THIS control had written. Anything refunded through the refund panel, or
+   * before the control existed, matched nothing — so five adjustments sat at full price above
+   * a bare "Refunded −$23.00", which reads as if none of them had been touched. That is what
+   * "the fee is still there?" was looking at.
+   *
+   * The ledger cannot say which adjustment a refund cancelled, because it does not record
+   * that: a refund names a PART and an amount. So this allocates the same way the server does
+   * when a refund names no line — top-down, oldest first, until the refunded total is used
+   * up. Only a fully covered line is marked; a partly covered one is still owed something and
+   * must not read as settled.
+   *
+   * A FULLY REVERSED ADJUSTMENT IS NOT SHOWN HERE (owner's call, asked twice). It was struck
+   * through first, on the argument that hiding a movement makes this card disagree with the
+   * wallet. The counter-argument is the stronger one: this card answers WHAT THIS ORDER
+   * COSTS, and an adjustment that was charged and sent back contributes nothing to that. Six
+   * struck-out rows are six things to read past to find the four that are still true.
+   *
+   * NOTHING IS HIDDEN THAT IS NOT ALSO RECORDED. Both movements stay in wallet_ledger, on the
+   * seller's statement, and in Order history with who pressed it and when — which is where
+   * "what happened to this order" is answered, and where it is answered better than a struck
+   * line ever did.
+   *
+   * AND THE TOTALS STILL RECONCILE, which is what makes this safe rather than cosmetic:
+   * hiding a reversed pair drops an equal charge and refund, so the rows on screen still sum
+   * to Seller paid. `claimed` is subtracted from the refunded row for exactly that reason —
+   * shown charges minus shown refunds equals charged minus refunded, which is netCost.
+   */
+ const reversedLines = (() => {
+    /* Per PART, because that is what a refund names. Started fee-only; every part behaves the
+       same way, and shipping sent back in full is as settled as an adjustment sent back in
+       full. Owner's call: a line fully refunded leaves the card, anything less stays. */
+ const left = new Map<string, number>()
+ for (const p of charges?.parts ?? []) left.set(p.key, p.refunded ?? 0)
+ const marked = new Set<number>()
+ const byPart = new Map<string, number>()
+ let claimed = 0
+    ;(charges?.lines ?? []).forEach((l, i) => {
+ if (l.amount <= 0) return
+ const room = left.get(l.part) ?? 0
+      /* FULLY covered, or not at all. A partly refunded line is still owed something and has
+         to keep saying so — that is the "don't disappear them" half of the rule. */
+ if (room + 0.005 < l.amount) return
+ left.set(l.part, room - l.amount)
+ marked.add(i)
+ claimed += l.amount
+ byPart.set(l.part, (byPart.get(l.part) ?? 0) + l.amount)
+    })
+    /**
+     * `claimed` and `claimedFee` ARE DIFFERENT QUESTIONS, and one number cannot answer both.
+     *
+     * `claimed` is money already accounted for by a hidden row — it keeps the visible figures
+     * summing to Seller paid. `claimedFee` is the part of that which was a reversed
+     * ADJUSTMENT, and only that is "not really a refund": undoing a charge nobody should have
+     * made leaves the seller where they started, while sending back the base cost genuinely
+     * returns their money. The status chip has to count the second and ignore the first.
+     */
+ return { marked, claimed, claimedFee: byPart.get("fee") ?? 0, byPart }
+  })()
+
+  /**
+   * WHAT CAME BACK, ON THE ROW IT CAME BACK FROM.
+   *
+   * Refunding the base cost showed "Base cost $111.60" and a lone "Refunded −$50.00" at the
+   * bottom — the money right, and WHICH part was sent back nowhere on the card. Same gap the
+   * reversed adjustments had, for every other part: shipping, express, design, files.
+   *
+   * The ledger records a refund against a PART, not a line, so a part's refund is attributed
+   * to the first line carrying that part — which for base cost, shipping and the rest is the
+   * only line there is. Fees are excluded because a fully reversed adjustment already leaves
+   * the card entirely, and counting it here as well would show the same money twice.
+   */
+ const refundByPart = (() => {
+ const left = new Map<string, number>()
+ for (const p of charges?.parts ?? []) {
+      /* Per part: what a hidden row already shows for THIS part, not the total across all. */
+ const shownElsewhere = reversedLines.byPart.get(p.key) ?? 0
+ const amt = (p.refunded ?? 0) - shownElsewhere
+ if (amt > 0.005) left.set(p.key, amt)
+    }
+ const onLine = new Map<number, number>()
+    ;(charges?.lines ?? []).forEach((l, i) => {
+ if (reversedLines.marked.has(i)) return
+ const amt = left.get(l.part)
+ if (amt == null) return
+ onLine.set(i, amt)
+ left.delete(l.part)
+    })
+ let attributed = 0
+ onLine.forEach((v) => { attributed += v })
+ return { onLine, attributed }
+  })()
+
+  /**
+   * MAY THE CHARGED VIEW SHOW THE ITEM GROUPS? Only if they add up to it.
+   *
+   * The goods line is pushed gross (order_refunds.js: `split.gross`, with the discount as its
+   * own line), so on an ordinary order the item totals equal it to the cent. They can still
+   * disagree — a line added after the charge is produced and not billed, and a catalogue price
+   * that moved since would recompute differently — and in that case the aggregate stays. A
+   * breakdown that does not sum to the figure above it is worse than no breakdown: it makes a
+   * correct total look wrong.
+   */
+ const goodsLine = (charges?.lines ?? []).find((l) => l.part === "product")
+ const itemsSumToCharge = (() => {
+ if (!goodsLine || !quote?.lines?.length) return false
+ const sum = quote.lines.reduce((n, l) => n + (Number(l.unitCost) || 0) * (Number(l.qty) || 1), 0)
+ return Math.abs(sum - Number(goodsLine.amount)) < 0.01
+  })()
+
+ const chargedRows = (
+    <>
+                    {(charges?.lines ?? []).map((l, i) => (
+                      reversedLines.marked.has(i) ? null
+                      /* THE GOODS LINE BECOMES ITS ITEMS. Same function the quote uses, so the
+                         two sides of the charge read identically and the half below — which is
+                         already per item — lines up with the half above. */
+                      : l.part === "product" && itemsSumToCharge ? (
+                        <Fragment key={`${l.part}-${i}`}>{itemGroups(byItemNo(quote?.lines ?? []), true)}</Fragment>
+                      ) : (
+                      <Fragment key={`${l.part}-${i}`}>
+                      {/* `items-baseline`, so the FIGURE sits on the label's first line even
+                          when a note wraps underneath it — the amounts down this column have
+                          to share one axis, and centring a two-line row against a one-line one
+                          is what knocked them out of it. */}
+                      <div className="flex items-baseline justify-between gap-3">
+                        <dt className="min-w-0 text-muted-foreground">
+                          {l.label}
+                          {/* THE SAME SUFFIX THE QUOTE PRINTS. A design fee names its item's
+                              NUMBER here, exactly as it does before the charge — see the note
+                              on the quote's row for why a product title cannot go beside a
+                              $2.00 figure. */}
+                          {l.part === "design" && l.lineId
+                            ? (() => {
+ const n = items.findIndex((x) => x.line_id === l.lineId)
+ return n >= 0 ? <span className="opacity-70"> · Item {n + 1}</span> : null
+                              })()
+                            : null}
+                          {/**
+                            * THE RATE, ON THE ROW THAT HOLDS THE MONEY (owner, today).
+                            *
+                            * It used to sit on each item heading, which was right while the
+                            * deduction was struck through on those items' own rows. The ledger
+                            * carries it as a line of its own, so a reader looking at "−$8.80"
+                            * had to go back up to two headings to learn what rate produced it
+                            * — and those headings no longer strike anything through.
+                            *
+                            * Same green as the figure beside it, because they are one fact.
+                            */}
+                          {l.part === "discount" && dpct > 0 && (
+                            <span className="font-semibold text-success"> · {dpct}% {tl("order", "off")}</span>
+                          )}
+                          {/**
+                            * THE NOTE GOES UNDERNEATH (owner, 2026-09-10).
+                            *
+                            * "Price adjustment · Method DTG → Embroidery · Item 1" on one line
+                            * is a 50-character label in a 380px column: it wrapped to three
+                            * lines and dragged the amount down with it, so a column of figures
+                            * that should read straight down stepped sideways at every
+                            * adjustment.
+                            *
+                            * Its own line, a step smaller, under the thing it explains. The
+                            * label stays the size of every other label so the rows still scan
+                            * as a list, and the note reads as what it is — the reason, not
+                            * another charge.
+                            */}
+                          {l.part !== "design" && l.note && (
+                            <div className="text-2xs leading-snug opacity-70">{l.note}</div>
+                          )}
+                          {/* On the row, not in a total at the bottom: "which part did I send
+                              back" is the question, and a lone Refunded line cannot answer it. */}
+                          {refundByPart.onLine.has(i) && (
+                            <span className="text-success"> · {usd(refundByPart.onLine.get(i) ?? 0)} refunded</span>
+                          )}
+                        </dt>
+                        {/* A deduction reads as one: same minus and same green as the quote,
+                            so the row a seller checks looks identical either side of the
+                            charge. */}
+                        {/* `shrink-0`: the label can now be two lines and wants the width, and
+                            a flex child yields it from wherever it can — which was the figure,
+                            wrapping "$5.00" onto its own line at the narrowest column. */}
+                        <dd className="flex shrink-0 items-center gap-2">
+                          <span className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
+                            {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
+                          </span>
+                          {/* AFTER THE FIGURE, and a mark rather than a word. "Reverse" ahead
+                              of the amount put a verb where the eye is scanning a column of
+                              money, and pushed the numbers out of alignment row by row. The
+                              glyph sits past the end of that column, so the figures still line
+                              up and the action reads as belonging to the row it is on.
+                              Staff only, adjustments only, and only while that part still has
+                              room to send back — so it cannot be pressed twice. */}
+                          {/* ADJUSTMENTS ONLY. This briefly appeared on every line, and on an
+                              untouched shipping charge a U-turn arrow reads as "undo what was
+                              done here" when nothing has been done — it was offering to START
+                              a refund while looking like it was reversing one.
+                              An adjustment is different in kind: it is a number somebody typed
+                              onto this order, and taking it back off is undoing their own act.
+                              Refunding the goods or the postage is a decision about the order,
+                              it wants a reason and often a partial amount, and the Refund panel
+                              below is built for exactly that. */}
+                          {isStaff && l.part === "fee" && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === l.part && p.refundable >= l.amount - 0.005) && (
+                            <button
+                              type="button"
+                              onClick={() => void reverseFee(l, `${l.part}-${i}`)}
+                              disabled={reversing === `${l.part}-${i}`}
+                              aria-label={`Send back this ${usd(l.amount)} ${l.label.toLowerCase()}`}
+                              title="Send this back to the seller. The charge and the refund both stay in the order's history."
+                              className="eg-tap -my-1 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive disabled:opacity-50"
+                            >
+                              {reversing === `${l.part}-${i}`
+                                ? <CircleNotch size={13} className="animate-spin" />
+                                : <ArrowUUpLeft size={13} weight="bold" />}
+                            </button>
+                          )}
+                        </dd>
+                      </div>
+                      {/**
+                        * A DEDUCTION BELONGS IN THE DEDUCTION COLUMN.
+                        *
+                        * This was a note on the label — "Base cost · $89.28 refunded" — with
+                        * nothing in the amount column, so the column read $111.60 + $6.99 −
+                        * $22.32 while announcing $6.99 underneath it. A list of figures that
+                        * does not add up to the total beneath it is unreadable however correct
+                        * that total is; the owner's word was "very confusing".
+                        *
+                        * Its own row, negative, in the same green Discount already uses, and
+                        * indented under the charge it came off — so the column adds up on the
+                        * page and the deduction stays attached to the thing it reduced.
+                        */}
+                      {refundByPart.onLine.has(i) && (
+                        <div className="flex justify-between">
+                          <dt className="pl-3 text-muted-foreground">Refunded</dt>
+                          <dd className="tabular-nums text-success">−{usd(refundByPart.onLine.get(i) ?? 0)}</dd>
+                        </div>
+                      )}
+                      {/* WHICH FACES ARE INSIDE THIS NUMBER. The goods line is one figure and
+                          the per-side charge is part of it — unitCostOf returns base + method
+                          + sides as a single unit cost — so a two-sided line raised the amount
+                          with nothing on the charged card able to say why. The quote has said
+                          which faces since 2026-09-10 and this branch never did, so the
+                          explanation vanished at the exact moment the money became real.
+                          Same function as the quote's, and only under the goods: a design fee
+                          or a postage charge has no faces. */}
+                      {/* The face rows only when the groups are NOT being shown — inside a
+                          group each face already has its own line under its item, and printing
+                          both would list the same $3.00 twice. */}
+                      {l.part === "product" && !itemsSumToCharge
+                        && (quote?.lines ?? []).flatMap((ql, qi) => sideRowsFor(ql, qi, true))}
+                      </Fragment>
+                      )
+                    ))}
+                    {/* THE REFUSAL, WHERE THE PRESS WAS. Not a toast and not the top of the
+                        page: the ↩ is on one of these rows, and an answer that appears
+                        anywhere else is an answer somebody has to go looking for. */}
+                    {reverseErr && (
+                      <div className="mt-1 rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
+                        {reverseErr}
+                      </div>
+                    )}
+                    {/* EVERYTHING ELSE SENT BACK. Reversals are already shown on the rows
+                        they cancelled, so counting them here too would report the same money
+                        twice — once struck through and once as a refund. What is left is a
+                        genuine refund to the seller, which is a different act. */}
+                    {/* WHATEVER IS LEFT OVER. Reversed adjustments left the card with their
+                        refund, and every other part now carries its own on its row — so this
+                        only appears for money that belongs to no visible line, which is the
+                        one case a bare total is the honest answer to. */}
+                    {refundedTotal - reversedLines.claimed - refundByPart.attributed > 0.005 && (
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Refunded</dt>
+                        <dd className="tabular-nums text-success">−{usd(refundedTotal - reversedLines.claimed - refundByPart.attributed)}</dd>
+                      </div>
+                    )}
+    </>
+  )
+
+  /**
+   * REVERSING AN ADJUSTMENT DOES NOT REFUND THE ORDER.
+   *
+   * This read `refundedTotal`, which counts every refund on the order including the ones that
+   * only undo a price adjustment. So an order approved a minute ago, whose seller has had
+   * nothing back, wore "Partly refunded" because $32 of adjustments had been charged and
+   * reversed. The chip is the first thing read on this card and it was describing a
+   * transaction that never happened.
+   *
+   * A reversed adjustment nets to zero: charged and sent back, and neither the order's cost
+   * nor the seller's position moved. What counts here is what came back BEYOND that, which is
+   * the same residual the refunded row shows.
+   */
+ const refundedToSeller = refundedTotal - reversedLines.claimedFee
+ const moneyState: { label: string; tone: string } = isFactory
+    ? { label: "Internal", tone: "bg-muted text-muted-foreground" }
+ : refundedToSeller > 0.005
+      ? { label: netCost != null && netCost <= 0.005 ? "Refunded" : "Partly refunded",
+          tone: "bg-success/10 text-success" }
+ : cost != null
+        ? { label: "Charged", tone: "bg-primary/10 text-primary" }
+ : { label: "Estimated", tone: "bg-muted text-muted-foreground" }
+
+ return (
+    <div className="space-y-5">
+      {/* Header. Identity + metadata on the left, actions on the right — one baseline
+ each. The quote breakdown that used to float here now lives in Summary, next
+ to the Total it was duplicating. */}
+      <div>
+        {!embedded && (
+          <Button variant="ghost" size="sm" onClick={() => router.push("/orders")} className="-ml-2 mb-1 h-7 text-muted-foreground">
+            <CaretLeft size={14} weight="bold" /> Orders
+          </Button>
+        )}
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0">
+            {/* BASELINE, NOT CENTRE. The number is a two-line stack and the badge is one
+                line, so `items-center` floated "Pending" in the gap between the number and
+                its reference — level with neither. Baseline puts it on the number's own
+                line, which is the thing it describes. Same rule the mixed-type rows follow:
+                centring boxes of different heights makes the row slide the moment either
+                one wraps. */}
+            <div className="flex items-baseline gap-2.5">
+              {/* The number is a LABEL (orders.seq), and staff can correct it in place —
+                  a mistyped one otherwise had to be lived with. Not the id: that is the key
+                  ten tables join on. See components/app/order-number.tsx. */}
+              <h1 className="font-title tracking-tight">
+                {/* The one site where the number is a page TITLE rather than a row's
+                    identity, so it overrides the primitive's row size explicitly. It used
+                    to inherit text-2xl from this h1; the primitive owns the size now, and
+                    an inherited size no longer reaches past it. */}
+                {/* `editable` is now "this SURFACE offers it", not "this person may". The
+                    component owns the gate — staff always, the seller while it is still a
+                    draft — so passing isStaff here would have kept the seller out of their
+                    own unsubmitted order. */}
+                <OrderNumber order={order} editable onSaved={() => reloadAll()} className="text-2xl" />
+              </h1>
+              {/*
+                * THE FACTORY READS ITS OWN VOCABULARY.
+                *
+                * The two are deliberately different — a seller sees collapsed stages, so
+                * approved/working/packed all read "In Process", while the floor needs to
+                * know WHICH of those it is. This page showed the seller's word to everyone,
+                * so a staffer met "Working" on the list and "In Process" on the order, for
+                * one unchanged order. Same badge the list uses, for staff.
+                *
+                * A seller still sees their own status here: it is their order, and the
+                * collapsed vocabulary is what the rest of their account speaks.
+                */}
+              {isStaff
+                /* The SAME resolver the production queue uses. Reading order.factory_status
+ alone meant a line moved to Working on the board left this page saying
+                   Draft — the mirror of the cancelled-order case, and as confusing from the
+ other side. */
+                ? <StageBadge status={resolvedOrderStage(order)} />
+ : <SellerStatusBadge order={order} />}
+              {/* And beside it, for staff only, the carrier's own word about the parcel —
+ a second status from a party we don't control, which changes nothing here
+ by design. See lib/delivery-status.ts. */}
+              {isStaff && <DeliveryBadge order={order} />}
+            </div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
+            </div>
+          </div>
+          {/* Secondary first, primary last — the destructive action shouldn't lead.
+              Staff also get the factory move set here: the board row is the quick option,
+ but the detail page is where an order is actually worked. */}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {/* Label control sits next to Cancel; it shows "Create label" until one is bought,
+ then a "Download label" split (download / create another / refund). The ⋯ stage
+ menu moves to the END of the row. */}
+            {isStaff && canFulfill && (
+              <LabelActionButton
+ order={order}
+ onOpenLabel={() => setLabelOpen(true)}
+ onChanged={reloadAll}
+ onError={setActionErr}
+              />
+            )}
+            {/* PACKING SLIP FOR THIS ORDER. It existed only as a bulk action on the list,
+ so the screen where one order is actually worked could not print its own —
+ you had to go back, find it, tick it, and print from there. */}
+            {isStaff && (
+              <Button
+ variant="outline"
+ size="sm"
+ onClick={() => { const msg = printPackingSlips([order]); if (msg) setActionErr(msg) }}
+              >
+                Packing slip
+              </Button>
+            )}
+            {/*
+              * reloadAll, NOT reload — these are the two actions that move factory_status.
+              *
+              * `order` resolves as `one ?? the list row`, so the direct fetch WINS (see the
+              * note on reloadAll). Refreshing only the list therefore left `one` holding the
+              * pre-submit order: the stage stayed Draft and "Submit to production" stayed on
+              * screen after the money had already been taken, which reads as a press that did
+              * nothing and invites a second one. Same for Cancel. ApproveOrderButton beside
+              * them already did this correctly, which is what made the other two look right.
+              */}
+            <CancelOrderButton order={order} onDone={reloadAll} />
+            <SubmitOrderButton order={order} quote={quote} onDone={reloadAll} incomplete={orderNeedsSetup(order.items, catalog)} />
+            {isStaff && <ApproveOrderButton order={order} catalog={catalog} onDone={reloadAll} onError={setActionErr} />}
+            {isStaff && (
+              <OrderStageMenu
+ order={order}
+ role={role}
+ canFulfill={canFulfill}
+                /* NO onNewLabel — deliberately. LabelActionButton is in this same row under
+ the same condition, so passing it would put the same action on screen
+ twice under two different names ("Create label" / "New label"). The button
+ is the one that stays: it also knows when a label already exists and
+ confirms before buying a second. */
+ onChanged={reloadAll}
+ onError={setActionErr}
+              />
+            )}
+          </div>
+        </div>
+        {isStaff && actionErr && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{actionErr}</div>
+        )}
+      </div>
+
+      {isStaff && (
+        <NewLabelDialog
+ open={labelOpen}
+ onOpenChange={setLabelOpen}
+          // items ride along so the parcel is worked out from the blanks being shipped
+          // rather than guessed — over-declaring is billed on every label.
+ order={{ id: order.id, num, to: toShipAddress(order), items: order.items }}
+ onCreated={reloadAll}
+        />
+      )}
+
+      {/* min-w-0 on both tracks: a grid item's automatic minimum size is its MIN-CONTENT
+ width, so a long unbroken order/SKU string holds the 1.6fr track open and pushes
+ the whole grid past its container — the page then scrolls sideways. There was
+ slack to absorb it at 1600px; at the reading width there isn't. */}
+      <div className={embedded ? "grid gap-5" : "grid gap-5 lg:grid-cols-[2.1fr_1fr]"}>
+        {/* THE LEFT COLUMN IS TABBED — 2026-08-26.
+            Five cards stacked meant the item list, which is what this page is FOR, was
+            followed by four more before the fold, and Design files sat below however many
+            lines the order happened to have. Items and Activity are two different
+            questions; each gets its own word and the items get the height they need.
+
+            BOTH PANELS STAY MOUNTED and are hidden with `hidden` rather than unmounted —
+            switching tabs must not refetch the thread or drop a half-typed message, and an
+            unmounted panel takes its scroll position and its draft with it. */}
+        {/* THE COLUMN IS A SURFACE. Measured on the live page: both columns computed
+            `background: rgba(0,0,0,0)` with `border-width: 0`, so every word on this screen
+            sat directly on the page grey and the content had nothing to stand on.
+
+            That was an over-correction. The complaint the strip-out answered was DIVIDERS —
+            four stacked boxes with rules between them — and removing those was right. But a
+            divider and a ground are different things, and taking the second away with the
+            first left the page reading as one undifferentiated field of #F3F4F5.
+
+            One surface per column, no rules inside it. The grey goes back to being the gap
+            BETWEEN surfaces, which is the only job a page colour has. */}
+        <div className="min-w-0 space-y-5 rounded-[var(--radius)] bg-card p-5 ring-1 ring-foreground/5">
+          <TabBar
+            ariaLabel="Order sections"
+            value={detailTab}
+            onChange={goTab}
+            items={[
+              { id: "items" as const, label: "Items", count: items.length },
+              { id: "files" as const, label: "Files", count: fileTabCount || undefined },
+              /* STAFF ONLY. Sending work to a designer is factory business, and §6 is blunt
+                 about the reason: a seller must never learn their design was used by another
+                 seller, which is precisely what the reuse check on the way to the board
+                 reports. The tab is absent for a seller rather than present and refusing. */
+              ...(isStaff ? [{ id: "board" as const, label: "Board", count: boardCards.length || undefined }] : []),
+              { id: "history" as const, label: "History" },
+              /* A NOTE ON AN ORDER IS THE ONE THING HERE NOBODY MAY MISS — "chỉ trắng giúp
+                 em" changes what gets sewn, and it was sitting behind a word that looked
+                 identical whether the conversation was empty or not. Items has carried its
+                 count all along; this is the tab where a missed count costs a remake. */
+              /* `|| undefined` — no badge at zero. A count that is always drawn is a count
+                 nobody reads, and "Activity 0" is the tab saying nothing twice. */
+              { id: "activity" as const, label: "Activity", count: messages.length || undefined },
+            ]}
+          />
+
+          <div className={detailTab === "items" ? "space-y-5" : "hidden"}>
+          {/* NO TITLE. The tab immediately above says "Items 2" — a heading repeating it
+              is the same fact twice with nothing to tell the two apart. SectionCard still
+              renders its head for the action. */}
+          <SectionCard className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0"
+ actions={canAddItem ? (
+                  <Button size="sm" variant="outline" onClick={() => void addItem()} disabled={adding}
+ title="Add a line to this order — set its blank and variants with the pickers on the row">
+                    {adding ? "Adding…" : "Add item"}
+                  </Button>
+                ) : undefined}
+              >
+                {/* AN ADDED LINE IS MADE, NOT BILLED. unit_cost/ship_fee froze at submit, so
+ a line added afterwards is produced and the charge is not reopened. Said
+ here rather than discovered in a reconciliation. */}
+                {rowErr && <p className="px-5 pt-3 text-xs text-destructive">{rowErr}</p>}
+            {items.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground">No line items on this order.</div>
+            ) : (
+              <div className="divide-y divide-border">
+                {items.map((it, i) => {
+                  // Per LINE, not per order: the order-level readiness chip said "on the
+                  // board" for every item the moment one of them was sent.
+ const card = isStaff ? cardForLine(boardCards, { line_id: it.line_id, sku: it.sku }) : undefined
+ const design = designForLine(designs, it)
+ const artwork = designSrc(design?.data)
+                  /* WHICH POSITIONS ARE PICKED, on the row — so "how many faces does this
+                     line print" is read down the list rather than found by opening each
+                     designer. From the per-face map the Files tab already reads; the
+                     singular `design` above stays the front, which is what the avatar wants.
+                     ONLY FACES THAT CARRY ARTWORK. Removing a design from a face that declared
+                     a method keeps the row and drops its bytes (DELETE /designs), so counting
+                     rows left "3 positions" on a line whose artwork was gone. Same set the
+                     quote prices (`priced_faces`). */
+ const lineFaces = sidesForLine(designSides, it)
+ const picked = Object.keys(lineFaces).filter((k) => !!lineFaces[k]?.data).map((k) => k.toLowerCase())
+    .sort((a, b) => (ALL_SIDES as readonly string[]).indexOf(a) - (ALL_SIDES as readonly string[]).indexOf(b))
+ const qty = Number(it.qty) || 1
+                  /**
+                   * WHAT THIS LINE COSTS, from the quote — not unit_price.
+                   *
+                   * unit_price is the SELLER'S LISTING PRICE, what their buyer paid on a
+                   * marketplace. A factory order has no listing, so it is 0 and always will
+                   * be — which is why every line on a submitted manual order read $0.00
+                   * while the seller had actually been charged $18.50 each.
+                   *
+                   * The quote is the same computation the CHARGE uses (pricing.js), so the
+                   * number on the row is the number taken from the wallet. Matched on the
+                   * line's own id rather than position: an unpriced line is absent from
+                   * quote.lines, so index alignment silently shifts every row after it onto
+                   * the wrong price.
+                   */
+ const qLine = quote?.lines?.find(
+                    (l) => String(l.id) === String((it as { id?: string | number }).id ?? ""))
+                  // ITS OWN reason, matched on the line id for the same reason qLine is: two
+                  // lines of one sku are different jobs and must not share an explanation.
+ const qUnpriced = quote?.unpriced?.find(
+                    (u) => String(u.id ?? "") === String((it as { id?: string | number }).id ?? ""))
+                  // THREE SOURCES, most authoritative first: the live quote while the order
+                  // can still change, the cost FROZEN on the line once it is charged, and
+                  // the buyer's retail price as a last resort. A submitted order stops
+                  // quoting, which is why these rows read "—" beside a Summary that had the
+                  // total all along — the frozen number was on the line, unread.
+ const unit = qLine ? Number(qLine.unitCost) || 0
+ : Number(it.unit_cost ?? 0) || Number(it.unit_price) || 0
+ return (
+                    <div key={i} className="relative flex flex-wrap items-start gap-4 overflow-hidden px-5 py-4">
+                      {/* The line's number, where the eye lands last — same number the drop
+ zone's targets carry. */}
+                      {/* ON THE PICTURE'S CORNER, not the row's. It was anchored
+                          `bottom-3 right-4` against the row — but the variant strip is
+                          `basis-full`, so it wraps onto its own line and the row's
+                          bottom-right corner is now INSIDE that strip. The ordinal was
+                          sitting on top of the last field. The well's top-left corner is
+                          the item's own zone and nothing else is in it. */}
+                      {/* z-10 AND A RING, because it was neither. Nothing here creates a
+                          stacking context, so the picture — later in DOM order — simply
+                          painted over the corner of the ordinal, and what was left read as a
+                          badge with a bite out of it. The ring is the card colour, so the
+                          chip separates from the white well it overlaps instead of merging
+                          into its rounded corner. */}
+                      <span className="pointer-events-none absolute left-1 top-1 z-10 flex size-6 items-center justify-center rounded-full bg-primary text-2xs font-bold tabular-nums text-primary-foreground ring-2 ring-card" title={`Item ${i + 1}`}>
+                        {i + 1}
+                      </span>
+                      {/* The blank with its artwork placed — the seller sees the same
+ composite the floor will produce from. */}
+                      {/* MOCKUP LEFT, STITCHES RIGHT — the two claims about one job, side
+ by side. The mockup is what the buyer was sold; the tile beside it
+ is what the machine will actually sew, from the worksheet the
+ digitiser sent or from Wilcom. Staff only: the render route is
+ requireStaff, and a seller is looking at their own product, not at
+ our production check. */}
+                      {/* A WELL, NOT A BLEED — and it had been claiming to be both.
+                          `-my-4 -ml-5` pulled a black slab out to the card's edge and then
+                          `px-4 py-4` pushed the picture back in by 16px, so what shipped was
+                          a heavy frame around two white product photos rather than artwork
+                          reaching an edge.
+
+                          Full bleed cannot work here anyway. ItemAvatar shows TWO pictures
+                          at once on purpose — the buyer's listing photo offset behind, the
+                          composite we are about to print in front — and that offset only
+                          reads as two objects because there is room around them. Bleeding
+                          the pair crops the back card and takes the comparison with it,
+                          which is the one question this tile exists to answer.
+
+                          So: an inset well in a quiet neutral. It gives two white photos an
+                          edge on a white card without framing them in black, and
+                          `self-stretch` goes because the well belongs to the picture, not to
+                          the full height of a row that now wraps. */}
+                      {/* NO GROUND AT ALL. The well went in to give two white product photos
+                          an edge — but ItemAvatar already draws its own white tile with its
+                          own radius, so the grey sat as a box around a box, which is what
+                          made it read as a frame rather than a surface. The picture is its
+                          own object; it does not need a second one behind it. */}
+                      <div className="flex shrink-0 items-center justify-center">
+                      <div className="relative shrink-0">
+                        {/* The line's files, on the corner of its own picture — see
+                            LineDownloads for why they are not a link under the text. */}
+                        <LineDownloads design={design} files={dfiles} item={it} sides={sidesForLine(designSides, it)} />
+                        <ItemAvatar
+ item={it}
+ designs={designs}
+ catalog={catalog}
+                          // Tall enough to run from the item name down through the variant
+                          // strip. At 56 it read as a bullet beside the text rather than as
+                          // the thing being ordered — the smallest element in its own row,
+                          // next to a two-line title, a SKU and a set of variant fields,
+                          // when it is the one thing you actually check the order against.
+                          // At 144 the composite (blank + placed artwork) is legible without
+                          // opening the preview.
+                          //
+                          // 176 NOW, because the column beside it grew past 144 and left a
+                          // band of empty card under the picture. The avatar is square and
+                          // its size is an inline style, so height cannot be stretched to the
+                          // row on its own — the number is the only lever, and it moves the
+                          // width with it (the pair is size x 1.4 when both faces show, so
+                          // ~246px here). Still a FIXED size: it closes the ordinary gap, it
+                          // does not track a row that wraps to three lines.
+ size={176}
+ bare
+ className="rounded-none"
+ onEdit={() => setCustomize(it)}
+                        />
+                        {/* THE "DESIGN ATTACHED" PIP IS GONE (owner's call, 2026-09-09).
+                            A filled square with a nib in it, in the corner of a tile that was
+                            already showing the design. It marked a fact the picture beside it
+                            states more plainly than any glyph can — the same thing said twice,
+                            and the second telling was the one nobody could read at 16px. */}
+                      </div>
+                      </div>
+                      {/* One column holding three stacked zones — identity+price, then
+ the variant fields, then the design action. Previously the
+ action shared a cramped right rail with the price, which buried
+ the item's primary control under secondary text. */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            {/**
+                              * THE GARMENT, NOT THE LISTING (owner, 2026-09-23: "the product
+                              * name only changed on the designer window, should change here in
+                              * order detail page as well").
+                              *
+                              * This read `it.name` — the marketplace title, which belongs to
+                              * what the BUYER ordered and never moves. Swap the blank on the
+                              * strip below and a youth tee went on calling itself "Transfer
+                              * Duffel. 108084". resolveProduct is the row the price, the
+                              * mockups and the faces already come from, so the heading now
+                              * follows the strip the way everything else on the card does.
+                              *
+                              * THE BUYER'S TITLE IS NOT LOST. On an ORDER page it is how a
+                              * seller recognises the line on the marketplace, so it keeps a
+                              * line of its own — but only when it exists and actually differs,
+                              * which on a manual line or a matching title is never. A blank
+                              * that resolves to nothing falls back to it, exactly as the
+                              * designer does: a row with no name is worse than a stale one.
+                              */}
+                            <div className="flex items-center gap-2">
+                              <div className="truncate font-medium">
+                                {resolveProduct(it, catalog)?.name || it.name || it.sku || "Item"}
+                              </div>
+                            </div>
+                            {(() => {
+                              const pn = resolveProduct(it, catalog)?.name
+                              const listing = (it.name || "").trim()
+                              return pn && listing && listing.toLowerCase() !== pn.toLowerCase()
+                                ? <div className="truncate text-xs text-muted-foreground">{listing}</div>
+                                : null
+                            })()}
+                            {/* Same line as the production queue: what the buyer chose, next
+ to what we are choosing. */}
+                            {/* The catalogue row is what turns a blank NAME into the sku
+ production actually keys on — resolveProduct is the shared
+ resolver (CLAUDE.md §5), not a private copy. */}
+                            {/* `showQty` off only when the price line below is actually
+                                printing "× N". An unpriced row renders no multiplication at
+                                all, so it keeps the count here — otherwise de-duplicating
+                                would have deleted it. */}
+                            <OrderedVariant item={it} blankSku={resolveProduct(it, catalog)?.sku ?? undefined} catalogReady={catalog.length > 0} showQty={unit <= 0} />
+                            {/* THE POSITIONS, directly under the codes — one column of facts
+                                about the line, all on the same left edge. It sat over the
+                                spec strip at the foot of the card, the width of the artwork
+                                away from the text it belongs with (owner's call, 2026-09-07). */}
+                            {(it.sku || it.line_id) && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1 text-2xs">
+                                <span className={picked.length ? "font-medium text-foreground" : "text-muted-foreground"}>
+                                  {picked.length} {tl("orders", picked.length === 1 ? "position" : "positions")}
+                                </span>
+                                {picked.map((k) => (
+                                  <span key={k} className="rounded bg-muted px-1.5 py-0.5 capitalize text-foreground">{tl("sides", k)}</span>
+                                ))}
+                              </div>
+                            )}
+                            {/* THIS LINE's board state, with the lane named. "Sent to design"
+ and "Approved" are different answers, and until now the only
+ signal was an order-wide chip that lit for every item the
+ moment one of them was sent. */}
+                            {/* THE LANE IS THE NEWS, "on design board" is the preamble.
+                                A filled violet chip carrying both, at the same weight, sat
+ louder than the item's own name and said the obvious part
+ first. Now: a dot for the state, one quiet word for where it
+ is, and the lane in ink — the only part that changes as the
+ job moves. */}
+                            {/* THE DESIGN'S OWN NUMBER, beside the state of the job it belongs
+                                to. It is minted for every piece of artwork, keyed on the
+                                content hash so the same file is one number across every order
+                                printing it — and it was indexed for SEARCH in two places while
+                                appearing on no screen, so the only way to use it was to already
+                                know it. Same number, same spelling, on the board card. */}
+                            {designLabel(it.design_no) && (
+                              <span
+                                title="This artwork's number — the same on the design board, and searchable"
+                                className="mt-1 inline-flex items-center rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground"
+                              >
+                                {designLabel(it.design_no)}
+                              </span>
+                            )}
+                            {card && (
+                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
+                                {/* NO DOT — see the note in chat/page.tsx. The lane in ink
+ beside it is what changes as the job moves; a violet disc
+ was decoration on a pill that already reads. */}
+                                Design
+                                <span className="font-medium text-foreground">{card.lane_label || card.col || "Incoming"}</span>
+                              </span>
+                            )}
+                            {/* WHICH RECIPE THIS CAME OFF, for the factory only.
+                                A template is a placement recipe — artwork, where it sits,
+                                which blank — and picking one used to leave no trace, so a
+                                submitted order carried the RESULT of TPL-12 with no memory
+                                that TPL-12 existed. Recorded on the artwork now (per line,
+                                per side), which is what makes "what else have we cut from
+                                this one" an index lookup rather than a perceptual guess.
+                                Absent for artwork somebody simply dropped, which is most
+                                of it — so this appears only when it says something. */}
+                            {isStaff && design?.template_id && (
+                              <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground" title={`This artwork was placed from template ${design.template_id}`}>
+                                Template
+                                <span className="font-medium tabular-nums text-foreground">{design.template_id}</span>
+                              </span>
+                            )}
+                            {/* The bare mono sku that sat here is gone: it printed the SAME
+ string the strip above already labels "Listing SKU", one row
+ below it and with nothing to say which of the two skus it
+ was — the listing's, or the blank we buy against. An
+ unlabelled duplicate of a labelled value is worse than
+ either alone (CLAUDE.md §5 on why the two are kept apart). */}
+                          </div>
+                          {/* "$0.00 · 1 × $0.00" IS NOT A PRICE, it is the absence of one.
+                              A line whose blank doesn't resolve is missing from the quote
+ entirely — no product, no cost — and the buyer's retail price
+ is 0 on anything imported without an Item Price column. Both
+ printed as free goods on a row about to be produced, which is
+ the empty-state-that-looks-like-a-feature this house rule
+ exists to stop. Say which is missing, and where to fix it. */}
+                          <div className="shrink-0 text-right text-sm">
+                            {unit > 0 ? (
+                              <>
+                                {/* ONE LINE: the unit price and how many of it. It was two —
+ the extended total above, "1 × $18.50" beneath — which on
+ a quantity of one printed the same figure twice, and even
+ at four is one multiplication shown as two rows. The
+ total is the sum at the foot of the order; what a row has
+ to say is what this item costs and how many there are. */}
+                                <div className="flex items-center justify-end gap-1.5 font-medium tabular-nums">
+                                  {usd(unit)}
+                                  <span className="text-muted-foreground">×</span>
+                                  {/* EDITABLE WHERE IT IS READ. The quantity was a number in
+ a sentence, and changing one meant cancelling the order
+ and raising it again. Only while the line is still
+ editable; after approval it goes back to being text.
+                                      Uncontrolled + keyed on the value, so a save that fails
+ re-mounts with what the server actually holds rather
+ than leaving a typed number that never landed. */}
+                                  {canEditVariants ? (
+                                    <input
+ key={`qty-${it.line_id ?? it.sku}-${qty}`}
+ defaultValue={qty}
+ inputMode="numeric"
+ aria-label={`Quantity for ${it.name || it.sku || "this item"}`}
+ title="How many of this line to make"
+ onBlur={(e) => void setQty(it, e.target.value)}
+ onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur() }}
+ className="h-7 w-12 rounded-md border border-border bg-background px-1 text-center text-sm tabular-nums outline-none focus:ring-2 focus:ring-ring/40"
+                                    />
+                                  ) : qty}
+                                </div>
+                                {/* The "$17.46 blank + $5.00 Embroidery" breakdown was here.
+                                    It answered a question the row wasn't asking — the row is
+ a price and a quantity — and it put a third and fourth
+ figure under a number that is already the sum of them.
+                                    The split still exists on the quote (baseCost, methodFee,
+ sideFee) for anywhere that needs to explain a price. */}
+                              </>
+                            ) : quote === null ? (
+                              // STILL LOADING. The quote arrives a moment after the rows, and
+                              // asserting "Not priced · pick a blank first" in that gap is a
+                              // confident answer to a question nobody has finished asking —
+                              // it appeared on lines that were correctly priced all along.
+                              <div className="text-muted-foreground">—</div>
+                            ) : (
+                              <>
+                                <div className="font-medium text-muted-foreground">Not priced</div>
+                                {/* THE SERVER SAYS WHY, and this printed "pick a blank first"
+                                    regardless — on lines whose blank was already chosen, which
+                                    is a screen telling you to do something you have done. The
+                                    two reasons need different people to act:
+                                      no-product  no blank yet → the seller picks one
+                                      no-cost     blank chosen, our catalogue has no price
+                                                  against it → ours to fix, and saying "pick a
+                                                  blank" sends them back to a filled field. */}
+                                <div className="text-xs text-muted-foreground">
+                                  {qLine || qUnpriced?.reason === "no-cost" ? "no price set for this blank"
+                                    : qUnpriced?.reason === "unknown-blank" ? "this blank isn’t in the catalogue"
+                                    : "pick a blank first"}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          {/* REMOVE, at the row it removes. Hidden on the same test the
+                              server enforces — staff before approval, or the seller on their
+                              own un-submitted order — so a refusal is never the first thing
+                              you learn about the rule. Its own control rather than a menu
+                              entry: ItemDesignActions renders only with a sku AND a design
+                              status, and a line added by mistake has neither — so the row
+                              most needing this would have had no way. */}
+                          {canRemoveItem && (
+                            <button
+                              type="button"
+                              onClick={() => void removeItem(it)}
+                              title="Remove this line from the order"
+                              aria-label={"Remove " + (it.name || it.sku || "this line")}
+                              className="eg-tap -mr-1 shrink-0 self-start rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-alert/10 hover:text-alert focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                            >
+                              {/* X, NOT A TRASH CAN. Removing a mis-ordered line before
+                                  approval is a correction, not destruction — and a bin
+                                  overstates it. X also pairs with "Add item" as its opposite,
+                                  and matches the confirm dialog that follows. */}
+                              <X size={15} />
+                            </button>
+                          )}
+                        </div>
+
+
+                        {(it.sku || it.line_id) && (
+                          <>
+                            <div className="mt-3 flex items-center justify-end gap-2">
+                              {/* Partner chip + the tucked-away send action. Staff only —
+ it renders nothing when design-status can't be read, which
+ is what a seller gets. */}
+                              {/* `designStatus?.bySku`, not `designStatus`. Truthiness was the
+                                  wrong question: an empty ARRAY passes it, and the next line
+                                  reads .bySku off it and throws — which white-screens the whole
+                                  order page, not just this chip. Found with a stub API rather
+                                  than in production, and the real endpoint does return the
+                                  right shape, so this is a guard that was checking existence
+                                  when it needed to check shape. */}
+                              {designStatus && it.sku && (
+                                <ItemDesignActions
+ orderId={id}
+ sku={String(it.sku)}
+ lineId={it.line_id ?? undefined}
+ itemName={it.name}
+ qty={qty}
+ printType={it.print_type}
+ artworkUrl={artwork}
+ lineImage={it.img ?? undefined}
+ state={designCardFor(designStatus, { line_id: it.line_id, sku: it.sku })}
+ onChanged={loadDesignStatus}
+                                />
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      {/* THE SPEC, ACROSS THE WHOLE CARD — owner's call, 2026-08-26.
+                          It sat inside the copy column, so four fields shared whatever width
+                          the 144px artwork left them and Method was permanently cramped. As
+                          its own basis-full row it gets the card, and the four tracks finally
+                          have room to hold a real blank name.
+
+                          It reads LAST deliberately. The column above answers what this line
+                          IS and what to do about it; the strip answers what it will be MADE
+                          from, which is the question you ask once the first two are settled.
+
+                          Locked and editable keep the same four labelled fields — see
+                          VariantStrip: a settled line and an editable one describe the same
+                          thing, so they must not be two different shapes. */}
+                      <div className="w-full basis-full">
+                        {/* THE QUOTE HAS TO BE REFETCHED TOO. This called reloadOne alone, which reloads the
+                            ORDER — so picking a different blank updated the row and left Summary
+                            quoting the old one: Base cost, the per-face additions and the Blanks
+                            estimate all still describing the garment you just replaced. Every other
+                            path that changes what a line IS already bumps this nonce (the designer's
+                            onSaved does); the variant picker is the one that did not, and it is the
+                            control most likely to change the price. */}
+                        {canEditVariants ? (
+                          <VariantPicker orderId={String(id)} item={it} catalog={catalog}
+                            /**
+                              * WHAT EACH FACE SAYS IT IS, from the designs this page already
+                              * holds. Giving the map is what turns the Method slot into the
+                              * per-face disclosure — a shirt can be embroidered on the front
+                              * and printed on the back, which is what the charge has priced
+                              * all along and what this strip asked once, for the garment.
+                              *
+                              * Only faces with a ROW appear here; the picker lists every face
+                              * the blank OFFERS and reads an absent one as inheriting, which
+                              * is what absent means (§4, the faces case).
+                              */
+                            faceMethods={Object.fromEntries(
+                              Object.entries(sidesForLine(designSides, it))
+                                .map(([sd, d]) => [sd.toLowerCase(), String(d?.method ?? "")]))}
+                            /* A face's method lands on order_designs, so the DESIGNS are what
+                               has to be refetched — reloadOne alone would leave the strip
+                               showing the value it had before the pick. */
+                            onSaved={() => { reloadOne(); reloadDesigns(); setQuoteNonce((n) => n + 1) }} />
+                        ) : (
+                          <VariantStrip blank={it.blank} color={it.color} size={it.size} method={methodsLabelOf(it)} marketplace={it.variant} locked />
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </SectionCard>
+
+          </div>
+          {/* FILES IS ITS OWN TAB. Design deliverables were the first card inside Activity,
+              so the artwork on an order was found by pressing a word that means messages —
+              and anyone looking for a file had to know that. Factory .emb/mockups are
+              filtered out server-side and the bytes are paywalled there too, so this renders
+              nothing when there is nothing the seller can buy. */}
+          <div className={detailTab === "files" ? "space-y-5" : "hidden"}>
+            {/* `designs` is the same map the item rows draw their mockups from, so the tab
+                lists the artwork already ON this order rather than announcing that nothing
+                has arrived. */}
+            <SellerDesignFiles orderId={String(id)} items={items} designs={designSides} onAttached={reloadDesigns} />
+          </div>
+
+          {/* HISTORY IS ITS OWN TAB TOO. It was at the bottom of the right-hand column, under
+              the money — worth having, rarely worth looking at, so it was put last and closed.
+              That is the right instinct for a column and the wrong one for a question people
+              do ask: "what happened to this order" is now a word you press, not a scroll to
+              the end of the summary. The staff timeline sits with it, since they answer the
+              same question at two grains. */}
+          {/**
+            * THE BOARD TAB — every line, and whether it has reached a designer.
+            *
+            * ONE ROW PER LINE, not per card: the question is "which of this order's lines still
+            * need a designer", and a list of cards can only answer it by omission. A line that
+            * cannot be sent says WHY on its own row rather than offering a button that refuses.
+            */}
+          {/* THE DIALOG THAT ALREADY EXISTED. It carries the band pills and the read-only
+              list of what the line holds as well as the title and brief — everything the
+              inline form here was a thinner copy of. */}
+          {boardSend && (
+            <SendToBoardDialog
+              open
+              onOpenChange={(v) => { if (!v) setBoardSend(null) }}
+              orderId={String(id)}
+              sku={boardSend.item.sku || ""}
+              lineId={boardSend.item.line_id}
+              side={boardSend.side}
+              itemName={boardSend.item.name}
+              artworkUrl={(boardSend.side ? sidesForLine(designSides, boardSend.item)?.[boardSend.side]?.data : null)
+                || boardArtworkFor(designs, boardSend.item) || null}
+              lineImage={boardSend.item.img}
+              printType={boardSend.item.print_type}
+              onSent={() => {
+ setBoardNote({ ok: true, text: tl("order", "Sent to the designer board.") })
+ reloadBoard(); reloadDesigns()
+              }}
+            />
+          )}
+          {isStaff && (
+          <div className={detailTab === "board" ? "space-y-5" : "hidden"}>
+            <SectionCard title={tl("order", "Designer board")}>
+              {boardNote && (
+                <div className={"mb-3 rounded-lg border px-3 py-2 text-sm "
+                  + (boardNote.ok ? "border-success/40 bg-success/5 text-foreground" : "border-alert/40 bg-alert/5 text-foreground")}>
+                  {boardNote.text}
+                </div>
+              )}
+              {items.length === 0
+                ? <EmptyState icon={Package} title={tl("order", "No lines on this order")} />
+                : (
+                /* SectionCard's body carries NO padding of its own — every other card on this
+                   page puts it on its own child (`space-y-3 p-5`, `flex … p-5`), and this list
+                   was the one that forgot, so its rows ran to the card's edge and the Send to
+                   board buttons sat on the border. Tight vertically because each row already
+                   carries py-3; the 20px sides are the house figure. */
+                <div className="divide-y divide-border px-5 py-2">
+                  {items.flatMap((it, ix) => {
+                    /**
+                     * ONE ROW PER FACE, because a card is per face — a front and a back are two
+                     * jobs a designer does separately, and a single row could only ever send one
+                     * of them. A line whose faces we do not know yet still gets one row, sent
+                     * without a side, which is the card shape that predates faces and is still
+                     * valid.
+                     */
+                    const faces = Object.keys(sidesForLine(designSides, it) ?? {})
+                    const rows: (string | null)[] = faces.length ? faces : [null]
+                    return rows.map((side) => {
+                    const key = `${it.line_id || it.sku || it.name || String(ix)}|${side ?? ""}`
+                    const card = (boardCards ?? []).find((c) =>
+                      (it.line_id ? c.line_id === it.line_id : !c.line_id && c.sku === it.sku)
+                      && (side ? String(c.side || "").toLowerCase() === side : true))
+                    const art = (side ? sidesForLine(designSides, it)?.[side]?.data : null) || boardArtworkFor(designs, it)
+                    const busy = boardBusy === key
+                    const hits = boardReuse?.key === key ? boardReuse : null
+                    /**
+                     * WHAT WE ALREADY HOLD FOR THIS LINE — read on arrival, not on the way
+                     * to the board. Keyed exactly as the server keys it: line first, sku
+                     * only for rows written before line_id existed (§5).
+                     */
+                    const owned = ownedFiles[it.line_id ? `L:${it.line_id}` : it.sku ? `S:${it.sku}` : ""] ?? null
+                    const ownedHit = owned && (owned.exact[0] ?? owned.similar[0]) ? owned : null
+                    return (
+                      <div key={key} className="py-3">
+                        <div className="flex items-center gap-3">
+                          {/* The ARTWORK, not the product photo — what a designer would be
+                              handed is the thing to check before handing it over. */}
+                          <div className="size-10 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                            {art
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              ? <img src={canvasReadableSrc(art)} alt="" className="size-full object-cover" />
+                              : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">{it.name || it.sku || tl("order", "Line")}</div>
+                            {/* THE FACE, THEN THE GARMENT. `variantOf` already ends with the
+                                method, so appending print_type printed it twice — a row reading
+                                "EMB · EMB", which says one thing and looks like a fault. */}
+                            <div className="truncate text-xs text-muted-foreground">
+                              {side && <span className="capitalize">{tl("sides", side)}</span>}
+                              {side && variantOf(it) ? " · " : ""}
+                              {variantOf(it)}
+                            </div>
+                          </div>
+                          {/**
+                            * WE ALREADY HAVE THIS FILE — the thing the owner asked to surface
+                            * on 2026-09-21 and which has been computable ever since.
+                            *
+                            * On the row, before anyone reaches for Send to board, because the
+                            * whole value is stopping the press rather than interrupting it.
+                            * Hidden once the line is ON the board: by then the question has
+                            * been answered one way or the other and a suggestion is noise.
+                            *
+                            * THE OTHER SELLER IS NEVER NAMED. The factory may know two shops
+                            * ordered the same picture; this page must not be where that leaks
+                            * (§6). The row says what we can DO, never whose work it was.
+                            */}
+                          {!card && ownedHit && (
+                            <span
+                              className="shrink-0 text-xs font-medium text-success"
+                              title={ownedHit.exact.length
+                                ? tl("order", "An identical design has already been digitised — open the line to use that file.")
+                                : tl("order", "A similar design has already been digitised — a person confirms before it is used.")}
+                            >
+                              {ownedHit.exact.length
+                                ? tl("order", "Already digitised")
+                                : tl("order", "Similar on file")}
+                            </span>
+                          )}
+                          {/* THREE STATES, AND THEY ARE NOT THE SAME. On the board already;
+                              nothing to send; ready. §4 forbids drawing "can't" and "done" alike. */}
+                          {card
+                            ? <span className="shrink-0 text-xs text-muted-foreground">{tl("order", "On the board")}{card.col ? ` · ${card.col}` : ""}</span>
+                            : !art
+                              ? <span className="shrink-0 text-xs text-muted-foreground">{tl("order", "No artwork yet")}</span>
+                              : (
+                                <Button size="sm" variant="outline" disabled={busy}
+                                  onClick={() => void beginSend(it, side)}>
+                                  {tl("order", "Send to board")}
+                                </Button>
+                              )}
+                        </div>
+                        {/* WE MAY HAVE MADE THIS ALREADY. Shown, never acted on (§6) — and the
+                            seller is never told whose it was, only that a file exists. */}
+                        {hits && (
+                          <div className="mt-2 rounded-lg border border-hold/40 bg-hold/5 px-3 py-2 text-xs">
+                            <div className="font-medium text-foreground">
+                              {tl("order", "We may already have this file")}
+                            </div>
+                            <div className="mt-1 text-muted-foreground">
+                              {hits.exact.length > 0 && <>{hits.exact.length} {tl("order", "identical")}</>}
+                              {hits.exact.length > 0 && hits.similar.length > 0 && " · "}
+                              {hits.similar.length > 0 && <>{hits.similar.length} {tl("order", "that look alike")}</>}
+                            </div>
+                            <div className="mt-2 flex gap-2">
+                              <Button size="sm" variant="outline" disabled={busy}
+                                onClick={() => void beginSend(it, side, true)}>
+                                {tl("order", "Send anyway")}
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setBoardReuse(null)}>
+                                {tl("order", "Leave it")}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                    })
+                  })}
+                </div>
+              )}
+            </SectionCard>
+          </div>
+          )}
+
+          <div className={detailTab === "history" ? "space-y-5" : "hidden"}>
+
+          {/* FACTORY ONLY. A seller's order page shows them what they need to act on; the
+ blow-by-blow of who moved it where is internal, and the chat is where anything
+ they should know gets said. */}
+          {isStaff && timeline.length > 0 && (
+            <SectionCard title="Timeline">
+              <ol className="space-y-3 p-5">
+                {timeline.map((t, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="mt-1 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Clock size={13} weight="bold" />
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium capitalize">{(t.status || "").replace(/_/g, " ")}</div>
+                      <div className="text-xs text-muted-foreground">{fmtDateTime(t.at)}</div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </SectionCard>
+          )}
+            {seen.has("history") && <OrderHistory orderId={String(id)} items={items} startOpen />}
+          </div>
+
+          <div className={detailTab === "activity" ? "space-y-5" : "hidden"}>
+          <SectionCard title="Order activity">
+            {/* THE WHOLE CARD ACCEPTS A DROP — thread and composer alike. A picture gets
+ dropped on the box you type in, so a target that stops at the message list is
+ a target that refuses the aim everybody takes. `relative` carries the overlay;
+ onDragOver's preventDefault is load-bearing rather than ceremony — without it
+ the browser never fires a drop at all. */}
+            <div
+ className="relative flex flex-col"
+ onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; if (e.dataTransfer.types?.includes("Files")) setDragging(true) }}
+ onDragOver={(e) => e.preventDefault()}
+ onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
+ onDrop={(e) => {
+ e.preventDefault()
+ dragDepth.current = 0; setDragging(false)
+ void onAttach(firstDroppedFile(e.dataTransfer))
+              }}
+            >
+              {/* pointer-events-none: the overlay must not fire its own dragenter/dragleave,
+ or the depth counter it depends on never returns to zero. */}
+              {dragging && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background p-6">
+                  <div className="flex w-full max-w-sm flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/40 px-8 py-10 text-center">
+                    <Paperclip size={22} weight="duotone" className="text-primary" />
+                    <span className="text-sm font-medium text-foreground">Drop to attach</span>
+                    <span className="text-xs text-muted-foreground">It posts on this order, with your message</span>
+                  </div>
+                </div>
+              )}
+              <div className="max-h-72 min-h-[80px] flex-1 space-y-3 overflow-y-auto p-5">
+                {messages.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">No messages yet — start the conversation.</div>
+                ) : (
+ messages.map((m) => {
+                    // "Mine" is whoever is READING, not always the seller. On a staff
+                    // board every message rendered as if it came from the other side.
+ const myRole = getUser()?.role || "seller"
+ const mine = (m.role ?? "seller") === myRole
+ return (
+                      <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
+                        <div className={"max-w-[80%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                          {/* AI briefs/replies arrive as markdown (**bold**, lists). Render it —
+ keyed off content — so a brief bolds instead of showing literal **;
+ a plain human message stays verbatim with its line breaks. */}
+                          {m.text ? (hasMarkdown(m.text) ? <Markdown>{m.text}</Markdown> : <span className="whitespace-pre-wrap">{m.text}</span>) : null}
+                          {/* ATTACHMENTS. This panel rendered text only, so a package photo
+ taken on the phone arrived as the words "Package photo" and
+ nothing else — the picture was stored and posted correctly, and
+ simply had nowhere to appear on this screen. */}
+                          {(() => {
+ const att = m.attachment as { url?: string; name?: string; mime?: string } | undefined
+ if (!att?.url) return null
+ const isImg = (att.mime || "").startsWith("image/")
+ return (
+                              <a
+ href={att.url} target="_blank" rel="noreferrer"
+ className={"block w-fit " + (m.text ? "mt-1.5" : "")}
+                              >
+                                {isImg ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+ src={att.url}
+ alt={att.name || "attachment"}
+ className="max-h-80 max-w-full rounded-lg border border-border"
+                                  />
+                                ) : (
+                                  <span className="underline underline-offset-2">{att.name || "Attachment"}</span>
+                                )}
+                              </a>
+                            )
+                          })()}
+                        </div>
+                        <span className="mt-0.5 text-2xs text-muted-foreground">
+                          {m.by ? `${m.by} · ` : m.role && m.role !== "seller" ? `${m.role} · ` : ""}
+                          {fmtMsgTime(m.ts)}
+                        </span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              {/* WHAT IS ABOUT TO GO WITH THE MESSAGE, as a picture rather than a filename.
+                  You attached an image to look at it; a row of text asks you to take it on
+ trust — the same call the chat composer makes. */}
+              {(pendingAtt || attErr) && (
+                <div className="flex items-center gap-2 border-t border-border px-3 pt-3">
+                  {pendingAtt && (
+                    <div className="relative">
+                      {pendingAtt.mime?.startsWith("image/") ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={pendingAtt.url} alt={pendingAtt.name} className="size-14 rounded-lg border border-border object-cover" />
+                      ) : (
+                        <div className="flex size-14 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted/50 px-1">
+                          <FileText size={16} weight="duotone" className="text-muted-foreground" />
+                          <span className="w-full truncate text-center text-2xs text-muted-foreground">{pendingAtt.name}</span>
+                        </div>
+                      )}
+                      <button
+ onClick={() => setPendingAtt(null)} aria-label="Remove attachment"
+ className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background transition-colors hover:bg-foreground"
+                      >
+                        <X size={10} weight="bold" />
+                      </button>
+                    </div>
+                  )}
+                  {/* A failed upload SAYS SO. Silently attaching nothing is how a photo is
+ believed to have been sent. */}
+                  {attErr && <span className="text-xs text-destructive">{attErr}</span>}
+                </div>
+              )}
+              <div className="flex items-center gap-2 border-t border-border p-3">
+                <input
+ ref={attachRef} type="file" className="hidden"
+ accept="image/*,application/pdf"
+ onChange={(e) => void onAttach(e.target.files?.[0])}
+                />
+                <Button
+ variant="ghost" size="icon" className="size-10 shrink-0"
+ onClick={() => attachRef.current?.click()}
+ disabled={attaching}
+ title="Attach an image or PDF"
+ aria-label="Attach a file"
+                >
+                  {attaching ? <CircleNotch size={16} className="animate-spin" /> : <Paperclip size={17} />}
+                </Button>
+                <Input
+ value={msg}
+ onChange={(e) => setMsg(e.target.value)}
+ onKeyDown={(e) => {
+ if (e.key === "Enter" && !e.shiftKey) {
+ e.preventDefault()
+ sendMsg()
+                    }
+                  }}
+ placeholder="Add a message or note…"
+ className="h-10"
+                />
+                {/* Either half is a message: words, a picture, or both. */}
+                <Button size="icon" className="size-10" onClick={sendMsg} disabled={(!msg.trim() && !pendingAtt) || attaching}>
+                  <PaperPlaneTilt size={16} weight="fill" />
+                </Button>
+              </div>
+            </div>
+          </SectionCard>
+          </div>
+        </div>
+
+        {/* summary */}
+        {/* THE RAIL IS ONE PANEL. See the note above SectionCard's className below: each
+            child stops drawing its own border, corner and ring, and this container draws
+            them once for the set. divide-y puts a hairline between the sections, so the
+            four read as one object with four parts rather than four objects. */}
+        {/* A STACK OF CARDS, not one card with rules in it. Each rail section answers a
+            different question — what the factory should know, who it goes to, what was
+            charged — and a shared surface made them read as one long thing you scroll past.
+            Separate cards on the page ground let the eye land on the one it wants. */}
+        <div className="min-w-0 space-y-4">
+          {/* THE FACTORY NOTE, IN THE RAIL — moved 2026-08-26.
+              Still one field, overwritten, staff-only: "the thing to know about this
+              order", and still deliberately separate from the activity thread, which is a
+              sequence of events. Conflating them is how a note becomes forty messages
+              nobody reads, or a note nobody can find.
+
+              What changed is WHERE. It sat in the left column above the thread, so it was
+              below the item list and off-screen on any order with more than a couple of
+              lines — and it is written WHILE DOING SOMETHING ELSE, mid-call or mid-pick, so
+              it must not cost a scroll to reach. The rail is already where everything that
+              is not an item lives, and it is short enough to keep the note in view. */}
+          {isStaff && (
+            <SectionCard title="Factory note" bodyClassName="p-5">
+              <InternalNote
+ hideLabel
+                orderId={order.id}
+                value={(order as { internal_note?: string | null }).internal_note ?? ""}
+              />
+            </SectionCard>
+          )}
+          <SectionCard title="Customer">
+            <div className="space-y-3 p-5 text-sm">
+              <div>
+                <div className="font-medium">{cust.name || "—"}</div>
+                {cust.email && <div className="text-muted-foreground">{cust.email}</div>}
+              </div>
+              {editAddr ? (
+                /* A FIELD IS A FIELD (§4): plain Inputs, one per line of a real address, in
+                   the order they are written on a parcel. Street is first because it is the
+                   one that is usually missing. */
+                <div className="space-y-2 border-t border-border pt-3">
+                  {/*
+                   * ONE EDGE, NOT SEVEN (owner, 2026-09-21: "remove borderline they look too much").
+                   *
+                   * Seven separately-outlined lozenges stacked in a 300px rail is the §4 count
+                   * of 490 outlined boxes, in miniature: when every line is a box, the boxes
+                   * stop meaning anything and the panel reads as chrome rather than an address.
+                   *
+                   * NOT borderless, and that is deliberate — components/ui/input.tsx already
+                   * tried it and reverted: `border-transparent` over a fill "does not read as
+                   * somewhere you TYPE; it reads as a disabled chip". So the edge stays and the
+                   * REPETITION goes. The group keeps one hairline and the fields are divided by
+                   * the same hairline, which is how a real address is written down — lines on a
+                   * form, not seven separate forms.
+                   *
+                   * `rounded-none` + `border-0` on the children and `overflow-hidden` on the
+                   * group, so the outer corners are the only ones and no child pokes through.
+                   * The focus ring is inset for the same reason: an outset ring on a child
+                   * inside a clipped parent gets its top and bottom shaved off.
+                   */}
+                  <div className="divide-y divide-border overflow-hidden rounded-lg border border-input">
+                    <Input autoFocus placeholder="Name" value={addrDraft.name ?? ""} className={ADDR_FIELD}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, name: e.target.value })} />
+                    <Input placeholder="Street address" value={addrDraft.line1 ?? ""} className={ADDR_FIELD}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, line1: e.target.value })} />
+                    <Input placeholder="Apartment, suite (optional)" value={addrDraft.line2 ?? ""} className={ADDR_FIELD}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, line2: e.target.value })} />
+                    {/* City · State · ZIP share a line on a parcel, so they share one here.
+                        NO vertical rule between them, and not by omission: `divide-x` sets a
+                        border-left on the children, which the fields' own `border-0` cancels —
+                        it rendered as nothing and the comment claiming otherwise would have
+                        outlived the reason. Three placeholders on one line already read as
+                        three columns, and a rule between them would put the chrome back that
+                        this whole change removes. */}
+                    <div className="grid grid-cols-[minmax(0,1fr)_5rem_6rem]">
+                      <Input placeholder="City" value={addrDraft.city ?? ""} className={ADDR_FIELD}
+                        onChange={(e) => setAddrDraft({ ...addrDraft, city: e.target.value })} />
+                      <Input placeholder="State" value={addrDraft.state ?? ""} className={ADDR_FIELD}
+                        onChange={(e) => setAddrDraft({ ...addrDraft, state: e.target.value })} />
+                      <Input placeholder="ZIP" value={addrDraft.zip ?? ""} className={ADDR_FIELD}
+                        onChange={(e) => setAddrDraft({ ...addrDraft, zip: e.target.value })} />
+                    </div>
+                    <Input placeholder="Country" value={addrDraft.country ?? ""} className={ADDR_FIELD}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, country: e.target.value })} />
+                  </div>
+                  {/* A refusal carries its reason — that is the answer, not a subtitle. */}
+                  {addrErr && <div className="text-xs text-destructive">{addrErr}</div>}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button size="sm" onClick={saveAddress} disabled={addrSaving}>
+                      {addrSaving ? "Saving…" : "Save address"}
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={addrSaving}
+                      onClick={() => { setEditAddr(false); setAddrErr(null) }}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (addr.line1 || addr.city) ? (
+                /*
+                 * AN ADDRESS IS A VALUE, NOT A CAPTION (§4).
+                 *
+                 * This whole block was `text-muted-foreground` — the street, the city and
+                 * the ZIP all set in the colour reserved for labels nobody re-reads. It is
+                 * the opposite of true: this is the one thing on the page a person reads
+                 * digit by digit, copies, and transcribes onto a parcel. It is inked now,
+                 * and the ICON is what went muted, because the pin is decoration and the
+                 * address is the content.
+                 */
+                <div className="flex items-start gap-2 border-t border-border pt-3">
+                  <MapPin size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    {/* ONLY WHEN IT DIFFERS. `cust.name` is who bought it and `addr.name`
+                        is who receives it — genuinely different fields, and on a gift order
+                        they differ and both matter. On the common order they are the same
+                        person, and printing it twice under a heading that already said it
+                        is the repetition. Compared case- and space-insensitively, because
+                        two marketplaces spell one name two ways. */}
+                    {addr.name && addr.name.trim().toLowerCase() !== String(cust.name ?? "").trim().toLowerCase() && <div>{addr.name}</div>}
+                    {addr.line1 && <div>{addr.line1}</div>}
+                    {addr.line2 && <div>{addr.line2}</div>}
+                    {/* The gap, said out loud. A blank where the street belongs is the one
+                        thing that stops a label being bought, and it used to render as
+                        nothing at all. */}
+                    {/* The two blanks, told apart. Withheld is the factory holding it; the
+                        other is us having nothing to ship against, which is what stops a
+                        label being bought. Same wording as the board's panel. */}
+                    {addr.masked && <div className="select-none tracking-widest">••••••••••</div>}
+                    {streetMissing && <div className="text-destructive">No street address</div>}
+                    {/* CITY, ST ZIP — a comma after the city only. Joining all three with
+                        commas produced "Anchorage, AK, 99515-2719", which is not how an
+                        address is written anywhere, and this is read against a printed
+                        label where the difference is obvious. */}
+                    <div>
+                      {[addr.city, addr.state].filter(Boolean).join(", ")}
+                      {addr.zip ? ` ${addr.zip}` : ""}
+                    </div>
+                    {addr.country && <div className="text-muted-foreground">{addr.country}</div>}
+                    {/*
+                      * WHERE IT CAME FROM, said out loud.
+                      *
+                      * There are now four ways an address arrives — the marketplace sync,
+                      * Shippo's own Etsy connection, the CSV/extension import, and somebody
+                      * typing it — and until this line the screen looked identical for all
+                      * of them. "Which of these do I trust" is a real question on a card
+                      * whose whole job is telling you where to send a parcel, and
+                      * addressSourceLabel already answered it for the boards.
+                      */}
+                    {/* Empty for a typed address — see STATIC_SOURCE_LABEL.manual. An empty
+                        div would still draw its margin, so the row goes with the words. */}
+                    {addressSourceLabel(order)
+                      ? <div className="mt-1.5 text-2xs text-muted-foreground">{addressSourceLabel(order)}</div>
+                      : null}
+                  </div>
+                  {/* Top-aligned, not centred. `-my-1` on a control beside a four-line
+                      block put Edit level with the middle of the address, which is why it
+                      looked unattached to anything. */}
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {/* Copy the whole thing, in the order it goes on a label — the reason
+                        anyone reads this card is to put it somewhere else. */}
+                    {!addr.masked && !streetMissing && (
+                      <CopyButton
+                        value={addressLines(order).join("\n")}
+                        label={tl("orders", "Copy address")}
+                        copiedLabel={tl("orders", "Copied")}
+                      />
+                    )}
+                    {addrEditable && (
+                      <Button size="sm" variant="ghost" className="shrink-0"
+                        onClick={() => { setAddrDraft(addrFields); setAddrErr(null); setEditAddr(true) }}>
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : addrEditable ? (
+                /* No address at all. One line and one way out — the four parts, minus the
+                   mark, because this sits inside a card that already names itself. */
+                <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+                  <span className="text-muted-foreground">No shipping address</span>
+                  <Button size="sm" variant="outline" className="shrink-0"
+                    onClick={() => { setAddrDraft(addrFields); setAddrErr(null); setEditAddr(true) }}>
+                    Add address
+                  </Button>
+                </div>
+              ) : null}
+              {/*
+                * WHERE IT CAME FROM, under who it is going to.
+                *
+                * The page named the buyer and nothing else: which shop sold it, on which
+                * marketplace, for which of our sellers were all absent from the one screen
+                * where an order is actually worked — you had to go back to the queue and
+                * find the row. Same three facts the board's Store column carries, so the two
+                * screens can't tell different stories.
+                *
+                * In the Customer card rather than a card of its own, because it answers the
+                * same question one step further out: this order's parties. Separated by the
+                * rule and labelled, so the shop can never be misread as the buyer.
+                *
+                * The seller line is STAFF ONLY — the server strips seller_name for a seller,
+                * who would only ever be reading their own name back.
+                */}
+              <div className="border-t border-border pt-3">
+                <div className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">Sold through</div>
+                <div className="mt-1 font-medium">{order.store || platformOf(order)}</div>
+                <div className="text-muted-foreground">
+                  {platformOf(order)}
+                  {(() => {
+ const seller = sellerLabelOf(order, { deactivated: tl("orders", "deactivated"), deleted: tl("orders", "deleted account") })
+ return seller ? ` · ${seller}` : ""
+                  })()}
+                </div>
+                {/* THE ACCOUNT, spelled out. The line above carries a display NAME, which two
+                    accounts can share and which says nothing about which login placed this —
+                    the question someone reading a manual order is actually asking. Its own
+                    line rather than appended, because an address and a name run together read
+                    as one long word at this size. Staff only: the server strips it for the
+                    seller, who would be reading their own address back. */}
+                {!order.factory_order && order.seller_email && order.seller_email !== order.seller_name && (
+                  <div className="mt-0.5 text-xs text-muted-foreground/80">{order.seller_email}</div>
+                )}
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Also shown for a TikTok platform-shipped order that has no tracking yet — the
+ label exists on TikTok's side before the number reaches us, and a Shipping card
+ that isn't there reads as "nothing has shipped". */}
+          {(order.tracking || order.carrier || canFetchTiktokLabel(order)) && (
+            <SectionCard title="Shipping">
+              <div className="flex items-start gap-2 p-5 text-sm">
+                <Truck size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  {/* WHO owes the label. On TikTok shipping it already exists and is fetched;
+ on seller shipping nothing exists until we buy one — and a floor that
+ confuses the two either waits forever or buys a second label. Stated
+ before the carrier and tracking because it decides what those mean. */}
+                  {(() => {
+ const ship = tiktokShippingOf(order)
+ if (!ship) return null
+ const tone =
+ ship.key === "tiktok" ? "bg-primary/10 text-primary"
+ : ship.key === "seller" ? "bg-muted text-foreground"
+ : "bg-hold/15 text-hold"
+ return (
+                      <div className="mb-1.5">
+                        <span className={"inline-flex items-center rounded-md px-1.5 py-0.5 text-2xs font-semibold " + tone}>
+                          {ship.label}
+                        </span>
+                        <div className="mt-1 text-xs text-muted-foreground">{ship.hint}</div>
+                      </div>
+                    )
+                  })()}
+                  {order.carrier && <div className="font-medium">{order.carrier}</div>}
+                  <TrackingNumber carrier={order.carrier} tracking={order.tracking} />
+                  {/* No tracking yet: the number often exists somewhere — a seller shipped it
+ themselves, a partner emailed it — and the order had nowhere to put it. */}
+                  {!order.tracking && <AddTracking orderId={order.id} onSaved={reloadAll} />}
+                  {canFetchTiktokLabel(order) && (
+                    <>
+                      <button
+ type="button"
+ onClick={async () => {
+ setTtLabelBusy(true); setTtLabelErr(null)
+ const err = await openTiktokLabelFor(order)
+ setTtLabelErr(err); setTtLabelBusy(false)
+                        }}
+ disabled={ttLabelBusy}
+ className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-60"
+                      >
+                        {ttLabelBusy
+                          ? <CircleNotch size={12} className="animate-spin" />
+ : <FileArrowDown size={12} weight="bold" />}
+                        {ttLabelBusy ? "Loading…" : "TikTok label"}
+                      </button>
+                      {/* TikTok's own wording, not a generic failure — the reason is usually
+ actionable ("no package on TikTok yet"). */}
+                      {ttLabelErr && <div className="mt-1.5 text-xs text-hold">{ttLabelErr}</div>}
+                    </>
+                  )}
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/*
+            * NO MONEY ON THE FLOOR (2026-08-24).
+            *
+            * Warehouse produces: print it, pack it, scan it out. What the order was worth
+            * informs none of that, and it is the number most likely to be read over a
+            * shoulder in a workshop. Both sections go, rather than rendering with the
+            * figures blanked — an empty Summary reads as an order nobody priced, which is
+            * the one thing §4 says an empty state must never be mistaken for.
+            *
+            * Not merely hidden: /api/orders/:id/charges answers this role with the withheld
+            * shape, so the amounts never reach the browser. See canSeeMoney in lib/auth.ts
+            * and its mirror in server/src/auth.js.
+            */}
+          {canSeeMoney(role) && (
+            <>
+            {/* Summary owns every number on this page. Pre-submit it shows the QUOTE (what
+   we'll charge to produce this); once submitted the price is frozen and it
+   falls back to the order's own totals. */}
+            {/* THE STATE OF THE MONEY, IN ONE WORD, in the header.
+                It used to be a sentence under the total ("not charged yet"), which states
+                what has NOT happened — a reader can do nothing with that, and on our own
+                orders it was permanent, because a factory order never passes in_review and
+                so is never charged at all. The chip says what IS true instead, in the
+                vocabulary the design fees already use: estimated · charged · refunded. */}
+            <SectionCard
+              title="Summary"
+              actions={<span className={"rounded-full px-2 py-0.5 text-2xs font-medium " + moneyState.tone}>{moneyState.label}</span>}
+            >
+              {/* pr-7, not p-5: the fee rows' pencil is positioned PAST the money column so it
+                  costs the figures no width (see DesignFeeAmount), and it needs a gutter to
+                  land in — SectionCard is overflow-hidden, so a glyph that overflowed the
+                  card would simply be cut in half. Every figure still ends at the same x. */}
+              <dl className="space-y-2 p-5 pr-7 text-sm">
+                {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
+   the alternative is a card that looks like an order nobody has priced. */}
+                {quoteErr && submittable && (
+                  <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive">
+                    Couldn&apos;t load this order&apos;s price. Nothing has been charged — reload, and tell us if it keeps failing.
+                  </p>
+                )}
+                {/**
+                  * ── OUR OWN ORDER: ONE COLUMN OF MONEY, AND IT IS OURS ──────────────────
+                  *
+                  * Nobody is billed internally, so every seller-facing figure on this card is
+                  * a price that will never be charged: Base cost, Shipping and Total describe
+                  * a transaction that does not exist, "You paid" reads "not charged yet"
+                  * forever (a factory order skips in_review, so chargeForSubmit never runs),
+                  * and the real numbers sat below them in a bordered box captioned as if we
+                  * were hiding them from a seller who cannot open this page.
+                  *
+                  * So on the factory's own orders there is no second card and no seller side:
+                  * what the buyer paid, what it cost us, what is left.
+                  */}
+                {isFactory && isStaff ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Customer paid</dt>
+                      {customerPaidCell}
+                    </div>
+                    {spendRows}
+                    {grossMarginRow}
+                  </>
+                ) : isStaff ? (
+                  /**
+                   * ── A SELLER'S ORDER, READ BY THE FACTORY ──────────────────────────────
+                   *
+                   * One list in OUR vocabulary. It used to be the seller's card — Base cost,
+                   * You paid, Customer paid, Estimated profit — with our numbers in a box
+                   * underneath, and the owner's reading of it was "redundant and confusing"
+                   * (2026-09-07): what the buyer paid the seller and what the seller keeps
+                   * is their business, not a figure we act on. What we act on is what came
+                   * in from the seller (product, label, fees, itemised), what went out
+                   * (blanks, the postage we actually bought, partner work), and what is left.
+                   */
+                  <>
+                    {cost != null ? chargedRows : quoteRows}
+                    <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                      <dt>{cost != null ? "Seller paid" : "Seller pays"}</dt>
+                      <dd className="tabular-nums">
+                        {netCost != null ? usd(netCost)
+                          : quote && !quote.unpriced?.length ? usd(quote.total + dfTotal)
+                          : <span className="font-normal italic text-muted-foreground">not priced</span>}
+                      </dd>
+                    </div>
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      {spendRows}
+                      {grossMarginRow}
+                    </div>
+                  </>
+                ) : submittable && quote && !quote.unpriced?.length ? (
+                  <>
+                    {quoteRows}
+                    <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                      <dt>Total</dt>
+                      <dd className="tabular-nums">{usd(quote.total + dfTotal)}</dd>
+                    </div>
+                    {/* The "charged when you submit" half moved into the header chip —
+                        §4 forbids a sentence under a control that repeats what a label
+                        already says. What is left is the one thing the rows cannot say for
+                        themselves: why a fee reads To Be Determined. */}
+                    {designFees?.items?.some((f) => f.amount == null) && (
+                      <p className="pt-1 text-xs text-muted-foreground">A design still under review shows “To Be Determined” until we confirm the quote.</p>
+                    )}
+                  </>
+                ) : feesGated ? (
+                  /* A team member whose leader hasn't shared order fees. The server sent no
+   amounts at all, so there is nothing here to hide — and this says which,
+   rather than rendering an empty card that reads as a broken page. */
+                  <p className="text-xs text-muted-foreground">
+                    Order costs aren&apos;t shared with you. Your team leader can turn this on
+   under Settings › Team.
+                  </p>
+                ) : (
+                  <>
+                    {/* Submitted → the price is frozen and the LEDGER is the record of it.
+                        Every part it charged, itemised: production, shipping, and the fees
+   the quote can't see (expedited shipping, express, design, files). */}
+                    {chargedRows}
+                    <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                      <dt>You paid</dt>
+                      {/* "$0.00" would claim this order was produced free. Nothing has been
+   charged because it hasn't been submitted — a different fact, and the
+   one the seller needs before they read a profit figure below. */}
+                      <dd className="tabular-nums">
+                        {netCost != null ? usd(netCost)
+   : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
+                      </dd>
+                    </div>
+
+
+                    {/* The buyer's side, kept visually apart from ours. Two different pots of
+   money on one card is only safe if the reader can never mistake one
+   for the other — which is the bug this replaced. */}
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="text-muted-foreground">Customer paid</dt>
+                        {customerPaidCell}
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <dt>Estimated profit</dt>
+                        <dd className={"tabular-nums " + (estProfit != null && estProfit < 0 ? "text-destructive" : "")}>
+                          {estProfit != null ? usd(estProfit) : <span className="font-normal italic text-muted-foreground">—</span>}
+                        </dd>
+                      </div>
+                    </div>
+
+                    {/* OUR SIDE OF THE SAME ORDER used to sit HERE, and could never render.
+                        It was inside this branch — the one that runs only when the quote is
+                        absent or unpriceable — while testing `quote?.supplierTotal != null`,
+                        which needs the quote present. Two conditions that cannot both hold
+                        on a normal order, so Product cost, Postage and Factory margin were
+                        invisible on every properly-priced order this app has ever had.
+                        It now sits after this whole ternary, where every state reaches it. */}
+
+                    {/* The "no retail price recorded" line is gone. It was written for an
+   occasional order nobody had typed a sale price on; the manual order
+   form no longer asks for one at all, so it appeared under EVERY total —
+   a permanent apology for a field that was deliberately removed. The
+   dash beside Estimated profit already says there is nothing to work
+   out. */}
+                  </>
+                )}
+                {/* The unpriced lines say so on the rows themselves ("Not priced · pick a
+   blank first"), which is where the fix is. Repeating it in red under the
+   total made the same fact an alarm about the total. */}
+              </dl>
+            </SectionCard>
+
+            {/* Sits under Summary: what was charged, then what can be sent back. Renders
+   nothing for sellers and for staff without the permission. */}
+            <OrderRefundPanel key={adjRev} orderId={id} />
+            </>
+          )}
+
+          {/* The price adjustment stands on its own and at EVERY stage — a draft included,
+              which is when the floor finds what the quote missed. Seller orders only: a
+              factory-owned order has no wallet to charge. */}
+          {!order.factory_order && <OrderAdjustPanel orderId={id} onCharged={() => { setAdjRev((n) => n + 1); reloadAll() }} />}
+
+          {/* THE RECORD MOVED TO ITS OWN TAB. It sat here, last and collapsed, under
+              Customer -> Shipping -> Summary -> Refund — the order the questions come in,
+              with "what has happened to this order" asked last. That reasoning holds for a
+              column and stops holding once the question has a word of its own: a person
+              looking for it should press History, not scroll past the money to find a
+              closed panel. */}
+        </div>
+      </div>
+
+      {customize && (
+        <DesignCanvasDialog
+ open={!!customize}
+ onOpenChange={(v) => !v && setCustomize(null)}
+ orderId={id}
+ orderLabel={numOf(order)}
+ item={customizeLive ?? customize}
+ initialDesign={designSrc(designForLine(designs, customize)?.data)}
+ initialPos={designForLine(designs, customize)?.pos}
+          /**
+           * OPPOSITE SIDES OF THE SAME MOMENT. Before submit the order is the seller's draft
+           * and the factory has no business swapping their file; after it, the job is ours
+           * and the seller asks in chat instead. Whoever is locked sees the buttons disabled
+           * with the reason, not a "forbidden" after the click.
+           *
+           * EXCEPT THERE IS NO SELLER ON A FACTORY ORDER, and 1,129 of them say so. An order
+           * the factory owns — every Etsy order synced into a factory account — sat at
+           * `new` and told staff "the files on this line are still the seller's", which is
+           * not a lock they can wait out: they ARE the owner, and there is nobody on the
+           * other side of it. The rule needs two parties to mean anything, so with one it
+           * does not apply.
+           */
+ filesLocked={isStaff ? (preSubmit && !order.factory_order) : !preSubmit}
+ siblings={items.filter((it) => (it.line_id ?? it.sku) !== (customize.line_id ?? customize.sku))}
+ designs={designs}
+ onSaved={() => { reloadDesigns(); reloadOne(); setQuoteNonce((n) => n + 1) }}
+          /* What a SECOND printed face adds per unit, so the side pills can say so before
+ anyone commits to one. From the quote, which is the same settings the charge
+ reads — a number typed here would be a second opinion about the price. */
+                /*
+                 * THE RATES FOR *THIS LINE'S* BLANK, resolved server-side.
+                 *
+                 * This read `quote.fees.side_<face>` — the PLATFORM per-face keys — and
+                 * nothing else. A product carrying its own `sidePrice` map, which outranks
+                 * both platform tiers, was invisible here: every tile printed the flat
+                 * `method_side` while the charge used the map. On a duffel priced
+                 * {back:4, left:5} against a $3 flat, the rail said +$3.00 on all six faces
+                 * and the summary then charged $4 and $5 — the rail's own note calls that
+                 * out as worse than showing nothing.
+                 *
+                 * `sideRates` is the same resolver the charge uses, per line, so the number
+                 * on the tile is the number on the invoice. Matched by line_id, because two
+                 * lines of one order can be two different blanks.
+                 */
+                faceCharges={faceChargesFor(quote, customize)}
+                faceSurfaces={faceSurfacesFor(quote, customize)}
+                faceAddOns={faceAddOnsFor(quote, customize)}
+ catalog={catalog}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Cancel — only while the factory hasn't started. `started` mirrors the SERVER rule
+ * (factory_status not in new/draft/''), which is what actually enforces this: hiding
+ * the button is courtesy, the 403 is the gate.
+ */
+
+function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => void }) {
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [confirm, setConfirm] = useState(false)
+
+  // Mirrors the SERVER rule: in_review is still cancellable (submitted + charged,
+  // but the floor hasn't started). Past that it's a refund request.
+  //
+  // AND ONCE ACCEPTED, ALWAYS ACCEPTED. Reading the stage alone made this window
+  // re-openable: stepping an order back from Approved to Pending — the ordinary undo of a
+  // mis-click — handed the seller a full refund on work the floor had already taken on.
+  // `approved_at` is stamped once and never cleared, so an internal correction stays
+  // internal. See the column's note in server/src/routes/orders.js.
+ const fs = String(order.factory_status || "")
+ const started = !["", "new", "draft", "in_review"].includes(fs) || !!order.approved_at
+ const done = fs === "cancelled" || fs === "refunded"
+  /**
+   * A CLOSED ORDER GETS A WAY FORWARD, not just a label.
+   *
+   * It read "Order cancelled" and stopped there, which is true and useless: the thing
+   * somebody wants next is the same order again. Reopening this one is refused on purpose —
+   * it is settled, it was refunded, and chargeForSubmit would see the old charge leg and
+   * produce it for free — so this makes a NEW draft carrying everything but the money.
+   */
+ if (done) {
+ return (
+      <span className="flex items-center gap-2">
+        {err && <span className="text-xs text-destructive">{err}</span>}
+        {/* NO "Order cancelled" LABEL. The stage badge beside the order number says it, in
+ colour, at the top of the page — this repeated the same word in grey text inside
+ the row of things you can DO, where the only word is a verb.
+
+            REORDER, not "Duplicate". It is the same action and a truer name: nobody
+ duplicates a cancelled order for the sake of having two, they order it again.
+            Reopening this one is refused on purpose — it is settled and possibly refunded,
+ and chargeForSubmit would see the old charge leg and produce it for free — so
+ this makes a NEW draft carrying everything but the money. */}
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void duplicate()}
+ title="Start a new draft with the same items, variants and artwork. This order stays as it is.">
+          {busy ? "Copying…" : "Reorder"}
+        </Button>
+      </span>
+    )
+  }
+
+ const duplicate = async () => {
+ setBusy(true); setErr(null)
+ try {
+ const r = await duplicateOrder(order.id)
+ if (r?.error || !r?.id) throw new Error(r?.error || "Couldn't copy this order")
+      // Straight to the copy. Staying put would leave you looking at the cancelled order
+      // wondering whether anything happened — the new draft IS the result.
+ window.location.href = `/orders/${encodeURIComponent(r.id)}`
+    } catch (e) {
+ setErr(e instanceof Error ? e.message : "Couldn't copy this order")
+    } finally { setBusy(false) }
+  }
+
+ const cancel = async () => {
+ setBusy(true); setErr(null)
+ try {
+ await updateOrder(order.id, { factoryStatus: "cancelled", status: "cancelled" })
+ setConfirm(false)
+ onDone()
+    } catch (e) {
+ setErr(e instanceof Error ? e.message : "Could not cancel this order")
+    } finally { setBusy(false) }
+  }
+
+  // Once the factory has started there's no cancel to offer, and the order's own status
+  // already says it's in production — so this control simply steps aside rather than
+  // repeating that in words.
+ if (started) return null
+ return (
+    <span className="flex items-center gap-2">
+      {err && <span className="text-xs text-destructive">{err}</span>}
+      {confirm ? (
+        <>
+          <span className="text-xs text-muted-foreground">Cancel this order?</span>
+          <Button size="sm" variant="destructive" onClick={cancel} disabled={busy}>{busy ? "Cancelling…" : "Yes, cancel"}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Keep</Button>
+        </>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => setConfirm(true)}>Cancel order</Button>
+      )}
+    </span>
+  )
+}
