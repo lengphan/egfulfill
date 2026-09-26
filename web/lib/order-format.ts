@@ -132,6 +132,10 @@ export const numOf = (o: OrderRow) => {
    * `ref_no` comes from one sequence for the whole platform, so it can never do that. `seq`
    * stays as the fallback for anything read before the column was backfilled.
    */
+  /* A CUSTOM ID SOMEBODY CHOSE WINS ("T01") — it is the name they will search for and
+     read off their own records. The EGF number is still underneath it. */
+  const label = String(o.ref_label ?? "").trim()
+  if (label) return label
   const ref = egfRef(o.ref_no)
   if (ref) return ref
   if (o.seq) return `#${o.seq}`

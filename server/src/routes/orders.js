@@ -1283,6 +1283,20 @@ export function ordersRoutes(app, requireAuth) {
   q('alter table orders add column if not exists ref_no bigint').catch(() => {});
   q('create unique index if not exists orders_ref_no_key on orders(ref_no)').catch(() => {});
   /**
+   * A CUSTOM ORDER ID — "T01", "SHOP-12" — that a person chose (owner, 2026-09-26: typing
+   * T01 was refused with "a whole number above zero").
+   *
+   * A LABEL OVER THE NUMBERS, NOT A REPLACEMENT FOR THEM. ref_no keeps running underneath, so
+   * anything that sorts, counts or mints by it is untouched; numOf prints this first when it
+   * is set. Unique per seller scope (the same scope seq is minted in), case-insensitively —
+   * "t01" and "T01" are the same thing said twice. Chained: the index needs the column.
+   */
+  q('alter table orders add column if not exists ref_label text')
+    .then(() => q(`create unique index if not exists orders_ref_label_key
+                     on orders (seller_id, coalesce(factory_order, false), lower(ref_label))
+                     where ref_label is not null`))
+    .catch(() => {});
+  /**
    * WHAT THE FROZEN PRICE IS MADE OF, stamped at charge time beside unit_cost itself.
    *
    * `unit_cost` is base + print method + one row per EXTRA printed face, added together into
@@ -2625,6 +2639,49 @@ export function ordersRoutes(app, requireAuth) {
       if (clash.rowCount) { reply.code(409); return { error: `#${want} already belongs to another order.` }; }
       req.body.seq = want;   // normalised, so the generic writer below stores an int
     }
+    /**
+     * THE CUSTOM ORDER ID. Same zones as the number above — staff, or the seller on their own
+     * order while it is still a draft — and the same never-into-a-collision rule, in the same
+     * scope. Empty clears it, and the order reads as its EGF number again.
+     *
+     * Refused: anything shaped like an EGF number. EGF-000123 is some OTHER order's platform
+     * reference, and a label that looked like one would put two orders behind one name on
+     * every screen that prints it.
+     */
+    if ((req.body || {}).refLabel !== undefined) {
+      const raw = req.body.refLabel == null ? '' : String(req.body.refLabel);
+      const want = raw.replace(/^\s*#\s*/, '').replace(/\s+/g, ' ').trim();
+      if (want) {
+        if (want.length > 32) { reply.code(400); return { error: 'An order ID is at most 32 characters.' }; }
+        if (!/^[A-Za-z0-9][A-Za-z0-9 ._\/-]*$/.test(want)) {
+          reply.code(400); return { error: 'Use letters, numbers, spaces, and - _ . / only.' };
+        }
+        if (/^EGF-?\d+$/i.test(want)) {
+          reply.code(400); return { error: 'EGF- numbers belong to the platform — choose an ID without that prefix.' };
+        }
+      }
+      const own = (await q(
+        'select seller_id, coalesce(factory_order,false) as fo, coalesce(factory_status,\'\') as fs from orders where id=$1',
+        [req.params.id])).rows[0];
+      if (!own) { reply.code(404); return { error: 'Order not found' }; }
+      if (!isStaff(req.user)) {
+        const mine = await resolveSeller(req.user);
+        if (!mine?.id || String(own.seller_id) !== String(mine.id)) {
+          reply.code(403); return { error: 'Only staff can change an order ID.' };
+        }
+        if (!['', 'new', 'draft'].includes(String(own.fs).toLowerCase())) {
+          reply.code(403); return { error: 'The ID is fixed once the order is submitted — ask us if it needs changing.' };
+        }
+      }
+      if (want) {
+        const clash = await q(
+          `select id from orders where seller_id is not distinct from $1 and coalesce(factory_order,false)=$2
+             and lower(ref_label)=lower($3) and id <> $4 limit 1`,
+          [own.seller_id, own.fo, want, req.params.id]);
+        if (clash.rowCount) { reply.code(409); return { error: `${want} already belongs to another order.` }; }
+      }
+      req.body.refLabel = want || null;
+    }
     const map = { factoryStatus: 'factory_status', status: 'status', tracking: 'tracking',
                   carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes', meta: 'meta',
                   address: 'address', customer: 'customer' };
@@ -2637,6 +2694,8 @@ export function ordersRoutes(app, requireAuth) {
        otherwise. internal_note stays staff-only: a seller who could write it could read it
        back, and it is the factory's private note on their order. */
     if (isStaff(req.user) || (req.body || {}).seq !== undefined) { map.seq = 'seq'; }
+    /* Reached only past the ownership/draft checks in the refLabel block above. */
+    if ((req.body || {}).refLabel !== undefined) { map.refLabel = 'ref_label'; }
     const sets = [], vals = []; let n = 1;
     for (const k in (req.body || {})) if (map[k]) { sets.push(`${map[k]}=$${n++}`); vals.push(req.body[k]); }
     const body = req.body || {};
@@ -5555,7 +5614,7 @@ export function ordersRoutes(app, requireAuth) {
       if (recent.rows.length) return;
 
       const o = (await q(
-        `select id, seq, ref_no, source, store, status, factory_status, gates, tracking, carrier,
+        `select id, seq, ref_no, ref_label, source, store, status, factory_status, gates, tracking, carrier,
                 service, delivery, est_delivery, total, customer, timeline, created_at
            from orders where id=$1`, [orderId])).rows[0];
       if (!o) return;
@@ -6024,7 +6083,7 @@ export function ordersRoutes(app, requireAuth) {
       if (!(await canSeeThread(req.user, thread))) { reply.code(403); return { error: 'forbidden' }; }
       const sellerId = thread.slice('support-'.length);
       if (!(isStaff(req.user) && sellerId === req.user.sub)) {
-        const filt = like ? ` and (cast(seq as text) ilike $2 or id ilike $2)` : '';
+        const filt = like ? ` and (cast(seq as text) ilike $2 or id ilike $2 or ref_label ilike $2)` : '';
         const r = await q(
           `select ${cols} from orders where seller_id = $1${filt} order by created_at desc limit ${like ? 20 : 100}`,
           like ? [sellerId, like] : [sellerId]);
@@ -6036,7 +6095,7 @@ export function ordersRoutes(app, requireAuth) {
     // whole-board list is never exposed to a seller — the "Mention an order with @" the
     // Factory channel promises now actually works.
     if (isStaff(req.user)) {
-      const filt = like ? ` where (cast(seq as text) ilike $1 or id ilike $1)` : '';
+      const filt = like ? ` where (cast(seq as text) ilike $1 or id ilike $1 or ref_label ilike $1)` : '';
       const r = await q(
         `select ${cols} from orders${filt} order by created_at desc limit ${like ? 20 : 100}`,
         like ? [like] : []);

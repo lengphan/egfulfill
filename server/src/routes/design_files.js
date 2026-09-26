@@ -59,7 +59,7 @@ export async function libraryCandidates(artHash) {
             nullif(trim(coalesce(d.method, '')), '') as face_method,
             i.print_type, i.name as item_name, i.color, i.size,
             i.factory_status as line_stage, i.design_charged_at,
-            o.factory_status as order_stage, o.factory_order, o.seller_id, o.ref_no, o.seq,
+            o.factory_status as order_stage, o.factory_order, o.seller_id, o.ref_no, o.seq, o.ref_label,
             coalesce(u.store_name, u.name, u.email) as seller,
             exists (
               select 1 from design_file_data f
@@ -90,7 +90,7 @@ export async function libraryCandidates(artHash) {
     const stitches = STITCH_RE.test(method) || /-emb$/i.test(String(r.sku || ''));
     const row = {
       key: faceKey(r.order_id, r.line_id, r.sku, r.side),
-      order_id: r.order_id, ref_no: r.ref_no ?? null, seq: r.seq ?? null,
+      order_id: r.order_id, ref_no: r.ref_no ?? null, seq: r.seq ?? null, ref_label: r.ref_label ?? null,
       line_id: r.line_id || null, sku: r.sku || null, side: r.side || null,
       item: [r.item_name, [r.color, r.size].filter(Boolean).join(' / ')].filter(Boolean).join(' · ') || null,
       method: method || null,
@@ -121,14 +121,14 @@ async function copyStages(copies) {
   const ids = [...new Set(copies.map((c) => c.order_id))];
   if (!ids.length) return new Map();
   const r = await q(
-    `select o.id, o.factory_status as order_stage, o.ref_no, o.seq,
+    `select o.id, o.factory_status as order_stage, o.ref_no, o.seq, o.ref_label,
             i.line_id, i.sku, i.name as item_name, i.factory_status as line_stage
        from orders o left join order_items i on i.order_id = o.id
       where o.id = any($1::text[])`, [ids]).then((x) => x.rows).catch(() => []);
   const m = new Map();
   for (const x of r) {
     const key = x.id;
-    const o = m.get(key) || { ref_no: x.ref_no, seq: x.seq, order_stage: normalizeStage(x.order_stage), lines: [] };
+    const o = m.get(key) || { ref_no: x.ref_no, seq: x.seq, ref_label: x.ref_label, order_stage: normalizeStage(x.order_stage), lines: [] };
     o.lines.push({ line_id: x.line_id, sku: x.sku, name: x.item_name, stage: normalizeStage(x.line_stage) });
     m.set(key, o);
   }
@@ -617,7 +617,7 @@ export function designFilesRoutes(app, requireAuth) {
                    built here. Capped in the mapper below, not the aggregate: the count has
                    to stay the TRUE count even when the list is trimmed. */
                 jsonb_agg(distinct jsonb_build_object(
-                  'id', o.id, 'ref_no', o.ref_no, 'seq', o.seq)) as order_refs,
+                  'id', o.id, 'ref_no', o.ref_no, 'seq', o.seq, 'ref_label', o.ref_label)) as order_refs,
                 count(distinct o.seller_id) as sellers,
                 array_agg(distinct coalesce(u.store_name, u.name, u.email, '—')) as seller_names,
                 /**
@@ -800,7 +800,7 @@ export function designFilesRoutes(app, requireAuth) {
       const line = o.lines.find((l) => (c.line_id ? l.line_id === c.line_id : c.sku && l.sku === c.sku)) || null;
       const stage = (line && line.stage) || o.order_stage || '';
       return {
-        design_id: c.design_id, order_id: c.order_id, ref_no: o.ref_no ?? null, seq: o.seq ?? null,
+        design_id: c.design_id, order_id: c.order_id, ref_no: o.ref_no ?? null, seq: o.seq ?? null, ref_label: o.ref_label ?? null,
         line_id: c.line_id || null, side: c.side || null, item: line ? line.name || null : null, stage,
         unshipped: UNSTITCHED_STAGES.has(stage) && UNSTITCHED_STAGES.has(o.order_stage || ''),
       };
@@ -845,12 +845,12 @@ export function designFilesRoutes(app, requireAuth) {
     const kept = rows.filter((r) => r.action !== 'design.saved' || firstSave.get(String(r.entity_id)) === r.id).slice(0, 60);
     const ids = [...new Set(kept.filter((r) => r.action === 'design.saved').map((r) => String(r.entity_id)))];
     const orders = ids.length
-      ? await q('select id, ref_no, seq from orders where id = any($1::text[])', [ids])
+      ? await q('select id, ref_no, seq, ref_label from orders where id = any($1::text[])', [ids])
           .then((r) => new Map(r.rows.map((o) => [String(o.id), o]))).catch(() => new Map())
       : new Map();
     return kept.map((r) => {
       const o = r.action === 'design.saved' ? orders.get(String(r.entity_id)) : null;
-      return o ? { ...r, order: { id: o.id, ref_no: o.ref_no ?? null, seq: o.seq ?? null } } : r;
+      return o ? { ...r, order: { id: o.id, ref_no: o.ref_no ?? null, seq: o.seq ?? null, ref_label: o.ref_label ?? null } } : r;
     });
   });
 

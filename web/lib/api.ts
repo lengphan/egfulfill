@@ -366,6 +366,8 @@ export type LedgerRow = {
   order_id?: string | null
   order_seq?: number | null
   order_ref_no?: number | null
+  /** The order's custom ID when it has one — printed in place of the EGF number. */
+  order_ref_label?: string | null
   party?: string | null
 }
 
@@ -2154,7 +2156,7 @@ export type FactoryDesign = {
   /** WHICH orders carried it — newest first, capped at 24 while `orders` stays the true
    *  count. Carries what numOf needs so the library prints the same EGF-###### the order
    *  page does, rather than inventing a second way to name an order. */
-  order_refs?: { id: string; ref_no?: number | string | null; seq?: number | null }[]
+  order_refs?: { id: string; ref_no?: number | string | null; seq?: number | null; ref_label?: string | null }[]
   first_seen?: string | null
   last_seen?: string | null
 }
@@ -2173,7 +2175,7 @@ export function getFactoryDesigns(opts: { seller?: string | null; q?: string; li
 /** One face a library file could land on — see libraryCandidates in design_files.js. */
 export type LibraryFace = {
   key: string
-  order_id: string; ref_no?: number | string | null; seq?: number | null
+  order_id: string; ref_no?: number | string | null; seq?: number | null; ref_label?: string | null
   line_id: string | null; sku: string | null; side: string | null
   item: string | null; method: string | null
   /** Normalised stage id ('' = new/draft) — the line's when it has one, else the order's. */
@@ -2193,7 +2195,7 @@ export function getLibraryPreview(artHash: string) {
 }
 /** A library file's copies on orders, and whether "Unshipped" reaches each. Staff only. */
 export type LibraryCopy = {
-  design_id: string; order_id: string; ref_no?: number | string | null; seq?: number | null
+  design_id: string; order_id: string; ref_no?: number | string | null; seq?: number | null; ref_label?: string | null
   line_id: string | null; side: string | null; item: string | null; stage: string
   /** Nothing stitched yet — the "Unshipped" choice swaps this one. */
   unshipped: boolean
@@ -2201,7 +2203,7 @@ export type LibraryCopy = {
 /** An artwork's history: its library-file events plus when it was put on each order.
  *  `order` is set on those rows so the card prints the same number the order page does. */
 export function getArtworkHistory(artHash: string) {
-  return api<(AuditRow & { order?: { id: string; ref_no?: number | string | null; seq?: number | null } })[]>(
+  return api<(AuditRow & { order?: { id: string; ref_no?: number | string | null; seq?: number | null; ref_label?: string | null } })[]>(
     `/api/design_files/library/${encodeURIComponent(artHash)}/history`)
 }
 export function getLibraryCopies(designId: string) {
@@ -2626,6 +2628,9 @@ export type OrderRow = {
    *  unlike `seq` (which is per seller and collides across them) it identifies an order
    *  anywhere on the platform. Null only on a row read through a select that predates it. */
   ref_no?: number | null
+  /** A custom order ID someone chose ("T01") — printed INSTEAD of EGF-###### by numOf when
+   *  set. Unique per seller; ref_no keeps running underneath. */
+  ref_label?: string | null
   store?: string | null
   source?: string | null
   customer?: { name?: string; email?: string } | null
@@ -3062,7 +3067,7 @@ export function postItemStatus(id: string, sku: string, status: string, lineId?:
  * Only when money actually moved. A stage change that charges nothing must not make the
  * balance flicker as though it had.
  */
-export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; seq?: number; meta?: Record<string, unknown>; address?: Record<string, string>; customer?: Record<string, string> }) {
+export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; seq?: number; refLabel?: string | null; meta?: Record<string, unknown>; address?: Record<string, string>; customer?: Record<string, string> }) {
   return api<{ ok?: boolean; error?: string; charged?: number; refunded?: number }>(`/api/orders/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(patch),

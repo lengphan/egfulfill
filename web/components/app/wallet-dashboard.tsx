@@ -652,7 +652,7 @@ const shortRef = (ref: string) => {
  * category in the description too would be the same fact twice on one row.
  */
 function orderLabel(l: LedgerRow, withParty: boolean): string | null {
-  const ref = egfRef(l.order_ref_no)
+  const ref = String(l.order_ref_label ?? "").trim() || egfRef(l.order_ref_no)
   if (!ref) return null
   return withParty && l.party ? `${ref} · ${l.party}` : ref
 }

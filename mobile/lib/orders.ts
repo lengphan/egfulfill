@@ -126,6 +126,12 @@ export const shortOrderRef = (id: string) => {
  *  packing slip never quote an order differently. The hash marks a NUMBER; our own
  *  FF-… references already read as references and do not take one. */
 export const numOf = (o: Order) => {
+  /* Custom ID, then the platform number, then #seq — the web's order exactly. The phone
+     skipped the EGF number entirely, so the same order read #6 here and EGF-002116 there. */
+  const label = String(o.ref_label ?? "").trim()
+  if (label) return label
+  const n = Number(o.ref_no)
+  if (Number.isFinite(n) && n > 0) return `EGF-${String(Math.trunc(n)).padStart(6, "0")}`
   if (o.seq) return `#${o.seq}`
   const ref = shortOrderRef(String(o.id))
   return /^\d+$/.test(ref) ? `#${ref}` : ref

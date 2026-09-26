@@ -19,7 +19,9 @@ import { q } from './db.js';
  */
 const SOURCE_PREFIX = /^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i;
 
-export function orderLabel(id, seq) {
+export function orderLabel(id, seq, label) {
+  /* A custom order ID someone chose ("T01") wins — it is what they will search for. */
+  if (label != null && String(label).trim()) return String(label).trim();
   if (seq != null && Number(seq) > 0) return `#${Number(seq)}`;
   const plain = String(id ?? '').replace(SOURCE_PREFIX, '');
   return /^\d+$/.test(plain) ? `#${plain}` : String(id ?? '');
@@ -29,7 +31,7 @@ export function orderLabel(id, seq) {
  *  that fails must not stop whatever was being announced. */
 export async function orderLabelOf(id) {
   try {
-    const r = await q('select seq from orders where id=$1', [String(id)]);
-    return orderLabel(id, r.rows[0]?.seq);
+    const r = await q('select seq, ref_label from orders where id=$1', [String(id)]);
+    return orderLabel(id, r.rows[0]?.seq, r.rows[0]?.ref_label);
   } catch { return orderLabel(id, null); }
 }

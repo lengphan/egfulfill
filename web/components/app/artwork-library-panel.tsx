@@ -87,7 +87,7 @@ type SwapAsk = { d: FactoryDesign; f: LibraryFileRef; file: File; data: string; 
 
 /** One line of an artwork's history, in words. Unknown actions fall back to their name
  *  rather than vanishing — a history with gaps is worse than one with a plain label. */
-type HistoryRow = AuditRow & { order?: { id: string; ref_no?: number | string | null; seq?: number | null } }
+type HistoryRow = AuditRow & { order?: { id: string; ref_no?: number | string | null; seq?: number | null; ref_label?: string | null } }
 function historyLine(r: HistoryRow, tl: (ns: string, s: string) => string): string {
   const a = (r.after ?? {}) as Record<string, unknown>
   const b = (r.before ?? {}) as Record<string, unknown>

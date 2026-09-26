@@ -330,7 +330,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
     const refs = [...new Set(led.rows.map((r) => r.ref).filter(Boolean).map(String))];
     if (refs.length) {
       const probe = [...new Set(refs.flatMap(candidatesOf))];
-      const ords = (await q('select id, seq, ref_no, seller_id from orders where id = any($1)', [probe])
+      const ords = (await q('select id, seq, ref_no, ref_label, seller_id from orders where id = any($1)', [probe])
         .then((r) => r.rows).catch(() => []));
       const byOrder = new Map(ords.map((o) => [String(o.id), o]));
       const sellers = [...new Set(ords.map((o) => o.seller_id).filter(Boolean).map(String))];
@@ -352,6 +352,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
            formatting lives there beside numOf, so SQL never becomes a second opinion about
            what an order is called. */
         row.order_ref_no = o.ref_no ?? null;
+        row.order_ref_label = o.ref_label ?? null;
         const u = o.seller_id ? byUser.get(String(o.seller_id)) : null;
         /* Whose order it was. Meaningful on the factory ledger, where every row belongs to
            somebody else; the client drops it on a seller's own wallet, where it would be

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { updateOrder, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
-import { numOf, shortOrderRef } from "@/lib/order-format"
+import { numOf, shortOrderRef, egfRef } from "@/lib/order-format"
 import { cn } from "@/lib/utils"
 
 /**
@@ -75,7 +75,7 @@ export function OrderNumber({
   /** Staff only. The server refuses a seller regardless — this decides whether to OFFER it. */
   editable?: boolean
   /** Re-read the row: the number changed, so every list showing it is now stale. */
-  onSaved?: (seq: number) => void
+  onSaved?: (label: string | null) => void
   className?: string
 }) {
   const tl = useLabelT()
@@ -212,25 +212,35 @@ export function OrderNumber({
   }
 
   const open = () => {
-    setDraft(order.seq ? String(order.seq) : "")
+    setDraft(String(order.ref_label ?? ""))
     setErr(null)
     setEditing(true)
   }
 
+  /**
+   * A CUSTOM ORDER ID, not a number (owner, 2026-09-26: "T01" was refused with "a whole
+   * number above zero"). It is stored as `ref_label` and printed in place of the EGF number
+   * everywhere numOf runs; empty puts the EGF number back.
+   *
+   * This used to write `seq` — which numOf never shows on an order that has an EGF number,
+   * so even an accepted edit changed nothing on screen.
+   */
   const commit = async () => {
-    const want = Number(draft.trim())
+    const want = draft.replace(/^\s*#\s*/, "").replace(/\s+/g, " ").trim()
     // Refuse locally what the server would refuse anyway, so the common typo costs no round
     // trip and the reason is the same sentence either way.
-    if (!Number.isInteger(want) || want < 1) { setErr("A whole number above zero."); return }
-    if (want === order.seq) { setEditing(false); return }
+    if (want.length > 32) { setErr(tl("orderNumber", "An order ID is at most 32 characters.")); return }
+    if (want && !/^[A-Za-z0-9][A-Za-z0-9 ._\/-]*$/.test(want)) { setErr(tl("orderNumber", "Use letters, numbers, spaces, and - _ . / only.")); return }
+    if (/^EGF-?\d+$/i.test(want)) { setErr(tl("orderNumber", "EGF- numbers belong to the platform — choose an ID without that prefix.")); return }
+    if (want === String(order.ref_label ?? "")) { setEditing(false); return }
     setBusy(true); setErr(null)
     try {
-      const r = await updateOrder(String(order.id), { seq: want })
+      const r = await updateOrder(String(order.id), { refLabel: want || null })
       // The server owns the collision check — it is the only side that can see every other
       // order — so its refusal is the one shown, verbatim.
       if (r?.error) { setErr(r.error); return }
       setEditing(false)
-      onSaved?.(want)
+      onSaved?.(want || null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not change the number.")
     } finally { setBusy(false) }
@@ -243,7 +253,7 @@ export function OrderNumber({
         /* These numbers sit inside rows that navigate on click. Without this, pressing the
            number both opened the editor and left the page it was on. */
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); open() }}
-        title={tl("orderNumber", "Change this order's number")}
+        title={tl("orderNumber", "Change this order's ID")}
         className={cn("-mx-1 rounded px-1 text-left hover:bg-accent", BASE, className)}
       >
         {label}
@@ -259,20 +269,21 @@ export function OrderNumber({
   return (
     <span className="inline-flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
       <span className="inline-flex items-center gap-1">
-        <span className="text-muted-foreground">#</span>
         <Input
           ref={inputRef}
           value={draft}
           autoFocus
-          inputMode="numeric"
+          maxLength={32}
+          /* The number it reads as without one — clearing the field goes back to it. */
+          placeholder={egfRef(order.ref_no) || "T01"}
           disabled={busy}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); void commit() }
             if (e.key === "Escape") { e.preventDefault(); setEditing(false); setErr(null) }
           }}
-          className="h-8 w-24 tabular-nums"
-          aria-label={tl("orderNumber", "Order number")}
+          className="h-8 w-44 tabular-nums"
+          aria-label={tl("orderNumber", "Order ID")}
         />
         <Button size="icon" variant="ghost" className="size-8" disabled={busy} onClick={() => void commit()} aria-label={tl("orderNumber", "Save number")}>
           <Check size={15} />

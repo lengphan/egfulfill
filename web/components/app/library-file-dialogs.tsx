@@ -28,11 +28,11 @@ import type { LibraryFace, LibraryCopy } from "@/lib/api"
  */
 
 const sideLabel = (s: string | null) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "")
-const orderLabel = (f: { order_id: string; ref_no?: number | string | null; seq?: number | null }) =>
-  numOf({ id: f.order_id, ref_no: f.ref_no, seq: f.seq } as Parameters<typeof numOf>[0])
+const orderLabel = (f: { order_id: string; ref_no?: number | string | null; seq?: number | null; ref_label?: string | null }) =>
+  numOf({ id: f.order_id, ref_no: f.ref_no, seq: f.seq, ref_label: f.ref_label } as Parameters<typeof numOf>[0])
 
 /** Order · face · item — the identity of one row, at value size (§4: a value is not a caption). */
-function FaceTitle({ f, muted }: { f: { order_id: string; ref_no?: number | string | null; seq?: number | null; side: string | null; item: string | null }; muted?: boolean }) {
+function FaceTitle({ f, muted }: { f: { order_id: string; ref_no?: number | string | null; seq?: number | null; ref_label?: string | null; side: string | null; item: string | null }; muted?: boolean }) {
   return (
     <span className={"min-w-0 truncate text-sm tabular-nums " + (muted ? "text-muted-foreground" : "font-medium")}>
       {[orderLabel(f), sideLabel(f.side), f.item].filter(Boolean).join(" · ")}

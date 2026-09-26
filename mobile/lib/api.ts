@@ -189,6 +189,9 @@ export type Order = {
   id: string
   num?: string | null
   seq?: number | null
+  /** The platform number (EGF-000123) and a custom ID someone chose ("T01"), which wins. */
+  ref_no?: number | string | null
+  ref_label?: string | null
   factory_status?: string | null
   /** The FACTORY's own order, not a seller's. Decides which stage line applies: `in_review`
    *  ("Pending") means a seller submitted and was charged, so it is not a position a

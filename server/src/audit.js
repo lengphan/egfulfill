@@ -117,7 +117,7 @@ async function withOrderNames(rows) {
   let by = new Map();
   try {
     const r = await q(
-      `select o.id, o.seq, o.store, coalesce(nullif(u.name,''), u.email) as seller
+      `select o.id, o.seq, o.ref_label, o.store, coalesce(nullif(u.name,''), u.email) as seller
          from orders o left join users u on u.id = o.seller_id
         where o.id = any($1::text[])`, [ids]);
     by = new Map(r.rows.map((o) => [String(o.id), o]));
@@ -127,7 +127,7 @@ async function withOrderNames(rows) {
     const o = by.get(String(x.entity_id));
     if (!o) return x;
     const owner = [o.store, o.seller].filter(Boolean).join(' · ');
-    return { ...x, entity_label: orderLabel(o.id, o.seq), entity_owner: owner || null };
+    return { ...x, entity_label: orderLabel(o.id, o.seq, o.ref_label), entity_owner: owner || null };
   });
 }
 
