@@ -152,7 +152,8 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
     }))
   if (artPics.length) pics.push(...artPics)
   else if (art) pics.push({ uri: assetUrl(art) as string, caption: "Artwork", title: lineTitle(item) })
-  const docs = mine.filter((d) => !isArtwork(d.kind))
+  // A row whose file was removed but whose face keeps its method has no bytes — not a file.
+  const docs = mine.filter((d) => !isArtwork(d.kind) && (d.url || d.data))
   /**
    * IS THERE ANYTHING TO RENDER STITCHES FROM?
    *

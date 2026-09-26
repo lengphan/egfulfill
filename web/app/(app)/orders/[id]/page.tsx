@@ -2825,8 +2825,13 @@ const blankSkuOf = (l: { blank?: string | null; sku?: string | null }) =>
                   /* WHICH POSITIONS ARE PICKED, on the row — so "how many faces does this
                      line print" is read down the list rather than found by opening each
                      designer. From the per-face map the Files tab already reads; the
-                     singular `design` above stays the front, which is what the avatar wants. */
- const picked = Object.keys(sidesForLine(designSides, it)).map((k) => k.toLowerCase())
+                     singular `design` above stays the front, which is what the avatar wants.
+                     ONLY FACES THAT CARRY ARTWORK. Removing a design from a face that declared
+                     a method keeps the row and drops its bytes (DELETE /designs), so counting
+                     rows left "3 positions" on a line whose artwork was gone. Same set the
+                     quote prices (`priced_faces`). */
+ const lineFaces = sidesForLine(designSides, it)
+ const picked = Object.keys(lineFaces).filter((k) => !!lineFaces[k]?.data).map((k) => k.toLowerCase())
     .sort((a, b) => (ALL_SIDES as readonly string[]).indexOf(a) - (ALL_SIDES as readonly string[]).indexOf(b))
  const qty = Number(it.qty) || 1
                   /**
