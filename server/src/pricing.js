@@ -265,6 +265,20 @@ export function ourSku(sku) {
 }
 
 export function matchProduct(idx, item) {
+  /* REMEMBERED PER INDEX. The order list prices ~1,800 lines per load and hundreds share one
+     blank and sku; the walk below allocates an array per product per candidate, which the
+     profile showed as the biggest cost of GET /api/orders (with 9% of the time in the GC).
+     The memo lives on the index object — catalogIndex hands every call a fresh clone — so an
+     answer can never outlive the catalogue it was computed from. */
+  const memo = idx._match || (idx._match = new Map());
+  const mkey = `${item.blank ?? ''}\u0000${item.sku ?? ''}`;
+  if (memo.has(mkey)) return memo.get(mkey);
+  const hit = matchProductUncached(idx, item);
+  memo.set(mkey, hit);
+  return hit;
+}
+
+function matchProductUncached(idx, item) {
   const blank = String(item.blank || '').trim();
   if (blank) {
     for (const cand of blankCandidates(blank.toLowerCase())) {
@@ -1228,8 +1242,10 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
     // side AFTER submit from silently re-pricing an order that has already been paid for.
     let cost = num(it.unit_cost), ship = num(it.ship_fee);
     let extra = fees.ship_extra;
+    /* ONE lookup per line — it was made twice, once here and once as `srow` below. */
+    const srow = matchProduct(idx, it);
     if (cost == null || ship == null) {
-      const row = matchProduct(idx, it);
+      const row = srow;
       /*
        * TWO REASONS, AND THEY ASK THE READER FOR DIFFERENT THINGS.
        *
@@ -1266,7 +1282,6 @@ export function priceLines(items, idx, fees, sidesOf = () => ['front']) {
     // The supplier's price for this blank, when the catalogue knows it. Read even for a
     // frozen line: the sell price is history once charged, but what we PAID is a fact
     // about the blank and is what any margin figure has to be measured against.
-    const srow = matchProduct(idx, it);
     const supplier = srow ? supplierCostOf(srow, it) : null;
     // What the unit cost is MADE OF. Read from the catalogue even on a frozen line: the
     // split is a fact about the product and the technique, and showing it is the only way
