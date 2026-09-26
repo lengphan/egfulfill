@@ -927,22 +927,53 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return out;
   }
 
+  /**
+   * THE SLIMMED PRODUCT, CACHED UNTIL IT CHANGES (2026-09-26: "very laggy").
+   *
+   * This read every product's whole `data` — 222MB for 55 products, photos inline as base64 —
+   * then hashed every image to swap it for an address, on every call: ~1.2s, and the orders
+   * hub, the products page, the publish page and the designer all make it.
+   *
+   * The heavy part (the data, slimmed) is kept per product, keyed on updated_at, which every
+   * writer of `data` sets. The LIGHT columns — status, in_catalog, catalog_price — are read
+   * fresh on every call, because several writers move those without touching updated_at, and
+   * a cached price would be a wrong price. Both slimmings are kept (staff, and seller with
+   * supplier addresses hidden); sellerSafe still runs per request, on a fresh object.
+   *
+   * STAFF-ONLY STILL MEANS STAFF: a seller's list is filtered by status here, at the read,
+   * through sellerVisible()'s allow-list — unchanged from before the cache.
+   */
+  const slimCache = new Map();   // id -> { key, status, staff, seller }
   app.get('/api/catalog_products', { preHandler: requireAuth }, async (req) => {
-    const r = await q('select data, status, in_catalog, catalog_price from catalog_products order by created_at desc');
+    const meta = (await q(
+      `select id, updated_at, status, in_catalog, catalog_price from catalog_products
+        where data is not null order by created_at desc`)).rows;
+    const key = (m) => (m.updated_at ? new Date(m.updated_at).getTime() : 0);
+    const stale = meta.filter((m) => { const c = slimCache.get(m.id); return !c || c.key !== key(m); });
+    if (stale.length) {
+      const fresh = (await q('select id, data from catalog_products where id = any($1::text[])', [stale.map((m) => m.id)])).rows;
+      const byId = new Map(stale.map((m) => [m.id, m]));
+      await Promise.all(fresh.filter((r) => r.data && byId.has(r.id)).map(async (r) => {
+        const [staffRow, sellerRow] = await Promise.all([slimImages(r.data, false), slimImages(r.data, true)]);
+        slimCache.set(r.id, { key: key(byId.get(r.id)), status: r.data.status, staff: staffRow, seller: sellerRow });
+      }));
+    }
+    const live = new Set(meta.map((m) => m.id));
+    for (const id of slimCache.keys()) if (!live.has(id)) slimCache.delete(id);
+
     const staff = isStaff(req.user);
-    const rows = r.rows
-      .filter((row) => row.data)
-      // STAFF-ONLY MEANS STAFF. A seller's list is filtered by status here, at the read —
-      // not in the client, where "don't render it" still ships the row over the wire and a
-      // devtools tab is all it takes. Draft and Archived fall out for the same reason:
-      // sellerVisible() is an allow-list, so a status nobody has invented yet is withheld
-      // rather than published by default.
-      .filter((row) => staff || sellerVisible(row.status ?? row.data.status))
+    const out = [];
+    for (const m of meta) {
+      const c = slimCache.get(m.id);
+      if (!c) continue;
+      if (!staff && !sellerVisible(m.status ?? c.status)) continue;
       // The catalogue fields ride on the product rather than in a parallel list, so a
       // consumer can't hold a product and miss whether it's published.
-      .map((row) => ({ ...row.data, inCatalog: !!row.in_catalog, catalogPrice: row.catalog_price == null ? null : Number(row.catalog_price) }));
-    const light = await Promise.all(rows.map((row) => slimImages(row, !staff)));
-    return staff ? light : light.map(sellerSafe);
+      const row = { ...(staff ? c.staff : c.seller), inCatalog: !!m.in_catalog,
+                    catalogPrice: m.catalog_price == null ? null : Number(m.catalog_price) };
+      out.push(staff ? row : sellerSafe(row));
+    }
+    return out;
   });
 
   /**

@@ -125,11 +125,50 @@ export function candidateSkus(row, { alias = true } = {}) {
  * colourway photo on a parked line (replenish.js), and a default that quietly emptied
  * `img` would blank those tiles with nothing to say why.
  */
+/**
+ * THE IMAGE-FREE INDEX, CACHED PER PRODUCT (2026-09-26: "loading time per action is very
+ * laggy").
+ *
+ * 55 products occupy 222MB of `data` — photos stored inline as base64 — and `data - 'img'`
+ * still has to DETOAST all of it to drop those keys. Measured on the live box: ~300ms per call,
+ * and /api/orders makes one on every load (attachCost), so it was ~45% of that request.
+ *
+ * Each product's slimmed row is kept until the product changes. "Changed" is read from
+ * columns that never touch `data` — 2ms against 903ms for the full read — and every writer of
+ * `data` sets updated_at (catalog.js: the whole-catalogue upsert, the supplier-sku patch, the
+ * cost backfill). sku and base_price are in the key too, because they are columns a write
+ * could move on their own. A product that disappears is dropped from the cache on the next call.
+ *
+ * Callers get a CLONE: the rows are shared across requests now, and a caller that mutated
+ * one would otherwise change every later price. Cloning ~55 image-free rows costs ~1ms.
+ * `withImages: true` (the replenishment cart) is rare and reads through, uncached.
+ */
+const _slimIdx = new Map();   // id -> { key, row }
+const idxKey = (m) => `${m.updated_at ? new Date(m.updated_at).getTime() : ''}|${m.sku ?? ''}|${m.base_price ?? ''}`;
+
 export async function catalogIndex({ withImages = true } = {}) {
-  let rows = [];
-  const dataCol = withImages ? 'data' : "(data - 'img' - 'images' - 'side_mockups') as data";
-  try { rows = (await q(`select id, sku, base_price, ${dataCol} from catalog_products`)).rows; } catch { return { exact: new Map(), rows: [] }; }
-  return indexRows(rows);
+  if (withImages) {
+    let rows = [];
+    try { rows = (await q('select id, sku, base_price, data from catalog_products')).rows; } catch { return { exact: new Map(), rows: [] }; }
+    return indexRows(rows);
+  }
+  let meta;
+  try { meta = (await q('select id, sku, base_price, updated_at from catalog_products')).rows; } catch { return { exact: new Map(), rows: [] }; }
+  const stale = meta.filter((m) => { const c = _slimIdx.get(m.id); return !c || c.key !== idxKey(m); });
+  if (stale.length) {
+    let fresh = [];
+    try {
+      fresh = (await q(
+        `select id, sku, base_price, (data - 'img' - 'images' - 'side_mockups') as data
+           from catalog_products where id = any($1::text[])`, [stale.map((m) => m.id)])).rows;
+    } catch { return { exact: new Map(), rows: [] }; }
+    const byId = new Map(stale.map((m) => [m.id, m]));
+    for (const row of fresh) if (byId.has(row.id)) _slimIdx.set(row.id, { key: idxKey(byId.get(row.id)), row });
+  }
+  const live = new Set(meta.map((m) => m.id));
+  for (const id of _slimIdx.keys()) if (!live.has(id)) _slimIdx.delete(id);
+  const rows = meta.map((m) => _slimIdx.get(m.id)?.row).filter(Boolean);
+  return indexRows(structuredClone(rows));
 }
 
 /**
