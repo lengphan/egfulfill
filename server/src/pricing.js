@@ -93,11 +93,20 @@ export async function feeSettings() {
 // plus `variantSkus: [{sku,color,size}]` (older rows use `variants`), matched exactly,
 // then by base↔variant prefix. Keep the two in sync — a SKU that resolves to a picture
 // in one place and to nothing here would price an item at zero.
-function candidateSkus(row) {
+export function candidateSkus(row, { alias = true } = {}) {
   const d = row.data || {};
   const out = [];
   const push = (s) => { if (s) out.push(String(s).toUpperCase().trim()); };
   push(row.sku || d.sku);
+  /**
+   * THE SUPPLIER'S OWN CODE, AS AN ALIAS — exactly as variantSkusOf does on the web.
+   *
+   * The web matched it and this did not, so a line whose listing SKU IS a product's supplier
+   * code (EGF-002116: listing SKU LA6, product EG-6 whose supplierSku is "LA6") showed
+   * "Blank SKU: EG-6" with EG-6 in the picker, while pricing left it unpriced and Approve
+   * refused it as "no blank picked". Read only for matching; never printed (§2.9).
+   */
+  if (alias) push(row.supplier_sku || d.supplierSku);
   const variants = Array.isArray(d.variantSkus) ? d.variantSkus : (Array.isArray(d.variants) ? d.variants : []);
   for (const v of variants) push(typeof v === 'string' ? v : (v && (v.sku || v.SKU)));
   return out.filter(Boolean);
@@ -120,7 +129,21 @@ export async function catalogIndex({ withImages = true } = {}) {
   let rows = [];
   const dataCol = withImages ? 'data' : "(data - 'img' - 'images' - 'side_mockups') as data";
   try { rows = (await q(`select id, sku, base_price, ${dataCol} from catalog_products`)).rows; } catch { return { exact: new Map(), rows: [] }; }
+  return indexRows(rows);
+}
+
+/**
+ * THE EXACT-SKU INDEX, OWN CODES FIRST.
+ *
+ * Two passes, because a supplier's code can be ANOTHER product's own sku — measured on the
+ * live catalogue: SANMAR-5000 carries supplier code "5000", which is SS-16's own sku. One
+ * pass would hand "5000" to whichever row came first and silently re-price every line sold
+ * as 5000. A product's own sku and variant skus always win; a supplier code only fills a key
+ * nobody owns. resolveProduct on the web applies the same order.
+ */
+export function indexRows(rows) {
   const exact = new Map();
+  for (const row of rows) for (const c of candidateSkus(row, { alias: false })) if (!exact.has(c)) exact.set(c, row);
   for (const row of rows) for (const c of candidateSkus(row)) if (!exact.has(c)) exact.set(c, row);
   return { exact, rows };
 }
@@ -206,24 +229,21 @@ export function matchProduct(idx, item) {
   const blank = String(item.blank || '').trim();
   if (blank) {
     for (const cand of blankCandidates(blank.toLowerCase())) {
-      const hit = idx.rows.find((r) => {
+      /* OWN IDENTITY FIRST, THE SUPPLIER'S CODE SECOND — across the whole catalogue, not per
+         row. A supplier code can be another product's own sku (SANMAR-5000's "5000" is SS-16's),
+         and one pass returned whichever product came first. MIRRORS resolveProduct on the web.
+         The former names (nameAliases) are the product's own identity; the supplier's code is
+         somebody else's, so it only answers when nothing owns the string. */
+      const own = (r) => {
         const d = r.data || {};
-        /*
-         * THE SUPPLIER'S CODE AND THE FORMER NAMES, because the client matches both and a
-         * line that resolves on the screen must resolve here or it prices at zero.
-         *
-         *   supplierSku — the web resolver has always matched it and this did not, so a
-         *                 blank naming the supplier's style number resolved for DISPLAY and
-         *                 not for PRICE. Same class of bug as the composite blank above.
-         *   nameAliases — what the product used to be called. A rename (the brand split runs
-         *                 one in bulk) otherwise strands every line placed before it.
-         *
-         * MIRRORS resolveProduct in web/lib/variant-resolve.ts — tools/check-blank-resolve.mjs
-         * runs both implementations over the same fixtures for exactly this reason.
-         */
-        return [d.name, r.sku, d.sku, r.id, d.id, r.supplier_sku, d.supplierSku, ...(Array.isArray(d.nameAliases) ? d.nameAliases : [])]
+        return [d.name, r.sku, d.sku, r.id, d.id, ...(Array.isArray(d.nameAliases) ? d.nameAliases : [])]
           .some((v) => v != null && String(v).trim().toLowerCase() === cand);
-      });
+      };
+      const theirs = (r) => {
+        const d = r.data || {};
+        return [r.supplier_sku, d.supplierSku].some((v) => v != null && String(v).trim().toLowerCase() === cand);
+      };
+      const hit = idx.rows.find(own) || idx.rows.find(theirs);
       if (hit) return hit;
     }
   }
@@ -233,7 +253,9 @@ export function matchProduct(idx, item) {
   if (exact) return exact;
   // base ↔ variant prefix (TEE-WHT ↔ TEE-WHT-L), same rule as the image resolver.
   for (const row of idx.rows) {
-    for (const c of candidateSkus(row)) {
+    /* Own codes only: a supplier code is an exact alias, never a family prefix — or
+       "5000-XL-RED" would be claimed by whichever product merely BUYS as 5000. */
+    for (const c of candidateSkus(row, { alias: false })) {
       if (s.startsWith(c + '-') || c.startsWith(s + '-')) return row;
     }
   }

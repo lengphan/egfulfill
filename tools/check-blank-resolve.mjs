@@ -109,6 +109,9 @@ const srv = await import(path.join(ROOT, 'server/src/pricing.js'))
  * is the point — two fixture lists would drift the same way the implementations did.
  */
 const PRODUCTS = [
+  /* FIRST ON PURPOSE: its supplier code is p1's OWN sku (live: SANMAR-5000 → "5000" = SS-16).
+     A line sold as 5000 must still be p1. */
+  { id: 'p7', sku: 'SANMAR-5000', name: 'SanMar Tee', variantSkus: [], supplierSku: '5000' },
   { id: 'p1', sku: '5000', name: 'Gildan Unisex Heavy Cotton™ T-Shirt', variantSkus: ['5000-L-SKY', '5000-M-BLK'] },
   { id: 'p2', sku: 'EG-18000', name: 'Gildan Unisex Heavy Blend™ Crewneck Sweatshirt', variantSkus: [] },
   { id: 'p3', sku: 'EG-VC600', name: 'hat', variantSkus: [] },
@@ -127,13 +130,9 @@ const webCatalog = PRODUCTS.map((p) => ({ id: p.id, sku: p.sku, name: p.name, va
   supplierSku: p.supplierSku, nameAliases: p.nameAliases }))
 const srvRows = PRODUCTS.map((p) => ({ id: p.id, sku: p.sku, base_price: 10, supplier_sku: p.supplierSku,
   data: { name: p.name, sku: p.sku, variantSkus: p.variantSkus, supplierSku: p.supplierSku, nameAliases: p.nameAliases } }))
-const srvIdx = { rows: srvRows, exact: new Map() }
-for (const row of srvRows) {
-  for (const c of [row.sku, ...(row.data.variantSkus || [])]) {
-    const k = String(c).toUpperCase().trim()
-    if (k && !srvIdx.exact.has(k)) srvIdx.exact.set(k, row)
-  }
-}
+const srvIdx = srv.indexRows(srvRows)
+/* Built with the SERVER'S OWN indexRows, not a copy of it here — a hand-built index is a
+   third opinion, and it left the supplier code out exactly as the server did. */
 
 /* Four of these are REAL production rows, read off order_items on 2026-08-24 while three of
    the four most recent manual orders were sitting unpriced. */
@@ -163,6 +162,11 @@ const CASES = [
   { what: 'the name a product had BEFORE it was renamed', item: { blank: 'Gildan Unisex Heavy Blend™ Hooded Sweatshirt', sku: '' }, want: 'p6' },
   { what: 'composite blank written before the rename', item: { blank: 'EG-18009 - Gildan Unisex Heavy Blend™ Hooded Sweatshirt', sku: '' }, want: 'p6' },
   { what: "the supplier's own style code as the blank", item: { blank: '18500', sku: '' }, want: 'p6' },
+  /* EGF-002116 (2026-09-26): no blank, and the LISTING SKU is the product's supplier code.
+     The web resolved it (variantSkusOf carries supplierSku) and the server did not, so the
+     page showed a blank the Approve gate said was missing. */
+  { what: "the supplier's own code as the listing SKU, no blank", item: { blank: '', sku: '18500' }, want: 'p6' },
+  { what: "a product's own sku beats another product's supplier code", item: { blank: '', sku: '5000' }, want: 'p1' },
 ]
 
 /**

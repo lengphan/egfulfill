@@ -112,21 +112,34 @@ export function resolveProduct(item: OrderItem, catalog: CatalogProduct[]): Cata
   const blank = String(item.blank || "").trim().toLowerCase()
   if (blank) {
     for (const cand of blankCandidates(blank)) {
-      const hit = catalog.find((p) =>
-        // nameAliases: what it USED to be called. A product can be renamed — the brand split
-        // does it in bulk — and an order line names the blank in text, so without this the
-        // rename silently unprices every line placed before it. MIRRORS matchProduct in
-        // server/src/pricing.js; tools/check-blank-resolve.mjs runs both over the same cases.
-        [p.name, p.sku, p.supplierSku, p.id, ...(p.nameAliases ?? [])]
-          .some((v) => v != null && String(v).trim().toLowerCase() === cand))
+      // nameAliases: what it USED to be called. A product can be renamed — the brand split
+      // does it in bulk — and an order line names the blank in text, so without this the
+      // rename silently unprices every line placed before it. MIRRORS matchProduct in
+      // server/src/pricing.js; tools/check-blank-resolve.mjs runs both over the same cases.
+      // OWN IDENTITY FIRST across the whole catalogue, the supplier's code only after: it can
+      // be another product's own sku (live: SANMAR-5000's "5000" is SS-16's).
+      const is = (v: unknown) => v != null && String(v).trim().toLowerCase() === cand
+      const hit = catalog.find((p) => [p.name, p.sku, p.id, ...(p.nameAliases ?? [])].some(is))
+        ?? catalog.find((p) => is(p.supplierSku))
       if (hit) return hit
     }
   }
   const s = String(item.sku || "").toUpperCase().trim()
   if (!s) return null
-  for (const p of catalog) if (variantSkusOf(p).includes(s)) return p
+  /* OWN CODES FIRST, THEN SUPPLIER CODES — the server's indexRows order. A supplier code can
+     be another product's own sku (live: SANMAR-5000's supplier code "5000" is SS-16's sku),
+     and one loop over both returned whichever product came first in the list. */
+  const supplierOf = (p: CatalogProduct) => String(p.supplierSku ?? "").toUpperCase().trim()
   for (const p of catalog) {
+    const own = supplierOf(p)
+    if (variantSkusOf(p).some((c) => c === s && c !== own)) return p
+  }
+  for (const p of catalog) if (supplierOf(p) === s) return p
+  for (const p of catalog) {
+    // Own codes only — a supplier code is an exact alias, never a family prefix.
+    const sup = supplierOf(p)
     for (const c of variantSkusOf(p)) {
+      if (c === sup) continue
       if (s.startsWith(c + "-") || c.startsWith(s + "-")) return p
     }
   }
