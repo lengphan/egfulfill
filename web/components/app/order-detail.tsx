@@ -43,6 +43,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
  getOrders,
+ staleOrders,
  getOrder,
  indexDesigns,
  designsBySide,
@@ -350,7 +351,13 @@ export function OrderDetail({ id, embedded = false, seed }: {
         .then((o) => { if (alive && o && !o.error) setOne(o) })
         .catch(() => {})
     }
- getOrders()
+ /* NEIGHBOURING CONTEXT ONLY, so the list the board already holds will do — even a few
+    minutes old. Re-fetching all ~1,300 orders (2MB) on every open, just past the 30-second
+    freshness line, was the heaviest thing opening an order did. THIS order comes from its
+    own fetch above, never from here. */
+ const heldList = staleOrders()
+ if (heldList) Promise.resolve().then(() => alive && setOrders(heldList))
+ else getOrders()
       .then((rows) => alive && setOrders(rows ?? []))
       .catch(() => alive && setOrders([]))
     // Catalog powers the variant picker's blank/colour/size/method options.

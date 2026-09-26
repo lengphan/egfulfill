@@ -16,7 +16,7 @@ import { StageBadge } from "@/components/app/stage-badge"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { pushToDispatch, getDispatchStatus, getOrders, cachedOrders, streamOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getOrderDesignsBatch, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder, getOrderQuote, type OrderQuote } from "@/lib/api"
+import { pushToDispatch, getDispatchStatus, getOrders, cachedOrders, staleOrders, streamOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getOrderDesignsBatch, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder, getOrderQuote, type OrderQuote } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock, stockSkuOf } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -581,7 +581,12 @@ export function OrdersHub() {
       // Another board may already hold the whole list — take it rather than walk it again.
       const held = cachedOrders()
       if (held) { setOrders(held); setLoadErr(null); return }
-      streamOrders((rows) => { setOrders(rows); setLoadErr(null) }, { signal: ctl.signal })
+      /* SHOW WHAT WE HAVE, REFRESH QUIETLY. A list a few minutes old paints at once; the fresh
+         one streams behind it and replaces it only when COMPLETE — applying its first page
+         would shrink the board to 25 rows for a moment. With nothing held, stream as before. */
+      const stale = staleOrders()
+      if (stale) { setOrders(stale); setLoadErr(null) }
+      streamOrders((rows, done) => { if (stale && !done) return; setOrders(rows); setLoadErr(null) }, { signal: ctl.signal })
         .catch((e) => { setOrders([]); setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.") })
     }, 0)
     return () => { clearTimeout(id); ctl.abort() }

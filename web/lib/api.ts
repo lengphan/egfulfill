@@ -2801,6 +2801,18 @@ export function cachedOrders(): OrderRow[] | null {
   const hit = _lists.get("orders")
   return hit && Date.now() - hit.at < 30_000 ? (hit.data as OrderRow[]).slice() : null
 }
+/**
+ * THE LAST COMPLETE LIST, even if it is past the 30-second freshness line — up to ten minutes.
+ *
+ * For drawing IMMEDIATELY while a fresh copy streams in behind it ("show what you have,
+ * refresh quietly"). Coming back to a board after half a minute used to throw the held list
+ * away and start from an empty page; now the old list paints at once and the new one replaces
+ * it when it is complete. Never for decisions — only for what is on screen for a moment.
+ */
+export function staleOrders(maxAgeMs = 10 * 60_000): OrderRow[] | null {
+  const hit = _lists.get("orders")
+  return hit && Date.now() - hit.at < maxAgeMs ? (hit.data as OrderRow[]).slice() : null
+}
 
 /**
  * THE ORDER LIST, A PAGE AT A TIME — so the first screen doesn't wait for the last order.

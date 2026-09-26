@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { cachedOrders, streamOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign, getOrderQuote, type OrderQuote } from "@/lib/api"
+import { cachedOrders, staleOrders, streamOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign, getOrderQuote, type OrderQuote } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken, getUser } from "@/lib/auth"
@@ -375,9 +375,13 @@ export function OrdersList() {
     // Another board may already hold the whole list — reuse it rather than walk it again.
     const held = cachedOrders()
     if (held) { settle(held, true); return undefined }
-    setComplete(false)
+    /* Show what we have, refresh quietly — see staleOrders. Only the COMPLETE fresh list
+       replaces it, so the table never drops to its first page for a moment. */
+    const stale = staleOrders()
+    if (stale) settle(stale, true)
+    else setComplete(false)
     const ctl = new AbortController()
-    streamOrders(settle, { signal: ctl.signal })
+    streamOrders((rows, done) => { if (stale && !done) return; settle(rows, done) }, { signal: ctl.signal })
       .catch(() => { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn); setComplete(true) })
     return () => ctl.abort()
   }, [])
