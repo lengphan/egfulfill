@@ -32,6 +32,7 @@ import { ItemAvatar } from "@/components/app/item-avatar"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
+import { useUrlView } from "@/lib/url-view"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl, faceChargesFor, faceSurfacesFor, faceAddOnsFor, methodsLabelOf } from "@/lib/order-format"
@@ -416,7 +417,19 @@ export function OrdersList() {
     })
   }, [orders, filter, query])
 
- const paged = usePaged(filtered, 25)
+ const paged = usePaged(filtered, 25, { url: true })
+
+  /* THE VIEW LIVES IN THE ADDRESS — tab and search, beside the page usePaged keeps — so an
+     order opened from page 3 of "Shipped" comes Back to page 3 of "Shipped". lib/url-view.ts. */
+  useUrlView(
+    () => ({ q: query.trim(), tab: filter === "All" ? "" : filter }),
+    (p) => {
+      const q = p.get("q"); if (q) setQuery(q)
+      const t = p.get("tab") as SellerFilter | null
+      if (t && (SELLER_FILTERS as readonly string[]).includes(t)) setFilter(t)
+    },
+    [query, filter],
+  )
 
  return (
     <div className="space-y-4">

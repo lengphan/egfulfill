@@ -2,14 +2,32 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
+import { useUrlView } from "@/lib/url-view"
 import { CaretLeft, CaretRight } from "@phosphor-icons/react"
 
 // Client-side pagination for pages that load a full list then render it. Derives the
 // current page from raw state clamped to the page count (no effects), so shrinking the
 // list or changing per-page never leaves you stranded on an empty page.
-export function usePaged<T>(items: T[], initialPerPage = 24) {
+/**
+ * `url: true` keeps the page and page size in the address (?page=3&per=50), so opening a row
+ * and pressing Back lands on the same page — see lib/url-view.ts. Opt-in, because two paged
+ * lists on one screen would fight over one `page` key.
+ *
+ * The RAW page is what is stored, never the clamped one: while the list is still loading it
+ * has one page, and writing that clamp back would erase the page the address was holding.
+ */
+export function usePaged<T>(items: T[], initialPerPage = 24, opts: { url?: boolean } = {}) {
   const [pageRaw, setPageRaw] = useState(1)
   const [perPage, setPerPageRaw] = useState(initialPerPage)
+  useUrlView(
+    () => (opts.url ? { page: pageRaw > 1 ? String(pageRaw) : "", per: perPage !== initialPerPage ? String(perPage) : "" } : {}),
+    (p) => {
+      if (!opts.url) return
+      const n = Number(p.get("page")); if (Number.isInteger(n) && n > 1) setPageRaw(n)
+      const pp = Number(p.get("per")); if (Number.isInteger(pp) && pp > 0 && pp <= 500) setPerPageRaw(pp)
+    },
+    [pageRaw, perPage],
+  )
   const total = items.length
   const pageCount = Math.max(1, Math.ceil(total / perPage))
   const page = Math.min(Math.max(1, pageRaw), pageCount)

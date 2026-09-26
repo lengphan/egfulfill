@@ -78,7 +78,8 @@ import { OrderNumber } from "@/components/app/order-number"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
-import { filterOrders, matchesStatus, isRush, isOverdue, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, type OrderQuery } from "@/lib/order-filter"
+import { filterOrders, matchesStatus, isRush, isOverdue, DEFAULT_OVERDUE_DAYS, EMPTY_ORDER_QUERY, STATUS_PILLS, loadHiddenStatusPills, saveHiddenStatusPills, isOrderQueryActive, type OrderQuery } from "@/lib/order-filter"
+import { useUrlView } from "@/lib/url-view"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { AddItemDialog } from "@/components/app/inventory-view"
@@ -1124,7 +1125,35 @@ export function OrdersHub() {
  return [...list].sort(newestFirst)
   }, [orders, query, filterCtx, sort])
 
- const paged = usePaged(filtered, 25)
+ const paged = usePaged(filtered, 25, { url: true })
+
+  /**
+   * THE VIEW LIVES IN THE ADDRESS — the tab, the search, every filter and the sort — so opening
+   * an order and pressing Back returns to exactly this list, not to page 1 of All (owner,
+   * 2026-09-26). The page itself is kept by usePaged above. See lib/url-view.ts.
+   */
+  useUrlView(
+    () => ({
+      q: query.text.trim(), status: query.status, ready: query.ready, platform: query.platform,
+      store: query.store, seller: query.seller, method: query.method,
+      days: query.days == null ? "" : String(query.days), from: query.from, to: query.to,
+      sort: sort ? `${sort.key}.${sort.dir}` : "",
+    }),
+    (p) => {
+      const days = p.get("days")
+      const next: OrderQuery = {
+        ...EMPTY_ORDER_QUERY,
+        text: p.get("q") ?? "", status: p.get("status") ?? "", ready: p.get("ready") ?? "",
+        platform: p.get("platform") ?? "", store: p.get("store") ?? "", seller: p.get("seller") ?? "",
+        method: p.get("method") ?? "", days: days != null && days !== "" && Number.isFinite(Number(days)) ? Number(days) : null,
+        from: p.get("from") ?? "", to: p.get("to") ?? "",
+      }
+      if (isOrderQueryActive(next)) setQuery(next)
+      const m = /^(.+)\.(asc|desc)$/.exec(p.get("sort") ?? "")
+      if (m) setSort({ key: m[1] as FactoryColId, dir: m[2] as "asc" | "desc" })
+    },
+    [query, sort],
+  )
 
   // Batch dispatch selection. Kept as a Set of order ids rather than a flag on the rows so
   // it survives re-fetches and filter changes without having to reconcile anything.
