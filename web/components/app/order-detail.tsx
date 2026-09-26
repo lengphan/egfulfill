@@ -130,11 +130,19 @@ type TimelineEntry = { status?: string; at?: string }
  * one column instead of two, because the panel is narrower than the viewport breakpoint the
  * two-column grid is written against.
  */
-export function OrderDetail({ id, embedded = false }: { id: string; embedded?: boolean }) {
+export function OrderDetail({ id, embedded = false, seed }: {
+  id: string
+  embedded?: boolean
+  /** The list's own row for this order, when opened from a list. The page then draws complete
+   *  on its FIRST render instead of a skeleton that grows into the order a moment later —
+   *  which, inside the sliding panel, was content changing size mid-motion. The direct fetch
+   *  below still replaces it with the full record as soon as it lands. */
+  seed?: OrderRow | null
+}) {
  const router = useRouter()
  const tl = useLabelT()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
- const [one, setOne] = useState<OrderRow | null>(null)
+ const [one, setOne] = useState<OrderRow | null>(seed ?? null)
   // Fetching TikTok's own label for this order. Kept local to the Shipping card — it's a
   // read, not a state change on the order, so it has no business in the page-level banner.
  const [ttLabelBusy, setTtLabelBusy] = useState(false)

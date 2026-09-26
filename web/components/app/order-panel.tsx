@@ -8,6 +8,9 @@ import { CaretUp, CaretDown, ArrowSquareOut, X } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { useOrderOpen } from "@/lib/order-open"
 import { OrderDetail } from "@/components/app/order-detail"
+import { StageBadge } from "@/components/app/stage-badge"
+import { numOf } from "@/lib/order-format"
+import type { OrderRow } from "@/lib/api"
 
 /**
  * THE ORDER, OPENED BESIDE THE LIST (owner, 2026-09-26: open an order "so it still stays in
@@ -25,8 +28,17 @@ import { OrderDetail } from "@/components/app/order-detail"
  * reflows while it slides. No scrim: the list stays clickable, and clicking another row
  * swaps the order in place.
  *
- * MOTION (globals.css): in 260ms on a soft landing, out 180ms, a 140ms cross-fade with an 8px
- * nudge when stepping between orders; a 100ms fade under prefers-reduced-motion.
+ * MOTION (globals.css) — Material 3's side-sheet guidance, a little quicker for a panel this
+ * size: in 300ms on emphasized-decelerate, out 200ms on emphasized-accelerate; stepping between
+ * orders is a 120ms fade with no movement; a 100ms fade under prefers-reduced-motion.
+ *
+ * WHEN THE WORK HAPPENS matters more than the curve (owner, 2026-09-26: "the motion is a bit
+ * weird"). Measured frame by frame, the first version did nothing for ~410ms after the click —
+ * React building the whole order before the panel could exist — then dropped a frame starting
+ * the slide while the content grew 304 → 1352 → 1500px underneath it. Now the FRAME appears on
+ * the click with the list row's number and stage in it, slides while nothing heavy runs, and
+ * the order is built only once it has landed — seeded from that same row, so it draws complete
+ * the first time. This is how Linear's peek feels instant: the data is already there.
  *
  * THE ADDRESS: ?order=<id> on the list's own URL. Opening PUSHES one entry, so Back closes
  * the panel instead of leaving the list; stepping with J/K REPLACES it, so Back does not walk
@@ -56,7 +68,7 @@ const isTyping = (el: EventTarget | null) => {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable
 }
 
-export function useOrderPanel(ids: string[]) {
+export function useOrderPanel(ids: string[], rowOf?: (id: string) => OrderRow | undefined) {
   const pref = useOrderOpen()
   const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
@@ -77,7 +89,7 @@ export function useOrderPanel(ids: string[]) {
       setOpenId(null); setClosing(false)
       returnFocus.current?.focus?.()
       returnFocus.current = null
-    }, reduced() ? 100 : 180)
+    }, reduced() ? 100 : 200)
   }, [])
 
   /* The address is read once after mount (a copied link) and on every Back/Forward. */
@@ -153,6 +165,7 @@ export function useOrderPanel(ids: string[]) {
   const panel = openId ? (
     <OrderPanelFrame
       id={openId}
+      seed={rowOf?.(openId) ?? null}
       closing={closing}
       dir={dir}
       index={index}
@@ -165,8 +178,9 @@ export function useOrderPanel(ids: string[]) {
   return { openId, openOrder, close, panel }
 }
 
-function OrderPanelFrame({ id, closing, dir, index, count, onClose, onStep }: {
+function OrderPanelFrame({ id, seed, closing, dir, index, count, onClose, onStep }: {
   id: string
+  seed: OrderRow | null
   closing: boolean
   dir: number
   index: number
@@ -177,6 +191,14 @@ function OrderPanelFrame({ id, closing, dir, index, count, onClose, onStep }: {
   const tl = useLabelT()
   const [mounted, setMounted] = useState(false)
   const [width, setWidth] = useState<number | null>(null)
+  /** The order is built only once the slide has landed — see the note at the top. Stays true
+   *  while the panel is open, so stepping between orders swaps content without waiting. */
+  const [landed, setLanded] = useState(false)
+  useEffect(() => {
+    if (!mounted) return
+    const t = setTimeout(() => setLanded(true), reduced() ? 0 : 320)   // backstop for animationend
+    return () => clearTimeout(t)
+  }, [mounted])
   const ref = useRef<HTMLElement | null>(null)
   useEffect(() => {
     const t = setTimeout(() => {
@@ -215,6 +237,7 @@ function OrderPanelFrame({ id, closing, dir, index, count, onClose, onStep }: {
       aria-label={tl("orderPanel", "Order")}
       data-closing={closing || undefined}
       style={style}
+      onAnimationEnd={(e) => { if (e.target === e.currentTarget) setLanded(true) }}
       className="eg-order-panel fixed bottom-0 right-0 top-16 z-40 flex flex-col border-l border-border bg-background shadow-[-12px_0_32px_rgba(0,0,0,0.08)] outline-none"
     >
       <div
@@ -254,9 +277,23 @@ function OrderPanelFrame({ id, closing, dir, index, count, onClose, onStep }: {
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         {/* KEYED BY ORDER: stepping remounts the order (no frame of the last one's state), and
             the remount is what replays the cross-fade. */}
-        <div key={id} className="eg-order-panel-body" style={{ "--eg-swap": `${dir * 8}px` } as CSSProperties}>
-          <OrderDetail id={id} embedded />
-        </div>
+        {landed ? (
+          <div key={id} className="eg-order-panel-body" data-dir={dir || undefined}>
+            <OrderDetail id={id} embedded seed={seed} />
+          </div>
+        ) : (
+          /* WHAT THE LIST ALREADY KNOWS, while the panel slides: the number and the stage, at
+             the size and place the order's own header will draw them, so nothing jumps when
+             the full order takes over. */
+          <div className="space-y-4" aria-busy>
+            <div className="flex items-baseline gap-3">
+              <span className="text-2xl font-semibold tabular-nums">{seed ? numOf(seed) : ""}</span>
+              {seed && <StageBadge status={seed.factory_status} />}
+            </div>
+            <div className="h-4 w-56 rounded bg-muted" />
+            <div className="h-64 rounded-2xl bg-muted/60" />
+          </div>
+        )}
       </div>
     </aside>,
     document.body,

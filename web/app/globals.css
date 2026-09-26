@@ -2207,17 +2207,17 @@ td[align="right"] {
 }
 
 /* ── ORDER SIDE PANEL (components/app/order-panel.tsx) ─────────────────────────────────────
-   In 260ms on a soft landing, out 180ms — closing should feel quicker than opening. Stepping
-   between orders cross-fades with an 8px nudge in the direction of travel (--eg-swap), and
-   never re-slides the panel. Under reduced motion: a 100ms fade, no movement. */
+   Material 3's side-sheet motion, a touch quicker for a panel this size: in 300ms on
+   emphasized-decelerate, out 200ms on emphasized-accelerate. Stepping between orders is a plain
+   120ms fade — the 8px nudge read as the content jumping. Reduced motion: a 100ms fade. */
 @keyframes eg-panel-in { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes eg-panel-out { from { transform: none; } to { transform: translateX(100%); } }
-@keyframes eg-panel-swap { from { opacity: 0; transform: translateY(var(--eg-swap, 0px)); } to { opacity: 1; transform: none; } }
+@keyframes eg-panel-swap { from { opacity: 0; } to { opacity: 1; } }
 @keyframes eg-panel-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes eg-panel-fade-out { from { opacity: 1; } to { opacity: 0; } }
-.eg-order-panel { animation: eg-panel-in 260ms cubic-bezier(0.32, 0.72, 0, 1); }
-.eg-order-panel[data-closing] { animation: eg-panel-out 180ms cubic-bezier(0.4, 0, 1, 1) forwards; }
-.eg-order-panel-body { animation: eg-panel-swap 140ms ease-out; }
+.eg-order-panel { will-change: transform; animation: eg-panel-in 300ms cubic-bezier(0.05, 0.7, 0.1, 1); }
+.eg-order-panel[data-closing] { animation: eg-panel-out 200ms cubic-bezier(0.3, 0, 0.8, 0.15) forwards; }
+.eg-order-panel-body { animation: eg-panel-swap 120ms ease-out; }
 /* Under 1100px the panel takes the whole width — 720px beside a sidebar leaves the list a
    sliver nobody can use. It is still a panel: Back and Esc close it. */
 @media (max-width: 1100px) { .eg-order-panel { width: 100vw !important; } }

@@ -421,7 +421,8 @@ export function OrdersList() {
  const paged = usePaged(filtered, 25, { url: true })
   /* Opens beside the list (order-panel.tsx); J/K walk the whole filtered list. */
  const panelIds = useMemo(() => filtered.map((o) => o.id), [filtered])
- const { openId: panelId, openOrder, panel } = useOrderPanel(panelIds)
+ const panelRows = useMemo(() => new Map(filtered.map((o) => [o.id, o])), [filtered])
+ const { openId: panelId, openOrder, panel } = useOrderPanel(panelIds, (id) => panelRows.get(id))
 
   /* THE VIEW LIVES IN THE ADDRESS — tab and search, beside the page usePaged keeps — so an
      order opened from page 3 of "Shipped" comes Back to page 3 of "Shipped". lib/url-view.ts. */

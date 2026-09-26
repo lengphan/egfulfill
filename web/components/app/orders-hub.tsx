@@ -1129,7 +1129,8 @@ export function OrdersHub() {
  const paged = usePaged(filtered, 25, { url: true })
   /* The side panel steps through the WHOLE filtered list with J/K, not just this page. */
  const panelIds = useMemo(() => filtered.map((o) => o.id), [filtered])
- const { openId: panelId, openOrder, panel } = useOrderPanel(panelIds)
+ const panelRows = useMemo(() => new Map(filtered.map((o) => [o.id, o])), [filtered])
+ const { openId: panelId, openOrder, panel } = useOrderPanel(panelIds, (id) => panelRows.get(id))
 
   /**
    * THE VIEW LIVES IN THE ADDRESS — the tab, the search, every filter and the sort — so opening
