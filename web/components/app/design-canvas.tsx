@@ -3501,7 +3501,11 @@ return (
                     /* One artwork per face is this window's model, so: a list of one. */
  layers={art ? [{ src: art.data, pos: art.pos }] : []}
  active={i === side} onSelect={() => goToSide(i)}
- extra={shown == null ? null
+ /* NOT CHOSEN READS "+ To be calculated" (owner, 2026-09-26), not a blank.
+    A blank tile beside priced ones read as "this face is free". Still nothing
+    while the rates are in flight (`addOns` absent) or on a bare garment —
+    those are "not known yet" and "not decorated", not "not chosen". */
+ extra={shown == null ? (addOns && !isNoPrint ? tl("designCanvas", "+ To be calculated") : null)
                       : shown > 0.005
                         ? `+${shown.toLocaleString("en-US", { style: "currency", currency: "USD" })}`
                         /* "FREE", THE SAME WORD THE SUMMARY USES. It said "Included", which
