@@ -698,21 +698,51 @@ export function approvalBlockersFor(items, missing, axes) {
  * shipBlockers' job — an order can be entirely ready to MAKE with no postage bought.
  */
 export async function approvalBlockers(orderId) {
-  const [items, missing] = await Promise.all([
+  const [items, missing, idx] = await Promise.all([
     q(`select sku, name, blank, color, size, print_type from order_items where order_id=$1`, [orderId])
       .then((r) => r.rows).catch(() => []),
     missingArtwork(orderId),
+    catalogIndex({ withImages: false }).catch(() => ({ exact: new Map(), rows: [] })),
   ]);
-  const blanks = [...new Set(items.map((it) => String(it.blank || '').trim()).filter(Boolean))];
-  const axes = new Map();
-  if (blanks.length) {
+  /**
+   * THE BLANK IS WHATEVER THE CATALOGUE SAYS IT IS — the same answer pricing and the order
+   * page give, not only the literal `blank` column.
+   *
+   * This read `it.blank` and nothing else, so a line whose listing SKU IS one of our
+   * product's variant SKUs — resolved by matchProduct, priced by it, and drawn on the order
+   * page as "Blank SKU: EG-6" with EG-6 in the picker — was refused as "no blank picked".
+   * The person was told to pick something the screen showed as picked, and there was no
+   * gesture that would satisfy the gate short of re-choosing the same value. (EGF-002116:
+   * listing SKU LA6, blank column empty, catalogue maps LA6 → EG-6.)
+   *
+   * matchProduct is the one resolver (catalogIndex's own note: a listing published from
+   * our catalogue "prices itself with no picking at all"), mirrored by resolveProduct on the
+   * web and held together by tools/check-blank-resolve.mjs. A second, stricter reading here
+   * was the divergence §5 warns about.
+   *
+   * The colour/size axes now come from the MATCHED product too. They were looked up by
+   * `catalog_products.sku = blank`, so a blank written as the product's NAME — what the
+   * picker stores — never found its axes and never demanded a colour or size.
+   */
+  const resolved = items.map((it) => ({ it, row: matchProduct(idx, it) }));
+  const ids = [...new Set(resolved.map((x) => x.row && x.row.id).filter(Boolean).map(String))];
+  const axesById = new Map();
+  if (ids.length) {
     const rows = await q(
-      `select sku, colors, sizes from catalog_products where sku = any($1::text[])`, [blanks]
+      `select id, colors, sizes from catalog_products where id::text = any($1::text[])`, [ids]
     ).then((r) => r.rows).catch(() => []);
     const arr = (v) => (Array.isArray(v) ? v : (() => { try { return JSON.parse(v || '[]'); } catch (e) { return []; } })());
-    for (const r of rows) axes.set(String(r.sku), { colors: arr(r.colors).length > 0, sizes: arr(r.sizes).length > 0 });
+    for (const r of rows) axesById.set(String(r.id), { colors: arr(r.colors).length > 0, sizes: arr(r.sizes).length > 0 });
   }
-  return approvalBlockersFor(items, missing, axes);
+  const axes = new Map();
+  const shaped = resolved.map(({ it, row }) => {
+    /* An explicit pick keeps its own text; an unset one takes the product it resolves to.
+       Nothing resolved and nothing picked stays empty — that is still "no blank". */
+    const key = String(it.blank || '').trim() || (row ? String(row.sku || (row.data && row.data.sku) || row.id) : '');
+    if (key && row && axesById.has(String(row.id))) axes.set(key, axesById.get(String(row.id)));
+    return { ...it, blank: key };
+  });
+  return approvalBlockersFor(shaped, missing, axes);
 }
 
 async function shipBlockers(orderId) {
