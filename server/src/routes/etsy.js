@@ -2,6 +2,7 @@
 // Etsy v3 uses PKCE with the keystring as client_id; NO client secret is needed
 // for the token exchange. Access tokens last ~1h and are refreshed automatically.
 import { q } from '../db.js';
+import { reclassifyFactoryOrders } from '../factory-orders.js';
 import { takenByAnother } from '../connections.js';
 import { descriptionText } from '../listing-description.js';
 import { recordUsage } from '../usage.js';
@@ -958,16 +959,20 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // factory_order: orders from the ADMIN/factory shop belong to the factory boards;
   // orders from a SELLER's own shop are seller-owned (factory_order=false, shown on
   // their dashboard, seller-managed until pushed). Sellers' GET excludes factory ones.
-  q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
+  q('alter table orders add column if not exists factory_order boolean not null default false')
+    /* THE ONE RULE, run after the column exists. This file used to run its OWN, older rule
+       here — factory-owned only if the order is ALSO from Etsy — while orders.js ran the
+       documented one (factory-orders.js: owned by a non-seller account) at the same startup,
+       neither awaiting the other. Whichever finished last won, so ~139 manual orders owned by
+       factory accounts flipped between the factory's books and a seller's on every deploy
+       (seen 2026-09-26: the log's "reclassified 139 after api start", then the Etsy rule
+       landing after it). Both startups now apply the same rule, so the race cannot matter. */
+    .then(() => reclassifyFactoryOrders('etsy routes load'))
+    .catch(() => {});
   // notes column is used by manual orders (the PATCH map). Etsy note/gift go into
   // meta (meta.note / meta.gift) so the order-detail Notes + Gift Message fill in.
   q('alter table orders add column if not exists notes text').catch(() => {});
-  // Re-classify Etsy orders by OWNER ROLE (not by id): factory_order=true only when
-  // the connection owner is staff; a seller's own Etsy orders → false. Idempotent
-  // (touches only rows whose flag is wrong), so it can't yank seller orders back to
-  // the factory on every boot the way the old id-based force-flag did.
-  q(`update orders set factory_order = (id like 'etsy-%' and exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller'))
-      where factory_order is distinct from (id like 'etsy-%' and exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller'))`).catch(() => {});
+  // (The Etsy-only re-classify that stood here is gone — see the factory_order column above.)
 
   // Auto-sync: poll Etsy incrementally so new orders land WITHOUT anyone clicking
   // "Sync now". Incremental (min_last_modified) means each run is just a couple of
